@@ -467,7 +467,7 @@ var
 begin
 {$IFDEF POSIX}
   // nonthing... reserved!
-  Result := 0;
+  Result := false;
 {$ELSE}
   if backlog = 0 then
   begin

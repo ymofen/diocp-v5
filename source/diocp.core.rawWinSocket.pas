@@ -100,6 +100,9 @@ implementation
 
 { TRawSocket }
 
+var
+  __WSAStartupDone:Boolean;
+
 function TRawSocket.bind(const pvAddr: string; pvPort: Integer): Boolean;
 var
   sockaddr: TSockAddrIn;
@@ -341,5 +344,28 @@ begin
     PAnsiChar(@FSocketHandle),
    SizeOf(TSocket)) <> SOCKET_ERROR
 end;
+
+function lock_cmp_exchange(cmp_val, new_val: Boolean; var target: Boolean): Boolean;
+asm
+  lock cmpxchg [ecx], dl
+end;
+
+procedure __CheckWSAStartup;
+var
+  AData: WSAData;
+begin
+  if lock_cmp_exchange(False, True, __WSAStartupDone) = False then
+  begin
+    if WSAStartup(MakeWord(1, 1), AData) <> 0 then
+    begin
+      __WSAStartupDone := false;
+      RaiseLastOSError(WSAGetLastError);
+    end;
+  end;
+end;
+
+initialization
+   __CheckWSAStartup();
+
 
 end.

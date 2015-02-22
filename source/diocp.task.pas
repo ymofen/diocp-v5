@@ -193,9 +193,9 @@ var
   requestPool:TBaseQueue;
 
 resourcestring
-  strDebugRequest_State = 'runInMainThread: %s, done: %s, time(ms): %d';
-  strSignalAlreadyRegisted = 'signal(%d) aready registed';
-  strSignalUnRegister = 'signal(%d) unregister';
+  strDebugRequest_State = '主线程运行: %s, 完成: %s, 耗时(ms): %d';
+  strSignalAlreadyRegisted = '信号(%d)已经注册';
+  strSignalUnRegister = '信号(%d)取消注册';
 
 procedure checkFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
 begin
