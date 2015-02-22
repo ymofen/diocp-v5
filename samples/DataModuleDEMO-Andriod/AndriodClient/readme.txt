@@ -1,0 +1,3 @@
+XE6
+ClientDataSet.Data赋值是会出现AV访问错误，
+Datasnap.dbClient.pas是我修正过的，如果其他版本没有该错误，可以删除该文件

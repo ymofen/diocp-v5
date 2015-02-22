@@ -1,0 +1,111 @@
+object frmMain: TfrmMain
+  Left = 0
+  Top = 0
+  Caption = 'Form1'
+  ClientHeight = 567
+  ClientWidth = 384
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  DesignerMobile = True
+  DesignerWidth = 384
+  DesignerHeight = 592
+  DesignerDeviceName = 'Google Nexus 4'
+  DesignerOrientation = 0
+  DesignerOSVersion = ''
+  object pnlTop: TPanel
+    Align = Top
+    Height = 161.000000000000000000
+    Width = 384.000000000000000000
+    TabOrder = 1
+    object mmoSQL: TMemo
+      Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+      Align = Client
+      Height = 80.000000000000000000
+      TabOrder = 2
+      Width = 384.000000000000000000
+      Lines.Strings = (
+        'select top 10 * '
+        '   from YesoulChenYu')
+    end
+    object pnlTopSet: TPanel
+      Align = Top
+      Height = 81.000000000000000000
+      Width = 384.000000000000000000
+      TabOrder = 4
+      object edtPort: TEdit
+        Touch.InteractiveGestures = [LongTap, DoubleTap]
+        TabOrder = 2
+        Text = '9983'
+        Position.X = 135.000000000000000000
+        Position.Y = 8.000000000000000000
+        Width = 65.000000000000000000
+        Height = 32.000000000000000000
+      end
+      object edtHost: TEdit
+        Touch.InteractiveGestures = [LongTap, DoubleTap]
+        TabOrder = 1
+        Text = '192.168.1.7'
+        Position.X = 7.000000000000000000
+        Position.Y = 8.000000000000000000
+        Width = 114.000000000000000000
+        Height = 32.000000000000000000
+      end
+      object btnConnect: TButton
+        Height = 36.000000000000000000
+        Position.X = 207.000000000000000000
+        Position.Y = 5.000000000000000000
+        TabOrder = 3
+        Text = 'Connect'
+        Width = 81.000000000000000000
+        OnClick = btnConnectClick
+      end
+      object btnOpen: TButton
+        Height = 36.000000000000000000
+        Position.X = 7.000000000000000000
+        Position.Y = 45.000000000000000000
+        TabOrder = 4
+        Text = 'Open'
+        Width = 89.000000000000000000
+        OnClick = btnOpenClick
+      end
+    end
+  end
+  object StringGrid1: TStringGrid
+    Align = Client
+    Height = 406.000000000000000000
+    TabOrder = 11
+    Width = 384.000000000000000000
+    RowCount = 100
+    RowHeight = 21.000000000000000000
+  end
+  object dsMain: TDataSource
+    DataSet = cdsMain
+    Left = 224
+    Top = 232
+  end
+  object cdsMain: TClientDataSet
+    Aggregates = <>
+    Params = <>
+    Left = 184
+    Top = 232
+  end
+  object BindingsList1: TBindingsList
+    Methods = <>
+    OutputConverters = <>
+    Left = 132
+    Top = 197
+    object LinkGridToDataSourceBindSourceDB1: TLinkGridToDataSource
+      Category = 'Quick Bindings'
+      DataSource = BindSourceDB1
+      GridControl = StringGrid1
+      Columns = <>
+    end
+  end
+  object BindSourceDB1: TBindSourceDB
+    DataSet = cdsMain
+    ScopeMappings = <>
+    Left = 176
+    Top = 272
+  end
+end
