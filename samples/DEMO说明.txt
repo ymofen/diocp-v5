@@ -1,4 +1,4 @@
-samples目录下面为自带的DEMO
+﻿samples目录下面为自带的DEMO
 
 发现有很多朋友不知道如何开始DIOCP，下面是DEMO的简单说明，希望对大家有用
 
@@ -50,7 +50,7 @@ samples\socket-Coder\StreamCoder
   可以在该DEMO学习到iocpCoderClient(客户端iocp)的使用。
   客户端有阻塞模式(RawTcpClient)和异步接受(Client)模式。
   
-samples\socket-Coder\DataModuleDEMO-Andriod
+samples\DataModuleDEMO-Andriod
   手机Andriod客户端与diocp服务器交换数据的例子
   可以学习到如何在andriod中请求diocp执行sql语句返回一个TClientDataSet的数据，并在手机上进行显示
   ==============================================

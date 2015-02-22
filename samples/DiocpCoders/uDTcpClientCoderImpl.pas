@@ -9,7 +9,7 @@ unit uDTcpClientCoderImpl;
 interface
 
 uses
-  uICoderSocket, DTcpClient;
+  uICoderSocket, diocp.tcp.blockClient;
 
 type
   TDTcpClientCoderImpl = class(TInterfacedObject, ICoderSocket)
