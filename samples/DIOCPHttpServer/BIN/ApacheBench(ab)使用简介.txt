@@ -1,0 +1,72 @@
+ApacheBench(ab)使用简介  
+服务器负载太大而影响程序效率也是很常见的，Apache服务器自带有一个叫AB(ApacheBench)的工具，在bin目录下。使用这个轻巧的工具我们可以对服务器进行负载测试，
+
+基本用法:
+
+ab -n 全部请求数 -c 并发数 测试url 
+例；ab -n 100 -c 50 http://192.168.22.150:8088/gfmis/login
+
+http://19.104.10.79:8080/gfmis/login
+例:ab -n 1000 -c 50 http://www.abc.com/a.php
+
+得到结果类似于(后面颜色字为中文翻译):
+
+Server Software:        Apache/2.0.55
+Server Hostname:        localhost
+Server Port:            80
+
+Document Path:          /1.php
+Document Length:        82522 bytes  #请求文档大小
+
+Concurrency Level:      50           #并发数  
+Time taken for tests:   92.76140 seconds #全部请求完成耗时
+Complete requests:      10000          #全部请求数
+Failed requests:        1974           #失败的请求
+   (Connect: 0, Length: 1974, Exceptions: 0)
+Write errors:           0
+Total transferred:      827019400 bytes #总传输大小
+HTML transferred:       825219400 bytes 
+Requests per second:    108.61 [#/sec] (mean) #每秒请求数(平均)
+Time per request:       460.381 [ms] (mean) #每次并发请求时间(所有并发)
+Time per request:       9.208 [ms] (mean, across all concurrent requests) #每一请求时间(并发平均)   
+Transfer rate:          8771.39 [Kbytes/sec] received #传输速率
+
+Connection Times (ms) #连接时间
+                      min  mean  [+/-sd]   median   max
+Connect(#连接):       0    0     2.1       0        46
+Processing(#处理):    31   458   94.7      438      1078
+Waiting(#等待):       15   437   87.5      422      938
+Total:                31   458   94.7      438      1078
+
+
+其它参数:
+
+ -n requests     全部请求数
+ -c concurrency  并发数
+ -t timelimit    最长等待回应时间
+ -p postfile     POST数据文件
+ -T content-type POST Content-type
+ -v verbosity    How much troubleshooting info to print
+ -w              Print out results in HTML tables
+ -i              Use HEAD instead of GET
+ -x attributes   String to insert as table attributes
+ -y attributes   String to insert as tr attributes
+ -z attributes   String to insert as td or th attributes
+ -C attribute    加入cookie, eg. 'Apache=1234. (repeatable)
+ -H attribute    加入http头, eg. 'Accept-Encoding: gzip'
+                 Inserted after all normal header lines. (repeatable)
+ -A attribute    http验证,分隔传递用户名及密码
+ -P attribute    Add Basic Proxy Authentication, the attributes
+                 are a colon separated username and password.
+ -X proxy:port   代理服务器
+ -V              查看ab版本
+ -k              Use HTTP KeepAlive feature
+ -d              Do not show percentiles served table.
+ -S              Do not show confidence estimators and warnings.
+ -g filename     Output collected data to gnuplot format file.
+ -e filename     Output CSV file with percentages served
+ -h              Display usage information (this message)
+ 
+ 
+ 
+ 

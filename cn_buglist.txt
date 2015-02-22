@@ -1,0 +1,15 @@
+DIOCP 3.5.01
+1. DHashTable.pas中
+    VAR
+      lvIndex :Integer;
+    BEGIN  
+      lvIndex := Integer(pvHashValue) mod FBucketSize;
+      lvBucket.Next:=FBuckets[lvIndex];
+    1>当FBucketSize大于High(integer)和pvHashValue >大于 High(Integer)时，会导致lvIndex出现负数,从而在读取数组时会导致访问违规错误
+    2>当pvHashValue超过High(integer)时，Integer(pvHashValue)为负数 mod FBucketSize，出现负数，,从而在读取数组时会导致访问违规错误
+    
+   紧急级别:小
+     diocp3中设定的FBucketSize尺寸远远小余high(integer)。pvHashValue值为socketHandle
+    
+   报告人:qsl (2014-10-20)
+   

@@ -1,0 +1,2 @@
+search path:
+  $(DIOCP3_HOME)\Source;

@@ -1,0 +1,102 @@
+samples目录下面为自带的DEMO
+
+发现有很多朋友不知道如何开始DIOCP，下面是DEMO的简单说明，希望对大家有用
+
+C#\Simple
+  用C#写的一个简单的回传测试，服务端开启ECHO服务器即可
+  
+samples\ECHO
+  IOCP回射测试，在服务端收到数据后立即发送回客户端，
+  可以从这个DEMO看出如何在服务端接收数据，返回数据。
+  
+samples\iocpTask
+  iocpTask演示DEMO，异步任务执行DEMO，
+  可以在该DEMO中学到，如何投递任务让主线程去执行(访问UI最好在主线程访问)。
+  可以学到如果注册信号任务，如何触发信号任何，如何反注册信号。
+    信号任务可以在一个位置进行注册，在子线程中通过信号进行触发，可以有效的进行解耦你的代码。
+  更多的功能可以使用QDAC3中的QWorkers
+  
+
+samples\qdac3-source
+  qdac3项目源码, 优秀的开源项目，你可以更新到qdac项目中去更新最新版，
+  一些DEMO中有使用到。
+  
+samples\safeLogger
+  SafeLogger的使用DEMO，
+  可以在该DEMO中学习到如何使用SafeLogger将日志显示到MEMO，
+  如何使用SafeLogger将日志记录到文件。
+  
+samples\simple
+  最简单的DIOCP使用例子
+  客户端采用阻塞模式，发送数据到服务端，然后服务端自己返回，客户端等待接收数据.
+  
+=================================================================================
+samples\socket-Coder
+  编码器方式的DEMO,编码器模式的存在可以让大家在使用DEMO的时候直接传递对象，而不用你去处理粘包问题，
+  编码器模式在解码成功后将接收到的对象投递到iocpTask/qworkers的线程中去执行，这样不会阻塞diocp的通信线程，即使在处理复杂的业务逻辑，也不影响到数据的接收和发送。
+  
+samples\socket-Coder\diocpCoders
+  常用的一些编码和解码器,
+  JsonStream: 包含一个Json和一个Stream  
+  TStream : 通用简单的TStream对象，头标记 + CRC + 数据长度 + 数据
+  TMsgPackCoder: msgpack对象。使用Qmsgpack进行解析
+  
+  推荐搭建使用TStream的编码和解码模式，因为很多对象都能序列化到流和从流中还原。
+  例如 msgpack -> TStream -> diocp -> TStream ->msgpack
+  
+samples\socket-Coder\StreamCoder
+  Stream编码器模式例子。
+  可以在该DEMO中学习到如果直接发送一个TStream对象,如何在服务端中接收到到这个对象，如果将一个Stream对象推送给客户端。
+  可以在该DEMO学习到iocpCoderClient(客户端iocp)的使用。
+  客户端有阻塞模式(RawTcpClient)和异步接受(Client)模式。
+  
+samples\socket-Coder\DataModuleDEMO-Andriod
+  手机Andriod客户端与diocp服务器交换数据的例子
+  可以学习到如何在andriod中请求diocp执行sql语句返回一个TClientDataSet的数据，并在手机上进行显示
+  ==============================================
+  * 注意 不知道从那个版本开始 XE中就存在一个对ClientDataSet.Data赋值出现AV异常的bug
+    你可以进行简单的测试
+    datasetProvider1.DataSet := adoDataSet;
+    clientDataSet.Data := datasetProvider1.Data;  //进行打包的时候出现非法访问异常
+    如果出现类似的错误, 需要你修正DBClient.pas才能正确运行。
+    
+  你可以手工修改DBClient.pas文件, 修改该方法，注释掉下面三行
+  然后把修改的文件，放到你的工程目录,然后添加到工程了
+  function TCustomClientDataSet.CreateDSBase: IDSBase;
+  begin
+    CreateDbClientObject(CLSID_DSBase, IDSBase, Result);
+  //  Check(Result.SetProp(dspropANSICODEPAGE, DefaultSystemCodePage));
+  //  Check(Result.SetProp(dspropUTF8METADATA, NativeUInt(True)));
+  //  Check(Result.SetProp(dspropUTF8ERRORMSG, NativeUInt(True)));
+  end;
+  
+samples\socket-Coder\DataModuleDEMO
+  三层数据演示
+  可以学习到如何在客户端中请求diocp执行sql语句返回一个TClientDataSet的数据，并在客户端进行显示
+samples\socket-Coder\DataModuleDEMO-SimpleMsgPack
+  使用simpleMsgPack代替QMsgPack，可以在D7中使用
+  ==============================================
+  * 注意 不知道从那个版本开始 XE中就存在一个对ClientDataSet.Data赋值出现AV异常的bug
+    你可以进行简单的测试
+    datasetProvider1.DataSet := adoDataSet;
+    clientDataSet.Data := datasetProvider1.Data;  //进行打包的时候出现非法访问异常
+    如果出现类似的错误, 需要你修正DBClient.pas才能正确运行。
+    
+  你可以手工修改DBClient.pas文件, 修改该方法，注释掉下面三行, 
+  然后把修改的文件，放到你的工程目录,然后添加到工程了
+  function TCustomClientDataSet.CreateDSBase: IDSBase;
+  begin
+    CreateDbClientObject(CLSID_DSBase, IDSBase, Result);
+  //  Check(Result.SetProp(dspropANSICODEPAGE, DefaultSystemCodePage));
+  //  Check(Result.SetProp(dspropUTF8METADATA, NativeUInt(True)));
+  //  Check(Result.SetProp(dspropUTF8ERRORMSG, NativeUInt(True)));
+  end;
+  
+
+samples\socket-Coder\DIOCPFileSERVER
+  演示DIOCP如何作为文件服务器使用
+  可以学习到如果分块上传文件和下载文件
+  
+  
+
+  

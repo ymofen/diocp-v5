@@ -1,0 +1,39 @@
+【DIOCP知识库】连接上下文TIocpClientContext
+
+【概述】
+该类管理远程连接，每一个远程连接会对应一个该类的实例，开发时可以通过继承该类，扩展属性，可以存储更多的连接信息，可以重写OnRecvBuffer方法进行数据逻辑的处理
+
+
+【字段/属性说明】
+property RemoteAddr: String read FRemoteAddr;
+说明：远程连接IP。
+
+property RemotePort: Integer read FRemotePort;
+说明：远程连接端口。
+
+property SocketHandle: TSocket read FSocketHandle;
+说明：连接套接字.
+
+
+
+【方法说明】
+procedure DoCleanUp;virtual;
+说明：该方法从对象池中获取一个对象时(TIocpTcpServer.getClientContext)执行该方法，进行相关资源的清理，在该实例不再需要，放回到连接池时(TIocpTcpServer.releaseClientContext)也会执行该方法，该方法同时只会一个线程访问和执行。
+
+procedure PostNextSendRequest; virutal;
+说明：该方法在发送请求得到响应完成并成功(TIocpSendRequest.HandleResponse)，会再次调用该方法可以进行下一个请求的发送，如果响应中发现GetLastError不为0或者服务关闭已经停止则不会执行该方法
+
+procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); virtual;
+说明：如果接收到远程数据时会触发该函数的执行，该方法在响应投递的接收数据的请求(TIocpRecvRequest.HandleResponse)中调用，如果响应中发现GetLastError不为0或者服务关闭已经停止则不会执行该方法。
+
+function InnerPostSendRequestAndCheckStart(pvSendRequest:TIocpSendRequest): Boolean;
+说明：将请求对象压入待发送队列(FSendRequestLink)中, 然后检测是否当前连接上下文是否正在发送，如果没有发送则启动发送过程。
+返回值: 
+  压入成功返回True, 失败返回False
+
+========================================== 
+
+DIOCP官方社区|MyBean官方社区
+http://www.diocp.org/ 
+
+========================================== 

@@ -1,0 +1,38 @@
+【DIOCP知识库】连接上下文TIocpSendRequest
+
+【概述】
+该类封装一个发送数据的请求。
+
+
+【字段/属性说明】
+
+
+【方法说明】
+
+procedure HandleResponse; override;
+说明：该方法响应请求，由IocpEngine调用
+
+procedure ResponseDone; override;
+说明：该方法在响应完请求后，调用该方法
+
+procedure DoCleanUp;virtual;
+说明：清理资源在还回到对象池时(TIocpTcpServer.ReleaseSendRequest)调用执行。
+
+procedure UnBindingSendBuffer();
+说明：解除绑定待发送的Buffer，一般在投递发送失败时去调用。
+
+procedure TIocpRequest.CancelRequest; virtual;
+说明：在投递到待发送队列(FSendRequestLink)后，如果取消投递请求时。
+
+会取消的情况：
+  1.投递到IOCP队列时(TIocpClientContext.checkNextSendRequest)，投递失败时，会调用该方法
+  2.连接上下文进行关闭时,进行清理资源(TIocpClientContext.checkReleaseRes)。
+
+
+
+========================================== 
+
+DIOCP官方社区|MyBean官方社区
+http://www.diocp.org/ 
+
+========================================== 

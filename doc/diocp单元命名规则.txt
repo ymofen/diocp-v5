@@ -1,0 +1,96 @@
+核心单元命名规范
+
+方案一:
+  diocp.tcp.server.pas
+  diocp.tcp.client.pas
+  diocp.core.baseQueue.pas
+
+  
+类名:
+  TDiocpTcpServer
+  
+方法名称:首字母大小,单词首字母大写
+  OnRecvBuffer
+  
+  
+  
+BaseQueue      -> utils.queues        (队列)
+DHashTable     -> utils.hashs         (哈希表)
+safeLogger     -> utils.safeLogger    (日志记录器)
+iocpLocker     -> utils.locker        (锁)
+uByteTools     -> utils.byteTools     (byte工具函数静态类)
+uBuffer        -> utils.buffer        (TBufferLink,内存池<闲大湿改造>)
+uBufferRW      -> utils.bufferTools   (buffer工具函数静态类)
+
+iocpStringRes  -> diocp.res            (diocp用到的资源)
+iocpEngine     -> diocp.core.engine    (diocp的iocp核心引擎)
+
+
+iocpTask       -> diocp.task             (diocp中提供的异步任务类)
+iocpTcpServer  -> diocp.tcp.server       (diocp的高并发的服务端)
+iocpWinsock2   -> diocp.winapi.winsock2  (winsock2,api) 
+
+iocpProtocol   -> diocp.sockets.utils    (diocp用到的一些工具函数)
+iocpSocketUtils-> 合并到diocp.sockets.utils
+
+iocpBaseSocket -> diocp.sockets          (diocp基类组件)
+
+DTcpClient     -> diocp.tcp.blockClient  (阻塞模式跨平台的客户端)
+iocpTcpClient  -> diocp.tcp.blockClient  (阻塞模式跨平台的客户端)
+
+
+uIocpCoder     -> diocp.coder.baseObject (diocp编码层的基础对象)
+uIOCPCentre    -> diocp.coder.tcpServer  (diocp编码层的服务端高并发组件）
+iocpCoderClient -> diocp.coder.tcpClient (diocp编码层的客户端高并发组件）
+
+uIOCPFileLogger-> 去掉 直接使用safeLogger
+iocpLogger     -> 去掉 使用safeLogger
+
+
+TIocpTcpServer -> TDiocpTcpServer
+iocpTcpServer  -> diocp.tcp.server       (diocp的高并发的服务端)
+  TIOCPConsole.OnDataObjectReceived          -> TDiocpCoderTcpServer.OnContextAction
+  TIocpTcpServer.OnClientContextConnected    -> TDiocpCoderTcpServer.OnContextConnected
+  TIocpTcpServer.OnClientContextDisconnected -> TDiocpCoderTcpServer.OnContextDisconnected
+  TIocpTcpServer.OnClientContextError        -> TDiocpCoderTcpServer.OnContextError
+  
+类名替换:
+  TIocpTcpServer -> TDiocpTcpServer
+  TIOCPConsole   -> TDiocpCoderTcpServer
+  TiocpBaseSocket-> TDiocpCustom
+  TIocpBaseContext -> TDiocpCustomContext
+  TIocpClientSocket -> TDiocpTcpClient
+  TIocpCoderClient  -> TDiocpCoderTcpClient
+  TIOCPCoderSendRequest -> TDiocpCoderSendRequest
+  
+  TDTcpClient    -> TDiocpBlockTcpClient  
+  
+  TContextDoublyLinked  -> 去掉
+
+  
+过程,方法,事件
+  TOnDataObjectReceived                      -> TOnContextAction
+  TClientContextNotifyEvent                  -> TContextNotifyEvent
+  TClientOnContextError                      -> TOnContextError
+  
+  TIOCPConsole.OnDataObjectReceived          -> TDiocpCoderTcpServer.OnContextAction
+  TIocpTcpServer.OnClientContextConnected    -> TDiocpCoderTcpServer.OnContextConnected
+  TIocpTcpServer.OnClientContextDisconnected -> TDiocpCoderTcpServer.OnContextDisconnected
+  TIocpTcpServer.OnClientContextError        -> TDiocpCoderTcpServer.OnContextError
+  
+  
+  
+  dataReceived -> DoContextAction
+  
+  
+  TBaseQueue.Push  -> EnQueue
+  TBaseQueue.Pop  -> DeQueue
+  
+  
+  
+  
+
+safeLogger记录到Memo中的方法  
+  sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
+  sfLogger.AppendInMainThread := true;
+
