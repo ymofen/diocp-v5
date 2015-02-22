@@ -3,8 +3,8 @@ unit uIOCPJSonStreamDecoder;
 interface
 
 uses
-  uIocpCoder, uBuffer, Classes, JSonStream, uIOCPFileLogger, SysUtils,
-  uMyTypes, iocpTcpServer;
+  diocp.coder.baseObject, diocp.tcp.server, Classes, JSonStream, uIOCPFileLogger, SysUtils,
+  uMyTypes, diocp.tcp.server;
 
 const
   MAX_OBJECT_SIZE = 1024 * 1024 * 10;  //最大对象大小 10M , 大于10M 则会认为错误的包。 

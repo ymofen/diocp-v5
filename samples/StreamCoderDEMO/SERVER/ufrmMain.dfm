@@ -2,7 +2,7 @@ object frmMain: TfrmMain
   Left = 0
   Top = 0
   BorderIcons = [biSystemMenu]
-  Caption = 'diocp3 server for diocp1'
+  Caption = 'diocp-v5 server for diocp1'
   ClientHeight = 385
   ClientWidth = 640
   Color = clBtnFace

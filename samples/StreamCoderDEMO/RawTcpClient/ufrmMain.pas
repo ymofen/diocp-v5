@@ -4,8 +4,9 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
-  Controls, Forms, Dialogs, StdCtrls, iocpLogger, iocpTask, RawTcpClient,
-  uStreamCoderSocket, uRawTcpClientCoderImpl;
+  Controls, Forms, Dialogs, StdCtrls, diocp.task,
+  uStreamCoderSocket, uRawTcpClientCoderImpl, utils.safeLogger,
+  diocp.tcp.blockClient;
 
 type
   TfrmMain = class(TForm)
@@ -21,7 +22,7 @@ type
     procedure btnSendObjectClick(Sender: TObject);
   private
     { Private declarations }
-    FTcpClient:TRawTcpClient;
+    FTcpClient:TDiocpBlockTcpClient;
 
 
   public
@@ -47,8 +48,9 @@ implementation
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited;
-  uiLogger.setLogLines(mmoRecvMessage.Lines);
-  FTcpClient := TRawTcpClient.Create(Self);
+  sfLogger.setAppender(TStringsAppender.Create(mmoRecvMessage.Lines));
+  sfLogger.AppendInMainThread := true;
+  FTcpClient := TDiocpBlockTcpClient.Create(Self);
 
 end;
 
@@ -69,15 +71,14 @@ procedure TfrmMain.btnConnectClick(Sender: TObject);
 begin
   if FTcpClient.Active then
   begin
-    uiLogger.logMessage('already connected...');
+    sfLogger.logMessage('already connected...');
     Exit;
   end;
   FTcpClient.Host := edtHost.Text;
   FTcpClient.Port := StrToInt(edtPort.Text);
   FTcpClient.Connect;
 
-  mmoRecvMessage.Clear;
-
+  mmoRecvMessage.Clear;   
   mmoRecvMessage.Lines.Add('connected...');
 end;
 
@@ -106,7 +107,7 @@ begin
     lvStream.Position := 0;
     lvStream.Read(s[1], lvStream.Size);
 
-    uiLogger.logMessage('recv msg from server:' + sLineBreak + '    ' + s);
+    sfLogger.logMessage('recv msg from server:' + sLineBreak + '    ' + s);
   finally
     lvStream.Free;
   end;

@@ -6,10 +6,10 @@ uses
   Forms,
   ufrmMain in 'ufrmMain.pas' {frmMain},
   uDIOCPStreamCoder in '..\..\diocpCoders\uDIOCPStreamCoder.pas',
-  uFMMonitor in '..\..\..\Common\Frames\uFMMonitor.pas' {FMMonitor: TFrame},
-  uRunTimeINfoTools in '..\..\..\Common\Frames\uRunTimeINfoTools.pas',
   uMyClientContext in 'uMyClientContext.pas',
-  uZipTools in '..\..\diocpCoders\uZipTools.pas';
+  uZipTools in '..\..\diocpCoders\uZipTools.pas',
+  uFMMonitor in '..\..\Common\Frames\uFMMonitor.pas' {FMMonitor: TFrame},
+  uRunTimeINfoTools in '..\..\Common\Frames\uRunTimeINfoTools.pas';
 
 {$R *.res}
 

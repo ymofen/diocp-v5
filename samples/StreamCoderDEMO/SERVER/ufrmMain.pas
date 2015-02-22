@@ -4,8 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ActnList, uIOCPCentre, iocpTcpServer, ExtCtrls,
-  ComObj, iocpLogger, ComCtrls;
+  Dialogs, StdCtrls, ActnList, diocp.coder.tcpServer, diocp.tcp.server, ExtCtrls,
+  ComObj, ComCtrls, utils.safeLogger;
 
 type
   TfrmMain = class(TForm)
@@ -33,7 +33,7 @@ type
     procedure actStopExecute(Sender: TObject);
   private
     { Private declarations }
-    FTcpServer: TIOCPConsole;
+    FTcpServer: TDiocpCoderTcpServer;
     procedure refreshState;
   public
     constructor Create(AOwner: TComponent); override;
@@ -55,8 +55,7 @@ uses
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  uiLogger.setLogLines(mmoLog.Lines);
-  FTcpServer := TIOCPConsole.Create(Self);
+  FTcpServer := TDiocpCoderTcpServer.Create(Self);
   FTcpServer.createDataMonitor;
 
   FTcpServer.WorkerCount := 3;
@@ -66,6 +65,9 @@ begin
   FTcpServer.registerContextClass(TMyClientContext);
   
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
+
+  sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
+  sfLogger.AppendInMainThread := true;
 end;
 
 destructor TfrmMain.Destroy;

@@ -230,7 +230,7 @@ begin
       FCurrentSendBufferLink.Free;
             
       // 如果当前块 没有任何数据, 则获取下一个要发送的BufferLink
-      FCurrentSendBufferLink := TBufferLink(FSendingQueue.Pop);
+      FCurrentSendBufferLink := TBufferLink(FSendingQueue.DeQueue);
       // 如果当前发送Buffer为nil 则退出
       if FCurrentSendBufferLink = nil then Exit;
 
@@ -435,10 +435,10 @@ begin
         begin
           raise Exception.Create('Out of MaxSendingQueueSize!!!');
         end;
-        FSendingQueue.Push(lvOutBuffer);
+        FSendingQueue.EnQueue(lvOutBuffer);
         if FCurrentSendBufferLink = nil then
         begin
-          FCurrentSendBufferLink := TBufferLink(FSendingQueue.Pop);
+          FCurrentSendBufferLink := TBufferLink(FSendingQueue.DeQueue);
           lvStart := true;
         end;
       finally

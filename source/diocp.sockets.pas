@@ -1532,7 +1532,7 @@ begin
       InterlockedIncrement(FDataMoniter.FSendRequestReturnCounter);
     end;
     pvObject.DoCleanUp;
-    FSendRequestPool.Push(pvObject);
+    FSendRequestPool.EnQueue(pvObject);
     Result := true;
   end else
   begin
@@ -1653,7 +1653,7 @@ end;
 
 function TDiocpCustom.getSendRequest: TIocpSendRequest;
 begin
-  Result := TIocpSendRequest(FSendRequestPool.Pop);
+  Result := TIocpSendRequest(FSendRequestPool.DeQueue);
   if Result = nil then
   begin
     if FIocpSendRequestClass <> nil then

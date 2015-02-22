@@ -53,7 +53,7 @@ implementation
   //PACK_FLAG  + CRC_VALUE + STREAM_LEN + STREAM_DATA
 
 uses
-  uByteTools;
+  utils.byteTools;
 
 const
   PACK_FLAG = $0818;  

@@ -3,7 +3,7 @@ unit uIOCPJSonStreamEncoder;
 interface
 
 uses
-  uIocpCoder, uBuffer, JSonStream, Classes,
+  diocp.coder.baseObject, diocp.tcp.server, JSonStream, Classes,
   uZipTools, SysUtils, uMyTypes, AnsiStringTools, uByteTools;
 
 type

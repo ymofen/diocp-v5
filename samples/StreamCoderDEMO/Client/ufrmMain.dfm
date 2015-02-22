@@ -1,7 +1,7 @@
 object frmMain: TfrmMain
   Left = 0
   Top = 0
-  Caption = 'diocp3 coder client'
+  Caption = 'diocp-v5 coder client'
   ClientHeight = 314
   ClientWidth = 565
   Color = clBtnFace

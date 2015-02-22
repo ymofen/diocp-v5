@@ -15,19 +15,19 @@ type
   TDTcpClientCoderImpl = class(TInterfacedObject, ICoderSocket)
   private
     FReconnect: Boolean;
-    FTcpClient: TDTcpClient;
+    FTcpClient: TDiocpBlockTcpClient;
   protected
     function sendBuf(buf:Pointer; len:Cardinal):Cardinal; stdcall;
     function recvBuf(buf:Pointer; len:Cardinal):Cardinal; stdcall;    
     procedure closeSocket; stdcall;
   public
-    constructor Create(ATcpClient: TDTcpClient; pvReconnect: Boolean = true);
+    constructor Create(ATcpClient: TDiocpBlockTcpClient; pvReconnect: Boolean = true);
     destructor Destroy; override;
   end;
 
 implementation
 
-constructor TDTcpClientCoderImpl.Create(ATcpClient: TDTcpClient; pvReconnect:
+constructor TDTcpClientCoderImpl.Create(ATcpClient: TDiocpBlockTcpClient; pvReconnect:
     Boolean = true);
 begin
   inherited Create;

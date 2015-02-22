@@ -347,7 +347,7 @@ var
   lvRequest:TIocpTaskRequest;
 begin
   if not FEnable then Exit;
-  lvRequest := TIocpTaskRequest(requestPool.Pop);
+  lvRequest := TIocpTaskRequest(requestPool.DeQueue);
   try
     if lvRequest = nil then
     begin
@@ -363,7 +363,7 @@ begin
     InnerPostTask(lvRequest);
   except
     // if occur exception, push to requestPool.
-    if lvRequest <> nil then requestPool.Push(lvRequest);
+    if lvRequest <> nil then requestPool.EnQueue(lvRequest);
     raise;
   end;
 end;
@@ -396,7 +396,7 @@ var
   lvRequest:TIocpTaskRequest;
 begin
   if not FEnable then Exit;
-  lvRequest := TIocpTaskRequest(requestPool.Pop);
+  lvRequest := TIocpTaskRequest(requestPool.DeQueue);
   try
     if lvRequest = nil then
     begin
@@ -412,7 +412,7 @@ begin
     InnerPostTask(lvRequest);
   except
     // if occur exception, push to requestPool.
-    if lvRequest <> nil then requestPool.Push(lvRequest);
+    if lvRequest <> nil then requestPool.EnQueue(lvRequest);
     raise;
   end;
 
@@ -425,7 +425,7 @@ var
   lvRequest:TIocpTaskRequest;
 begin
   if not FEnable then Exit;
-  lvRequest := TIocpTaskRequest(requestPool.Pop);
+  lvRequest := TIocpTaskRequest(requestPool.DeQueue);
   try
     if lvRequest = nil then
     begin
@@ -442,7 +442,7 @@ begin
     InnerPostTask(lvRequest);
   except
     // if occur exception, push to requestPool.
-    if lvRequest <> nil then requestPool.Push(lvRequest);
+    if lvRequest <> nil then requestPool.EnQueue(lvRequest);
     raise;
   end;
 
@@ -456,7 +456,7 @@ var
 begin
   if not FEnable then Exit;
   
-  lvRequest := TIocpTaskRequest(requestPool.Pop);
+  lvRequest := TIocpTaskRequest(requestPool.DeQueue);
   try
     if lvRequest = nil then
     begin
@@ -473,7 +473,7 @@ begin
     InnerPostTask(lvRequest);
   except
     // if occur exception, push to requestPool.
-    if lvRequest <> nil then requestPool.Push(lvRequest);
+    if lvRequest <> nil then requestPool.EnQueue(lvRequest);
     raise;
   end;
 end;
@@ -484,7 +484,7 @@ var
   lvRequest:TIocpTaskRequest;
 begin
   if not FEnable then Exit;
-  lvRequest := TIocpTaskRequest(requestPool.Pop);
+  lvRequest := TIocpTaskRequest(requestPool.DeQueue);
   try
     if lvRequest = nil then
     begin
@@ -501,7 +501,7 @@ begin
 
   except
     // if occur exception, push to requestPool.
-    if lvRequest <> nil then requestPool.Push(lvRequest);
+    if lvRequest <> nil then requestPool.EnQueue(lvRequest);
     raise;
   end;
 end;
@@ -572,7 +572,7 @@ begin
     FLocker.unLock;
   end;
 
-  lvRequest := TIocpTaskRequest(requestPool.Pop);
+  lvRequest := TIocpTaskRequest(requestPool.DeQueue);
   try
     if lvRequest = nil then
     begin
@@ -589,7 +589,7 @@ begin
     InnerPostTask(lvRequest);
   except
     // if occur exception, push to requestPool.
-    if lvRequest <> nil then requestPool.Push(lvRequest);
+    if lvRequest <> nil then requestPool.EnQueue(lvRequest);
 
     checkFreeData(pvTaskData, pvDataFreeType);
     raise;
@@ -688,7 +688,7 @@ begin
     FEndTime := GetTickCount;
   finally
     checkFreeData(FTaskData, FFreeType);
-    requestPool.Push(Self);
+    requestPool.EnQueue(Self);
   end;
 end;
 

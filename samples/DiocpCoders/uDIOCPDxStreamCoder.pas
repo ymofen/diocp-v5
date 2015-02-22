@@ -9,7 +9,7 @@ unit uDIOCPDxStreamCoder;
 interface
 
 uses
-  diocp.coder.baseObject, utils.buffer, Classes, SysUtils;
+  diocp.coder.baseObject, diocp.tcp.server, Classes, SysUtils, diocp.tcp.server;
 
 type
   TIOCPStreamDecoder = class(TIOCPDecoder)
@@ -41,7 +41,7 @@ function verifyData(const buf; len:Cardinal): Cardinal;
 implementation
 
 uses
-  utils.byteTools;
+  uByteTools;
 
 function verifyData(const buf; len: Cardinal): Cardinal;
 var

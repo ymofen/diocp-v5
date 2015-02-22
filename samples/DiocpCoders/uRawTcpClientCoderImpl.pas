@@ -9,25 +9,25 @@ unit uRawTcpClientCoderImpl;
 interface
 
 uses
-  uICoderSocket, RawTcpClient;
+  uICoderSocket, diocp.tcp.blockClient;
 
 type
   TRawTcpClientCoderImpl = class(TInterfacedObject, ICoderSocket)
   private
     FReconnect: Boolean;
-    FTcpClient: TRawTcpClient;
+    FTcpClient: TDiocpBlockTcpClient;
   protected
     function sendBuf(buf:Pointer; len:Cardinal):Cardinal; stdcall;
     function recvBuf(buf:Pointer; len:Cardinal):Cardinal; stdcall;    
     procedure closeSocket; stdcall;
   public
-    constructor Create(ATcpClient: TRawTcpClient; pvReconnect: Boolean = true);
+    constructor Create(ATcpClient: TDiocpBlockTcpClient; pvReconnect: Boolean = true);
     destructor Destroy; override;
   end;
 
 implementation
 
-constructor TRawTcpClientCoderImpl.Create(ATcpClient: TRawTcpClient;
+constructor TRawTcpClientCoderImpl.Create(ATcpClient: TDiocpBlockTcpClient;
     pvReconnect: Boolean = true);
 begin
   inherited Create;

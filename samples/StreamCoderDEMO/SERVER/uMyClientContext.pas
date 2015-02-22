@@ -3,7 +3,7 @@ unit uMyClientContext;
 interface
 
 uses
-  uIOCPCentre, iocpLogger, SysUtils, Classes, Windows, Math;
+  diocp.coder.tcpServer, SysUtils, Classes, Windows, Math;
 
 
 type
@@ -13,17 +13,17 @@ type
     procedure OnDisconnected; override;
 
     procedure OnConnected; override;
-  protected
+  public
     /// <summary>
     ///   数据处理
     /// </summary>
     /// <param name="pvObject"> (TObject) </param>
-    procedure dataReceived(const pvObject: TObject); override;
+    procedure DoContextAction(const pvObject: TObject); override;
   end;
 
 implementation
 
-procedure TMyClientContext.dataReceived(const pvObject: TObject);
+procedure TMyClientContext.DoContextAction(const pvObject: TObject);
 begin
   // 直接返回
   writeObject(pvObject);
