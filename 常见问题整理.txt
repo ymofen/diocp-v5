@@ -1,0 +1,15 @@
+﻿1.diocp-v5使用在哪里可以得到帮助
+  
+  http://www.diocp.org/?page_id=159
+  
+  可以浏览官方社区的一些基础说明,该文档会陆续进行整理。
+  
+
+
+2.diocp-v5怎么样编译DEMO
+  
+  <<关于DEMO的编译
+>>
+  http://www.diocp.org/?p=16
+
+
