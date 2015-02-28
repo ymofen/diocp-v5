@@ -623,7 +623,7 @@ type
     /// <summary>
     ///   pop sendRequest object
     /// </summary>
-    function getSendRequest():TIocpSendRequest;
+    function GetSendRequest: TIocpSendRequest;
 
     /// <summary>
     ///   push back to pool
@@ -987,16 +987,17 @@ end;
 
 procedure TDiocpCustomContext.DoCleanUp;
 begin
-  FOwner := nil;
-
-
-  if FActive then
-  begin
-    FRawSocket.close;
-    FActive := false;
-    CheckReleaseRes;
-  end;
+  FLastActivity := 0;
+  FRequestDisconnect := false;
   FSending := false;
+
+  FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), '-----DoCleanUp-----']));
+
+  if IsDebugMode then
+  begin
+    Assert(FReferenceCounter = 0);
+    Assert(not FActive);
+  end;
 end;
 
 procedure TDiocpCustomContext.DoConnected;
@@ -1168,6 +1169,8 @@ begin
       end;
       OnDisconnected;
       SetSocketState(ssDisconnected);
+
+      Self.DoCleanUp;
     except
     end;
   finally
@@ -1536,6 +1539,7 @@ begin
       InterlockedIncrement(FDataMoniter.FSendRequestReturnCounter);
     end;
     pvObject.DoCleanUp;
+    pvObject.FOwner := nil;
     FSendRequestPool.EnQueue(pvObject);
     Result := true;
   end else
@@ -1655,7 +1659,7 @@ begin
   end;
 end;
 
-function TDiocpCustom.getSendRequest: TIocpSendRequest;
+function TDiocpCustom.GetSendRequest: TIocpSendRequest;
 begin
   Result := TIocpSendRequest(FSendRequestPool.DeQueue);
   if Result = nil then
