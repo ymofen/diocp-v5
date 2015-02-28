@@ -3,8 +3,7 @@ program diocpTcpClientDemo;
 uses
   Forms,
   ufrmMain in 'ufrmMain.pas' {frmMain},
-  uZipTools in '..\..\diocpCoders\uZipTools.pas',
-  uDIOCPDxStreamCoder in '..\..\diocpCoders\uDIOCPDxStreamCoder.pas';
+  uDIOCPDxStreamCoder in '..\..\DiocpCoders\uDIOCPDxStreamCoder.pas';
 
 {$R *.res}
 

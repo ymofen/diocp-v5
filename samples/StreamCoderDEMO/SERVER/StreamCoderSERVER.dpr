@@ -1,8 +1,6 @@
 program StreamCoderSERVER;
 
 uses
-  FastMM4,
-  FastMM4Messages,
   Forms,
   ufrmMain in 'ufrmMain.pas' {frmMain},
   uDIOCPStreamCoder in '..\..\diocpCoders\uDIOCPStreamCoder.pas',
