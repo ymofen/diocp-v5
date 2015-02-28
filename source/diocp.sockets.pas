@@ -1001,8 +1001,10 @@ end;
 
 procedure TDiocpCustomContext.DoConnected;
 begin
-  FLastActivity := GetTickCount;
+  // 一些状态的初始化
+  FRequestDisconnect := false;
 
+  FLastActivity := GetTickCount;
 
   FContextLocker.lock('DoConnected');
   try
@@ -1019,6 +1021,8 @@ begin
       {$ENDIF}
     end else
     begin
+
+
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
       FOwner.AddToOnlineList(Self);
