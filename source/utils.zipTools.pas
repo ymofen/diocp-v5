@@ -44,33 +44,23 @@ type
 implementation
 
 class procedure TZipTools.UnZipStream(const pvInStream, pvOutStream: TStream);
-{$if defined(NEWZLib)}
 var
-  lvBytes, lvOutBytes:TBytes;
-{$ELSE}
-var
+  lvBytes:TBytes;
   l:Integer;
-  lvBytes: TBytes;
   OutBuf: Pointer;
   OutBytes: Integer;
-{$ifend}
 begin
-  {$if defined(NEWZLib)}
-  SetLength(lvBytes, pvInStream.Size);
-  pvInStream.Position := 0;
-  pvInStream.Read(lvBytes[0], pvInStream.Size);
-  ZLib.ZDecompress(lvBytes, lvOutBytes);
-  pvOutStream.Size := 0;
-  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
-  {$ELSE}
   if pvInStream= nil then exit;
   l := pvInStream.Size;
   if l = 0 then Exit;
-
   setLength(lvBytes, l);
   pvInStream.Position := 0;
   pvInStream.ReadBuffer(lvBytes[0], l);
+  {$if defined(NEWZLib)}
+  ZLib.ZDecompress(@lvBytes[0], l, OutBuf, OutBytes);
+  {$ELSE}
   Zlib.DecompressBuf(@lvBytes[0], l, 0, OutBuf, OutBytes);
+  {$ifend}
   try
     pvOutStream.Size := OutBytes;
     pvOutStream.Position := 0;
@@ -78,13 +68,6 @@ begin
   finally
     FreeMem(OutBuf, OutBytes);
   end;
-  {$ifend}
-
-
-
-//  if pvInStream= nil then Exit;
-//  if pvInStream.Size = 0 then Exit;
-//  ZLib.ZDecompressStream(pvInStream, pvOutStream);
 end;
 
 class function TZipTools.verifyData(const buf; len: Cardinal): Cardinal;
@@ -133,37 +116,25 @@ begin
 end;
 
 class procedure TZipTools.ZipStream(const pvInStream, pvOutStream: TStream);
-{$if defined(NEWZLib)}
 var
-  lvBytes, lvOutBytes:TBytes;
-{$ELSE}
-var
-  lvBytes: TBytes;
+  lvInBuf: TBytes;
   OutBuf: Pointer;
   OutBytes: Integer;
   l: Integer;
-{$ifend}
+
 begin
-{$if defined(NEWZLib)}
-  SetLength(lvBytes, pvInStream.Size);
-  pvInStream.Position := 0;
-  pvInStream.Read(lvBytes[0], pvInStream.Size);
-  ZLib.ZCompress(lvBytes, lvOutBytes);
-
-  pvOutStream.Size := 0;
-  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
-{$ELSE}
   if pvInStream= nil then exit;
-
   l := pvInStream.Size;
-
   if l = 0 then Exit;
 
-  setLength(lvBytes, l);
+  SetLength(lvInBuf, l);
   pvInStream.Position := 0;
-  pvInStream.ReadBuffer(lvBytes[0], l);
-
-  ZLib.CompressBuf(@lvBytes[0], l, OutBuf, OutBytes);
+  pvInStream.ReadBuffer(lvInBuf[0], l);
+{$if defined(NEWZLib)}
+  ZLib.ZCompress(@lvInBuf[0], l, OutBuf, OutBytes);
+{$ELSE}
+  ZLib.CompressBuf(@lvInBuf[0], l, OutBuf, OutBytes);
+{$ifend}
   try
     pvOutStream.Size := OutBytes;
     pvOutStream.Position := 0;
@@ -171,10 +142,7 @@ begin
   finally
     FreeMem(OutBuf, OutBytes);
   end;
-{$ifend}
 
-
-  //ZLib.ZDecompress(pvInStream, pvOutStream);
 end;
 
 end.
