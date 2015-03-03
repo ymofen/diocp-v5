@@ -105,6 +105,12 @@ type
     procedure Clear;
 
     property ContextLength: Int64 read FContextLength;
+
+
+    /// <summary>
+    ///   与客户端建立的连接
+    /// </summary>
+    property Connection: TDiocpHttpClientContext read FDiocpContext;
     /// <summary>
     ///   原始的Post过来的数据
     /// </summary>

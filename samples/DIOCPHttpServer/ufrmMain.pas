@@ -94,6 +94,10 @@ begin
   pvRequest.DecodePostDataParam(false);
   {$ENDIF}
 
+  // 输出客户端IP信息
+  pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,
+    pvRequest.Connection.RemotePort]));
+
   pvRequest.Response.WriteString('请求方法:' + pvRequest.RequestMethod);
   pvRequest.Response.WriteString('<br>');
   pvRequest.Response.WriteString('=======================================<br>');
