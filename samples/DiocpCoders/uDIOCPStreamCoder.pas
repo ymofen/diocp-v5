@@ -74,7 +74,7 @@ begin
 
   //如果缓存中的数据长度不够包头长度，
   lvValidCount := inBuf.validCount;   //pack_flag + head_len + buf_len
-  if (lvValidCount < SizeOf(Word) + SizeOf(Integer)) then
+  if (lvValidCount < SizeOf(Word) + SizeOf(Integer) + SizeOf(Integer)) then
   begin
     Exit;
   end;
