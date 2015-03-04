@@ -1,34 +1,8 @@
-#ifndef RAWSOCKET_H_INCLUDED
-#define RAWSOCKET_H_INCLUDED
-
-
-
-#ifdef WIN32
-#include <winsock.h>
-#include <Windows.h>
-typedef int				socklen_t;
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/select.h>
-#include <arpa/inet.h>
-typedef int				SOCKET;
-
-//#pragma region define win32 const variable in linux
-#define INVALID_SOCKET	-1
-#define SOCKET_ERROR	-1
-//#pragma endregion
-#endif
-
+#include "utils.rawsocket.h"
 
 #ifdef WIN32
 // 进行初始化
-int WINWSAStartup()
+int WinWSAStartup()
 {
     WORD wVersion;
     wVersion=MAKEWORD(2, 2);
@@ -130,9 +104,3 @@ void PrintLastError()
 {
     printf("socket error:%d", GetLastError());
 }
-
-
-
-
-
-#endif // RAWSOCKET_H_INCLUDED

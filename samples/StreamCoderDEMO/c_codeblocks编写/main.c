@@ -1,47 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <winsock.h>
-#include "raw/rawsocket.h"
 
 
-LONG VerifyData(unsigned char* DataBuff, int DataSize)
-{
-    LONG Ret = 0;
 
-    int i = 0;
-
-    for (i = 0; i < DataSize; i++)
-    {
-        Ret += DataBuff[i];
-    }
-
-    return Ret;
-}
-
-void swap32(void * inBuf, void * outBuf)
-{
-    unsigned char * tmpOutBuf = (unsigned char *)(outBuf);
-    unsigned char * tmpInBuf = (unsigned char *)(inBuf);
-
-    tmpOutBuf[0] = tmpInBuf[3];
-    tmpOutBuf[1] = tmpInBuf[2];
-    tmpOutBuf[2] = tmpInBuf[1];
-    tmpOutBuf[3] = tmpInBuf[0];
-}
-
-void swap16(void * inBuf, unsigned char * outBuf)
-{
-    unsigned char * tmpOutBuf = (unsigned char *)(outBuf);
-    unsigned char * tmpInBuf = (unsigned char *)(inBuf);
-
-    tmpOutBuf[0] = tmpInBuf[1];
-    tmpOutBuf[1] = tmpInBuf[0];
-}
 
 int main()
 {
+
+//    char ouBuf[1024];
+//    memset(ouBuf, 0, 1024);
+//
+//    int x = 0xD10;
+//    VarToHexBytes(&x, 4, ouBuf, " ", 1);
+//    printf("字节数据:%s", ouBuf);
+//
+//    return 0;
+
+
+
     int ret;
-    WINWSAStartup();
+    WinWSAStartup();
     SOCKET s = CreateTcpSocket();
 
     printf("这是一个纯c写(codeblocks编写)的客户端\n");

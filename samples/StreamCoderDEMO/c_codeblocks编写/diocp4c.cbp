@@ -13,6 +13,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add directory="include" />
 				</Compiler>
 			</Target>
 			<Target title="Release">
@@ -22,6 +23,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add directory="include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
@@ -34,6 +36,14 @@
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="src/utils.byteTools.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/utils.byteTools.h" />
+		<Unit filename="src/utils.rawsocket.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/utils.rawsocket.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />

@@ -18,13 +18,57 @@
 	<sys/select.h>
 	<arpa/inet.h>
 
-1425450483 source:e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\main.c
+1425463735 source:e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\main.c
 	<stdio.h>
 	<stdlib.h>
 	<winsock.h>
-	"raw/rawsocket.h"
 
 1425448620 e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\raw\rawsocket.h
+	<winsock.h>
+	<Windows.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<netdb.h>
+	<fcntl.h>
+	<unistd.h>
+	<sys/stat.h>
+	<sys/types.h>
+	<sys/select.h>
+	<arpa/inet.h>
+
+1425463243 source:e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\src\utils.bytetools.c
+	<stdio.h>
+	<stdlib.h>
+
+1425463646 source:e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\src\utils.rawsocket.c
+	"utils.rawsocket.h"
+
+1425463657 e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\src\utils.rawsocket.h
+	<winsock.h>
+	<Windows.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<netdb.h>
+	<fcntl.h>
+	<unistd.h>
+	<sys/stat.h>
+	<sys/types.h>
+	<sys/select.h>
+	<arpa/inet.h>
+
+1425463735 source:e:\workspace\delphi\diocp-v5\samples\streamcoderdemo\c_codeblocks±‡–¥\main.c
+	<stdio.h>
+	<stdlib.h>
+	<winsock.h>
+
+1425463243 source:e:\workspace\delphi\diocp-v5\samples\streamcoderdemo\c_codeblocks±‡–¥\src\utils.bytetools.c
+	<stdio.h>
+	<stdlib.h>
+
+1425463646 source:e:\workspace\delphi\diocp-v5\samples\streamcoderdemo\c_codeblocks±‡–¥\src\utils.rawsocket.c
+	"utils.rawsocket.h"
+
+1425463657 e:\workspace\delphi\diocp-v5\samples\streamcoderdemo\c_codeblocks±‡–¥\src\utils.rawsocket.h
 	<winsock.h>
 	<Windows.h>
 	<sys/socket.h>
