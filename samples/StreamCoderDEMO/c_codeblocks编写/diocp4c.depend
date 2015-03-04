@@ -1,0 +1,39 @@
+# depslib dependency file v1.0
+1425396652 source:e:\workspace\d_workspace\mybean-project-plug-ins\tester\diocp4c\main.c
+	<stdio.h>
+	<stdlib.h>
+	<winsock.h>
+	"raw/rawsocket.h"
+
+1425396584 e:\workspace\d_workspace\mybean-project-plug-ins\tester\diocp4c\raw\rawsocket.h
+	<winsock.h>
+	<Windows.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<netdb.h>
+	<fcntl.h>
+	<unistd.h>
+	<sys/stat.h>
+	<sys/types.h>
+	<sys/select.h>
+	<arpa/inet.h>
+
+1425450483 source:e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\main.c
+	<stdio.h>
+	<stdlib.h>
+	<winsock.h>
+	"raw/rawsocket.h"
+
+1425448620 e:\workspace\delphi\mybean-project-plug-ins\tester\diocp4c\raw\rawsocket.h
+	<winsock.h>
+	<Windows.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<netdb.h>
+	<fcntl.h>
+	<unistd.h>
+	<sys/stat.h>
+	<sys/types.h>
+	<sys/select.h>
+	<arpa/inet.h>
+

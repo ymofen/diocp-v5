@@ -1,0 +1,7 @@
+    printf("这是一个纯c写(codeblocks编写)的客户端\n");
+    printf("用于和diocp中的StreamCoderSERVER(samples\StreamCoderDEMO\SERVER)进行测试!\n");
+    printf("该份代码可以跨平台的,不过尚未进行测试!\n");
+    printf("需要运行服务端(samples\StreamCoderDEMO\SERVER),端口为:9983!\n");
+
+
+感谢麻子提供测试文件(mz\*.*)
