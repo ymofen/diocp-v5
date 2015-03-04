@@ -10,8 +10,7 @@ uses
   uRemoteServerDIOCPImpl in 'service\uRemoteServerDIOCPImpl.pas',
   uIRemoteServer in 'interface\uIRemoteServer.pas',
   SimpleMsgPack in '..\Common\SimpleMsgPack.pas',
-  uStreamCoderSocket in '..\..\diocpCoders\uStreamCoderSocket.pas',
-  Datasnap.DBClient in 'Datasnap.DBClient.pas';
+  uStreamCoderSocket in '..\..\diocpCoders\uStreamCoderSocket.pas';
 
 {$R *.res}
 

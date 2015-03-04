@@ -16,7 +16,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer
+  ComCtrls, diocp.ex.httpServer, System.Actions
   ;
 
 type
@@ -163,8 +163,15 @@ begin
     pvRequest.Response.WriteString('<br>=======================================<br>');
 
     pvRequest.Response.WriteString('<br>');
-    pvRequest.Response.WriteString('解码参数信息<br>');
+    pvRequest.Response.WriteString(Format('解码参数信息(参数数量:%d)<br>', [pvRequest.RequestParamsList.Count]));
     pvRequest.Response.WriteString(pvRequest.RequestParamsList.Text);
+
+    if pvRequest.RequestParamsList.Count > 0 then
+    begin
+      pvRequest.Response.WriteString('<br>第一个参数:' + pvRequest.GetRequestParam(pvRequest.RequestParamsList.Names[0]));
+    end;
+    pvRequest.Response.WriteString('<br>获取a参数的值:' + pvRequest.GetRequestParam('a'));
+
     pvRequest.Response.WriteString('<br>');
     pvRequest.Response.WriteString('=======================================<br>'); 
 

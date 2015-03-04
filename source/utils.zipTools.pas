@@ -45,14 +45,30 @@ implementation
 
 class procedure TZipTools.UnZipStream(const pvInStream, pvOutStream: TStream);
 var
-  lvBytes:TBytes;
   l:Integer;
+
+{$IFDEF POSIX}
+var
+  lvBytes, lvOutBytes:TBytes;
+{$ELSE}
+var
+  lvBytes:TBytes;
   OutBuf: Pointer;
   OutBytes: Integer;
+{$ENDIF}
 begin
   if pvInStream= nil then exit;
   l := pvInStream.Size;
   if l = 0 then Exit;
+{$IFDEF POSIX}
+  SetLength(lvBytes, l);
+  pvInStream.Position := 0;
+  pvInStream.Read(lvBytes[0], pvInStream.Size);
+  ZLib.ZDecompress(lvBytes, lvOutBytes);  //POSIX下，只支持该方式
+  pvOutStream.Size := Length(lvOutBytes);
+  pvOutStream.Position := 0;
+  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
+{$ELSE}
   setLength(lvBytes, l);
   pvInStream.Position := 0;
   pvInStream.ReadBuffer(lvBytes[0], l);
@@ -68,6 +84,7 @@ begin
   finally
     FreeMem(OutBuf, OutBytes);
   end;
+{$ENDIF}
 end;
 
 class function TZipTools.verifyData(const buf; len: Cardinal): Cardinal;
@@ -116,25 +133,39 @@ begin
 end;
 
 class procedure TZipTools.ZipStream(const pvInStream, pvOutStream: TStream);
+{$IFDEF POSIX}
+var
+  lvBytes, lvOutBytes:TBytes;
+{$ELSE}
 var
   lvInBuf: TBytes;
   OutBuf: Pointer;
   OutBytes: Integer;
+{$ENDIF}
+var
   l: Integer;
-
 begin
   if pvInStream= nil then exit;
   l := pvInStream.Size;
   if l = 0 then Exit;
 
+{$IFDEF POSIX}
+  SetLength(lvBytes, pvInStream.Size);
+  pvInStream.Position := 0;
+  pvInStream.Read(lvBytes[0], pvInStream.Size);
+  ZLib.ZCompress(lvBytes, lvOutBytes);                 // POSIX下只支持该中方式的压缩
+  pvOutStream.Size := Length(lvOutBytes);
+  pvOutStream.Position := 0;
+  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
+{$ELSE}
   SetLength(lvInBuf, l);
   pvInStream.Position := 0;
   pvInStream.ReadBuffer(lvInBuf[0], l);
-{$if defined(NEWZLib)}
+  {$if defined(NEWZLib)}
   ZLib.ZCompress(@lvInBuf[0], l, OutBuf, OutBytes);
-{$ELSE}
+  {$ELSE}
   ZLib.CompressBuf(@lvInBuf[0], l, OutBuf, OutBytes);
-{$ifend}
+  {$ifend}
   try
     pvOutStream.Size := OutBytes;
     pvOutStream.Position := 0;
@@ -142,6 +173,8 @@ begin
   finally
     FreeMem(OutBuf, OutBytes);
   end;
+{$ENDIF}
+
 
 end;
 

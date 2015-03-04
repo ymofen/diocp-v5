@@ -8,7 +8,8 @@ uses
   Data.DB, Datasnap.DBClient, FMX.Layouts, FMX.Grid, FMX.StdCtrls, FMX.Edit,
   uIRemoteServer, uRemoteServerDIOCPImpl, FMX.Memo, Data.Bind.EngExt,
   Fmx.Bind.DBEngExt, Fmx.Bind.Grid, System.Bindings.Outputs, Fmx.Bind.Editors,
-  Data.Bind.Components, Data.Bind.DBScope, Data.Bind.Grid;
+  Data.Bind.Components, Data.Bind.DBScope, Data.Bind.Grid,
+  FMX.Controls.Presentation;
 
 type
   TfrmMain = class(TForm)
