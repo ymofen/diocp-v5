@@ -3,3 +3,19 @@ DIOCP-v5 0.0.1
 
 1.规范单元文件的命名，和组件的命名
 2.中文注释重要的过程和类名
+
+DIOCP-v5 0.0.2
+  2015-03-04 21:49:41
+
+1.更新DIOCPStreamCoder解码的一处Bug
+
+  //如果缓存中的数据长度不够包头长度，
+  lvValidCount := inBuf.validCount;   //pack_flag + head_len + buf_len
+  if (lvValidCount < SizeOf(Word) + SizeOf(Integer)  + SizeOf(Integer)) then
+
+  // 之前如下
+  if (lvValidCount < SizeOf(Word) + SizeOf(Integer)) then
+
+  // 在客户端只发送了6个字节就进行解码时会出现错误的数据包，从而会T掉客户端
+
+  2015-03-04 21:46:53
