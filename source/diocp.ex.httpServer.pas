@@ -33,7 +33,10 @@ type
     FRequestVersionStr: string;
 
     FRequestMethod: string;
-    FRequestUrl: String;
+    FRequestUrl: String;  // 带原始的参数
+
+    FRequestURI: String;  // URI 不带参数
+
 
     FRequestParamsList: TStringList; // TODO:存放http参数的StringList
 
@@ -122,9 +125,14 @@ type
     property RequestHeader: TStringList read FRequestHeader;
 
     /// <summary>
-    ///   从头信息解码器出来的Url
+    ///   从头信息解码器出来的Url,包含参数
     /// </summary>
     property RequestUrl: String read FRequestUrl;
+
+    /// <summary>
+    ///   不带URL参数
+    /// </summary>
+    property RequestURI: String read FRequestURI;
 
     /// <summary>
     /// 得到客户端请求方式
@@ -150,6 +158,8 @@ type
     ///   从Url和Post数据中得到的参数信息: key = value
     /// </summary>
     property RequestParamsList: TStringList read FRequestParamsList;
+
+
 
     /// <summary>
     /// 应答完毕，发送会客户端
@@ -291,6 +301,7 @@ begin
   FRawHeaderData.Clear;
   FRawPostData.Clear;
   FRequestUrl := '';
+  FRequestURI := '';
   FRequestVersionStr := '';
   FRequestMethod := '';
   FRequestCookies := '';
@@ -460,39 +471,41 @@ begin
 
   // 请求参数及路径
   lvTempStr := Copy(lvRequestCmdLine, J, I - J);
+  FRequestUrl := lvTempStr;
+
   // 解析参数
   J := Pos('?', lvTempStr);
 
   if (J <= 0) then
   begin
-    FRequestUrl := lvTempStr;
     lvRawTemp := '';
-
     FRequestUrl := URLDecode(FRequestUrl);
-    // Utf8解码
-    FRequestUrl := Utf8Decode(FRequestUrl);
-
+    FRequestUrl := UTF8Decode(FRequestUrl);  // Url经过了Utf8编码
+    FRequestURI := FRequestUrl;   //无参数和url一致
   end
   else
   begin
-    FRequestUrl := Copy(lvTempStr, 1, J - 1);
-    FRequestUrl := URLDecode(FRequestUrl);
-    // Utf8解码
-    FRequestUrl := Utf8Decode(FRequestUrl);
+    // IE原始URL  : /中国.asp?topicid=a汉字a
+    // 360原始URL : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
+    // 后台接收到 : /%E4%B8%AD%E5%9B%BD.asp?topicid=a汉字a
 
+    // URI需要进行URLDecode和Utf8解码
+    FRequestURI := Copy(lvTempStr, 1, J - 1);
+    FRequestURI := URLDecode(FRequestURI, False);
+    FRequestURI := UTF8Decode(FRequestURI);
 
     // Url中的参数
     lvRawTemp := Copy(lvTempStr, J + 1, MaxInt);
+    lvRawTemp := URLDecode(lvRawTemp, False);      // 其他浏览器需要进行URLDecode(IE不需要)
 
-    //
-    lvTempStr := URLDecode(lvRawTemp);
+    // 拼接
+    FRequestUrl := FRequestURI + lvRawTemp;
 
-    // TODO:解析GET和POST参数
+    // 解析GET和POST参数
     if Trim(lvTempStr) <> '' then
     begin
-      ParseParams(lvTempStr);
+      ParseParams(lvRawTemp);
     end;
-
   end;
 
   Inc(I);

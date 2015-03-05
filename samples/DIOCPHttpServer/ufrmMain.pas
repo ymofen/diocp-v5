@@ -90,6 +90,7 @@ begin
   // 解码Post数据参数
   {$IFDEF UNICODE}
   pvRequest.DecodePostDataParam(nil);
+  //pvRequest.DecodePostDataParam(TEncoding.UTF8);
   {$ELSE}
   pvRequest.DecodePostDataParam(false);
   {$ENDIF}
@@ -102,7 +103,7 @@ begin
   pvRequest.Response.WriteString('<br>');
   pvRequest.Response.WriteString('=======================================<br>');
 
-  if pvRequest.RequestUrl = '/diocp-v5' then
+  if pvRequest.RequestURI = '/diocp-v5' then
   begin  // 输出diocp运行信息
     pvRequest.Response.WriteString('DIOCP运行信息<br>');
     s := FTcpServer.GetStateInfo;
@@ -114,7 +115,7 @@ begin
     s := FTcpServer.IocpEngine.GetStateINfo;
     s := ReplaceText(s, sLineBreak, '<br>');
     pvRequest.Response.WriteString(s);
-  end else if pvRequest.RequestUrl = '/input' then
+  end else if pvRequest.RequestURI = '/input' then
   begin  // 输出diocp运行信息
     pvRequest.Response.WriteString('DIOCP HTTP 表单提交测试<br>');
     pvRequest.Response.WriteString('<form id="form1" name="form1" method="post" action="/post?param1=''汉字''&time=' + DateTimeToStr(Now()) +'">');

@@ -3,6 +3,9 @@
  *	       blog: http://www.cnblogs.com/dksoft
  *     homePage: www.diocp.org
  *
+ *   2015-03-05 12:53:38
+ *     修复URLEncode，URLDecode在Anddriod和UNICODE下的异常
+ *
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
@@ -14,6 +17,17 @@ interface
 
 uses
   Classes, SysUtils;
+
+type
+{$IFDEF WIN32}
+  URLString = AnsiString;
+  URLChar = AnsiChar;
+{$ELSE}
+  // andriod下面使用
+  URLString = String;
+  URLChar = Char;
+  {$DEFINE UNICODE_URL}
+{$ENDIF}
 
 
 /// <summary>
@@ -68,7 +82,7 @@ function SplitStrings(s:String; pvStrings:TStrings; pvSpliterChars
 /// </returns>
 /// <param name="ASrc"> 原始数据 </param>
 /// <param name="pvIsPostData"> Post的原始数据中原始的空格经过UrlEncode后变成+号 </param>
-function URLDecode(const ASrc: String; pvIsPostData: Boolean = true): String;
+function URLDecode(const ASrc: URLString; pvIsPostData: Boolean = true):URLString;
 
 /// <summary>
 ///  将数据进行URL编码
@@ -78,7 +92,7 @@ function URLDecode(const ASrc: String; pvIsPostData: Boolean = true): String;
 /// </returns>
 /// <param name="S"> 需要编码的数据 </param>
 /// <param name="pvIsPostData"> Post的原始数据中原始的空格经过UrlEncode后变成+号 </param>
-function URLEncode(S: string; pvIsPostData: Boolean = true): string;
+function URLEncode(S: string; pvIsPostData: Boolean = true): URLString;
 
 
 
@@ -178,44 +192,95 @@ begin
 end;
 
 
-function URLDecode(const ASrc: String; pvIsPostData: Boolean = true): String;
+function URLDecode(const ASrc: URLString; pvIsPostData: Boolean = true): URLString;
 var
   i, j: integer;
-  ESC: string;
+  {$IFDEF UNICODE_URL}
+  lvRawBytes:TBytes;
+  {$ENDIF}
 begin
   i := 1;
+  {$IFDEF UNICODE_URL}
+  SetLength(lvRawBytes, Length(ASrc));   // 预留后面一个字符串结束标志
+  j := 0;  // 从0开始
+  {$ELSE}
   SetLength(Result, Length(ASrc));   // 预留后面一个字符串结束标志
-  j := 1;
+  j := 1;  // 从1开始
+  {$ENDIF}
+
   while i <= Length(ASrc) do
   begin
     if (pvIsPostData) and (ASrc[i] = '+') then   // + 号变成空格, Post的原始数据中如果有 空格时会变成 +号
     begin
+      {$IFDEF UNICODE_URL}
+      lvRawBytes[j] := 32; // Ord(' ');
+      {$ELSE}
       Result[j] := ' ';
+      {$ENDIF}
     end else if ASrc[i] <> '%' then
     begin
+      {$IFDEF UNICODE_URL}
+      lvRawBytes[j] := Ord(ASrc[i]);
+      {$ELSE}
       Result[j] := ASrc[i];
+      {$ENDIF}
     end else 
     begin
       Inc(i); // skip the % char
-      ESC := ASrc[i] + ASrc[i+1];
-      Inc(i, 1); // Then skip it.
       try
-        Result[j] := Char(StrToInt('$' + ESC));  {do not localize}
+      {$IFDEF UNICODE_URL}
+      lvRawBytes[j] := StrToInt('$' + ASrc[i] + ASrc[i+1]);
+      {$ELSE}
+      Result[j] := URLChar(StrToInt('$' + ASrc[i] + ASrc[i+1]));
+      {$ENDIF}
       except end;
+      Inc(i, 1);  // 再跳过一个字符.
+
     end;
     Inc(i);
     Inc(j);
   end;
+  {$IFDEF UNICODE_URL}
+  SetLength(lvRawBytes, j);
+  Result := TEncoding.ANSI.GetString(lvRawBytes);
+  {$ELSE}
   SetLength(Result, j - 1);
+  {$ENDIF}
+
 end;
 
 
 
 
-function URLEncode(S: string; pvIsPostData: Boolean = true): string;
+function URLEncode(S: string; pvIsPostData: Boolean = true): URLString;
 var
   i: Integer; // loops thru characters in string
+  {$IFDEF UNICODE_URL}
+  lvRawBytes:TBytes;
+  {$ENDIF}
 begin
+  {$IFDEF UNICODE_URL}
+  lvRawBytes := TEncoding.ANSI.GetBytes(S);
+  for i := 0 to Length(lvRawBytes) - 1 do
+  begin
+    case lvRawBytes[i] of
+      //'A' .. 'Z', 'a'.. 'z', '0' .. '9', '-', '_', '.':
+      65..90, 97..122, 48..57, 45, 95, 46:
+        Result := Result + URLChar(lvRawBytes[i]);
+      //' ':
+      32:
+        if pvIsPostData then
+        begin     // Post数据如果是空格需要编码成 +
+          Result := Result + '+';
+        end else
+        begin
+          Result := Result + '%20';
+        end
+    else
+      Result := Result + '%' + SysUtils.IntToHex(lvRawBytes[i], 2);
+    end;
+  end;
+  {$ELSE}
   Result := '';
   for i := 1 to Length(S) do
   begin
@@ -234,6 +299,7 @@ begin
       Result := Result + '%' + SysUtils.IntToHex(Ord(S[i]), 2);
     end;
   end;
+  {$ENDIF}
 end;
 
 end.
