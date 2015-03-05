@@ -27,3 +27,14 @@ DIOCP-v5 0.0.2
    原来的Request.RequestURL ->改成Request.RequestURI
    RequestURL 带完整的参数
    2015-03-05 12:58:55
+   
+4. 添加TDiocpHttpRequest.DecodeURLParam({$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+   解码URL中的参数，放到参数列表(RequestParamsList)中
+   在OnDiocpHttpRequest中调用(和DecodePostDataParam一样)
+   2015-03-05 22:42:04
+
+5. 修正在编译成64位EXE时HttpSERVER运行出错的BUG
+   2015-03-05 22:42:42
+   
+6. 优化URLDecode解码
+   2015-03-05 22:42:58
