@@ -22,3 +22,8 @@ DIOCP-v5 0.0.2
 
 2. 修复URLEncode，URLDecode在Anddriod和UNICODE下的异常
 *   2015-03-05 12:53:38
+
+3  修正UNICODE下URLDecode和URLEncode的BUG
+   原来的Request.RequestURL ->改成Request.RequestURI
+   RequestURL 带完整的参数
+   2015-03-05 12:58:55
