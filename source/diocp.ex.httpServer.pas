@@ -33,8 +33,8 @@ type
     FRequestVersionStr: string;
 
     FRequestMethod: string;
-    FRequestUrl: String;  // 带原始的参数
-
+    FRequestRawURL: String;  // 原始的请求URL，不进行任何解码
+    FRequestURL: String;
     FRequestURI: String;  // URI 不带参数
 
 
@@ -52,6 +52,8 @@ type
     FRequestCookies: string;
     FRequestHostName: string;
     FRequestHostPort: string;
+
+
 
     FXForwardedFor: string;
 
@@ -127,8 +129,12 @@ type
     /// <summary>
     ///   从头信息解码器出来的Url,包含参数
     /// </summary>
-    property RequestUrl: String read FRequestUrl;
+    property RequestURL: String read FRequestURL;
 
+    /// <summary>
+    ///   从头信息提取出来的URL，未经过任何加工,包含参数
+    /// </summary>
+    property RequestRawURL: String read FRequestRawURL;
     /// <summary>
     ///   不带URL参数
     /// </summary>
@@ -158,6 +164,7 @@ type
     ///   从Url和Post数据中得到的参数信息: key = value
     /// </summary>
     property RequestParamsList: TStringList read FRequestParamsList;
+
 
 
 
@@ -300,8 +307,9 @@ procedure TDiocpHttpRequest.Clear;
 begin
   FRawHeaderData.Clear;
   FRawPostData.Clear;
-  FRequestUrl := '';
+  FRequestURL := '';
   FRequestURI := '';
+  FRequestRawURL := '';
   FRequestVersionStr := '';
   FRequestMethod := '';
   FRequestCookies := '';
@@ -471,7 +479,7 @@ begin
 
   // 请求参数及路径
   lvTempStr := Copy(lvRequestCmdLine, J, I - J);
-  FRequestUrl := lvTempStr;
+  FRequestRawURL := lvTempStr;
 
   // 解析参数
   J := Pos('?', lvTempStr);
@@ -479,27 +487,30 @@ begin
   if (J <= 0) then
   begin
     lvRawTemp := '';
-    FRequestUrl := URLDecode(FRequestUrl);
-    FRequestUrl := UTF8Decode(FRequestUrl);  // Url经过了Utf8编码
-    FRequestURI := FRequestUrl;   //无参数和url一致
+    FRequestURL := URLDecode(lvTempStr);
+    FRequestURL := UTF8Decode(FRequestURL);  // Url经过了Utf8编码
+    FRequestURI := FRequestURL;   //无参数和url一致
   end
   else
   begin
     // IE原始URL  : /中国.asp?topicid=a汉字a
-    // 360原始URL : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
     // 后台接收到 : /%E4%B8%AD%E5%9B%BD.asp?topicid=a汉字a
+
+    // FireFox/360极速浏览器原始URL : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
+    // 后台接收到 : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
+
 
     // URI需要进行URLDecode和Utf8解码
     FRequestURI := Copy(lvTempStr, 1, J - 1);
     FRequestURI := URLDecode(FRequestURI, False);
     FRequestURI := UTF8Decode(FRequestURI);
 
-    // Url中的参数
+    // URL中的参数需要进行URLDecode，IE提交过来的为前台的系统默认编码
     lvRawTemp := Copy(lvTempStr, J + 1, MaxInt);
     lvRawTemp := URLDecode(lvRawTemp, False);      // 其他浏览器需要进行URLDecode(IE不需要)
 
     // 拼接
-    FRequestUrl := FRequestURI + lvRawTemp;
+    FRequestURL := FRequestURI + lvRawTemp;
 
     // 解析GET和POST参数
     if Trim(lvTempStr) <> '' then

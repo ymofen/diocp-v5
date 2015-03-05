@@ -150,11 +150,16 @@ begin
     pvRequest.Response.WriteString('<br>');
     pvRequest.Response.WriteString('参数信息<br>');
     pvRequest.Response.WriteString('=======================================<br>');
-    pvRequest.Response.WriteString(Format('原始数据长度:%d', [pvRequest.RawPostData.Size]));
-    pvRequest.Response.WriteString('<br>');
+    pvRequest.Response.WriteString('  关于URL的编码问题说明<br>');
+    pvRequest.Response.WriteString('URI, IE和其他浏览器进行了URLEncode编码和UTF8编码，所以后台进行了统一处理<br>');
+    pvRequest.Response.WriteString('URL中的参数, IE为进行任何编码, 其他浏览器(FireFox和360极速浏览器)进行了URLEncode编码和UTF8编码<br>');
+    pvRequest.Response.WriteString('   所以后台参数中只进行了URLDecode的解码，需要开发时进行去单独处理<br>');
+    pvRequest.Response.WriteString('*****************************************<br>');
 
-    pvRequest.Response.WriteString(Format('context-length:%d', [pvRequest.ContextLength]));
-    pvRequest.Response.WriteString('<br>');
+
+    pvRequest.Response.WriteString(Format('原始URL数据:%s<br>', [pvRequest.RequestRawURL]));
+    pvRequest.Response.WriteString(Format('原始数据长度:%d<br>', [pvRequest.RawPostData.Size]));
+    pvRequest.Response.WriteString(Format('context-length:%d<br>', [pvRequest.ContextLength]));
 
     SetLength(lvRawData,pvRequest.RawPostData.Size);
     pvRequest.RawPostData.Position := 0;
