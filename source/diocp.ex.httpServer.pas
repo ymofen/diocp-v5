@@ -116,10 +116,15 @@ type
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
+    property HttpVersion: Word read FHttpVersion;
     /// <summary>
     ///   原始的Post过来的数据
     /// </summary>
     property RawPostData: TMemoryStream read FRawPostData;
+    property RequestAccept: String read FRequestAccept;
+    property RequestAcceptEncoding: string read FRequestAcceptEncoding;
+    property RequestAcceptLanguage: string read FRequestAcceptLanguage;
+    property RequestCookies: string read FRequestCookies;
 
     /// <summary>
     ///   请求的头信息
@@ -135,23 +140,24 @@ type
     ///   从头信息提取出来的URL，未经过任何加工,包含参数
     /// </summary>
     property RequestRawURL: String read FRequestRawURL;
+
     /// <summary>
     ///   不带URL参数
     /// </summary>
     property RequestURI: String read FRequestURI;
 
     /// <summary>
-    /// 得到客户端请求方式
+    ///  从头信息中读取的请求服务器请求方式
     /// </summary>
     property RequestMethod: string read FRequestMethod;
 
     /// <summary>
-    /// 得到客户端主机IP地址
+    ///   从头信息中读取的请求服务器IP地址
     /// </summary>
     property RequestHostName: string read FRequestHostName;
 
     /// <summary>
-    /// 得到客户端主机端口
+    ///   从头信息中读取的请求服务器端口
     /// </summary>
     property RequestHostPort: string read FRequestHostPort;
 
@@ -164,6 +170,8 @@ type
     ///   从Url和Post数据中得到的参数信息: key = value
     /// </summary>
     property RequestParamsList: TStringList read FRequestParamsList;
+
+    property RequestReferer: String read FRequestReferer;
 
 
 
@@ -209,7 +217,7 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure WriteBuf(pvBuf: Pointer; len: Cardinal);
-    procedure WriteString(pvString: string);
+    procedure WriteString(pvString: string; pvUtf8Convert: Boolean = true);
 
     property ContentType: String read FContentType write FContentType;
   end;
@@ -782,11 +790,18 @@ begin
   FData.Write(pvBuf^, len);
 end;
 
-procedure TDiocpHttpResponse.WriteString(pvString: string);
+procedure TDiocpHttpResponse.WriteString(pvString: string; pvUtf8Convert:
+    Boolean = true);
 var
   lvRawString: AnsiString;
 begin
-  lvRawString := AnsiString(pvString);
+  if pvUtf8Convert then
+  begin     // 进行Utf8转换
+    lvRawString := UTF8Encode(pvString);
+  end else
+  begin
+    lvRawString := AnsiString(pvString);
+  end;
   FData.WriteBuffer(PAnsiChar(lvRawString)^, Length(lvRawString));
 end;
 
