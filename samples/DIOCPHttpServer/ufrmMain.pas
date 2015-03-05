@@ -84,8 +84,8 @@ var
   s:String;
   lvRawData:AnsiString;
 begin
-  // Context Type
-  // pvRequest.Response.ContentType := 'utf-8';
+  // Context Type                        返回的是UTF-8的编码
+  pvRequest.Response.ContentType := 'text/html; charset=utf-8';
 
   // 解码Post数据参数
   {$IFDEF UNICODE}
