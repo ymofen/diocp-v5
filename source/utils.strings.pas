@@ -19,7 +19,7 @@ uses
   Classes, SysUtils;
 
 type
-{$IFDEF WIN32}
+{$IFDEF MSWINDOWS}  // Windows平台下面可以使用AnsiString
   URLString = AnsiString;
   URLChar = AnsiChar;
 {$ELSE}
@@ -197,42 +197,28 @@ var
   i, j: integer;
   {$IFDEF UNICODE_URL}
   lvRawBytes:TBytes;
+  lvSrcBytes:TBytes;
   {$ENDIF}
 begin
-  i := 1;
+
   {$IFDEF UNICODE_URL}
   SetLength(lvRawBytes, Length(ASrc));   // 预留后面一个字符串结束标志
+  lvSrcBytes := TEncoding.ANSI.GetBytes(ASrc);
   j := 0;  // 从0开始
-  {$ELSE}
-  SetLength(Result, Length(ASrc));   // 预留后面一个字符串结束标志
-  j := 1;  // 从1开始
-  {$ENDIF}
-
+  i := 0;
   while i <= Length(ASrc) do
   begin
-    if (pvIsPostData) and (ASrc[i] = '+') then   // + 号变成空格, Post的原始数据中如果有 空格时会变成 +号
+    if (pvIsPostData) and (lvSrcBytes[i] = 43) then   //43(+) 号变成空格, Post的原始数据中如果有 空格时会变成 +号
     begin
-      {$IFDEF UNICODE_URL}
       lvRawBytes[j] := 32; // Ord(' ');
-      {$ELSE}
-      Result[j] := ' ';
-      {$ENDIF}
-    end else if ASrc[i] <> '%' then
+    end else if lvSrcBytes[i] <> 37 then      //'%' = 37
     begin
-      {$IFDEF UNICODE_URL}
-      lvRawBytes[j] := Ord(ASrc[i]);
-      {$ELSE}
-      Result[j] := ASrc[i];
-      {$ENDIF}
-    end else 
+      lvRawBytes[j] :=lvSrcBytes[i];
+    end else
     begin
       Inc(i); // skip the % char
       try
-      {$IFDEF UNICODE_URL}
-      lvRawBytes[j] := StrToInt('$' + ASrc[i] + ASrc[i+1]);
-      {$ELSE}
-      Result[j] := URLChar(StrToInt('$' + ASrc[i] + ASrc[i+1]));
-      {$ENDIF}
+      lvRawBytes[j] := StrToInt('$' +URLChar(lvSrcBytes[i]) + URLChar(lvSrcBytes[i+1]));
       except end;
       Inc(i, 1);  // 再跳过一个字符.
 
@@ -240,10 +226,32 @@ begin
     Inc(i);
     Inc(j);
   end;
-  {$IFDEF UNICODE_URL}
   SetLength(lvRawBytes, j);
   Result := TEncoding.ANSI.GetString(lvRawBytes);
   {$ELSE}
+  SetLength(Result, Length(ASrc));   // 预留后面一个字符串结束标志
+  j := 1;  // 从1开始
+  i := 1;
+  while i <= Length(ASrc) do
+  begin
+    if (pvIsPostData) and (ASrc[i] = '+') then   // + 号变成空格, Post的原始数据中如果有 空格时会变成 +号
+    begin
+      Result[j] := ' ';
+    end else if ASrc[i] <> '%' then
+    begin
+      Result[j] := ASrc[i];
+    end else 
+    begin
+      Inc(i); // skip the % char
+      try
+      Result[j] := URLChar(StrToInt('$' + ASrc[i] + ASrc[i+1]));
+      except end;
+      Inc(i, 1);  // 再跳过一个字符.
+
+    end;
+    Inc(i);
+    Inc(j);
+  end;
   SetLength(Result, j - 1);
   {$ENDIF}
 

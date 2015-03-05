@@ -347,7 +347,13 @@ end;
 
 function lock_cmp_exchange(cmp_val, new_val: Boolean; var target: Boolean): Boolean;
 asm
+{$ifdef win32}
   lock cmpxchg [ecx], dl
+{$else}
+.noframe
+  mov rax, rcx
+  lock cmpxchg [r8], dl
+{$endif}
 end;
 
 procedure __CheckWSAStartup;

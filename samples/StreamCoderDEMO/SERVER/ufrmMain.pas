@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp.coder.tcpServer, diocp.tcp.server, ExtCtrls,
-  ComObj, ComCtrls, utils.safeLogger, System.Actions;
+  ComObj, ComCtrls, utils.safeLogger;
 
 type
   TfrmMain = class(TForm)

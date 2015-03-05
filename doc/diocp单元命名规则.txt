@@ -28,12 +28,15 @@ iocpEngine     -> diocp.core.engine    (diocp的iocp核心引擎)
 
 iocpTask       -> diocp.task             (diocp中提供的异步任务类)
 iocpTcpServer  -> diocp.tcp.server       (diocp的高并发的服务端)
+iocpClientSocket -> diocp.tcp.client     (diocp的高并发的客户端)
+
+iocpBaseSocket -> diocp.sockets          (diocp基类组件)
+
 iocpWinsock2   -> diocp.winapi.winsock2  (winsock2,api) 
 
 iocpProtocol   -> diocp.sockets.utils    (diocp用到的一些工具函数)
 iocpSocketUtils-> 合并到diocp.sockets.utils
 
-iocpBaseSocket -> diocp.sockets          (diocp基类组件)
 
 DTcpClient     -> diocp.tcp.blockClient  (阻塞模式跨平台的客户端)
 iocpTcpClient  -> diocp.tcp.blockClient  (阻塞模式跨平台的客户端)
@@ -94,3 +97,9 @@ safeLogger记录到Memo中的方法
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
   sfLogger.AppendInMainThread := true;
 
+
+
+iocpTask       -> diocp.task             (diocp中提供的异步任务类)
+iocpTcpServer  -> diocp.tcp.server       (diocp的高并发的服务端)
+iocpClientSocket -> diocp.tcp.client     (diocp的高并发的客户端)
+iocpBaseSocket -> diocp.sockets          (diocp基类组件)

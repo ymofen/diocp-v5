@@ -90,9 +90,10 @@ begin
   // 解码Post数据参数
   {$IFDEF UNICODE}
   pvRequest.DecodePostDataParam(nil);
-  //pvRequest.DecodePostDataParam(TEncoding.UTF8);
+  pvRequest.DecodeURLParam(nil);
   {$ELSE}
   pvRequest.DecodePostDataParam(false);
+  pvRequest.DecodeURLParam(false);
   {$ENDIF}
 
   // 输出客户端IP信息

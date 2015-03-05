@@ -30,12 +30,19 @@ type
     /// 头信息
     FHttpVersion: Word; // 10, 11
 
-    FRequestVersionStr: string;
+    FRequestVersionStr: String;
 
-    FRequestMethod: string;
-    FRequestRawURL: String;  // 原始的请求URL，不进行任何解码
-    FRequestURL: String;
-    FRequestURI: String;  // URI 不带参数
+    FRequestMethod: String;
+    FRequestRawURL: String;       // 原始的请求URL，不进行任何解码
+
+    /// <summary>
+    ///  原始请求中的URL参数数据(没有经过URLDecode，因为在DecodeRequestHeader中要拼接RequestURL时临时进行了URLDecode)
+    ///  没有经过URLDecode是考虑到参数值中本身存在&字符，导致DecodeURLParam出现不解码异常
+    /// </summary>
+    FRequestURLParamData: string;
+
+    FRequestURL: String;          // URI + 参数
+    FRequestURI: String;          // URI 不带参数
 
 
     FRequestParamsList: TStringList; // TODO:存放http参数的StringList
@@ -59,6 +66,9 @@ type
 
     FRawHeaderData: TMemoryStream;
 
+    /// <summary>
+    ///   原始的POST数据
+    /// </summary>
     FRawPostData: TMemoryStream;
 
     FPostDataLen: Integer;
@@ -102,6 +112,13 @@ type
     ///   在OnDiocpHttpRequest中调用
     /// </summary>
     procedure DecodePostDataParam(
+      {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+
+    /// <summary>
+    ///   解码URL中的参数，放到参数列表中
+    ///   在OnDiocpHttpRequest中调用
+    /// </summary>
+    procedure DecodeURLParam(
       {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 
     /// <summary>
@@ -488,6 +505,7 @@ begin
   // 请求参数及路径
   lvTempStr := Copy(lvRequestCmdLine, J, I - J);
   FRequestRawURL := lvTempStr;
+  FRequestURLParamData := '';
 
   // 解析参数
   J := Pos('?', lvTempStr);
@@ -515,16 +533,11 @@ begin
 
     // URL中的参数需要进行URLDecode，IE提交过来的为前台的系统默认编码
     lvRawTemp := Copy(lvTempStr, J + 1, MaxInt);
+    FRequestURLParamData := lvRawTemp;
     lvRawTemp := URLDecode(lvRawTemp, False);      // 其他浏览器需要进行URLDecode(IE不需要)
 
     // 拼接
     FRequestURL := FRequestURI + lvRawTemp;
-
-    // 解析GET和POST参数
-    if Trim(lvTempStr) <> '' then
-    begin
-      ParseParams(lvRawTemp);
-    end;
   end;
 
   Inc(I);
@@ -638,14 +651,12 @@ begin
   end;
 end;
 
-
-
-
 procedure TDiocpHttpRequest.DecodePostDataParam({$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 var
-  lvRawData:AnsiString;
+  lvRawData : AnsiString;
   lvRawParams, s:String;
   i:Integer;
+  lvStrings:TStrings;
 {$IFDEF UNICODE}
 var
   lvBytes:TBytes;
@@ -657,38 +668,105 @@ begin
   FRawPostData.Position := 0;
   FRawPostData.Read(lvRawData[1], FRawPostData.Size);
 
-  // 先放入到Strings
-  SplitStrings(lvRawData, FRequestParamsList, ['&']);
+  lvStrings := TStringList.Create;
+  try
+    // 先放入到Strings
+    SplitStrings(lvRawData, lvStrings, ['&']);
 
+    for i := 0 to lvStrings.Count - 1 do
+    begin
+      lvRawData := URLDecode(lvStrings.ValueFromIndex[i]);
+      if lvRawData <> '' then   // 不合法的Key-Value会导致空字符串
+      begin
+        {$IFDEF UNICODE}
+        if pvEncoding <> nil then
+        begin
+          // 字符编码转换
+          SetLength(lvBytes, length(lvRawData));
+          Move(PByte(lvRawData)^, lvBytes[0], Length(lvRawData));
+          s := pvEncoding.GetString(lvBytes);
+        end else
+        begin
+          s := lvRawData;
+        end;
+        {$ELSE}
+        if pvUseUtf8Decode then
+        begin
+          s := UTF8Decode(lvRawData);
+        end else
+        begin
+          s := lvRawData;
+        end;
+        {$ENDIF}
 
-  for i := 0 to FRequestParamsList.Count - 1 do
-  begin
-    lvRawData := URLDecode(FRequestParamsList.ValueFromIndex[i]);
-    {$IFDEF UNICODE}
-    if pvEncoding <> nil then
-    begin
-      // 字符编码转换
-      SetLength(lvBytes, length(lvRawData));
-      Move(PByte(lvRawData)^, lvBytes[0], Length(lvRawData));
-      s := pvEncoding.GetString(lvBytes);
-    end else
-    begin
-      s := lvRawData;
+        // 解码参数
+        lvStrings.ValueFromIndex[i] := s;
+      end;
     end;
-    {$ELSE}
-    if pvUseUtf8Decode then
-    begin
-      s := UTF8Decode(lvRawData);
-    end else
-    begin
-      s := lvRawData;
-    end;
-    {$ENDIF}
-
-    FRequestParamsList.ValueFromIndex[i] := s;
+    FRequestParamsList.AddStrings(lvStrings);
+  finally
+    lvStrings.Free;
   end;
 end;
 
+
+procedure TDiocpHttpRequest.DecodeURLParam(
+  {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+var
+  lvRawData : AnsiString;
+  lvRawParams, s:String;
+  i:Integer;
+  lvStrings:TStrings;
+{$IFDEF UNICODE}
+var
+  lvBytes:TBytes;
+{$ELSE}
+{$ENDIF}
+begin
+  // 解析URL参数
+  if FRequestURLParamData = '' then exit;
+
+  lvStrings := TStringList.Create;
+  try
+    // 先放入到Strings
+    SplitStrings(FRequestURLParamData, lvStrings, ['&']);
+
+    for i := 0 to lvStrings.Count - 1 do
+    begin
+      lvRawData := URLDecode(lvStrings.ValueFromIndex[i]);
+      if lvRawData<> '' then
+      begin
+        {$IFDEF UNICODE}
+        if pvEncoding <> nil then
+        begin
+          // 字符编码转换
+          SetLength(lvBytes, length(lvRawData));
+          Move(PByte(lvRawData)^, lvBytes[0], Length(lvRawData));
+          s := pvEncoding.GetString(lvBytes);
+        end else
+        begin
+          s := lvRawData;
+        end;
+        {$ELSE}
+        if pvUseUtf8Decode then
+        begin
+          s := UTF8Decode(lvRawData);
+        end else
+        begin
+          s := lvRawData;
+        end;
+        {$ENDIF}
+
+        // 解码参数
+        lvStrings.ValueFromIndex[i] := s;
+      end;
+    end;
+    FRequestParamsList.AddStrings(lvStrings);
+  finally
+    lvStrings.Free;
+  end;
+
+end;
 
 /// <summary>
 ///  解析POST和GET参数
