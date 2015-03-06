@@ -34,6 +34,8 @@ SOCKET CreateTcpSocket();
 
 int ConnectSocket(SOCKET s, const char * host, u_short port);
 
+int ConnectSocketTimeOut(SOCKET s, const char * host, u_short port, int ms);
+
 // 测试是否有数据可以进行读取
 BOOL CanRecvable(SOCKET s, UINT ims);
 

@@ -27,6 +27,15 @@ int ConnectSocket(SOCKET s, const char * host, u_short port)
     return connect(s, (struct sockaddr*)&sa, sizeof(sa));
 }
 
+int ConnectSocketTimeOut(SOCKET s, const char * host, u_short port, int ms)
+{
+    struct sockaddr_in sa;
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = inet_addr(host);
+    sa.sin_port = htons(port);
+    return connect(s, (struct sockaddr*)&sa, sizeof(sa));
+}
+
 // 测试是否有数据可以进行读取
 BOOL CanRecvable(SOCKET s, UINT ims)
 {
