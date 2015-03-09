@@ -116,6 +116,19 @@ begin
     s := FTcpServer.IocpEngine.GetStateINfo;
     s := ReplaceText(s, sLineBreak, '<br>');
     pvRequest.Response.WriteString(s);
+  end else if pvRequest.RequestURI = '/redirect' then
+  begin                                       //重新定向
+    s := pvRequest.GetRequestParam('url');
+    if s = '' then
+    begin
+      pvRequest.Response.WriteString('重定向例子:<a href="/redirect?url=http://www.diocp.org">' +
+       Format('http://%s:%s/redirect?url=http://www.diocp.org',[pvRequest.RequestHostName, pvRequest.RequestHostPort]) + '</a>');
+    end else
+    begin
+      pvRequest.Response.RedirectURL(s);
+      pvRequest.CloseContext;
+      Exit;
+    end;
   end else if pvRequest.RequestURI = '/input' then
   begin  // 输出diocp运行信息
     pvRequest.Response.WriteString('DIOCP HTTP 表单提交测试<br>');
@@ -135,7 +148,8 @@ begin
     pvRequest.Response.WriteString('北京时间:' + DateTimeToStr(Now()) + '<br>');
     pvRequest.Response.WriteString('<a href="http://www.diocp.org">DIOCP/MyBean官方社区</a><br>');
     pvRequest.Response.WriteString('<a href="/diocp-v5">查看diocp运行信息</a><br>');
-    pvRequest.Response.WriteString('<a href="/input">表单提交测试</a><br>'); 
+    pvRequest.Response.WriteString('<a href="/input">表单提交测试</a><br>');
+    pvRequest.Response.WriteString('<a href="/redirect">重新定向</a><br>');
     pvRequest.Response.WriteString('<br>');
 
     pvRequest.Response.WriteString('<div>');

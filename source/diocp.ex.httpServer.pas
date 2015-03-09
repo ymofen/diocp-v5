@@ -18,6 +18,9 @@ uses
   Classes, StrUtils, SysUtils, utils.buffer, utils.strings,
   diocp.tcp.server;
 
+const
+  HTTPLineBreak = #13#10;
+
 type
   TDiocpHttpState = (hsCompleted, hsRequest { 接收请求 } , hsRecvingPost { 接收数据 } );
   TDiocpHttpResponse = class;
@@ -100,8 +103,6 @@ type
     /// </summary>
     procedure WriteRawBuffer(const buffer: Pointer; len: Integer);
   protected
-    function MakeHeader(const Status, ContType, Header: string;
-      pvContextLength: Integer): string;
   public
     constructor Create;
     destructor Destroy; override;
@@ -229,14 +230,21 @@ type
     FResponseHeader: string;
     FContentType: String;
     FData: TMemoryStream;
+    FDiocpContext : TDiocpHttpClientContext;
   public
     procedure Clear;
     constructor Create;
     destructor Destroy; override;
     procedure WriteBuf(pvBuf: Pointer; len: Cardinal);
     procedure WriteString(pvString: string; pvUtf8Convert: Boolean = true);
+    /// <summary>
+    ///   与客户端建立的连接
+    /// </summary>
+    property Connection: TDiocpHttpClientContext read FDiocpContext;
 
     property ContentType: String read FContentType write FContentType;
+
+    procedure RedirectURL(pvURL:String);
   end;
 
   /// <summary>
@@ -314,6 +322,7 @@ type
   end;
 
 
+
 implementation
 
 function FixHeader(const Header: string): string;
@@ -326,6 +335,39 @@ begin
     else
       Result := Result + #13#10#13#10;
   end;
+end;
+
+function MakeHeader(const Status, pvRequestVersionStr: string; pvKeepAlive:
+    Boolean; const ContType, Header: string; pvContextLength: Integer): string;
+var
+  lvVersionStr:string;
+begin
+  Result := '';
+
+  lvVersionStr := pvRequestVersionStr;
+  if lvVersionStr = '' then lvVersionStr := 'HTTP/1.0';
+
+  if (Status = '') then
+    Result := Result + lvVersionStr + ' 200 OK' + #13#10
+  else
+    Result := Result + lvVersionStr + ' ' + Status + #13#10;
+
+  if (ContType = '') then
+    Result := Result + 'Content-Type: text/html' + #13#10
+  else
+    Result := Result + 'Content-Type: ' + ContType + #13#10;
+
+  if (pvContextLength > 0) then
+    Result := Result + 'Content-Length: ' + IntToStr(pvContextLength) + #13#10;
+  // Result := Result + 'Cache-Control: no-cache'#13#10;
+
+  if pvKeepAlive then
+    Result := Result + 'Connection: keep-alive'#13#10
+  else
+    Result := Result + 'Connection: close'#13#10;
+
+  Result := Result + 'Server: DIOCP-V5/1.0'#13#10;
+
 end;
 
 procedure TDiocpHttpRequest.Clear;
@@ -779,45 +821,18 @@ begin
   SplitStrings(pvParamText, FRequestParamsList, ['&']);
 end;
 
-function TDiocpHttpRequest.MakeHeader(const Status, ContType, Header: string;
-  pvContextLength: Integer): string;
-begin
-  Result := '';
-
-  if (Status = '') then
-    Result := Result + FRequestVersionStr + ' 200 OK' + #13#10
-  else
-    Result := Result + FRequestVersionStr + ' ' + Status + #13#10;
-
-  if (ContType = '') then
-    Result := Result + 'Content-Type: text/html' + #13#10
-  else
-    Result := Result + 'Content-Type: ' + ContType + #13#10;
-
-  if (pvContextLength > 0) then
-    Result := Result + 'Content-Length: ' + IntToStr(pvContextLength) + #13#10;
-  // Result := Result + 'Cache-Control: no-cache'#13#10;
-
-  if FKeepAlive then
-    Result := Result + 'Connection: keep-alive'#13#10
-  else
-    Result := Result + 'Connection: close'#13#10;
-
-  Result := Result + 'Server: DIOCP3/1.0'#13#10;
-
-  if (Header <> '') then
-    Result := Result + FixHeader(Header)
-  else
-    Result := Result + #13#10;
-end;
-
 procedure TDiocpHttpRequest.ResponseEnd;
 var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
-  lvFixedHeader := MakeHeader('', FResponse.FContentType,
+  lvFixedHeader := MakeHeader('200 OK', FRequestVersionStr, FKeepAlive, FResponse.FContentType,
     FResponse.FResponseHeader, FResponse.FData.Size);
+
+  if (lvFixedHeader <> '') then
+    lvFixedHeader := FixHeader(lvFixedHeader)
+  else
+    lvFixedHeader := lvFixedHeader + HTTPLineBreak;
 
   // FResponseSize必须准确指定发送的数据包大小
   // 用于在发送完之后(Owner.TriggerClientSentData)断开客户端连接
@@ -863,6 +878,28 @@ begin
   inherited Destroy;
 end;
 
+procedure TDiocpHttpResponse.RedirectURL(pvURL: String);
+var
+  lvFixedHeader: AnsiString;
+  len: Integer;
+begin
+  lvFixedHeader := MakeHeader('302 Temporarily Moved', 'HTTP/1.0', false, '',
+    '', 0);
+
+  lvFixedHeader := lvFixedHeader + 'Location: ' + pvURL + HTTPLineBreak;
+
+  lvFixedHeader := FixHeader(lvFixedHeader);
+
+  // FResponseSize必须准确指定发送的数据包大小
+  // 用于在发送完之后(Owner.TriggerClientSentData)断开客户端连接
+  if lvFixedHeader <> '' then
+  begin
+    len := Length(lvFixedHeader);
+    FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
+  end;
+
+end;
+
 procedure TDiocpHttpResponse.WriteBuf(pvBuf: Pointer; len: Cardinal);
 begin
   FData.Write(pvBuf^, len);
@@ -888,6 +925,7 @@ begin
   inherited Create;
   FRequest := TDiocpHttpRequest.Create();
   FRequest.FDiocpContext := self;
+  FRequest.Response.FDiocpContext := self;
 end;
 
 destructor TDiocpHttpClientContext.Destroy;
