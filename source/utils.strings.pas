@@ -95,6 +95,17 @@ function URLDecode(const ASrc: URLString; pvIsPostData: Boolean = true):URLStrin
 function URLEncode(S: string; pvIsPostData: Boolean = true): URLString;
 
 
+/// <summary>procedure ValueOfName
+/// </summary>
+/// <returns> String
+/// </returns>
+/// <param name="pvStrings"> (TStrings) </param>
+/// <param name="pvName"> (string) </param>
+/// <param name="pvSpliters"> 名字和值的分割符 </param>
+function ValueOfName(pvStrings: TStrings; const pvName: string; pvSpliters:
+    TSysCharSet; pvTrim: Boolean): String;
+
+
 
 implementation
 
@@ -308,6 +319,45 @@ begin
     end;
   end;
   {$ENDIF}
+end;
+
+function ValueOfName(pvStrings: TStrings; const pvName: string; pvSpliters:
+    TSysCharSet; pvTrim: Boolean): String;
+var
+  i : Integer;
+  s : string;
+  lvName: String;
+  p : PChar;
+  lvSpliters:TSysCharSet;
+begin
+  lvSpliters := pvSpliters;
+  Result := '';
+
+  // context-length : 256
+  for i := 0 to pvStrings.Count -1 do
+  begin
+    s := pvStrings[i];
+    p := PChar(s);
+
+    // 获取名称
+    lvName := LeftUntil(p, lvSpliters);
+
+    if pvTrim then lvName := Trim(lvName);
+
+    if CompareText(lvName, pvName) = 0 then
+    begin
+      // 跳过分隔符
+      SkipChars(p, lvSpliters);
+
+      // 获取值
+      Result := LeftUntil(P, []);
+
+      if pvTrim then Result := Trim(Result);
+
+      Exit;
+    end;
+  end;
+
 end;
 
 end.
