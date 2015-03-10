@@ -632,7 +632,7 @@ begin
     SkipChars(P, [':', ' ']);
 
     // »ñÈ¡Ê£ÓàµÄ×Ö·û
-    lvRemainStr := LeftUntil(P, []);
+    lvRemainStr := P;
 
     if (lvRequestCmdLine = '') then
       Continue;

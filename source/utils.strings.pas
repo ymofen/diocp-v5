@@ -59,9 +59,10 @@ function SkipUntil(var p:PChar; pvChars: TSysCharSet): Integer;
 /// <summary>
 ///   跳过字符
 /// </summary>
-/// <returns> Integer
+/// <returns>
+///   返回跳过的字符个数
 /// </returns>
-/// <param name="p"> (PChar) </param>
+/// <param name="p"> 源(字符串)位置 </param>
 /// <param name="pvChars"> (TSysCharSet) </param>
 function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
 
@@ -69,11 +70,23 @@ function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
 /// <summary>
 ///   从左边开始截取字符
 /// </summary>
-/// <returns> Integer
+/// <returns>
+///   返回截取到的字符串
 /// </returns>
-/// <param name="p"> (PChar) </param>
+/// <param name="p"> 源(字符串)开始的位置, 匹配成功会出现在pvSpliter的首次出现位置, 否则不会进行移动</param>
 /// <param name="pvChars"> (TSysCharSet) </param>
 function LeftUntil(var p:PChar; pvChars: TSysCharSet): string;
+
+/// <summary>
+///   从左边开始截取字符串
+/// </summary>
+/// <returns>
+///   返回截取到的字符串
+/// </returns>
+/// <param name="p"> 源(字符串), 匹配成功会出现在pvSpliter的首次出现位置, 否则不会进行移动 </param>
+/// <param name="pvSpliter"> 分割(字符串) </param>
+function LeftUntilStr(var P: PChar; pvSpliter: PChar; pvIgnoreCase: Boolean =
+    true): string;
 
 /// <summary>
 ///   根据SpliterChars中提供的字符，进行分割字符串，放入到Strings中
@@ -143,7 +156,7 @@ function StrStr(P:PChar; PSub:PChar): PChar;
 /// </summary>
 /// <returns>
 ///   如果找到, 返回第一个字符串位置
-///   找不到返回False
+///   找不到返回nil
 ///   * 来自qdac.qstrings
 /// </returns>
 /// <param name="P"> 要开始查找(字符串) </param>
@@ -216,32 +229,38 @@ end;
 
 function LeftUntil(var p:PChar; pvChars: TSysCharSet): string;
 var
-  ps: PChar;
+  lvPTemp: PChar;
   l:Integer;
+  lvMatched: Byte;
 begin
-  ps := p;
-  while p^ <> #0 do
+
+  lvMatched := 0;
+  lvPTemp := p;
+  while lvPTemp^ <> #0 do
   begin
-    if CharInSet(p^, pvChars) then
-      Break
-    else
+    if CharInSet(lvPTemp^, pvChars) then
+    begin            // 匹配到
+      lvMatched := 1;
+      Break;
+    end else
       Inc(P);
   end;
-  l := p-ps;
-  if l = 0 then
-  begin
+  if lvMatched = 0 then
+  begin   // 没有匹配到
     Result := '';
   end else
-  begin
+  begin   // 匹配到
+    l := lvPTemp-P;
     SetLength(Result, l);
     if SizeOf(Char) = 1 then
     begin
-      Move(ps^, PChar(Result)^, l);
+      Move(P^, PChar(Result)^, l);
     end else
     begin
       l := l shl 1;
-      Move(ps^, PChar(Result)^, l);
+      Move(P^, PChar(Result)^, l);
     end;
+    P := lvPTemp;  // 跳转到新位置
   end;
 end;
 
@@ -522,6 +541,47 @@ begin
       Inc(P);
     end;
   end;
+end;
+
+function LeftUntilStr(var P: PChar; pvSpliter: PChar; pvIgnoreCase: Boolean =
+    true): string;
+var
+  lvPUntil:PChar;
+  l : Integer;
+begin
+  if pvIgnoreCase then
+  begin
+    lvPUntil := StrStrIgnoreCase(P, pvSpliter);
+  end else
+  begin
+    lvPUntil := StrStr(P, pvSpliter);
+  end;
+  if lvPUntil = nil then
+  begin
+    Result := '';
+    P := nil;
+  end else
+  begin
+    l := lvPUntil-P;
+    if l = 0 then
+    begin
+      Result := '';
+    end else
+    begin
+      SetLength(Result, l);
+      if SizeOf(Char) = 1 then
+      begin
+        Move(P^, PChar(Result)^, l);
+      end else
+      begin
+        l := l shl 1;
+        Move(P^, PChar(Result)^, l);
+      end;
+      P := lvPUntil;
+    end;
+  end;
+  
+
 end;
 
 
