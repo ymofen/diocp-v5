@@ -16,7 +16,14 @@ unit utils.strings;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils
+  {$IFDEF MSWINDOWS}
+    , windows
+{$ENDIF}
+{$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
+    , AnsiStrings
+{$IFEND >=XE5}
+  ;
 
 type
 {$IFDEF MSWINDOWS}  // Windows平台下面可以使用AnsiString
@@ -27,6 +34,14 @@ type
   URLString = String;
   URLChar = Char;
   {$DEFINE UNICODE_URL}
+{$ENDIF}
+
+{$IFDEF UNICODE}
+WChar = Char;
+PWChar = PChar;
+{$ELSE}
+WChar = WideChar;
+PWChar = PWideChar;
 {$ENDIF}
 
 
@@ -95,19 +110,70 @@ function URLDecode(const ASrc: URLString; pvIsPostData: Boolean = true):URLStrin
 function URLEncode(S: string; pvIsPostData: Boolean = true): URLString;
 
 
-/// <summary>procedure ValueOfName
+/// <summary>
+///  在Strings中根据名称搜索值
 /// </summary>
 /// <returns> String
 /// </returns>
 /// <param name="pvStrings"> (TStrings) </param>
 /// <param name="pvName"> (string) </param>
 /// <param name="pvSpliters"> 名字和值的分割符 </param>
-function ValueOfName(pvStrings: TStrings; const pvName: string; pvSpliters:
-    TSysCharSet; pvTrim: Boolean): String;
+function StringsValueOfName(pvStrings: TStrings; const pvName: string;
+    pvSpliters: TSysCharSet; pvTrim: Boolean): String;
 
+
+/// <summary>
+///   查找PSub在P中出现的第一个位置
+///   精确查找
+///   如果PSub为空字符串(#0, nil)则直接返回P
+/// </summary>
+/// <returns>
+///   如果找到, 返回第一个字符串位置
+///   找不到返回False
+///   * 来自qdac.qstrings
+/// </returns>
+/// <param name="P"> 要开始查找(字符串) </param>
+/// <param name="PSub"> 要搜(字符串) </param>
+function StrStr(P:PChar; PSub:PChar): PChar;
+
+/// <summary>
+///   查找PSub在P中出现的第一个位置
+///   忽略大小写
+///   如果PSub为空字符串(#0, nil)则直接返回P
+/// </summary>
+/// <returns>
+///   如果找到, 返回第一个字符串位置
+///   找不到返回False
+///   * 来自qdac.qstrings
+/// </returns>
+/// <param name="P"> 要开始查找(字符串) </param>
+/// <param name="PSub"> 要搜(字符串) </param>
+function StrStrIgnoreCase(P, PSub: PChar): PChar;
+
+
+/// <summary>
+///  字符转大写
+///  * 来自qdac.qstrings
+/// </summary>
+function UpperChar(c: Char): Char;
 
 
 implementation
+
+
+
+{$IFDEF MSWINDOWS}
+type
+  TMSVCStrStr = function(s1, s2: PAnsiChar): PAnsiChar; cdecl;
+  TMSVCStrStrW = function(s1, s2: PWChar): PWChar; cdecl;
+  TMSVCMemCmp = function(s1, s2: Pointer; len: Integer): Integer; cdecl;
+
+var
+  hMsvcrtl: HMODULE;
+  VCStrStr: TMSVCStrStr;
+  VCStrStrW: TMSVCStrStrW;
+  VCMemCmp: TMSVCMemCmp;
+{$ENDIF}
 
 {$if CompilerVersion < 20}
 function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
@@ -115,6 +181,22 @@ begin
   Result := C in CharSet;
 end;
 {$ifend}
+
+
+function UpperChar(c: Char): Char;
+begin
+  {$IFDEF UNICODE}
+  if (c >= #$61) and (c <= #$7A) then
+    Result := Char(PWord(@c)^ xor $20)
+  else
+    Result := c;
+  {$ELSE}
+  if (c >= $61) and (c <= $7A) then
+    Result := c xor $20
+  else
+    Result := c;
+  {$ENDIF}
+end;
 
 
 function SkipUntil(var p:PChar; pvChars: TSysCharSet): Integer;
@@ -321,8 +403,8 @@ begin
   {$ENDIF}
 end;
 
-function ValueOfName(pvStrings: TStrings; const pvName: string; pvSpliters:
-    TSysCharSet; pvTrim: Boolean): String;
+function StringsValueOfName(pvStrings: TStrings; const pvName: string;
+    pvSpliters: TSysCharSet; pvTrim: Boolean): String;
 var
   i : Integer;
   s : string;
@@ -352,6 +434,7 @@ begin
       // 获取值
       Result := LeftUntil(P, []);
 
+      // 截取值
       if pvTrim then Result := Trim(Result);
 
       Exit;
@@ -359,5 +442,112 @@ begin
   end;
 
 end;
+
+function StrStrIgnoreCase(P, PSub: PChar): PChar;
+var
+  I: Integer;
+  lvSubUP: String;
+begin
+  Result := nil;
+  if (P = nil) or (PSub = nil) then
+    Exit;
+  lvSubUP := UpperCase(PSub);
+  PSub := PWideChar(lvSubUP);
+  while P^ <> #0 do
+  begin
+    if UpperChar(P^) = PSub^ then
+    begin
+      I := 1;
+      while PSub[I] <> #0 do
+      begin
+        if UpperChar(P[I]) = PSub[I] then
+          Inc(I)
+        else
+          Break;
+      end;
+      if PSub[I] = #0 then
+      begin
+        Result := P;
+        Break;
+      end;
+    end;
+    Inc(P);
+  end;
+end;
+
+function StrStr(P: PChar; PSub: PChar): PChar;
+var
+  I: Integer;
+begin
+{$IFDEF MSWINDOWS}
+{$IFDEF UNICODE}
+  if Assigned(VCStrStrW) then
+  begin
+    Result := VCStrStrW(P, PSub);
+    Exit;
+  end;
+{$ELSE}
+  if Assigned(VCStrStr) then
+  begin
+    Result := VCStrStr(P, PSub);
+    Exit;
+  end;
+{$ENDIF}
+{$ENDIF}
+
+  if (PSub = nil) or (PSub^ = #0) then
+    Result := P
+  else
+  begin
+    Result := nil;
+    while P^ <> #0 do
+    begin
+      if P^ = PSub^ then
+      begin
+        I := 1;     // 从后面第二个字符开始对比
+        while PSub[I] <> #0 do
+        begin
+          if P[I] = PSub[I] then
+            Inc(I)
+          else
+            Break;
+        end;
+
+        if PSub[I] = #0 then
+        begin  // P1和P2已经匹配到了末尾(匹配成功)
+          Result := P;
+          Break;
+        end;
+      end;
+      Inc(P);
+    end;
+  end;
+end;
+
+
+initialization
+
+{$IFDEF MSWINDOWS}
+hMsvcrtl := LoadLibrary('msvcrt.dll');
+if hMsvcrtl <> 0 then
+begin
+  VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
+  VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
+  VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
+end
+else
+begin
+  VCStrStr := nil;
+  VCStrStrW := nil;
+  VCMemCmp := nil;
+end;
+{$ENDIF}
+
+finalization
+
+{$IFDEF MSWINDOWS}
+if hMsvcrtl <> 0 then
+  FreeLibrary(hMsvcrtl);
+{$ENDIF}
 
 end.
