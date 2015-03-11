@@ -908,7 +908,7 @@ procedure TIocpEngine.SetWorkerCount(AWorkerCount: Integer);
 begin
   if FActive then SafeStop;
   if AWorkerCount <= 0 then
-    FWorkerCount := (getCPUCount shl 2) -1
+    FWorkerCount := (getCPUCount shl 1) -1
   else
     FWorkerCount := AWorkerCount;
   
