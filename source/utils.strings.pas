@@ -243,7 +243,7 @@ begin
       lvMatched := 1;
       Break;
     end else
-      Inc(P);
+      Inc(lvPTemp);
   end;
   if lvMatched = 0 then
   begin   // √ª”–∆•≈‰µΩ
