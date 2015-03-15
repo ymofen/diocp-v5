@@ -1106,6 +1106,10 @@ begin
     except
     end;
   finally
+    {$IFDEF DEBUG_ON}
+    FDebugStrings.Add(Format('#-(%d):Disconnected', [FContextDNA]));
+    if FDebugStrings.Count > 40 then FDebugStrings.Delete(0);
+    {$ENDIF}
     FOwner.RemoveFromOnOnlineList(Self);
     FOwner.ReleaseClientContext(Self);
   end;
@@ -1468,6 +1472,11 @@ begin
     begin
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
+
+      {$IFDEF DEBUG_ON}
+      FDebugStrings.Add(Format('#+(%d):Connected', [FContextDNA]));
+      if FDebugStrings.Count > 40 then FDebugStrings.Delete(0);
+      {$ENDIF}
       FOwner.AddToOnlineList(Self);
 
       if self.LockContext('onConnected', Self) then

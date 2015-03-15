@@ -204,8 +204,8 @@ begin
   else
     Result := c;
   {$ELSE}
-  if (c >= $61) and (c <= $7A) then
-    Result := c xor $20
+  if (c >= #$61) and (c <= #$7A) then
+    Result := Char(ord(c) xor $20)
   else
     Result := c;
   {$ENDIF}
@@ -471,7 +471,7 @@ begin
   if (P = nil) or (PSub = nil) then
     Exit;
   lvSubUP := UpperCase(PSub);
-  PSub := PWideChar(lvSubUP);
+  PSub := PChar(lvSubUP);
   while P^ <> #0 do
   begin
     if UpperChar(P^) = PSub^ then
