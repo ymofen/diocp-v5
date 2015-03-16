@@ -30,6 +30,10 @@ resourcestring
   strOnRecvBufferException = '[%d]响应OnRecvBuffer时出现了异常:%s。';
 
 
+  strConnectTimeOut = '建立连接超时(%s:%d)';
+
+
+
   //strContextCloseErr = '
 
 

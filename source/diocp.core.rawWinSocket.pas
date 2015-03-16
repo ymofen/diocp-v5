@@ -67,11 +67,17 @@ type
 
     function connect(const pvAddr: string; pvPort: Integer): Boolean;
 
+    /// <summary>
+    ///   超时连接, 返回失败，表示连接超时
+    /// </summary>
+    function ConnectTimeOut(const pvAddr: string; pvPort: Integer; pvMs:Cardinal):
+        Boolean;
+
     //zero if the time limit expired, or SOCKET_ERROR if an error occurred.
     function selectSocket(vReadReady, vWriteReady, vExceptFlag: PBoolean;
         pvTimeOut: Integer = 0): Integer;
 
-    function setReadTimeOut(const pvTimeOut: Cardinal): Integer;
+    function SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
 
     function CancelIO: Boolean;
 
@@ -154,6 +160,65 @@ begin
     sin_port :=  htons(pvPort);
   end;
   Result := diocp.winapi.winsock2.connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn))  = 0;
+end;
+
+function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
+    pvMs:Cardinal): Boolean;
+var
+  lvFlags: Cardinal;
+  sockaddr: TSockAddrIn;
+  lvErr, lvRet: Integer;
+  fs: TFDset;
+
+
+  tv: timeval;
+  Timeptr: PTimeval;
+
+begin
+  lvFlags := 1;  // 非阻塞模式
+  ioctlsocket(FSocketHandle, FIONBIO, lvFlags);
+
+  FillChar(sockaddr, SizeOf(sockaddr), 0);
+  with sockaddr do
+  begin
+    sin_family := AF_INET;
+    sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
+    sin_port :=  htons(pvPort);
+  end;
+  lvRet := diocp.winapi.winsock2.connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn));
+  if lvRet = 0 then
+  begin  // 连接成功
+    lvFlags := 0;  // 非阻塞模式
+    ioctlsocket(FSocketHandle, FIONBIO, lvFlags);
+    Result := true;
+  end else
+  begin
+    FD_ZERO(fs);
+    _FD_SET(FSocketHandle, fs);
+
+    tv.tv_sec := pvMs div 1000;
+    tv.tv_usec :=  1000 * (pvMs mod 1000);
+    Timeptr := @tv;
+
+    lvRet := diocp.winapi.winsock2.select(FSocketHandle + 1, nil, @fs, nil, Timeptr);
+
+    if lvRet <= 0 then
+    begin
+      Result := false;  //连接超时
+//      lvErr := WSAGetLastError;
+      closesocket(FSocketHandle);
+//      Result := lvErr = 0;
+    end else
+    begin
+      lvFlags := 0;  // 非阻塞模式
+      ioctlsocket(FSocketHandle, FIONBIO, lvFlags);
+      Result := true;
+    end;
+
+
+
+  end;
+
 end;
 
 procedure TRawSocket.CreateTcpOverlappedSocket;
@@ -273,7 +338,7 @@ begin
   //  zero if the time limit expired, or SOCKET_ERROR if an error occurred.
   //  If the return value is SOCKET_ERROR,
   //  WSAGetLastError can be used to retrieve a specific error code.
-  
+
   Result := diocp.winapi.winsock2.select(FSocketHandle + 1, ReadFdsptr, WriteFdsptr, ExceptFdsptr, Timeptr);
 
   if Assigned(vReadReady) then
@@ -327,7 +392,7 @@ begin
   Result := setsockopt(FSocketHandle, IPPROTO_TCP, TCP_NODELAY, @bNoDelay, SizeOf(bNoDelay)) <> SOCKET_ERROR;
 end;
 
-function TRawSocket.setReadTimeOut(const pvTimeOut: Cardinal): Integer;
+function TRawSocket.SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
 begin
   Result := setsockopt(FSocketHandle,
    SOL_SOCKET, SO_RCVTIMEO, PAnsiChar(@pvTimeOut), SizeOf(Cardinal));

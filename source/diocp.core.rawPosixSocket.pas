@@ -59,6 +59,11 @@ type
     function SendBuf(const data; const len: Cardinal): Integer;
     function SendBufTo(const data; const len: Integer): Integer;
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
+
+
+    function ConnectTimeOut(const pvAddr: string; pvPort: Integer; pvMs:Cardinal):
+        Boolean;
+
     function RecvdCount: Integer;
 
 
@@ -290,6 +295,13 @@ begin
   FSockaddr.sin_addr.s_addr :=inet_addr(PAnsichar(AnsiString(pvAddr)));
   Result := winsock.Connect(FSocketHandle, FSockaddr, sizeof(sockaddr_in))  = 0;
 {$ENDIF}
+end;
+
+function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
+    pvMs:Cardinal): Boolean;
+begin
+  Assert(False, 'connectTimeout‘› ±Œ¥ µœ÷!');
+  Result := False;
 end;
 
 {$IFDEF MSWINDOWS}

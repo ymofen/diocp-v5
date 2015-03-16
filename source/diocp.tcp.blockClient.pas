@@ -6,6 +6,9 @@
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
+ *   2015-03-16 13:51:06
+ *     添加ConnectTimeOut方法(可以进行超时连接,andriod平台暂时未实现)
+ *
  *)
  
 unit diocp.tcp.blockClient;
@@ -14,6 +17,7 @@ interface
 
 uses
   SysUtils
+  , diocp.res
   {$IFDEF POSIX}
   , diocp.core.rawPosixSocket
   {$ELSE}
@@ -52,6 +56,11 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure Connect;
+    /// <summary>
+    ///   超时连接
+    /// </summary>
+    /// <param name="pvMs"> (Cardinal) </param>
+    procedure ConnectTimeOut(pvMs:Cardinal);
     procedure Disconnect;
     /// <summary>
     ///  recv buffer
@@ -101,10 +110,9 @@ begin
   if FActive then exit;
 
   FRawSocket.createTcpSocket;
-  //FRawSocket.setReadTimeOut(FReadTimeOut);
-  //lvIpAddr := FHost;
+  FRawSocket.setReadTimeOut(FReadTimeOut);
 
-  // may domain name
+  // 进行域名解析
   lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
 
   FActive := FRawSocket.connect(lvIpAddr, FPort);
@@ -112,6 +120,26 @@ begin
   begin
     RaiseLastOSError;
   end;
+end;
+
+procedure TDiocpBlockTcpClient.ConnectTimeOut(pvMs:Cardinal);
+var
+  lvIpAddr:String;
+begin
+  if FActive then exit;
+
+  FRawSocket.createTcpSocket;
+  FRawSocket.setReadTimeOut(FReadTimeOut);
+
+  // 进行域名解析
+  lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
+
+  FActive := FRawSocket.ConnectTimeOut(lvIpAddr, FPort, pvMs);
+  if not FActive then
+  begin
+    raise Exception.CreateFmt(strConnectTimeOut, [FHost, FPort]);
+  end;
+
 end;
 
 procedure TDiocpBlockTcpClient.Disconnect;
