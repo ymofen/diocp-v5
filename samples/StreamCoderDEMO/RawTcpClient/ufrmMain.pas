@@ -76,7 +76,7 @@ begin
   end;
   FTcpClient.Host := edtHost.Text;
   FTcpClient.Port := StrToInt(edtPort.Text);
-  FTcpClient.Connect;
+  FTcpClient.ConnectTimeOut(10000);
 
   mmoRecvMessage.Clear;   
   mmoRecvMessage.Lines.Add('connected...');
