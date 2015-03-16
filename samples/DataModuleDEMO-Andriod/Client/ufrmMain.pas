@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
-  Controls, Forms, Dialogs, StdCtrls, iocpLogger, diocp.task, diocp.tcp.blockClient,
+  Controls, Forms, Dialogs, StdCtrls, diocp.task, diocp.tcp.blockClient,
   uStreamCoderSocket, uRawTcpClientCoderImpl, Grids, DBGrids,
   uIRemoteServer, uRemoteServerDIOCPImpl, DB, DBClient;
 

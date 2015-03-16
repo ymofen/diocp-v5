@@ -1,9 +1,9 @@
 object frmMain: TfrmMain
   Left = 571
   Top = 391
-  Width = 848
-  Height = 447
   Caption = 'RawTcpClient'
+  ClientHeight = 409
+  ClientWidth = 832
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
