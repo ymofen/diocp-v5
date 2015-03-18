@@ -299,9 +299,59 @@ end;
 
 function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
     pvMs:Cardinal): Boolean;
+var
+  lvFlags: Cardinal;
+  lvErr, lvRet: Integer;
+  fs: fd_set;
+
+
+  tv: timeval;
+  Timeptr: PTimeval;
+
 begin
-  Assert(False, 'connectTimeout暂时未实现!');
-  Result := False;
+  // 获取原标志
+  lvFlags := fcntl(FSocketHandle, F_GETFL, 0);
+  lvFlags := lvFlags OR (O_NONBLOCK);  // 非阻塞模式
+  lvFlags := fcntl(FSocketHandle, F_SETFL, 0);
+
+  FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
+  FSockaddr.sin_family := AF_INET;
+  FSockaddr.sin_port := htons(pvPort);
+
+  FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
+  lvRet := Posix.SysSocket.Connect(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in));
+
+  if lvRet = 0 then
+  begin  // 连接成功
+    lvFlags := lvFlags AND (NOT O_NONBLOCK);  // 阻塞模式
+    lvFlags := fcntl(FSocketHandle, F_SETFL, 0);
+    Result := true;
+  end else
+  begin
+    FD_ZERO(fs);
+    _FD_SET(FSocketHandle, fs);
+
+    tv.tv_sec := pvMs div 1000;
+    tv.tv_usec :=  1000 * (pvMs mod 1000);
+    Timeptr := @tv;
+
+    lvRet := select(FSocketHandle + 1, nil, @fs, nil, Timeptr);
+
+    if lvRet <= 0 then
+    begin
+      Result := false;  //连接超时
+//      lvErr := WSAGetLastError;
+      __close(FSocketHandle);
+//      Result := lvErr = 0;
+    end else
+    begin
+      lvFlags := lvFlags AND (NOT O_NONBLOCK);  // 阻塞模式
+      lvFlags := fcntl(FSocketHandle, F_SETFL, 0);
+      Result := true;
+    end;
+  end;
+
+
 end;
 
 {$IFDEF MSWINDOWS}

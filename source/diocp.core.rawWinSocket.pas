@@ -200,7 +200,7 @@ begin
     tv.tv_usec :=  1000 * (pvMs mod 1000);
     Timeptr := @tv;
 
-    lvRet := diocp.winapi.winsock2.select(FSocketHandle + 1, nil, @fs, nil, Timeptr);
+    lvRet := diocp.winapi.winsock2.select(FSocketHandle, nil, @fs, nil, Timeptr);
 
     if lvRet <= 0 then
     begin
