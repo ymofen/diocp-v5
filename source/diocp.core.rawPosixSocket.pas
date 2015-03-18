@@ -312,7 +312,7 @@ begin
   // 获取原标志
   lvFlags := fcntl(FSocketHandle, F_GETFL, 0);
   lvFlags := lvFlags OR (O_NONBLOCK);  // 非阻塞模式
-  lvFlags := fcntl(FSocketHandle, F_SETFL, 0);
+  fcntl(FSocketHandle, F_SETFL, lvFlags);
 
   FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
   FSockaddr.sin_family := AF_INET;
@@ -324,7 +324,7 @@ begin
   if lvRet = 0 then
   begin  // 连接成功
     lvFlags := lvFlags AND (NOT O_NONBLOCK);  // 阻塞模式
-    lvFlags := fcntl(FSocketHandle, F_SETFL, 0);
+    fcntl(FSocketHandle, F_SETFL, lvFlags);
     Result := true;
   end else
   begin
@@ -346,7 +346,7 @@ begin
     end else
     begin
       lvFlags := lvFlags AND (NOT O_NONBLOCK);  // 阻塞模式
-      lvFlags := fcntl(FSocketHandle, F_SETFL, 0);
+      fcntl(FSocketHandle, F_SETFL, lvFlags);
       Result := true;
     end;
   end;
