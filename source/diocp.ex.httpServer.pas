@@ -14,9 +14,20 @@ unit diocp.ex.httpServer;
 
 interface
 
+/// 三个编译开关，只能开启一个
+{$DEFINE INNER_IOCP}     // iocp线程触发事件
+{.$DEFINE  QDAC_QWorker} // 用qworker进行调度触发事件
+{$DEFINE DIOCP_Task}    // 用diocp.task进行调度触发事件
+
+
 uses
-  Classes, StrUtils, SysUtils, utils.buffer, utils.strings,
-  diocp.tcp.server;
+  Classes, StrUtils, SysUtils, utils.buffer, utils.strings
+
+  {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
+  {$IFDEF DIOCP_Task}, diocp.task{$ENDIF}
+  , diocp.tcp.server, utils.queues;
+
+
 
 const
   HTTPLineBreak = #13#10;
@@ -25,9 +36,15 @@ type
   TDiocpHttpState = (hsCompleted, hsRequest { 接收请求 } , hsRecvingPost { 接收数据 } );
   TDiocpHttpResponse = class;
   TDiocpHttpClientContext = class;
+  TDiocpHttpServer = class;
 
   TDiocpHttpRequest = class(TObject)
   private
+    /// <summary>
+    ///   便于在Close时归还回对象池
+    /// </summary>
+    FDiocpHttpServer:TDiocpHttpServer;
+
     FDiocpContext: TDiocpHttpClientContext;
 
     /// 头信息
@@ -80,6 +97,10 @@ type
 
     FResponse: TDiocpHttpResponse;
 
+    /// <summary>
+    ///   不再使用了，归还回对象池
+    /// </summary>
+    procedure Close;
     /// <summary>
     /// 是否有效的Http 请求方法
     /// </summary>
@@ -223,6 +244,7 @@ type
     /// </pvParamText>
     procedure ParseParams(pvParamText: string);
 
+
   end;
 
   TDiocpHttpResponse = class(TObject)
@@ -253,7 +275,17 @@ type
   TDiocpHttpClientContext = class(TIocpClientContext)
   private
     FHttpState: TDiocpHttpState;
-    FRequest: TDiocpHttpRequest;
+    FCurrentRequest: TDiocpHttpRequest;
+    {$IFDEF QDAC_QWorker}
+    procedure OnExecuteJob(pvJob:PQJob);
+    {$ENDIF}
+    {$IFDEF DIOCP_Task}
+    procedure OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
+    {$ENDIF}
+
+    // 执行事件
+    procedure DoRequest(pvRequest:TDiocpHttpRequest);
+
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -288,6 +320,8 @@ type
   /// </summary>
   TDiocpHttpServer = class(TDiocpTcpServer)
   private
+    FRequestPool: TBaseQueue;
+
     FOnDiocpHttpRequest: TOnDiocpHttpRequestEvent;
     FOnDiocpHttpRequestPostDone: TOnDiocpHttpRequestEvent;
 
@@ -301,8 +335,20 @@ type
     /// </summary>
     procedure DoRequestPostDataDone(pvRequest: TDiocpHttpRequest);
 
+    /// <summary>
+    ///   从池中获取一个对象
+    /// </summary>
+    function GetRequest: TDiocpHttpRequest;
+
+    /// <summary>
+    ///   还回一个对象
+    /// </summary>
+    procedure GiveBackRequest(pvRequest:TDiocpHttpRequest);
+
   public
     constructor Create(AOwner: TComponent); override;
+
+    destructor Destroy; override;
 
 
 
@@ -384,6 +430,12 @@ begin
   FContextLength := 0;
   FPostDataLen := 0;
   FResponse.Clear;  
+end;
+
+procedure TDiocpHttpRequest.Close;
+begin
+  if FDiocpHttpServer = nil then exit;
+  FDiocpHttpServer.GiveBackRequest(Self);
 end;
 
 procedure TDiocpHttpRequest.CloseContext;
@@ -923,14 +975,10 @@ end;
 constructor TDiocpHttpClientContext.Create;
 begin
   inherited Create;
-  FRequest := TDiocpHttpRequest.Create();
-  FRequest.FDiocpContext := self;
-  FRequest.Response.FDiocpContext := self;
 end;
 
 destructor TDiocpHttpClientContext.Destroy;
 begin
-  FreeAndNil(FRequest);
   inherited Destroy;
 end;
 
@@ -938,7 +986,64 @@ procedure TDiocpHttpClientContext.DoCleanUp;
 begin
   inherited;
   FHttpState := hsCompleted;
+  if FCurrentRequest <> nil then
+  begin
+    FCurrentRequest.Close;
+    FCurrentRequest := nil;
+  end;
 end;
+
+procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
+begin
+   {$IFDEF QDAC_QWorker}
+   Workers.Post(OnExecuteJob, pvRequest);
+   {$ELSE}
+     {$IFDEF DIOCP_TASK}
+     iocpTaskManager.PostATask(OnExecuteJob, pvRequest);
+     {$ELSE}
+     try
+       // 直接触发事件
+       TDiocpHttpServer(FOwner).DoRequest(pvRequest);
+     finally
+       pvRequest.Close;
+     end;
+     {$ENDIF}
+   {$ENDIF}
+end;
+
+{$IFDEF QDAC_QWorker}
+procedure TDiocpHttpClientContext.OnExecuteJob(pvJob:PQJob);
+var
+  lvObj:TDiocpHttpRequest;
+begin
+  lvObj := TDiocpHttpRequest(pvJob.Data);
+  try
+     // 触发事件
+     TDiocpHttpServer(FOwner).DoRequest(lvObj);
+  finally
+    lvObj.Close;
+  end;
+end;
+
+{$ENDIF}
+
+{$IFDEF DIOCP_Task}
+procedure TDiocpHttpClientContext.OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
+var
+  lvObj:TDiocpHttpRequest;
+begin
+  lvObj := TDiocpHttpRequest(pvTaskRequest.TaskData);
+  try
+     // 触发事件
+     TDiocpHttpServer(FOwner).DoRequest(lvObj);
+  finally
+    lvObj.Close;
+  end;
+
+end;
+{$ENDIF}
+
+
 
 procedure TDiocpHttpClientContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
   ErrCode: Word);
@@ -946,6 +1051,7 @@ var
   lvTmpBuf: PAnsiChar;
   CR, LF: Integer;
   lvRemain: Cardinal;
+  lvTempRequest: TDiocpHttpRequest;
 begin
   inherited;
   lvTmpBuf := buf;
@@ -956,7 +1062,10 @@ begin
   begin
     if FHttpState = hsCompleted then
     begin // 完成后重置，重新处理下一个包
-      FRequest.Clear;
+      FCurrentRequest := TDiocpHttpServer(Owner).GetRequest;
+      FCurrentRequest.FDiocpContext := self;
+      FCurrentRequest.Response.FDiocpContext := self;
+      FCurrentRequest.Clear;
       FHttpState := hsRequest;
     end;
 
@@ -973,10 +1082,11 @@ begin
       end;
 
       // 写入请求数据
-      FRequest.WriteRawBuffer(lvTmpBuf, 1);
+      FCurrentRequest.WriteRawBuffer(lvTmpBuf, 1);
 
-      if FRequest.DecodeHttpRequestMethod = 2 then
+      if FCurrentRequest.DecodeHttpRequestMethod = 2 then
       begin // 无效的Http请求
+        // 还回对象池
         self.RequestDisconnect('无效的Http请求', self);
         Exit;
       end;
@@ -984,17 +1094,17 @@ begin
       // 请求数据已接收完毕(#13#10#13#10是HTTP请求结束的标志)
       if (CR = 2) and (LF = 2) then
       begin
-        if FRequest.DecodeHttpRequestHeader = 0 then
+        if FCurrentRequest.DecodeHttpRequestHeader = 0 then
         begin
           self.RequestDisconnect('无效的Http协议数据', self);
           Exit;
         end;
 
-        if SameText(FRequest.FRequestMethod, 'POST') or
-          SameText(FRequest.FRequestMethod, 'PUT') then
+        if SameText(FCurrentRequest.FRequestMethod, 'POST') or
+          SameText(FCurrentRequest.FRequestMethod, 'PUT') then
         begin
           // 无效的Post请求直接断开
-          if (FRequest.FContextLength <= 0) then
+          if (FCurrentRequest.FContextLength <= 0) then
           begin
             self.RequestDisconnect('无效的POST/PUT请求数据', self);
             Exit;
@@ -1005,27 +1115,39 @@ begin
         else
         begin
           FHttpState := hsCompleted;
+
+          lvTempRequest := FCurrentRequest;
+
+          // 避免断开后还回对象池，造成重复还回
+          FCurrentRequest := nil;
+
           // 触发事件
-          TDiocpHttpServer(FOwner).DoRequest(FRequest);
+          DoRequest(lvTempRequest);
+
+          FCurrentRequest := nil;
           Break;
         end;
       end;
     end
     else if (FHttpState = hsRecvingPost) then
     begin
-      FRequest.FRawPostData.Write(lvTmpBuf^, 1);
-      Inc(FRequest.FPostDataLen);
+      FCurrentRequest.FRawPostData.Write(lvTmpBuf^, 1);
+      Inc(FCurrentRequest.FPostDataLen);
 
-      if FRequest.FPostDataLen >= FRequest.FContextLength then
+      if FCurrentRequest.FPostDataLen >= FCurrentRequest.FContextLength then
       begin
         FHttpState := hsCompleted;
 
         // 触发事件
-        TDiocpHttpServer(FOwner).DoRequestPostDataDone(FRequest);
+        TDiocpHttpServer(FOwner).DoRequestPostDataDone(FCurrentRequest);
+
+        lvTempRequest := FCurrentRequest;
+
+        // 避免断开后还回对象池，造成重复还回
+        FCurrentRequest := nil;
 
         // 触发事件
-        TDiocpHttpServer(FOwner).DoRequest(FRequest);
-
+        DoRequest(lvTempRequest);
       end;
     end;
     Dec(lvRemain);
@@ -1038,8 +1160,15 @@ end;
 constructor TDiocpHttpServer.Create(AOwner: TComponent);
 begin
   inherited;
+  FRequestPool := TBaseQueue.Create;
   KeepAlive := false;
-  registerContextClass(TDiocpHttpClientContext);
+  RegisterContextClass(TDiocpHttpClientContext);
+end;
+
+destructor TDiocpHttpServer.Destroy;
+begin
+  FRequestPool.FreeDataObject;
+  inherited;
 end;
 
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
@@ -1058,6 +1187,21 @@ begin
   begin
     FOnDiocpHttpRequestPostDone(pvRequest);
   end;
+end;
+
+function TDiocpHttpServer.GetRequest: TDiocpHttpRequest;
+begin
+  Result := TDiocpHttpRequest(FRequestPool.DeQueue);
+  if Result = nil then
+  begin
+    Result := TDiocpHttpRequest.Create;
+  end;
+  Result.FDiocpHttpServer := Self;
+end;
+
+procedure TDiocpHttpServer.GiveBackRequest(pvRequest: TDiocpHttpRequest);
+begin
+  FRequestPool.EnQueue(pvRequest);
 end;
 
 end.
