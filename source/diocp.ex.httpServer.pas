@@ -15,7 +15,7 @@ unit diocp.ex.httpServer;
 interface
 
 /// 三个编译开关，只能开启一个
-{$DEFINE INNER_IOCP}     // iocp线程触发事件
+{.$DEFINE INNER_IOCP}     // iocp线程触发事件
 {.$DEFINE  QDAC_QWorker} // 用qworker进行调度触发事件
 {$DEFINE DIOCP_Task}    // 用diocp.task进行调度触发事件
 
