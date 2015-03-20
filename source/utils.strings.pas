@@ -451,7 +451,7 @@ begin
       SkipChars(p, lvSpliters);
 
       // 获取值
-      Result := LeftUntil(P, []);
+      Result := P;
 
       // 截取值
       if pvTrim then Result := Trim(Result);

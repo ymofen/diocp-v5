@@ -60,6 +60,9 @@ constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
 
+  sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
+  sfLogger.AppendInMainThread := true;
+
   FTcpServer := TDiocpTcpServer.Create(Self);
   FTcpServer.Name := 'iocpSVR';
   FTcpServer.OnDataReceived := self.OnRecvBuffer;
@@ -161,25 +164,14 @@ procedure TfrmMain.OnRecvBuffer(pvClientContext:TIocpClientContext;
     buf:Pointer; len:cardinal; errCode:Integer);
 var
   j, i:Integer;
+  s:AnsiString;
 begin
   if errCode = 0 then
   begin
-//   j := InterlockedIncrement(iCounter);
-//    if j mod 2000 = 0 then
-//    begin
-//      pvClientContext.RequestDisconnect;
-//      exit;
-//    end;
+    SetLength(s, len);
 
-//    if j mod 2000 = 0 then
-//    begin
-//      for i := 0 to 200 do
-//      begin
-//        pvClientContext.PostWSASendRequest(buf, len);
-//      end;
-//      exit;
-//    end;
-
+    Move(buf^, s[1], len);
+    sfLogger.logMessage(s);
     pvClientContext.PostWSASendRequest(buf, len);
 
   end else

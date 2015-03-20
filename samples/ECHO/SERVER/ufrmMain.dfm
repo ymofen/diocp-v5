@@ -38,10 +38,6 @@ object frmMain: TfrmMain
     object tsLog: TTabSheet
       Caption = 'log'
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 688
-      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
