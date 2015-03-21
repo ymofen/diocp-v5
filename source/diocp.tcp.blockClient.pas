@@ -97,10 +97,17 @@ procedure TDiocpBlockTcpClient.CheckSocketResult(pvSocketResult: Integer);
 begin
   ///  Posix, fail return 0
   ///  ms_windows, fail return -1
+  {$IFDEF POSIX}
   if (pvSocketResult = -1) or (pvSocketResult = 0) then
   begin
     RaiseLastOSError;
   end;
+  {$ELSE}
+  if (pvSocketResult = -1) then
+  begin
+    RaiseLastOSError;
+  end;
+  {$ENDIF}
 end;
 
 procedure TDiocpBlockTcpClient.Connect;

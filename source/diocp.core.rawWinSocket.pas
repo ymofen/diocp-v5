@@ -430,7 +430,7 @@ begin
     if WSAStartup(MakeWord(1, 1), AData) <> 0 then
     begin
       __WSAStartupDone := false;
-      RaiseLastOSError(WSAGetLastError);
+      RaiseLastOSError();
     end;
   end;
 end;
