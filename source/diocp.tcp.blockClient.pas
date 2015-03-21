@@ -62,13 +62,15 @@ type
     /// <param name="pvMs"> (Cardinal) </param>
     procedure ConnectTimeOut(pvMs:Cardinal);
     procedure Disconnect;
+
     /// <summary>
     ///  recv buffer
     /// </summary>
     procedure recv(buf: Pointer; len: cardinal);
     function RecvBuffer(buf: Pointer; len: cardinal): Integer;
-    function sendBuffer(buf: Pointer; len: cardinal): Integer;
+    function SendBuffer(buf: Pointer; len: cardinal): Integer;
     property Active: Boolean read FActive write SetActive;
+    property RawSocket: TRawSocket read FRawSocket;
   published
     property Host: String read FHost write FHost;
     property Port: Integer read FPort write FPort;
