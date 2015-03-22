@@ -170,6 +170,17 @@ function StrStrIgnoreCase(P, PSub: PChar): PChar;
 /// </summary>
 function UpperChar(c: Char): Char;
 
+/// <summary>
+///  aStr是否在Strs列表中
+/// </summary>
+/// <returns>
+///   如果在列表中返回true
+/// </returns>
+/// <param name="pvStr"> (string) </param>
+/// <param name="pvStringList"> (array of string) </param>
+function StrIndexOf(const pvStr: string; const pvStringList: array of string):
+    Integer;
+
 
 implementation
 
@@ -194,6 +205,24 @@ begin
   Result := C in CharSet;
 end;
 {$ifend}
+
+
+
+function StrIndexOf(const pvStr: string; const pvStringList: array of string):
+    Integer;
+var
+  i: Integer;
+begin
+  Result := -1;
+  for i := Low(pvStringList) to High(pvStringList) do
+  begin
+    if SameText(pvStringList[i], pvStr) then
+    begin
+      Result := i;
+      Break;
+    end;
+  end;
+end;
 
 
 function UpperChar(c: Char): Char;
