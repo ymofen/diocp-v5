@@ -1304,10 +1304,9 @@ begin
   FContextLocker.lock('DecReferenceCounter');
 
 {$IFDEF DEBUG_ON}
-  if FOwner.logCanWrite then
-    FOwner.FSafeLogger.logMessage('%d_RequestDisconnect:%s', [SocketHandle,pvDebugInfo],
-      'RequestDisconnectDEBUG');
+  FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID);
 {$ENDIF}
+
 
   FRequestDisconnect := true;
   Dec(FReferenceCounter);
@@ -1323,11 +1322,8 @@ begin
       Assert(FReferenceCounter >=0);
     end else
     begin
-      if FOwner.logCanWrite then
-      begin
-        FOwner.FSafeLogger.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, debugInfo:%s',
+      FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, debugInfo:%s',
           [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE);
-      end;
       FReferenceCounter :=0;
     end;
   end;
