@@ -191,7 +191,8 @@ begin
     begin
       pvRequest.Response.WriteString('<br>第一个参数:' + pvRequest.GetRequestParam(pvRequest.RequestParamsList.Names[0]));
     end;
-    pvRequest.Response.WriteString('<br>获取a参数的值:' + pvRequest.GetRequestParam('a'));
+    pvRequest.Response.WriteString('<br>获取b参数的原值:' +pvRequest.GetRequestParam('b'));
+    pvRequest.Response.WriteString('<br>获取b参数的Utf8解码:' +Utf8Decode(pvRequest.GetRequestParam('b')));
 
     pvRequest.Response.WriteString('<br>');
     pvRequest.Response.WriteString('=======================================<br>'); 
