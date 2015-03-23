@@ -21,7 +21,12 @@ resourcestring
   strSendErr       = '[%d]响应发送数据请求时出现了错误。错误代码:%d!';
   strSendPostError = '[%d]投递发送数据请求时出现了错误。错误代码:%d';
   strSendZero      = '[%d]投递发送请求数据时遇到0长度数据。进行关闭处理';
+  strWSACloseRequest      = '处理投递发送请求数据包时,发现异步关闭请求(Request.Tag = -1)。进行关闭处理!';
   strSendPushFail  = '[%d]投递发送请求数据包超出队列允许的最大长度[%d/%d]。';
+
+  strFuncFail      = '[%d]执行[%s]失败: %s';
+
+  strRequestDisconnectFileID = '请求断开日志';
 
   strBindingIocpError = '[%d]绑定到IOCP句柄时出现了异常, 错误代码:%d, (%s)';
 

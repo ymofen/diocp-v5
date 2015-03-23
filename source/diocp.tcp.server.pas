@@ -303,10 +303,19 @@ type
         true; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean; overload;
 
     /// <summary>
+    ///    投递发送请求到IOCP队列
     ///    post send request to iocp queue, if post successful return true.
     ///      if request is completed, will call DoSendRequestCompleted procedure
-    ///    如果 长度为0，则在处理请求时进行关闭
+    ///    如果 长度为0, 则在处理请求时进行关闭。
     /// </summary>
+    /// <returns>
+    ///    如果投递成功返回true。否则返回false(投递队列已满)
+    /// </returns>
+    /// <param name="buf"> (Pointer) </param>
+    /// <param name="len"> (Cardinal) </param>
+    /// <param name="pvBufReleaseType"> 释放类型 </param>
+    /// <param name="pvTag"> -1: 服务端请求关闭,如延时关闭 </param>
+    /// <param name="pvTagData"> (Pointer) </param>
     function PostWSASendRequest(buf: Pointer; len: Cardinal; pvBufReleaseType:
         TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
         overload;
@@ -381,6 +390,7 @@ type
   /// </summary>
   TIocpSendRequest = class(TIocpRequest)
   private
+    FLastMsg : String;
     FSendBufferReleaseType: TDataReleaseType;
     
     FMaxSize:Integer;
@@ -1166,17 +1176,13 @@ begin
       end;
     end else
     begin
-      FcurrSendRequest := nil;
+      FCurrSendRequest := nil;
 
-      /// cancel request
+      /// 取消请求
       lvRequest.CancelRequest;
 
-      {$IFDEF DEBUG_ON}
-      FOwner.logMessage('TIocpClientContext.CheckNextSendRequest:: ExecuteSend return False',
-         []);
-      {$ENDIF}
-      /// kick out the clientContext
-      RequestDisconnect('CheckNextSendRequest::lvRequest.checkSendNextBlock Fail', lvRequest);
+      /// 踢出连接
+      RequestDisconnect(Format(strFuncFail, [self.SocketHandle,'CheckNextSendRequest::lvRequest.ExecuteSend', lvRequest.FLastMsg]), lvRequest);
 
       FOwner.ReleaseSendRequest(lvRequest);
     end;
@@ -1347,8 +1353,7 @@ begin
   if not FActive then exit;
 
 {$IFDEF DEBUG_ON}
-  FOwner.logMessage('%d_RequestDisconnect:%s', [SocketHandle,pvDebugInfo],
-      'RequestDisconnectDEBUG');
+  FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID);
 {$ENDIF}
 
   FContextLocker.lock('RequestDisconnect');
@@ -1650,7 +1655,7 @@ end;
 
 procedure TIocpClientContext.PostWSACloseRequest;
 begin
-  PostWSASendRequest(nil, 0, dtNone);
+  PostWSASendRequest(nil, 0, dtNone, -1);
 end;
 
 procedure TIocpClientContext.PostWSARecvRequest;
@@ -2883,28 +2888,34 @@ begin
           Format(strRecvEngineOff, [FClientContext.FSocketHandle])
         );
       {$ENDIF}
-      // avoid postWSARecv
+      // 避免后面重复投递接收请求
       FClientContext.RequestDisconnect(
         Format(strRecvEngineOff, [FClientContext.FSocketHandle])
         , Self);
     end else if FErrorCode <> 0 then
     begin
-      {$IFDEF DEBUG_ON}
-      FOwner.FSafeLogger.logMessage(
-        Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
-        );
-      {$ENDIF}
-      FOwner.DoClientContextError(FClientContext, FErrorCode);
-      FClientContext.RequestDisconnect(
-        Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
-        ,  Self);
+      if not FClientContext.FRequestDisconnect then
+      begin   // 如果请求关闭，不再输出日志,和触发错误
+        {$IFDEF DEBUG_ON}
+        FOwner.FSafeLogger.logMessage(
+          Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
+          );
+        {$ENDIF}
+        FOwner.DoClientContextError(FClientContext, FErrorCode);
+        FClientContext.RequestDisconnect(
+          Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
+          ,  Self);
+      end;
     end else if (FBytesTransferred = 0) then
     begin      // no data recvd, socket is break
-      {$IFDEF DEBUG_ON}
-      FOwner.logMessage(strRecvZero,  [FClientContext.FSocketHandle]);
-      {$ENDIF}
-      FClientContext.RequestDisconnect(
-        Format(strRecvZero,  [FClientContext.FSocketHandle]),  Self);
+      if not FClientContext.FRequestDisconnect then
+      begin
+        {$IFDEF DEBUG_ON}
+        FOwner.logMessage(strRecvZero,  [FClientContext.FSocketHandle]);
+        {$ENDIF}
+        FClientContext.RequestDisconnect(
+          Format(strRecvZero,  [FClientContext.FSocketHandle]),  Self);
+      end;
     end else
     begin
       FClientContext.DoReceiveData;
@@ -3024,13 +3035,19 @@ end;
 
 function TIocpSendRequest.ExecuteSend: Boolean;
 begin
-  if (FBuf = nil) or (FLen = 0) then
+  if Tag = -1 then
   begin
-    {$IFDEF DEBUG_ON}
-     FOwner.logMessage(
-       Format(strSendZero, [FClientContext.FSocketHandle])
-       );
-    {$ENDIF}
+    FLastMsg := strWSACloseRequest;
+//    {$IFDEF DEBUG_ON}
+//     FOwner.logMessage(FLastMsg);
+//    {$ENDIF}
+    Result := False;
+  end else if (FBuf = nil) or (FLen = 0) then
+  begin
+    FLastMsg := strWSACloseRequest;
+//    {$IFDEF DEBUG_ON}
+//     FOwner.logMessage(FLastMsg);
+//    {$ENDIF}
     Result := False;
   end else
   begin
@@ -3108,15 +3125,19 @@ begin
     end else if FErrorCode <> 0 then
     begin
       FReponseState := 3;
-      {$IFDEF DEBUG_ON}
-      FOwner.logMessage(
-          Format(strSendErr, [FClientContext.FSocketHandle, FErrorCode])
-          );
-      {$ENDIF}
-      FOwner.DoClientContextError(FClientContext, FErrorCode);
-      FClientContext.RequestDisconnect(
-         Format(strSendErr, [FClientContext.FSocketHandle, FErrorCode])
-          , Self);
+
+      if not FClientContext.FRequestDisconnect then
+      begin   // 如果请求关闭，不再输出日志,和触发错误
+        {$IFDEF DEBUG_ON}
+        FOwner.logMessage(
+            Format(strSendErr, [FClientContext.FSocketHandle, FErrorCode])
+            );
+        {$ENDIF}
+        FOwner.DoClientContextError(FClientContext, FErrorCode);
+        FClientContext.RequestDisconnect(
+           Format(strSendErr, [FClientContext.FSocketHandle, FErrorCode])
+            , Self);
+      end;
     end else
     begin
       FReponseState := 2;
