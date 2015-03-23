@@ -1168,6 +1168,7 @@ end;
 destructor TDiocpHttpServer.Destroy;
 begin
   FRequestPool.FreeDataObject;
+  FRequestPool.Free;
   inherited;
 end;
 
