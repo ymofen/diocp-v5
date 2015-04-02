@@ -757,6 +757,8 @@ var
 {$ELSE}
 {$ENDIF}
 begin
+  if FRawPostData.Size = 0 then exit;
+  
   // 读取原始数据
   SetLength(lvRawData, FRawPostData.Size);
   FRawPostData.Position := 0;

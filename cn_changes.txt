@@ -41,3 +41,6 @@ DIOCP-v5 0.0.2
 
 7.* 池化TDiocpHttpRequest请求对象
   加入QWorkers/DiocpTask异步处理请求，不阻塞Iocp线程
+  
+8.修复SplitStrings,分隔符最后一个字符串没有加入的bug, 导致Http解析时最后一个参数没有解析
+  感谢(Xjumping  990669769)反馈bug

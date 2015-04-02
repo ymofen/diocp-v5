@@ -10,7 +10,9 @@ uses
 {$R *.res}
 
 begin
-  ReportMemoryLeaksOnShutdown := DebugHook = 1;
+{$if CompilerVersion >= 18}
+  ReportMemoryLeaksOnShutdown := true;
+{$ifend}
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TfrmMain, frmMain);

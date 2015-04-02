@@ -9,6 +9,10 @@
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
+ *   2015-04-02 12:52:43
+ *     修复SplitStrings,分隔符最后一个字符串没有加入的bug  abcd&33&eef
+ *       感谢(Xjumping  990669769)反馈bug
+ *
  *)
  
 unit utils.strings;
@@ -322,13 +326,25 @@ begin
     // 跳过空白
     SkipChars(p, [' ']);
     lvValue := LeftUntil(P, pvSpliterChars);
-    if lvValue = '' then exit;
-    // 跳过分隔符
-    SkipChars(p, pvSpliterChars);
 
-    // 添加到列表中
-    pvStrings.Add(lvValue);
-    inc(Result);
+    if lvValue = '' then
+    begin
+      if P^ <> #0 then
+      begin  // 最后一个字符
+        // 添加到列表中
+        pvStrings.Add(P);
+        inc(Result);
+      end;
+      Exit;
+    end else
+    begin
+      // 跳过分隔符
+      SkipChars(p, pvSpliterChars);
+
+      // 添加到列表中
+      pvStrings.Add(lvValue);
+      inc(Result);
+    end;
   end;
 end;
 
