@@ -2382,6 +2382,7 @@ begin
       InterlockedIncrement(FDataMoniter.FSendRequestCreateCounter);
     end;
   end;
+  Result.Tag := 0;
   Result.FAlive := true;
   //Result.DoCleanup;
   Result.FOwner := Self;

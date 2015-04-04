@@ -356,7 +356,13 @@ begin
   except
    on E:Exception do
     begin
-      FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+      if FOwner = nil then
+      begin
+        sfLogger.logMessage('截获处理逻辑异常:' + e.Message);
+      end else
+      begin
+        FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+      end;
     end;
   end;
 end;
