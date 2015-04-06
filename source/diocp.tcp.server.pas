@@ -1275,6 +1275,11 @@ begin
   begin
     if IsDebugMode then
     begin
+      if FOwner.logCanWrite then
+      begin
+        FOwner.FSafeLogger.logMessage('TIocpClientContext.DecReferenceCounter:%d, debugInfo:%s',
+          [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE);
+      end;
       Assert(FReferenceCounter >=0);
     end else
     begin
