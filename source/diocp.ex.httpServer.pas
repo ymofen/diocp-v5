@@ -9,6 +9,12 @@
   *    Http协议处理单元
   *    其中大部分思路来自于delphi iocp framework中的iocp.HttpServer
   *
+  *   2015-04-08 12:34:33
+  *    (感谢 (Xjumping  990669769)/(suoler)反馈bug和提供bug重现)
+  *    改为异步处理Http请求后
+  *      当连接已经关闭，但是请求还没有来得及处理，然后连接上下文已经归还到池，这个时候应该放弃处理任务()
+  *
+  *
 *)
 unit diocp.ex.httpServer;
 
@@ -40,6 +46,12 @@ type
 
   TDiocpHttpRequest = class(TObject)
   private
+
+    /// <summary>
+    ///   投递之前记录DNA，用于做异步任务时，是否取消当前任务
+    /// </summary>
+    FContextDNA : Integer;
+
     /// <summary>
     ///   便于在Close时归还回对象池
     /// </summary>
@@ -1018,10 +1030,29 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvJob:PQJob);
 var
   lvObj:TDiocpHttpRequest;
 begin
+  // 无论如何都要归还HttpRequest到池
   lvObj := TDiocpHttpRequest(pvJob.Data);
   try
-     // 触发事件
-     TDiocpHttpServer(FOwner).DoRequest(lvObj);
+     // 连接已经断开, 放弃处理逻辑
+     if (Self = nil) then Exit;
+
+     // 连接已经断开, 放弃处理逻辑
+     if (FOwner = nil) then Exit;
+
+
+     // 已经不是当时请求的连接， 放弃处理逻辑
+     if lvObj.FContextDNA <> self.ContextDNA then
+     begin
+       Exit;
+     end;
+
+     if Self.LockContext('HTTP逻辑处理...', Self) then
+     try
+       // 触发事件
+       TDiocpHttpServer(FOwner).DoRequest(lvObj);
+     finally
+       self.UnLockContext('HTTP逻辑处理...', Self);
+     end;
   finally
     lvObj.Close;
   end;
@@ -1034,10 +1065,28 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
 var
   lvObj:TDiocpHttpRequest;
 begin
+  // 无论如何都要归还HttpRequest到池
   lvObj := TDiocpHttpRequest(pvTaskRequest.TaskData);
   try
-     // 触发事件
-     TDiocpHttpServer(FOwner).DoRequest(lvObj);
+    // 连接已经断开, 放弃处理逻辑
+    if (Self = nil) then Exit;
+
+    // 连接已经断开, 放弃处理逻辑
+    if (FOwner = nil) then Exit;
+
+     // 已经不是当时请求的连接， 放弃处理逻辑
+     if lvObj.FContextDNA <> self.ContextDNA then
+     begin
+       Exit;
+     end;
+
+     if Self.LockContext('HTTP逻辑处理...', Self) then
+     try
+       // 触发事件
+       TDiocpHttpServer(FOwner).DoRequest(lvObj);
+     finally
+       self.UnLockContext('HTTP逻辑处理...', Self);
+     end;
   finally
     lvObj.Close;
   end;
@@ -1068,6 +1117,10 @@ begin
       FCurrentRequest.FDiocpContext := self;
       FCurrentRequest.Response.FDiocpContext := self;
       FCurrentRequest.Clear;
+
+      // 记录当前contextDNA，异步任务时组做检测
+      FCurrentRequest.FContextDNA := self.ContextDNA;
+
       FHttpState := hsRequest;
     end;
 

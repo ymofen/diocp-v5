@@ -38,6 +38,10 @@ object frmMain: TfrmMain
     object TabSheet2: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0

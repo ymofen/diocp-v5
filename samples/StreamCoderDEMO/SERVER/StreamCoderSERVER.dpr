@@ -12,6 +12,9 @@ uses
 {$R *.res}
 
 begin
+  {$IF CompilerVersion> 18}
+  ReportMemoryLeaksOnShutdown := true;
+  {$IFEND}
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TfrmMain, frmMain);

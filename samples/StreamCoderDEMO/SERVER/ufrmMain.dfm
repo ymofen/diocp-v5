@@ -39,10 +39,6 @@ object frmMain: TfrmMain
     object TabSheet2: TTabSheet
       Caption = 'log'
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -55,10 +51,6 @@ object frmMain: TfrmMain
     object tsTest: TTabSheet
       Caption = 'tsTest'
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btnBufferTester: TButton
         Left = 24
         Top = 24
@@ -75,7 +67,7 @@ object frmMain: TfrmMain
     Width = 640
     Height = 59
     Align = alTop
-    Caption = 'pnlTop'
+    BevelOuter = bvNone
     TabOrder = 1
     object edtPort: TEdit
       Left = 9

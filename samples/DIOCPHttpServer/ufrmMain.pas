@@ -106,6 +106,7 @@ begin
 
   if pvRequest.RequestURI = '/diocp-v5' then
   begin  // 输出diocp运行信息
+    Sleep(1000);
     pvRequest.Response.WriteString('DIOCP运行信息<br>');
     s := FTcpServer.GetStateInfo;
     s := ReplaceText(s, sLineBreak, '<br>');
