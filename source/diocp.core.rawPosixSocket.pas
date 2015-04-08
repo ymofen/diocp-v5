@@ -83,7 +83,7 @@ type
 
     /// <summary>
     ///   Peer Info
-    ///    no test
+    ///    Œ¥≤‚ ‘
     /// </summary>
     function GetPeerInfo(var vIp: longword; var vPort: Integer): Integer;
 
@@ -239,10 +239,6 @@ end;
 function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;
 var
   s :String;
-{$IFDEF POSIX}
-{$ELSE}
-{$ENDIF}
-
 begin
   FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
   FSockaddr.sin_family := AF_INET;
@@ -252,14 +248,9 @@ begin
   begin
     s := '0.0.0.0';
   end;
-{$IFDEF POSIX}
+  // Œ¥≤‚ ‘
   FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(s)));
-  //  unkonw 2015-01-05 22:59:10
-  //Result := Posix.SysSocket.Bind(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in))  = 0;
-{$ELSE}
-  FSockaddr.sin_addr.s_addr :=inet_addr(PAnsichar(UTF8Encode(s)));
-  Result := winsock.Bind(FSocketHandle, FSockaddr, sizeof(sockaddr_in))  = 0;
-{$ENDIF}
+  Result := Posix.SysSocket.Bind(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in))  = 0;
 end;
 
 procedure TRawSocket.Close;
@@ -387,7 +378,7 @@ var
 {$ENDIF}
 begin
 {$IFDEF POSIX}
-  // not test
+  // Œ¥≤‚ ‘
   FD_ZERO(lvFDSet);
   _FD_SET(FSocketHandle, lvFDSet);
 
@@ -426,7 +417,7 @@ end;
 function TRawSocket.SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
 begin
 {$IFDEF POSIX}
-  // not test
+  // Œ¥≤‚ ‘
   Result := setsockopt(FSocketHandle,
    SOL_SOCKET, SO_RCVTIMEO, pvTimeOut, SizeOf(Cardinal));
 {$ELSE} 
@@ -439,7 +430,7 @@ end;
 function TRawSocket.SetSendTimeOut(const pvTimeOut: Cardinal): Integer;
 begin
 {$IFDEF POSIX}
-  // not test
+  // Œ¥≤‚ ‘
   Result := setsockopt(FSocketHandle,
    SOL_SOCKET, SO_SNDTIMEO, pvTimeOut, SizeOf(Cardinal));
 {$ELSE}
@@ -460,7 +451,7 @@ var
 {$ENDIF}
 begin
 {$IFDEF POSIX}
-  // not test
+  // Œ¥≤‚ ‘
   FD_ZERO(lvFDSet);
   _FD_SET(FSocketHandle, lvFDSet);
 
@@ -521,16 +512,10 @@ begin
 end;
 
 function TRawSocket.Listen(const backlog: Integer = 0): Boolean;
-{$IFDEF POSIX}
-{$ELSE}
 var
   queueSize: Integer;
-{$ENDIF}
 begin
-{$IFDEF POSIX}
-  // nonthing... reserved!
-  Result := false;
-{$ELSE}
+  // Œ¥≤‚ ‘
   if backlog = 0 then
   begin
     queueSize := SOMAXCONN;
@@ -538,8 +523,7 @@ begin
   else begin
     queueSize := backlog;
   end;
-  Result := winsock.listen(FSocketHandle, queueSize) = 0;
-{$ENDIF}
+  Result := Posix.SysSocket.Listen(FSocketHandle, queueSize) = 0;
 end;
 
 function TRawSocket.PeekBuf(var data; const len:Cardinal): Integer;
@@ -548,25 +532,9 @@ begin
 end;
 
 function TRawSocket.RecvdCount: Integer;
-{$IFDEF POSIX}
-{$ELSE}
-var
-  Temp : u_long;
-{$ENDIF}
-
 begin
-{$IFDEF POSIX}
-  // nonthing... reserved!
+  // Œ¥ÕÍ≥…
   Result := 0;
-{$ELSE}
-  if ioctlsocket(FSocketHandle, FIONREAD, Temp) = SOCKET_ERROR then
-  begin
-    Result := -1;
-  end else
-  begin
-    Result := Temp;
-  end;
-{$ENDIF}
 end;
 
 procedure TRawSocket.SetConnectInfo(const pvAddr: string; pvPort: Integer);
