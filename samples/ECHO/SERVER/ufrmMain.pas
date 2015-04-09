@@ -25,6 +25,7 @@ type
     pnlTop: TPanel;
     btnPostWSAClose: TButton;
     Button1: TButton;
+    tmrKickOut: TTimer;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
@@ -32,6 +33,7 @@ type
     procedure btnGetWorkerStateClick(Sender: TObject);
     procedure btnPostWSACloseClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
+    procedure tmrKickOutTimer(Sender: TObject);
   private
     iCounter:Integer;
     FTcpServer: TDiocpTcpServer;
@@ -168,16 +170,21 @@ var
 begin
   if errCode = 0 then
   begin
-    SetLength(s, len);
-
-    Move(buf^, s[1], len);
-    sfLogger.logMessage(s);
+// 如果客户端发送的为字符串，可以用下面代码进行显示
+//    SetLength(s, len);
+//    Move(buf^, s[1], len);
+//    sfLogger.logMessage(s);
     pvClientContext.PostWSASendRequest(buf, len);
 
   end else
   begin
     pvClientContext.RequestDisconnect;
   end;
+end;
+
+procedure TfrmMain.tmrKickOutTimer(Sender: TObject);
+begin
+  FTcpServer.KickOut(30000);
 end;
 
 end.

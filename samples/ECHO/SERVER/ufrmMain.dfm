@@ -38,6 +38,10 @@ object frmMain: TfrmMain
     object tsLog: TTabSheet
       Caption = 'log'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -131,5 +135,11 @@ object frmMain: TfrmMain
       Caption = 'stop'
       OnExecute = actStopExecute
     end
+  end
+  object tmrKickOut: TTimer
+    Interval = 10000
+    OnTimer = tmrKickOutTimer
+    Left = 392
+    Top = 200
   end
 end

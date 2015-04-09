@@ -530,7 +530,7 @@ type
     /// <summary>
     ///   get socket peer info on acceptEx reponse
     /// </summary>
-    procedure getPeerINfo;
+    procedure GetPeerINfo;
   protected
     function PostRequest: Boolean;
 
@@ -553,6 +553,7 @@ type
     // sendRequest pool
     FAcceptExRequestPool: TBaseQueue;
 
+    // 一投递未响应的AcceptEx对象
     FList:TList;
     FListenSocket: TRawSocket;
     FLocker: TIocpLocker;
@@ -569,8 +570,14 @@ type
 
     procedure ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
 
+    /// <summary>
+    ///   从正在请求的列表中移除
+    /// </summary>
     procedure RemoveRequestObject(pvRequest:TIocpAcceptExRequest);
 
+    /// <summary>
+    ///   检测是否需要投递AcceptEx
+    /// </summary>
     procedure CheckPostRequest;
 
     property ListenSocket: TRawSocket read FListenSocket;
@@ -1907,8 +1914,7 @@ var
       if not Result then
       begin
         {$IFDEF DEBUG_ON}
-         if logCanWrite then
-          FSafeLogger.logMessage('OnAcceptEvent vAllowAccept = false');
+        logMessage('OnAcceptEvent vAllowAccept = false');
         {$ENDIF}
       end;
     end;
@@ -1921,8 +1927,7 @@ var
         begin
           lvErrCode := GetLastError;
           {$IFDEF DEBUG_ON}
-           if logCanWrite then
-            FSafeLogger.logMessage('FClientContext.FRawSocket.setKeepAliveOption, Error:%d', [lvErrCode]);
+          logMessage('FClientContext.FRawSocket.setKeepAliveOption, Error:%d', [lvErrCode]);
           {$ENDIF}
         end;
       end;
@@ -1944,8 +1949,7 @@ begin
         lvErrCode := GetLastError;
 
         {$IFDEF DEBUG_ON}
-         if logCanWrite then
-         FSafeLogger.logMessage(
+        logMessage(
             'bind2IOCPHandle(%d) in TDiocpTcpServer.DoAcceptExResponse occur Error :%d',
             [pvRequest.FClientContext.RawSocket.SocketHandle, lvErrCode]);
         {$ENDIF}
@@ -1985,10 +1989,10 @@ begin
     pvRequest.FClientContext := nil;
   end;
 
-  // remove from list
-  FIocpAcceptorMgr.removeRequestObject(pvRequest);
+  // 从正在请求的列表中移除
+  FIocpAcceptorMgr.RemoveRequestObject(pvRequest);
 
-  if FActive then FIocpAcceptorMgr.checkPostRequest;
+  if FActive then FIocpAcceptorMgr.CheckPostRequest;
 end;
 
 procedure TDiocpTcpServer.DoClientContextError(pvClientContext:
@@ -2058,7 +2062,7 @@ begin
     begin
       InterlockedIncrement(FDataMoniter.FContextCreateCounter);
     end;
-    Result.FSendRequestLink.setMaxSize(FMaxSendingQueueSize);
+    Result.FSendRequestLink.SetMaxSize(FMaxSendingQueueSize);
   end;
   Result.FAlive := True;
   Result.DoCleanUp;
@@ -2616,7 +2620,7 @@ begin
     while FList.Count < FMaxRequest do
     begin
       lvRequest := GetRequestObject;
-      lvRequest.FClientContext := FOwner.getClientContext;
+      lvRequest.FClientContext := FOwner.GetClientContext;
       lvRequest.FAcceptorMgr := self;
       if lvRequest.PostRequest then
       begin
@@ -2630,26 +2634,24 @@ begin
         inc(i);
 
         try
-          // free this object instead return to pool
+          // 出现异常，直接释放Context
           lvRequest.FClientContext.FAlive := false;
           lvRequest.FClientContext.Free;
         except
         end;
 
-        // return to pool
-        //lvRequest.FClientContext.SetSocketState(ssDisconnected);
-        //FOwner.releaseClientContext(lvRequest.FClientContext);
+        // 归还到对象池
+        ReleaseRequestObject(lvRequest);
 
-        // free request
-        releaseRequestObject(lvRequest);
+        if i > 100 then
+        begin    // 投递失败次数大于100 记录日志,本结束投递
+           FOwner.logMessage('TIocpAcceptorMgr.CheckPostRequest errCounter:%d', [i], CORE_LOG_FILE);
+           Break;
+        end;
+        
       end;
 
-      if i > 100 then
-      begin
-         if FOwner.logCanWrite then
-          FOwner.FSafeLogger.logMessage('TIocpAcceptorMgr.CheckPostRequest errCounter:%d', [i], CORE_LOG_FILE);
-         Break;
-      end;
+
     end;
   finally
     FLocker.unLock;
@@ -2710,7 +2712,7 @@ begin
   FOwner := AOwner;
 end;
 
-procedure TIocpAcceptExRequest.getPeerINfo;
+procedure TIocpAcceptExRequest.GetPeerINfo;
 var
   localAddr: PSockAddr;
   remoteAddr: PSockAddr;
@@ -2749,7 +2751,7 @@ begin
     //  is set on the socket.
     FOwner.FListenSocket.UpdateAcceptContext(FClientContext.FRawSocket.SocketHandle);
 
-    getPeerINfo();
+    GetPeerINfo();
   end;
   FOwner.DoAcceptExResponse(Self); 
 end;
@@ -2833,7 +2835,7 @@ end;
 procedure TIocpAcceptExRequest.ResponseDone;
 begin
   inherited;
-  FAcceptorMgr.releaseRequestObject(Self);
+  FAcceptorMgr.ReleaseRequestObject(Self);
 end;
 
 constructor TIocpRecvRequest.Create;
