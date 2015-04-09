@@ -90,10 +90,14 @@ type
 
     function GetStateINfo: String; virtual;
 
+    /// <summary>
+    ///   响应请求最后完成,在IOCP线程,执行请求时执行
+    ///   不管请求响应时有没有出现异常，都会执行
+    /// </summary>
     procedure ResponseDone; virtual;
 
     /// <summary>
-    ///   cancel
+    ///   请求取消,在未投递的请求下, 不得不取消请求
     /// </summary>
     procedure CancelRequest; virtual;
 
