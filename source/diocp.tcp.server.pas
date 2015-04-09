@@ -2833,7 +2833,7 @@ end;
 procedure TIocpAcceptExRequest.ResponseDone;
 begin
   inherited;
-  FAcceptorMgr.releaseRequestObject(Self);
+  FAcceptorMgr.ReleaseRequestObject(Self);
 end;
 
 constructor TIocpRecvRequest.Create;
