@@ -3,8 +3,8 @@ object frmMain: TfrmMain
   Top = 275
   BorderIcons = [biSystemMenu]
   Caption = 'diocp3 echo server'
-  ClientHeight = 387
-  ClientWidth = 801
+  ClientHeight = 455
+  ClientWidth = 812
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,57 +17,58 @@ object frmMain: TfrmMain
   TextHeight = 13
   object pgcMain: TPageControl
     Left = 0
-    Top = 41
-    Width = 801
-    Height = 346
+    Top = 59
+    Width = 812
+    Height = 396
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
+    ExplicitHeight = 328
     object TabSheet1: TTabSheet
-      Caption = 'moniter'
+      Caption = #30417#25511#38754#26495
+      ExplicitHeight = 300
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
-        Width = 793
-        Height = 318
+        Width = 804
+        Height = 368
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
+        ExplicitHeight = 300
       end
     end
     object tsLog: TTabSheet
-      Caption = 'log'
+      Caption = #26085#24535
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ExplicitHeight = 300
       object mmoLog: TMemo
         Left = 0
         Top = 0
-        Width = 793
-        Height = 318
+        Width = 804
+        Height = 368
         Align = alClient
         Lines.Strings = (
           'mmoLog')
         TabOrder = 0
+        ExplicitHeight = 300
       end
     end
   end
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 801
-    Height = 41
+    Width = 812
+    Height = 59
     Align = alTop
-    Caption = 'pnlTop'
+    BevelOuter = bvNone
     TabOrder = 1
     object btnDisconectAll: TButton
       Left = 216
       Top = 5
       Width = 113
       Height = 25
-      Caption = 'btnDisconectAll'
+      Caption = #26029#24320#25152#26377
       TabOrder = 0
       OnClick = btnDisconectAllClick
     end
@@ -76,7 +77,7 @@ object frmMain: TfrmMain
       Top = 5
       Width = 94
       Height = 25
-      Caption = 'btnFindContext'
+      Caption = #27979#35797#26597#25214'Context'
       TabOrder = 1
       OnClick = btnFindContextClick
     end
@@ -85,7 +86,7 @@ object frmMain: TfrmMain
       Top = 5
       Width = 121
       Height = 25
-      Caption = 'btnGetWorkerState'
+      Caption = #33719#21462#32447#31243#24037#20316#29366#24577
       TabOrder = 2
       OnClick = btnGetWorkerStateClick
     end
@@ -110,36 +111,58 @@ object frmMain: TfrmMain
       Top = 5
       Width = 103
       Height = 25
-      Caption = 'btnPostWSAClose'
+      Caption = #24322#27493#26029#24320
       TabOrder = 5
       OnClick = btnPostWSACloseClick
     end
-    object Button1: TButton
+    object btnReOpenTest: TButton
       Left = 671
       Top = 5
-      Width = 75
+      Width = 106
       Height = 25
-      Caption = 'Button1'
+      Caption = #24320#20851#27979#35797
       TabOrder = 6
-      OnClick = Button1Click
+      OnClick = btnReOpenTestClick
+    end
+    object chkLogDetails: TCheckBox
+      Left = 142
+      Top = 36
+      Width = 97
+      Height = 17
+      Caption = #35760#24405#35814#32454#26085#24535
+      Checked = True
+      State = cbChecked
+      TabOrder = 7
+      OnClick = chkLogDetailsClick
     end
   end
   object actlstMain: TActionList
     Left = 248
     Top = 104
     object actOpen: TAction
-      Caption = 'start'
+      Caption = #24320#21551
       OnExecute = actOpenExecute
     end
     object actStop: TAction
-      Caption = 'stop'
+      Caption = #20851#38381
       OnExecute = actStopExecute
     end
   end
   object tmrKickOut: TTimer
     Interval = 10000
     OnTimer = tmrKickOutTimer
-    Left = 392
-    Top = 200
+    Left = 72
+    Top = 144
+  end
+  object tmrTest: TTimer
+    Enabled = False
+    OnTimer = tmrTestTimer
+    Left = 672
+    Top = 128
+  end
+  object tmrInfo: TTimer
+    OnTimer = tmrInfoTimer
+    Left = 144
+    Top = 144
   end
 end

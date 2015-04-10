@@ -185,6 +185,27 @@ object FMMonitor: TFMMonitor
     Height = 13
     Caption = 'sendRequest'
   end
+  object lblPCInfo: TLabel
+    Left = 112
+    Top = 297
+    Width = 43
+    Height = 13
+    Caption = 'lblPCInfo'
+  end
+  object lblDEBUG_ON: TLabel
+    Left = 200
+    Top = 16
+    Width = 64
+    Height = 13
+    Caption = 'lblDEBUG_ON'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clBtnShadow
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+    Visible = False
+  end
   object tmrReader: TTimer
     Enabled = False
     OnTimer = tmrReaderTimer

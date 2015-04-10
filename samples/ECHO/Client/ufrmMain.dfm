@@ -52,14 +52,10 @@ object frmMain: TfrmMain
     Top = 56
     Width = 795
     Height = 292
-    ActivePage = tsMonitor
+    ActivePage = TabSheet1
     TabOrder = 4
     object TabSheet1: TTabSheet
       Caption = 'TabSheet1'
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoRecvMessage: TMemo
         Left = 0
         Top = 0
@@ -78,10 +74,6 @@ object frmMain: TfrmMain
     object tsOperator: TTabSheet
       Caption = 'tsOperator'
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoData: TMemo
         Left = 3
         Top = 3

@@ -2,9 +2,11 @@ unit uFMMonitor;
 
 interface
 
+{$I 'diocp.inc'}
+
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, 
-  Dialogs, diocp.tcp.server, StdCtrls, ExtCtrls, uRunTimeINfoTools;
+  Dialogs, diocp.tcp.server, StdCtrls, ExtCtrls, uRunTimeINfoTools, psApi;
 
 type
   TFMMonitor = class(TFrame)
@@ -33,10 +35,12 @@ type
     lblContextInfoCaption: TLabel;
     lblSendRequest: TLabel;
     lblSendRequestCaption: TLabel;
+    lblPCInfo: TLabel;
+    lblDEBUG_ON: TLabel;
     procedure lblRecvCaptionDblClick(Sender: TObject);
     procedure lblWorkerCountClick(Sender: TObject);
     procedure tmrReaderTimer(Sender: TObject);
-    procedure refreshState;
+    procedure RefreshState;
   private
     FIocpTcpServer: TDiocpTcpServer;
     procedure Translate();
@@ -62,6 +66,7 @@ resourcestring
   strOnline_Caption       = '在线信息';
   strWorkers_Caption      = '工作线程';
   strRunTime_Caption      = '运行信息';
+  strDebugON_Caption      = '*调试模式';
   
 
   strState_Active      = '开启';
@@ -72,9 +77,10 @@ resourcestring
   strSend_Info         = '投递:%d, 回应:%d, 剩余:%d';  //post:%d, response:%d, remain:%d
   strSendQueue_Info    = '压入/弹出/完成/终止:%d, %d, %d, %d';//push/pop/complted/abort:%d, %d, %d, %d
   strSendRequest_Info  = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
-  strAcceptEx_Info     = '投递:%d, 回应:%d';      //'post:%d, response:%d'
+  strAcceptEx_Info     = '创建:%d, 投递:%d, 回应:%d';      //'post:%d, response:%d'
   strSocketHandle_Info = '创建:%d, 销毁:%d';  //'create:%d, destroy:%d'
   strContext_Info      = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
+  strMemory_info       = '工作设置(内存):%f kB';
 
 class function TFMMonitor.CreateAsChild(pvParent: TWinControl; pvIOCPTcpServer:
     TDiocpTcpServer): TFMMonitor;
@@ -85,7 +91,13 @@ begin
   Result.Align := alClient;
   Result.IocpTcpServer := pvIOCPTcpServer;
   Result.tmrReader.Enabled := True;
-  Result.refreshState;   
+  Result.RefreshState;
+  {$IFDEF DEBUG_ON}
+  Result.lblDEBUG_ON.Visible := true;
+  {$ELSE}
+  Result.lblDEBUG_ON.Visible := false;
+  {$ENDIF}
+   
 end;
 
 procedure TFMMonitor.lblRecvCaptionDblClick(Sender: TObject);
@@ -103,7 +115,7 @@ end;
 
 procedure TFMMonitor.tmrReaderTimer(Sender: TObject);
 begin
-  refreshState;
+  RefreshState;
 end;
 
 procedure TFMMonitor.Translate;
@@ -119,9 +131,29 @@ begin
   lblSocketHandleCaption.Caption := strSocketHandle_Caption;
   lblContextInfoCaption.Caption := strContext_Caption;
   lblWorkersCaption.Caption := strWorkers_Caption;
+  lblDEBUG_ON.Caption := strDebugON_Caption;
 end;
 
-procedure TFMMonitor.refreshState;
+
+function GetProcessMemUse(PID: Cardinal): Cardinal;
+var
+  pmc: _PROCESS_MEMORY_COUNTERS; //uses psApi
+  ProcHandle: HWND;
+  iSize: DWORD;
+begin
+  Result := 0;
+  iSize := SizeOf(_PROCESS_MEMORY_COUNTERS);
+  pmc.cb := iSize;
+  ProcHandle := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, False, PID); //由PID取得进程对象的句柄
+  if GetProcessMemoryInfo(ProcHandle, @pmc, iSize) then
+    Result := pmc.WorkingSetSize;
+
+end;
+
+
+
+
+procedure TFMMonitor.RefreshState;
 begin
   if FIocpTcpServer = nil then
   begin
@@ -193,6 +225,7 @@ begin
 
   lblAcceptEx.Caption := Format(strAcceptEx_Info,
      [
+       FIocpTcpServer.DataMoniter.AcceptExObjectCounter,
        FIocpTcpServer.DataMoniter.PostWSAAcceptExCounter,
        FIocpTcpServer.DataMoniter.ResponseWSAAcceptExCounter
      ]
@@ -222,7 +255,7 @@ begin
 
   lblRunTimeINfo.Caption :=TRunTimeINfoTools.GetRunTimeINfo;
 
-
+  lblPCInfo.Caption := Format(strMemory_info, [GetProcessMemUse(GetCurrentProcessId) / 1024.00]);;
 end;
 
 end.

@@ -24,20 +24,26 @@ type
     btnFindContext: TButton;
     pnlTop: TPanel;
     btnPostWSAClose: TButton;
-    Button1: TButton;
+    btnReOpenTest: TButton;
     tmrKickOut: TTimer;
+    tmrTest: TTimer;
+    tmrInfo: TTimer;
+    chkLogDetails: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
     procedure btnPostWSACloseClick(Sender: TObject);
-    procedure Button1Click(Sender: TObject);
+    procedure btnReOpenTestClick(Sender: TObject);
+    procedure chkLogDetailsClick(Sender: TObject);
+    procedure tmrInfoTimer(Sender: TObject);
     procedure tmrKickOutTimer(Sender: TObject);
+    procedure tmrTestTimer(Sender: TObject);
   private
     iCounter:Integer;
     FTcpServer: TDiocpTcpServer;
-    procedure refreshState;
+    procedure RefreshState;
     procedure OnRecvBuffer(pvClientContext:TIocpClientContext; buf:Pointer;
         len:cardinal; errCode:Integer);
     procedure OnAccept(pvSocket: THandle; pvAddr: String; pvPort: Integer; var
@@ -54,7 +60,7 @@ var
 implementation
 
 uses
-  uFMMonitor, diocp.core.engine;
+  uFMMonitor, diocp.core.engine, diocp.core.rawWinSocket;
 
 {$R *.dfm}
 
@@ -78,7 +84,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TfrmMain.refreshState;
+procedure TfrmMain.RefreshState;
 begin
   if FTcpServer.Active then
   begin
@@ -94,13 +100,13 @@ begin
   FTcpServer.Port := StrToInt(edtPort.Text);
   FTcpServer.OnDataReceived := self.OnRecvBuffer;
   FTcpServer.Active := true;
-  refreshState;
+  RefreshState;
 end;
 
 procedure TfrmMain.actStopExecute(Sender: TObject);
 begin
-  FTcpServer.safeStop;
-  refreshState;
+  FTcpServer.SafeStop;
+  RefreshState;
 end;
 
 procedure TfrmMain.btnDisconectAllClick(Sender: TObject);
@@ -149,9 +155,21 @@ begin
 
 end;
 
-procedure TfrmMain.Button1Click(Sender: TObject);
+procedure TfrmMain.btnReOpenTestClick(Sender: TObject);
 begin
   FTcpServer.logMessage('DoHeartBeatChcek', 'DEBUG', lgvDebug);
+  tmrTest.Enabled := not tmrTest.Enabled;
+end;
+
+procedure TfrmMain.chkLogDetailsClick(Sender: TObject);
+begin
+  if chkLogDetails.Checked then
+  begin
+    FTcpServer.Logger.LogFilter := LogAllLevels;
+  end else
+  begin
+    FTcpServer.Logger.LogFilter := [lgvError];     // Ö»¼ÇÂ¼ÖÂÃü´íÎó
+  end;
 end;
 
 procedure TfrmMain.OnAccept(pvSocket: THandle; pvAddr: String; pvPort: Integer;
@@ -182,9 +200,28 @@ begin
   end;
 end;
 
+procedure TfrmMain.tmrInfoTimer(Sender: TObject);
+begin
+  self.Caption := Format('DIOCP ²âÊÔ:%d, %d', [__DebugWSACreateCounter, __DebugWSACloseCounter]);
+end;
+
 procedure TfrmMain.tmrKickOutTimer(Sender: TObject);
 begin
   FTcpServer.KickOut(30000);
+end;
+
+procedure TfrmMain.tmrTestTimer(Sender: TObject);
+begin
+  actStop.Execute;
+
+  FTcpServer.IocpAcceptorMgr.MinRequest := 1000;
+  FTcpServer.IocpAcceptorMgr.MaxRequest := 2000;
+
+  Application.ProcessMessages;
+
+
+
+  actOpen.Execute;
 end;
 
 end.
