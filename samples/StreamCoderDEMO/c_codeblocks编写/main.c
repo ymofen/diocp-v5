@@ -8,14 +8,31 @@
 int main()
 {
 
-//    char ouBuf[1024];
-//    memset(ouBuf, 0, 1024);
-//
-//    int x = 0xD10;
-//    VarToHexBytes(&x, 4, ouBuf, " ", 1);
-//    printf("字节数据:%s", ouBuf);
-//
-//    return 0;
+    char ouBuf[1024];
+    char xBuf[2];
+    memset(ouBuf, 0, 1024);
+
+    WORD x = 0xD10;
+    VarToHexBytes(&x, 2, ouBuf, " ", 1);
+    printf("0xD10 大端法:%s\r\n", ouBuf);
+
+    memset(ouBuf, 0, 1024);
+    memset(xBuf, 0, 2);
+    swap16(&x, xBuf);
+    VarToHexBytes(xBuf, 2, ouBuf, " ", 1);
+
+    printf("0xD10 小端法:%s\r\n", ouBuf);
+
+
+    WORD w;
+    swap16(xBuf, &w);
+    printf("xBuf小端法还原数据:%d\r\n", w);
+
+    printf("sizeof(CHAR):%d\r\n", sizeof(CHAR));
+
+
+
+    return 0;
 
 
 
