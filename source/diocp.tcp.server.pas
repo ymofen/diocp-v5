@@ -6,9 +6,13 @@
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
+ *   2015-04-10 18:00:52
+ *     停止时加入等待所有的投递的AcceptEx请求回归回归后再进行关闭IOCP引擎,(会导致投递出去的AcceptEx无法回归(XP下出现泄漏))
+ *     感谢 Xjumping  990669769, 反馈bug
  *
  *
  *   thanks qsl's suggestion
+ *
  *
  *)
  
@@ -586,6 +590,12 @@ type
     /// </summary>
     procedure CheckPostRequest;
 
+    procedure CancelAllRequest;
+    /// <summary>
+    ///   等待所有连接关闭
+    /// </summary>
+    function WaitForCancel(pvTimeOut: Cardinal): Boolean;
+
     property ListenSocket: TRawSocket read FListenSocket;
 
     property MaxRequest: Integer read FMaxRequest write FMaxRequest;
@@ -877,6 +887,7 @@ type
     ///   等待所有连接关闭
     /// </summary>
     function WaitForContext(pvTimeOut: Cardinal): Boolean;
+
 
     /// <summary>
     ///   get online client list
@@ -2253,10 +2264,17 @@ begin
   begin
     FActive := false;
 
+
+
     // Close listen socket
     FListenSocket.Close;
 
+
     DisconnectAll;
+
+    // 等等所有的投递的AcceptEx请求回归
+    // 感谢 Xjumping  990669769, 反馈bug
+    FIocpAcceptorMgr.WaitForCancel(12000);
 
     if not WaitForContext(120000) then
     begin  // wait time out
@@ -2651,6 +2669,23 @@ begin
   Result := FOnlineContextList.Count = 0;
 end;
 
+procedure TIocpAcceptorMgr.CancelAllRequest;
+var
+  i:Integer;
+  lvRequest:TIocpAcceptExRequest;
+begin
+  FLocker.lock();
+  try
+    for i := 0 to FList.Count - 1 do
+    begin
+      lvRequest := TIocpAcceptExRequest(FList[i]);
+      lvRequest.FClientContext.RawSocket.CancelIO;
+    end;
+  finally
+    FLocker.unLock;
+  end;
+end;
+
 procedure TIocpAcceptorMgr.CheckPostRequest;
 var
   lvRequest:TIocpAcceptExRequest;
@@ -2754,6 +2789,34 @@ begin
   finally
     FLocker.unLock;
   end;
+end;
+
+function TIocpAcceptorMgr.WaitForCancel(pvTimeOut: Cardinal): Boolean;
+var
+  l:Cardinal;
+  c:Integer;
+begin
+  l := GetTickCount;
+  c := FList.Count;
+  while (c > 0) do
+  begin
+    {$IFDEF MSWINDOWS}
+    SwitchToThread;
+    {$ELSE}
+    TThread.Yield;
+    {$ENDIF}
+
+    if GetTickCount - l > pvTimeOut then
+    begin
+      {$IFDEF WRITE_LOG}
+      FOwner.logMessage('WaitForCancel End Current AccepEx num:%d', [c], CORE_LOG_FILE, lgvError);
+      {$ENDIF}
+      Break;
+    end;
+    c := FList.Count;
+  end;
+
+  Result := FList.Count = 0;
 end;
 
 constructor TIocpAcceptExRequest.Create(AOwner: TDiocpTcpServer);

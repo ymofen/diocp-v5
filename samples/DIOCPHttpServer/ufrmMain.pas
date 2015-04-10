@@ -16,7 +16,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer, System.Actions
+  ComCtrls, diocp.ex.httpServer
   ;
 
 type
