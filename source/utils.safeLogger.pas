@@ -22,6 +22,8 @@ type
 const
   TLogLevelCaption: array [TLogLevel] of string = ('error', 'warning', 'hint', 'message', 'debug');
 
+  LogAllLevels = [lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug];
+
 type
   TSafeLogger = class;
   TSyncMainThreadType = (rtSync{$IFDEF MSWINDOWS}, rtPostMessage {$ENDIF});
@@ -142,6 +144,7 @@ type
     procedure stopWorker(pvTimeOut: Cardinal);
   private
   {$IFDEF MSWINDOWS}
+    FLogFilter: TLogLevels;
     FStateLocker:TCriticalSection;
     FWorking:Boolean;
     FMessageHandle: HWND;
@@ -185,7 +188,13 @@ type
     property DebugInfo: String read FDebugInfo;
 
     property Enable: Boolean read FEnable write FEnable;
+
+    /// <summary>
+    ///   设置要写入的日志级别, 默认所有
+    /// </summary>
+    property LogFilter: TLogLevels read FLogFilter write FLogFilter;
     property Name: String read FName write FName;
+
 
 
 
@@ -306,6 +315,7 @@ end;
 constructor TSafeLogger.Create;
 begin
   inherited Create;
+  FLogFilter := [lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug];
   FWorkerAlive := False;
   FEnable := true;
   FSyncMainThreadType := rtSync;
@@ -479,6 +489,9 @@ begin
 //  end;
 
   if not FEnable then exit;
+
+  if not (pvLevel in FLogFilter) then Exit;
+  
 
 
   

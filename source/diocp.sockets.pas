@@ -2715,7 +2715,6 @@ function TDiocpCustomContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
     pvBufReleaseType: TDataReleaseType): Boolean;
 var
   lvRequest:TIocpSendRequest;
-  lvErrStr:String;
 begin
   Result := false;
   if len = 0 then raise Exception.Create('PostWSASendRequest::request buf is zero!');

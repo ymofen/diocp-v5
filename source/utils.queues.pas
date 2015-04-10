@@ -41,16 +41,16 @@ type
     FPushCounter:Integer;
     {$ENDIF}
 
-    /// <summary>
-    ///   清空所有数据
-    /// </summary>
-    procedure clear;
     function InnerDeQueue: PQueueData;
     procedure InnerAddToTail(AData: PQueueData);
-    procedure InnerAddToHead(AData: PQueueData);
   public
     constructor Create;
     destructor Destroy; override;
+    /// <summary>
+    ///   清空所有数据
+    /// </summary>
+    procedure Clear;
+    
     function IsEmpty: Boolean;
 
     function Size: Integer;
@@ -98,7 +98,6 @@ type
     procedure Clear;
     function InnerPop: PQueueData;
     procedure InnerAddToTail(AData: PQueueData);
-    procedure InnerAddToHead(AData: PQueueData);
   public
     constructor Create;
     destructor Destroy; override;
@@ -234,7 +233,7 @@ end;
 //  InnerAddToHead(lvTemp);
 //end;
 
-procedure TBaseQueue.clear;
+procedure TBaseQueue.Clear;
 var
   ANext: PQueueData;
 begin
@@ -256,7 +255,7 @@ begin
   end;
 end;
 
-procedure TBaseQueue.freeDataObject;
+procedure TBaseQueue.FreeDataObject;
 var
   lvData:Pointer;
 begin
@@ -323,24 +322,6 @@ end;
 function TBaseQueue.Size: Integer;
 begin
   Result := FCount;
-end;
-
-procedure TBaseQueue.InnerAddToHead(AData: PQueueData);
-begin
-  FLocker.Enter;
-  try
-    AData.Next := FHead;
-    FHead := AData;
-    if FTail = nil then FTail := FHead;
-
-    Inc(FCount);
-
-    {$IFDEF DEBUG_ON}
-      Inc(FPushCounter);
-    {$ENDIF}
-  finally
-    FLocker.Leave;
-  end;
 end;
 
 function TBaseQueue.InnerDeQueue: PQueueData;
@@ -604,19 +585,6 @@ begin
   Result := FCount;
 end;
 
-procedure TSimpleQueue.InnerAddToHead(AData: PQueueData);
-begin
-  AData.Next := FHead;
-  FHead := AData;
-  if FTail = nil then FTail := FHead;
-  Inc(FCount);
-
-  {$IFDEF DEBUG_ON}
-    Inc(FPushCounter);
-  {$ENDIF}
-
-end;
-
 function TSimpleQueue.InnerPop: PQueueData;
 begin
   Result := FHead;
@@ -655,7 +623,7 @@ end;
 
 
 initialization
-  queueDataPool := TQueueDataPool.Create(10240);
+  queueDataPool := TQueueDataPool.Create(102400);
 
 finalization
   queueDataPool.Free;

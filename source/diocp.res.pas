@@ -24,6 +24,9 @@ resourcestring
   strWSACloseRequest      = '处理投递发送请求数据包时,发现异步关闭请求(Request.Tag = -1)。进行关闭处理!';
   strSendPushFail  = '[%d]投递发送请求数据包超出队列允许的最大长度[%d/%d]。';
 
+  strDoConnectedError  = '[%d]高等级错误:触发DoConnected事件时,发现连接状态(Active)已经为true';    //  on DoConnected event is already actived
+
+
   strFuncFail      = '[%d]执行[%s]失败: %s';
 
   strRequestDisconnectFileID = '请求断开日志';

@@ -46,8 +46,8 @@ type
   private
     FSocketHandle: TSocket;
   public
-    procedure close;
-    procedure createTcpSocket;
+    procedure Close;
+    procedure CreateTcpSocket;
 
     /// <summary>
     ///   create socket handle for overlapped
@@ -55,17 +55,17 @@ type
     procedure CreateTcpOverlappedSocket;
 
 
-    procedure createUdpOverlappedSocket;
+    procedure CreateUdpOverlappedSocket;
 
-    function bind(const pvAddr: string; pvPort: Integer): Boolean;
-    function listen(const backlog: Integer = 0): Boolean;
+    function Bind(const pvAddr: string; pvPort: Integer): Boolean;
+    function Listen(const backlog: Integer = 0): Boolean;
 
     function GetIpAddrByName(const host:string): String;
 
     function RecvBuf(var data; const len: Integer): Integer;
     function SendBuf(const data; const len: Integer): Integer;
 
-    function connect(const pvAddr: string; pvPort: Integer): Boolean;
+    function Connect(const pvAddr: string; pvPort: Integer): Boolean;
 
     /// <summary>
     ///   超时连接, 返回失败，表示连接超时
@@ -89,18 +89,23 @@ type
     /// <summary>
     ///   default 5000 check alive
     /// </summary>
-    function setKeepAliveOption(pvKeepAliveTime: Integer = 5000): Boolean;
+    function SetKeepAliveOption(pvKeepAliveTime: Integer = 5000): Boolean;
 
 
     /// <summary>
-    ///   call in listen RawSocket instance
+    ///   call in Listen RawSocket instance
     /// </summary>
     function UpdateAcceptContext(pvSocket: TSocket): Boolean;
 
-    function setNoDelayOption(pvOption:Boolean): Boolean;
+    function SetNoDelayOption(pvOption:Boolean): Boolean;
 
     property SocketHandle: TSocket read FSocketHandle;
   end;
+
+var
+  __DebugWSACreateCounter:Integer;
+
+  __DebugWSACloseCounter:Integer;
 
 implementation
 
@@ -109,7 +114,7 @@ implementation
 var
   __WSAStartupDone:Boolean;
 
-function TRawSocket.bind(const pvAddr: string; pvPort: Integer): Boolean;
+function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;
 var
   sockaddr: TSockAddrIn;
 begin
@@ -126,7 +131,7 @@ begin
     end;
     sin_port :=  htons(pvPort);
   end;
-  Result := diocp.winapi.winsock2.bind(FSocketHandle, TSockAddr(sockaddr), SizeOf(sockaddr)) = 0;
+  Result := diocp.winapi.winsock2.Bind(FSocketHandle, TSockAddr(sockaddr), SizeOf(sockaddr)) = 0;
 end;
 
 function TRawSocket.CancelIO: Boolean;
@@ -134,7 +139,7 @@ begin
   Result := Windows.CancelIo(FSocketHandle);
 end;
 
-procedure TRawSocket.close;
+procedure TRawSocket.Close;
 var
   lvTempSocket: TSocket;
 begin
@@ -144,11 +149,17 @@ begin
     FSocketHandle := INVALID_SOCKET;
     
     diocp.winapi.winsock2.shutdown(lvTempSocket, SD_BOTH);
-    closesocket(lvTempSocket);
+    
+    Closesocket(lvTempSocket);
+
+    InterlockedIncrement(__DebugWSACloseCounter);
+  end else
+  begin
+    //Assert(false, 'xxx');
   end;
 end;
 
-function TRawSocket.connect(const pvAddr: string; pvPort: Integer): Boolean;
+function TRawSocket.Connect(const pvAddr: string; pvPort: Integer): Boolean;
 var
   sockaddr: TSockAddrIn;
 begin
@@ -159,7 +170,7 @@ begin
     sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
     sin_port :=  htons(pvPort);
   end;
-  Result := diocp.winapi.winsock2.connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn))  = 0;
+  Result := diocp.winapi.winsock2.Connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn))  = 0;
 end;
 
 function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
@@ -167,7 +178,7 @@ function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
 var
   lvFlags: Cardinal;
   sockaddr: TSockAddrIn;
-  lvErr, lvRet: Integer;
+  lvRet: Integer;
   fs: TFDset;
 
 
@@ -185,7 +196,7 @@ begin
     sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
     sin_port :=  htons(pvPort);
   end;
-  lvRet := diocp.winapi.winsock2.connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn));
+  lvRet := diocp.winapi.winsock2.Connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn));
   if lvRet = 0 then
   begin  // 连接成功
     lvFlags := 0;  // 非阻塞模式
@@ -228,24 +239,27 @@ begin
   begin
     RaiseLastOSError;
   end;
+  InterlockedIncrement(__DebugWSACreateCounter);
 end;
 
-procedure TRawSocket.createTcpSocket;
+procedure TRawSocket.CreateTcpSocket;
 begin
   FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;
   end;
+  InterlockedIncrement(__DebugWSACreateCounter);
 end;
 
-procedure TRawSocket.createUdpOverlappedSocket;
+procedure TRawSocket.CreateUdpOverlappedSocket;
 begin
   FSocketHandle := WSASocket(AF_INET,SOCK_DGRAM, IPPROTO_UDP, Nil, 0, WSA_FLAG_OVERLAPPED);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;
   end;
+  InterlockedIncrement(__DebugWSACreateCounter);
 end;
 
 function TRawSocket.GetIpAddrByName(const host:string): String;
@@ -267,7 +281,7 @@ begin
   Result := inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^);
 end;
 
-function TRawSocket.listen(const backlog: Integer): Boolean;
+function TRawSocket.Listen(const backlog: Integer = 0): Boolean;
 var
   queueSize: Integer;
 begin
@@ -278,7 +292,7 @@ begin
   else begin
     queueSize := backlog;
   end;
-  Result := diocp.winapi.winsock2.listen(FSocketHandle, queueSize) = 0;
+  Result := diocp.winapi.winsock2.Listen(FSocketHandle, queueSize) = 0;
 end;
 
 function TRawSocket.RecvBuf(var data; const len: Integer): Integer;
@@ -354,7 +368,7 @@ begin
   Result := diocp.winapi.winsock2.Send(FSocketHandle, data, len, 0);
 end;
 
-function TRawSocket.setKeepAliveOption(pvKeepAliveTime: Integer = 5000):
+function TRawSocket.SetKeepAliveOption(pvKeepAliveTime: Integer = 5000):
     Boolean;
 var
   Opt, insize, outsize: integer;
@@ -384,7 +398,7 @@ begin
   end;
 end;
 
-function TRawSocket.setNoDelayOption(pvOption:Boolean): Boolean;
+function TRawSocket.SetNoDelayOption(pvOption:Boolean): Boolean;
 var
   bNoDelay: BOOL;
 begin
@@ -437,6 +451,8 @@ end;
 
 initialization
    __CheckWSAStartup();
+   __DebugWSACreateCounter := 0;
+   __DebugWSACloseCounter := 0;
 
 
 end.

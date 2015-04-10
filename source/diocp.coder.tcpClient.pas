@@ -19,7 +19,13 @@ uses
   utils.buffer, SysUtils, Classes, utils.queues, utils.safeLogger;
 
 type
+  TIocpCoderRemoteContext = class;
+  TDiocpCoderTcpClient = class;
+  
   TOnContextAction = procedure(pvObject:TObject) of object;
+
+  TOnChildContextAction = procedure(pvTcpClient: TDiocpCoderTcpClient; pvContext:
+      TIocpCoderRemoteContext; pvActionObject: TObject) of object;
 
   TDiocpCoderSendRequest = class(TIocpSendRequest)
   private
@@ -98,8 +104,17 @@ type
 
 
   TDiocpCoderTcpClient = class(TDiocpTcpClient)
+  private
+    FOnChildContextAction: TOnChildContextAction;
+    procedure DoChildContextAction(pvContext: TIocpCoderRemoteContext;
+        pvActionObject: TObject);
   public
     constructor Create(AOwner: TComponent); override;
+
+    property OnChildContextAction: TOnChildContextAction read FOnChildContextAction
+        write FOnChildContextAction;
+
+
   end;
 
 
@@ -136,7 +151,8 @@ end;
 procedure TIocpCoderRemoteContext.CheckStartPostSendBufferLink;
 var
   lvMemBlock:PMemoryBlock;
-  lvValidCount, lvDataLen: Integer;
+  lvDataLen: Integer;
+  lvValidCount:Cardinal;
   lvSendRequest:TDiocpCoderSendRequest;
 begin
   lock();
@@ -227,6 +243,7 @@ begin
         try
           if Assigned(FOnContextAction) then
             FOnContextAction(lvObject);
+          TDiocpCoderTcpClient(Owner).DoChildContextAction(Self, lvObject);
         except
           on E:Exception do
           begin
@@ -336,6 +353,16 @@ begin
   inherited;
   registerContextClass(TIocpCoderRemoteContext);
   FIocpSendRequestClass := TDiocpCoderSendRequest;
+end;
+
+procedure TDiocpCoderTcpClient.DoChildContextAction(pvContext:
+    TIocpCoderRemoteContext; pvActionObject: TObject);
+begin
+  if Assigned(FOnChildContextAction) then
+  begin
+    FOnChildContextAction(Self, pvContext, pvActionObject);
+
+  end;
 end;
 
 { TDiocpCoderSendRequest }
