@@ -13,7 +13,7 @@ unit utils.hashs;
 interface
 
 uses
-  SysUtils, SyncObjs;
+  SysUtils, SyncObjs, Classes;
 
 
 type
@@ -140,6 +140,11 @@ type
     procedure SetBucketSize(pvBucketSize:Integer);
 
     procedure FreeAllDataAsObject();
+
+    /// <summary>
+    ///   将所有数据写入到List中
+    /// </summary>
+    procedure GetDatas(pvList:TList);
 
     property Buckets[AIndex: Cardinal]: PDHashData read GetBuckets;
 
@@ -514,6 +519,22 @@ begin
       Break;
     end;
     lvCurrData:=lvCurrData.Next;
+  end;
+end;
+
+procedure TDHashTable.GetDatas(pvList:TList);
+var
+  I:Integer;
+  lvBucket: PDHashData;
+begin
+  for I := 0 to High(FBuckets) do
+  begin
+    lvBucket := FBuckets[I];
+    while lvBucket<>nil do
+    begin
+      pvList.Add(lvBucket.Data);
+      lvBucket:=lvBucket.Next;
+    end;
   end;
 end;
 

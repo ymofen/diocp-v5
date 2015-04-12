@@ -3,7 +3,7 @@ unit CHATHandler;
 interface
 
 uses
-  SimpleMsgPack, utils.unipool, utils.unipool.tools, diocp.session, diocp.tcp.server;
+  SimpleMsgPack, diocp.session, diocp.tcp.server;
 
 type
   TCHATSession = class(TSessionItem)
@@ -49,6 +49,7 @@ type
 procedure CHATExecute(pvCMDObject: TSimpleMsgPack; pvContext:
     TIocpClientContext);
 
+
 var
   ChatSessions:TSessions;
 
@@ -70,6 +71,28 @@ begin
   finally
     lvMS.Free;
   end;
+end;
+
+
+/// <summary>
+///   进行广播
+/// </summary>
+procedure DispatchCMDObject(pvCMDObject:TSimpleMsgPack; pvIgnoreContext:TIOCPCoderClientContext);
+var
+  lvMS:TMemoryStream;
+  i:Integer;
+  lvList:TList;
+begin
+  lvMS := TMemoryStream.Create;
+  lvList := TList.Create;
+  try
+    pvCMDObject.EncodeToStream(lvMS);
+    lvMS.Position := 0;
+    TIOCPCoderClientContext(pvContext).WriteObject(lvMS);
+  finally
+    lvMS.Free;
+  end;
+
 end;
 
 /// <summary> 进行心跳
@@ -121,8 +144,6 @@ begin
   finally
     lvContext.UnLockContext('执行心跳', nil);
   end;
-
-
 end;
 
 /// <summary>
@@ -160,13 +181,12 @@ end;
 /// </param>
 procedure ExecuteAllUsers(pvCMDObject: TSimpleMsgPack; pvContext: TIocpClientContext);
 var
-  lvSession:TCHATSession;
+  lvSession, lvTempSession:TCHATSession;
   lvContext:TIocpClientContext;
-var
-  lvUniOperator:TDUniOperator;
-  lvSQL, lvPass, lvUserID:String;
+  i: Integer;
 var
   lvItem, lvList:TSimpleMsgPack;
+  lvSessions:TList;
 begin
   lvContext := TIocpClientContext(pvContext);
   if lvContext.LockContext('执行登陆', nil) then
@@ -177,38 +197,31 @@ begin
       raise Exception.Create('未登陆用户!');
     end;
 
-    lvUniOperator := defaultPool.GetUniOperator();
+    lvSessions := TList.Create;
     try
-      // 所有用户不包含我的用户
-      lvSQL :=
-        'SELECT * FROM sys_users WHERE FCode NOT IN (SELECT FFriendUserID from app_myfriends WHERE FUserID = :userid)';
-      lvUniOperator.UniQuery.SQL.Clear;
-      lvUniOperator.UniQuery.SQL.Add(lvSQL);
-      lvUniOperator.UniQuery.ParamByName('userid').AsString := lvSession.UserID;
-      lvUniOperator.UniQuery.Open;
-
-      lvUniOperator.UniQuery.First;
+      /// 获取所有在线连接上下文
+      CHATSessions.GetSessionList(lvSessions);
 
       lvList := pvCMDObject.ForcePathObject('list');
-
-      while not lvUniOperator.UniQuery.Eof do
+      for i := 0 to lvSessions.Count - 1 do
       begin
+        lvTempSession := TCHATSession(lvSessions[i]);
+        if lvTempSession <> lvSession then
+        begin   // 不是请求的当前用户
+          // 在线
+          if lvTempSession.State = 1 then
+          begin
+            lvItem := lvList.AddArrayChild;
+            lvItem.Add('userid', lvTempSession.UserID);
+            /// ....
+          end;
+        end;
 
-
-        lvItem := lvList.Add();
-        lvUserID := lvUniOperator.UniQuery.FieldByName('FCode').AsString;
-        lvItem.Add('userid', lvUserID);
-        lvItem.Add('nickname', lvUniOperator.UniQuery.FieldByName('FName').AsString);
-        lvItem.Add('imageIndex', lvUniOperator.UniQuery.FieldByName('FImageIndex').AsString);
-
-
-        lvUniOperator.UniQuery.Next;
       end;
-
-
     finally
-      lvUniOperator.Close;
+      lvSessions.Free;
     end;
+
 
   finally
     lvContext.UnLockContext('执行登陆', nil);

@@ -892,7 +892,7 @@ type
     /// <summary>
     ///   get online client list
     /// </summary>
-    procedure getOnlineContextList(pvList:TList);
+    procedure GetOnlineContextList(pvList:TList);
 
     /// <summary>
     ///   stop and wait all workers down
@@ -2405,12 +2405,12 @@ begin
   Result := FOnlineContextList.Count;
 end;
 
-procedure TDiocpTcpServer.getOnlineContextList(pvList:TList);
+procedure TDiocpTcpServer.GetOnlineContextList(pvList:TList);
 var
   I:Integer;
   lvBucket: PDHashData;
 begin
-  FLocker.lock('getOnlineContextList');
+  FLocker.lock('GetOnlineContextList');
   try
     for I := 0 to FOnlineContextList.BucketSize - 1 do
     begin

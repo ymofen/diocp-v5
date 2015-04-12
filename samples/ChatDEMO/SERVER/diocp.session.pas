@@ -3,7 +3,7 @@ unit diocp.session;
 interface
 
 uses
-  utils.hashs, SysUtils, Windows;
+  utils.hashs, SysUtils, Windows, Classes;
 
 type
   TSessionItem = class(TObject)
@@ -30,11 +30,12 @@ type
     constructor Create(AItemClass: TSessionItemClass);
     destructor Destroy; override;
 
-
     /// <summary>
     ///   查找Session
     /// </summary>
     function FindSession(pvSessionID:string): TSessionItem;
+
+    procedure GetSessionList(pvList:TList);
 
     /// <summary>
     ///   查找并返回Session,如果不存在则创建一个新的Session
@@ -53,8 +54,6 @@ type
 
 implementation
 
-uses
-  Classes;
 
 /// <summary>
 ///   计算两个TickCount时间差，避免超出49天后，溢出
@@ -103,6 +102,13 @@ function TSessions.FindSession(pvSessionID:string): TSessionItem;
 begin
   FList.Lock;
   Result := TSessionItem(FList.ValueMap[pvSessionID]);
+  FList.unLock;
+end;
+
+procedure TSessions.GetSessionList(pvList:TList);
+begin
+  FList.Lock;
+  FList.GetDatas(pvList);
   FList.unLock;
 end;
 

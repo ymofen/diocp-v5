@@ -134,6 +134,19 @@ begin
   lblDEBUG_ON.Caption := strDebugON_Caption;
 end;
 
+// qsl
+// 未测试
+function GetAddressSpaceUsed: Cardinal;
+var
+  LMemoryStatus: TMemoryStatus;
+begin
+  {Set the structure size}
+  LMemoryStatus.dwLength := SizeOf(LMemoryStatus);
+  {Get the memory status}
+  GlobalMemoryStatus(LMemoryStatus);
+  {The result is the total address space less the free address space}
+  Result := (LMemoryStatus.dwTotalVirtual - LMemoryStatus.dwAvailVirtual) shr 10;
+end;
 
 function GetProcessMemUse(PID: Cardinal): Cardinal;
 var
@@ -147,7 +160,7 @@ begin
   ProcHandle := OpenProcess(PROCESS_QUERY_INFORMATION or PROCESS_VM_READ, False, PID); //由PID取得进程对象的句柄
   if GetProcessMemoryInfo(ProcHandle, @pmc, iSize) then
     Result := pmc.WorkingSetSize;
-
+  CloseHandle(ProcHandle);  
 end;
 
 
@@ -255,7 +268,10 @@ begin
 
   lblRunTimeINfo.Caption :=TRunTimeINfoTools.GetRunTimeINfo;
 
-  lblPCInfo.Caption := Format(strMemory_info, [GetProcessMemUse(GetCurrentProcessId) / 1024.00]);;
+  lblPCInfo.Caption := Format(strMemory_info,
+        [GetProcessMemUse(GetCurrentProcessId) / 1024.00]
+        //[GetAddressSpaceUsed / 1.0]
+        );
 end;
 
 end.
