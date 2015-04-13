@@ -565,7 +565,6 @@ type
     
   {$IFDEF DEBUG_ON}
     FDebug_SendRequestCounter:Integer;
-    FDebug_SendRequestReleaseCounter:Integer;
   {$ENDIF}
 
     FIsDestroying :Boolean;
@@ -2690,6 +2689,9 @@ function TDiocpCustomContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
     pvBufReleaseType: TDataReleaseType): Boolean;
 var
   lvRequest:TIocpSendRequest;
+  {$IFDEF DEBUG_ON}
+  lvErrStr :String;
+  {$ENDIF}
 begin
   Result := false;
   if len = 0 then raise Exception.Create('PostWSASendRequest::request buf is zero!');
