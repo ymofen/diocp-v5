@@ -17,11 +17,12 @@ interface
 uses
   diocp.sockets, SysUtils, diocp.sockets.utils
   {$IFDEF UNICODE}, Generics.Collections{$ELSE}, Contnrs {$ENDIF}
-  , Classes;
+  , Classes, Windows, utils.objectPool;
 
 type
   TIocpRemoteContext = class(TDiocpCustomContext)
   private
+    FLastDisconnectTime:Cardinal;
     FIsConnecting: Boolean;
 
     FAutoReConnect: Boolean;
@@ -37,7 +38,10 @@ type
 
     procedure OnDisconnected; override;
 
+    procedure OnConnected; override;
+
     procedure SetSocketState(pvState:TSocketState); override;
+
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -69,12 +73,30 @@ type
     function GetItems(pvIndex: Integer): TIocpRemoteContext;
   private
     FDisableAutoConnect: Boolean;
+    FReconnectRequestPool:TObjectPool;
+
+    function CreateReconnectRequest:TObject;
+
+    /// <summary>
+    ///   响应完成，归还请求对象到池
+    /// </summary>
+    procedure OnReconnectRequestResponseDone(pvObject:TObject);
+
+    /// <summary>
+    ///   响应重连请求Request
+    /// </summary>
+    procedure OnReconnectRequestResponse(pvObject:TObject);
   private
   {$IFDEF UNICODE}
     FList: TObjectList<TIocpRemoteContext>;
   {$ELSE}
     FList: TObjectList;
   {$ENDIF}
+  protected
+    /// <summary>
+    ///   投递重连请求事件
+    /// </summary>
+    procedure PostReconnectRequestEvent(pvContext: TIocpRemoteContext);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -104,13 +126,29 @@ type
 implementation
 
 uses
-  utils.safeLogger, diocp.winapi.winsock2;
+  utils.safeLogger, diocp.winapi.winsock2, diocp.core.engine;
 
 resourcestring
   strCannotConnect = '当前状态下不能进行连接...';
   strConnectError  = '建立连接失败, 错误代码:%d';
 
+const
+  // 重连间隔，避免连接过快，导致OnDisconnected还没有处理完成, 1秒
+  RECONNECT_INTERVAL = 1000;
 
+
+/// <summary>
+///   计算两个TickCount时间差，避免超出49天后，溢出
+///      感谢 [佛山]沧海一笑  7041779 提供
+///      copy自 qsl代码 
+/// </summary>
+function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+begin
+  if tick_end >= tick_start then
+    result := tick_end - tick_start
+  else
+    result := High(Cardinal) - tick_start + tick_end;
+end;
 
 constructor TIocpRemoteContext.Create;
 begin
@@ -162,6 +200,13 @@ begin
 
 end;
 
+procedure TIocpRemoteContext.OnConnected;
+begin
+  inherited;
+  // 重置断开时间
+  FLastDisconnectTime := 0;
+end;
+
 procedure TIocpRemoteContext.OnConnecteExResponse(pvObject: TObject);
 begin
   FIsConnecting := false;
@@ -207,21 +252,20 @@ begin
 
       Sleep(1000);
 
-      if CanAutoReConnect then
-        PostConnectRequest;
+      if CanAutoReConnect then PostConnectRequest;
     end;
   end;
 end;
 
 procedure TIocpRemoteContext.ReCreateSocket;
 begin
-  RawSocket.createTcpOverlappedSocket;
+  RawSocket.CreateTcpOverlappedSocket;
   if not RawSocket.bind('0.0.0.0', 0) then
   begin
     RaiseLastOSError;
   end;
 
-  Owner.IocpEngine.IocpCore.bind2IOCPHandle(RawSocket.SocketHandle, 0);
+  Owner.IocpEngine.IocpCore.Bind2IOCPHandle(RawSocket.SocketHandle, 0);
 end;
 
 procedure TIocpRemoteContext.SetSocketState(pvState: TSocketState);
@@ -229,9 +273,12 @@ begin
   inherited;
   if pvState = ssDisconnected then
   begin
+    // 记录最后断开时间
+    FLastDisconnectTime := GetTickCount;
+
     if CanAutoReConnect then
     begin
-      PostConnectRequest;
+      TDiocpTcpClient(Owner).PostReconnectRequestEvent(Self);
     end;
   end;
 end;
@@ -245,13 +292,23 @@ begin
   FList := TObjectList.Create();
 {$ENDIF}
   FDisableAutoConnect := false;
+
+  FReconnectRequestPool := TObjectPool.Create(CreateReconnectRequest);
+end;
+
+function TDiocpTcpClient.CreateReconnectRequest: TObject;
+begin
+  Result := TIocpASyncRequest.Create;
+
 end;
 
 destructor TDiocpTcpClient.Destroy;
 begin
+  FReconnectRequestPool.WaitFor(20000);
   Close;
   FList.Clear;
   FList.Free;
+  FReconnectRequestPool.Free;
   inherited Destroy;
 end;
 
@@ -281,6 +338,46 @@ begin
   Result := TIocpRemoteContext(FList[pvIndex]);
 {$ENDIF}
 
+end;
+
+procedure TDiocpTcpClient.OnReconnectRequestResponse(pvObject: TObject);
+var
+  lvContext:TIocpRemoteContext;
+  lvRequest:TIocpASyncRequest;
+begin
+  // 退出
+  if not Self.Active then Exit;
+    
+  lvRequest := TIocpASyncRequest(pvObject);
+  lvContext := TIocpRemoteContext(lvRequest.Data);
+
+  if tick_diff(lvContext.FLastDisconnectTime, GetTickCount) >= RECONNECT_INTERVAL  then
+  begin
+    // 投递真正的连接请求
+    lvContext.PostConnectRequest();
+  end else
+  begin
+    // 再次投递连接请求
+    PostReconnectRequestEvent(lvContext);
+  end;
+end;
+
+procedure TDiocpTcpClient.OnReconnectRequestResponseDone(pvObject: TObject);
+begin
+  FReconnectRequestPool.ReleaseObject(pvObject);
+end;
+
+procedure TDiocpTcpClient.PostReconnectRequestEvent(pvContext:
+    TIocpRemoteContext);
+var
+  lvRequest:TIocpASyncRequest;
+begin
+  lvRequest := TIocpASyncRequest(FReconnectRequestPool.GetObject);
+  lvRequest.DoCleanUp;
+  lvRequest.OnResponseDone := OnReconnectRequestResponseDone;
+  lvRequest.OnResponse := OnReconnectRequestResponse;
+  lvRequest.Data := pvContext;
+  IocpEngine.PostRequest(lvRequest);
 end;
 
 end.

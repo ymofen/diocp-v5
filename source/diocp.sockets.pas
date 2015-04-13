@@ -912,9 +912,12 @@ end;
 
 destructor TDiocpCustomContext.Destroy;
 begin
-  if FReferenceCounter <> 0 then
+  if IsDebugMode then
   begin
-    Assert(FReferenceCounter = 0);
+    if FReferenceCounter <> 0 then
+    begin
+      Assert(FReferenceCounter = 0);
+    end;
   end;
 
   FRawSocket.close;
@@ -995,7 +998,10 @@ begin
 
   if IsDebugMode then
   begin
-    Assert(FReferenceCounter = 0);
+    if FReferenceCounter <> 0 then
+    begin
+      Assert(FReferenceCounter = 0);
+    end;
     Assert(not FActive);
   end;
 end;
@@ -1155,8 +1161,6 @@ begin
 {$ENDIF}
   if not FActive then exit;
 
-//  Assert(FReferenceCounter = 0);
-//  Assert(FActive);
   try
     FActive := false;
     FRawSocket.close;
@@ -1167,48 +1171,19 @@ begin
       begin
         FOwner.FOnContextDisconnected(Self);
       end;
+
+      // 
       OnDisconnected;
+
+      // 设置Socket状态
       SetSocketState(ssDisconnected);
 
-      Self.DoCleanUp;
+      DoCleanUp;
     except
     end;
   finally
     FOwner.RemoveFromOnOnlineList(Self);
   end;
-
-//
-//  Assert(FOwner <> nil);
-//  Assert(FReferenceCounter = 0);
-//
-//  {$IFDEF DEBUG_ON}
-//  FOwner.LogMessage('(%d)断开调试信息:%s', [self.SocketHandle, FDebugStrings.Text], 'RequestDisconnect');
-//  {$ENDIF}
-//
-//  if not FActive then
-//    Assert(FActive);
-//  FContextLocker.lock('closeContext');
-//  try
-//    try
-//      FActive := false;
-//      Assert(FOwner <> nil);
-//      FRawSocket.close;
-//      CheckReleaseRes;
-//      try
-//        if Assigned(FOwner.FOnContextDisconnected) then
-//        begin
-//          FOwner.FOnContextDisconnected(Self);
-//        end;
-//        OnDisconnected;
-//        SetSocketState(ssDisconnected);
-//      except
-//      end;
-//    finally
-//       FOwner.RemoveFromOnOnlineList(self);
-//    end;
-//  finally
-//    FContextLocker.unLock;
-//  end;
 end;
 
 procedure TDiocpCustomContext.lock;

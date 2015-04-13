@@ -58,7 +58,7 @@ type
 
     FData: Pointer;
     /// io request response info
-    FiocpWorker: TIocpWorker;
+    FIocpWorker: TIocpWorker;
 
     FPre: TIocpRequest;
 
@@ -68,6 +68,7 @@ type
     FNext: TIocpRequest;
     
     FOnResponse: TNotifyEvent;
+    FOnResponseDone: TNotifyEvent;
     FTag: Integer;
   protected
     FResponding: Boolean;
@@ -104,10 +105,11 @@ type
   public
     constructor Create;
 
-    property iocpWorker: TIocpWorker read FiocpWorker;
+    property IocpWorker: TIocpWorker read FIocpWorker;
 
     property OnResponse: TNotifyEvent read FOnResponse write FOnResponse;
 
+    property OnResponseDone: TNotifyEvent read FOnResponseDone write FOnResponseDone;
 
     property ErrorCode: Integer read FErrorCode;
     
@@ -121,9 +123,39 @@ type
     //
     property Responding: Boolean read FResponding;
 
+    /// <summary>
+    ///   扩展Data数据
+    /// </summary>
     property Data: Pointer read FData write FData;
     
     property Tag: Integer read FTag write FTag;
+  end;
+
+  TIocpASyncRequest = class;
+
+
+{$IFDEF UNICODE}
+  TDiocpASyncEvent = reference to procedure(pvRequest: TIocpASyncRequest);
+{$ELSE}
+  TDiocpASyncEvent = procedure(pvRequest: TIocpASyncRequest) of object;
+{$ENDIF}
+
+  TIocpASyncRequest = class(TIocpRequest)
+  private
+    FStartTime: Cardinal;
+    FEndTime: Cardinal;
+    FOnASyncEvent: TDiocpASyncEvent;
+  protected
+    procedure HandleResponse; override;
+    function GetStateINfo: String; override;
+  public
+    destructor Destroy; override;
+    procedure DoCleanUp;
+
+    /// <summary>
+    ///   异步执行事件在iocp线程中触发
+    /// </summary>
+    property OnASyncEvent: TDiocpASyncEvent read FOnASyncEvent write FOnASyncEvent;
   end;
 
   /// <summary>
@@ -211,6 +243,9 @@ type
     /// </summary>
     function PostIOExitRequest: Boolean;
 
+    /// <summary>
+    ///   投递请求到IO
+    /// </summary>
     function PostRequest(dwCompletionKey: DWORD; lpOverlapped: POverlapped):
         Boolean;
   end;
@@ -265,7 +300,7 @@ type
 
 
   /// <summary>
-  ///  iocp engine , mananger iocp workers.
+  ///  IOCP引擎, 管理IOCP工作线程
   /// </summary>
   TIocpEngine = class(TObject)
   private
@@ -328,19 +363,18 @@ type
     procedure SetWorkerCount(AWorkerCount: Integer);
 
     /// <summary>
-    ///   set max worker count.
+    ///   设置最大的工作线程
     /// </summary>
     procedure SetMaxWorkerCount(AWorkerCount: Word);
 
 
-    /// <summary>
-    ///   check create a worker
-    ///     true: create a worker
-    /// </summary>
+    /// <summary>尝试创建一个工作线程, </summary>
+    /// <returns> true,成功创建一个工作线程.</returns>
+    /// <param name="pvIsTempWorker"> 临时工作线程 </param>
     function CheckCreateWorker(pvIsTempWorker: Boolean): Boolean;
 
     /// <summary>
-    ///   create worker thread and Start worker
+    ///   开启IOCP引擎，创建工作线程
     /// </summary>
     procedure Start;
 
@@ -361,6 +395,8 @@ type
     /// </summary>
     function StopWorkers(pvTimeOut: Cardinal): Boolean;
 
+    procedure PostRequest(pvRequest:TIocpRequest);
+
 
 
     property Active: Boolean read FActive;
@@ -371,13 +407,16 @@ type
     property IocpCore: TIocpCore read FIocpCore;
 
 
+    /// <summary>
+    ///   最大的工作线程数
+    /// </summary>
     property MaxWorkerCount: Word read FMaxWorkerCount write SetMaxWorkerCount;
 
 
 
 
     /// <summary>
-    ///  get worker count
+    ///  获取工作线程数量
     /// </summary>
     property WorkerCount: Word read FWorkerCount;
 
@@ -407,11 +446,13 @@ var
 {$ENDIF}
 
 resourcestring
-  strDebugINfo               = 'active : %s, worker count: %d';
-  strDebug_WorkerTitle       = '----------------------- woker %d --------------------';
-  strDebug_Worker_INfo       = 'thread id: %d, response count: %d';
-  strDebug_Worker_StateINfo  = 'busying:%s, waiting:%s, reserved:%s ';
-  strDebug_Request_Title     = 'request state info:';
+  strDebugINfo               = '状态 : %s, 工作线程: %d';
+  strDebug_WorkerTitle       = '----------------------- 工作线程(%d) --------------------';
+  strDebug_Worker_INfo       = '线程id: %d, 响应数量: %d';
+  strDebug_Worker_StateINfo  = '正在工作:%s, 等待:%s, 保留线程:%s ';
+  strDebug_Request_Title     = '请求状态信息:';
+  
+  strDebug_RequestState      = '完成: %s, 耗时(ms): %d';
 
 procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
 var
@@ -458,7 +499,7 @@ begin
 {$ENDIF}
 end;
 
-function getCPUCount: Integer;
+function GetCPUCount: Integer;
 {$IFDEF MSWINDOWS}
 var
   si: SYSTEM_INFO;
@@ -515,7 +556,7 @@ end;
 function TIocpCore.PostRequest(dwCompletionKey: DWORD; lpOverlapped:
     POverlapped): Boolean;
 begin
-  Result := PostQueuedCompletionStatus(FIOCPHandle, 0, dwCompletionKey, lpOverlapped);  
+  Result := PostQueuedCompletionStatus(FIOCPHandle, 0, dwCompletionKey, lpOverlapped);
 end;
 
 procedure TIocpWorker.CheckCoInitializeEx(pvReserved: Pointer = nil; coInit:
@@ -578,8 +619,7 @@ begin
           INFINITE);
       end else
       begin
-        // fire worker(will break) after 30's
-        //   timeout will return false and break while
+        // 临时工作线程, 30秒后没有任务可能会被释放
         lvResultStatus := GetQueuedCompletionStatus(FIocpCore.FIOCPHandle,
           lvBytesTransferred,  lpCompletionKey,
           POverlapped(lpOverlapped),
@@ -628,7 +668,13 @@ begin
           lvTempRequest.FRespondEndTime := Now();
           lvTempRequest.FResponding := false;
         finally
-          lvTempRequest.ResponseDone;
+          if Assigned(lvTempRequest.OnResponseDone) then
+          begin
+            lvTempRequest.FOnResponseDone(lvTempRequest);
+          end else
+          begin
+            lvTempRequest.ResponseDone();
+          end;
         end;
 
       end else
@@ -645,8 +691,6 @@ begin
         end;
       end;
     end;
-    
-
   end;
 
   FFlags := WORKER_OVER;
@@ -748,7 +792,7 @@ begin
   inherited Create;
   FWorkerLocker := TIocpLocker.Create;
 
-  FWorkerCount := getCPUCount shl 2 - 1;
+  FWorkerCount := GetCPUCount shl 2 - 1;
   FWorkerList := TList.Create();
   FIocpCore := TIocpCore.Create;
   FIocpCore.doInitialize;
@@ -891,6 +935,15 @@ begin
   InterlockedIncrement(FActiveWorkerCount);
 end;
 
+procedure TIocpEngine.PostRequest(pvRequest: TIocpRequest);
+begin
+  /// post request to iocp queue
+  if not IocpCore.postRequest(0, POverlapped(@pvRequest.FOverlapped)) then
+  begin
+    RaiseLastOSError;
+  end;
+end;
+
 procedure TIocpEngine.SafeStop(pvTimeOut: Integer = 120000);
 begin
   if FActiveWorkerCount > 0 then
@@ -912,7 +965,7 @@ procedure TIocpEngine.SetWorkerCount(AWorkerCount: Integer);
 begin
   if FActive then SafeStop;
   if AWorkerCount <= 0 then
-    FWorkerCount := (getCPUCount shl 1) -1
+    FWorkerCount := (GetCPUCount shl 1) -1
   else
     FWorkerCount := AWorkerCount;
   
@@ -925,7 +978,7 @@ var
   AWorker: TIocpWorker;
   lvCpuCount:Integer;
 begin
-  lvCpuCount := getCPUCount;
+  lvCpuCount := GetCPUCount;
 
   if FSafeStopSign <> nil then
   begin
@@ -1260,7 +1313,45 @@ end;
 
 procedure TIocpRequest.ResponseDone;
 begin
+  
+end;
 
+destructor TIocpASyncRequest.Destroy;
+begin
+
+  inherited;
+end;
+
+procedure TIocpASyncRequest.DoCleanUp;
+begin
+  Self.Remark := '';
+  FOnASyncEvent := nil;
+end;
+
+
+function TIocpASyncRequest.GetStateINfo: String;
+var
+  lvEndTime:Cardinal;
+begin
+  if FEndTime <> 0 then lvEndTime := FEndTime else lvEndTime := GetTickCount;
+  Result := '';
+  if Remark <> '' then
+  begin
+    Result := Remark + sLineBreak;
+  end;
+
+  Result := Result + Format(strDebug_RequestState, [BoolToStr(FEndTime <> 0, True), lvEndTime - FEndTime]);
+end;
+
+procedure TIocpASyncRequest.HandleResponse;
+begin
+  try
+    FStartTime := GetTickCount;
+    FEndTime := 0;
+    if Assigned(FOnASyncEvent) then FOnASyncEvent(Self);
+  finally
+    FEndTime := GetTickCount;
+  end;
 end;
 
 initialization
