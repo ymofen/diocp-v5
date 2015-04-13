@@ -37,9 +37,18 @@ type
 
   TDBuckets =array of PDHashData;
 
+{$IFDEF UNICODE}
+  TOnDataCompare = reference to function(P1,P2:Pointer): Integer;
+  TOnDHashDataNotify = reference to procedure(pvData:PDHashData);
+  TOnDHashDataNotifyEx = reference to procedure(pvData: PDHashData; pvParamData: Pointer);
+  TOnDataNotify = reference to procedure(pvData:Pointer);
+{$ELSE}
   TOnDataCompare = function(P1,P2:Pointer): Integer of object;
   TOnDHashDataNotify = procedure(pvData:PDHashData) of object;
+  TOnDHashDataNotifyEx = procedure(pvData: PDHashData; pvParamData: Pointer) of object;
   TOnDataNotify = procedure(pvData:Pointer) of object;
+{$ENDIF}
+
 
   TDHashTable = class(TObject)
   private
@@ -76,9 +85,14 @@ type
     destructor Destroy; override;
 
     /// <summary>
-    ///   for each element and invoke callback proc
+    ///    循环每一个数据进行回调
     /// </summary>
-    procedure ForEach(pvCallback:TOnDHashDataNotify);
+    procedure ForEach(pvCallback:TOnDHashDataNotify);overload;
+
+    /// <summary>
+    ///   循环每一个数据, 带一个扩展的参数数据进行回调
+    /// </summary>
+    procedure ForEach(pvCallback:TOnDHashDataNotifyEx; pvParamData:Pointer); overload;
 
     /// <summary>
     ///  add AData
@@ -382,6 +396,24 @@ begin
       Break;
     end;
     lvCurrData:=lvCurrData.Next;
+  end;
+end;
+
+procedure TDHashTable.ForEach(pvCallback: TOnDHashDataNotifyEx;
+  pvParamData: Pointer);
+var
+  I:Integer;
+  lvBucket: PDHashData;
+begin
+  Assert(Assigned(pvCallback));
+  for I := 0 to High(FBuckets) do
+  begin
+    lvBucket := FBuckets[I];
+    while lvBucket<>nil do
+    begin
+      pvCallback(lvBucket, pvParamData);
+      lvBucket:=lvBucket.Next;
+    end;
   end;
 end;
 
