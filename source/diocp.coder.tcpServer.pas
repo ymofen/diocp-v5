@@ -513,6 +513,7 @@ begin
 
   if self.LockContext('WriteObject', Self) then
   try
+    //sfLogger.logMessage('进入回写对象[%d]',[Integer(self)], 'BCB_DEBUG');
     lvOutBuffer := TBufferLink.Create;
     try
       TDiocpCoderTcpServer(Owner).FEncoder.Encode(pvDataObject, lvOutBuffer);
@@ -542,6 +543,7 @@ begin
     end;
   finally
     self.unLockContext('WriteObject', Self);
+    //sfLogger.logMessage('离开回写对象[%d]',[Integer(self)], 'BCB_DEBUG'); 
   end;    
 end;
 

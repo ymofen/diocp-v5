@@ -112,6 +112,7 @@ type
 
     FData: Pointer;
     FOnConnectedEvent: TNotifyContextEvent;
+    FOnDisconnectedEvent: TNotifyContextEvent;
     FOnSocketStateChanged: TNotifyEvent;
 
     /// sendRequest link
@@ -258,6 +259,8 @@ type
     property OnConnectedEvent: TNotifyContextEvent read FOnConnectedEvent write
         FOnConnectedEvent;
 
+    property OnDisconnectedEvent: TNotifyContextEvent read FOnDisconnectedEvent
+        write FOnDisconnectedEvent;
     property Owner: TDiocpCustom read FOwner write SetOwner;
 
     property RawSocket: TRawSocket read FRawSocket;
@@ -1173,6 +1176,8 @@ begin
 
       // 
       OnDisconnected;
+
+      if Assigned(FOnDisconnectedEvent) then FOnDisconnectedEvent(Self);
 
       // …Ë÷√Socket◊¥Ã¨
       SetSocketState(ssDisconnected);
