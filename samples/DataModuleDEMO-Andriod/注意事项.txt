@@ -1,0 +1,18 @@
+  手机Andriod客户端与diocp服务器交换数据的例子
+  可以学习到如何在andriod中请求diocp执行sql语句返回一个TClientDataSet的数据，并在手机上进行显示
+  ==============================================
+  * 注意 不知道从那个版本开始 XE中就存在一个对ClientDataSet.Data赋值出现AV异常的bug
+    你可以进行简单的测试
+    datasetProvider1.DataSet := adoDataSet;
+    clientDataSet.Data := datasetProvider1.Data;  //进行打包的时候出现非法访问异常
+    如果出现类似的错误, 需要你修正DBClient.pas才能正确运行。
+    
+  你可以手工修改DBClient.pas文件, 修改该方法，注释掉下面三行
+  然后把修改的文件，放到你的工程目录,然后添加到工程了
+  function TCustomClientDataSet.CreateDSBase: IDSBase;
+  begin
+    CreateDbClientObject(CLSID_DSBase, IDSBase, Result);
+  //  Check(Result.SetProp(dspropANSICODEPAGE, DefaultSystemCodePage));
+  //  Check(Result.SetProp(dspropUTF8METADATA, NativeUInt(True)));
+  //  Check(Result.SetProp(dspropUTF8ERRORMSG, NativeUInt(True)));
+  end;
