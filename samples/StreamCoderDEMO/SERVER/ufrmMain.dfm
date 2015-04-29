@@ -2,9 +2,9 @@ object frmMain: TfrmMain
   Left = 0
   Top = 0
   BorderIcons = [biSystemMenu]
-  Caption = 'diocp-v5 server for diocp1'
-  ClientHeight = 417
-  ClientWidth = 681
+  Caption = 'diocp-v5 server for Coder'
+  ClientHeight = 453
+  ClientWidth = 776
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,72 +18,54 @@ object frmMain: TfrmMain
   object PageControl1: TPageControl
     Left = 0
     Top = 59
-    Width = 681
-    Height = 358
-    ActivePage = TabSheet1
+    Width = 776
+    Height = 394
+    ActivePage = tsMonitor
     Align = alClient
     TabOrder = 0
-    ExplicitWidth = 640
-    ExplicitHeight = 326
-    object TabSheet1: TTabSheet
-      Caption = 'TabSheet1'
-      ExplicitWidth = 632
-      ExplicitHeight = 298
+    object tsMonitor: TTabSheet
+      Caption = #30417#25511#38754#26495
+      ExplicitWidth = 673
+      ExplicitHeight = 330
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
-        Width = 673
-        Height = 330
+        Width = 768
+        Height = 366
         Align = alClient
         BevelKind = bkTile
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitWidth = 632
-        ExplicitHeight = 298
+        ExplicitWidth = 673
+        ExplicitHeight = 330
       end
     end
-    object TabSheet2: TTabSheet
-      Caption = 'log'
+    object tsLog: TTabSheet
+      Caption = #26085#24535
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
-        Width = 632
-        Height = 298
+        Width = 768
+        Height = 366
         Align = alClient
         TabOrder = 0
       end
     end
     object tsTest: TTabSheet
-      Caption = 'tsTest'
+      Caption = #27979#35797#39029#38754
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
-      object btnBufferTester: TButton
-        Left = 24
-        Top = 24
-        Width = 121
-        Height = 25
-        Caption = 'btnBufferTester'
-        TabOrder = 0
-      end
     end
   end
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 681
+    Width = 776
     Height = 59
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitWidth = 640
+    ExplicitWidth = 681
     object edtPort: TEdit
       Left = 9
       Top = 7
@@ -129,19 +111,19 @@ object frmMain: TfrmMain
     Left = 232
     Top = 272
     object actOpen: TAction
-      Caption = 'start'
+      Caption = #24320#21551#26381#21153
       OnExecute = actOpenExecute
     end
     object actStop: TAction
-      Caption = 'stop'
+      Caption = #20572#27490#26381#21153
       OnExecute = actStopExecute
     end
     object actPushMsg: TAction
-      Caption = 'PushMsg'
+      Caption = #25512#36865#20449#24687
       OnExecute = actPushMsgExecute
     end
     object actDisconnectAll: TAction
-      Caption = 'Disconnect all'
+      Caption = #26029#24320#25152#26377
       OnExecute = actDisconnectAllExecute
     end
   end

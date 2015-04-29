@@ -162,7 +162,7 @@ begin
   end;
   if pvErrorCode = 0 then
   begin
-    Sleep(10);
+    Sleep(1);
     pvContext.PostWSASendRequest(buf, len);
   end else
   begin

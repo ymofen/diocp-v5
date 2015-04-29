@@ -18,15 +18,14 @@ type
     edtMsg: TEdit;
     btnPushMsg: TButton;
     PageControl1: TPageControl;
-    TabSheet1: TTabSheet;
-    TabSheet2: TTabSheet;
+    tsMonitor: TTabSheet;
+    tsLog: TTabSheet;
     pnlMonitor: TPanel;
     mmoLog: TMemo;
     pnlTop: TPanel;
     btnDisconnectAll: TButton;
     actDisconnectAll: TAction;
     tsTest: TTabSheet;
-    btnBufferTester: TButton;
     procedure actDisconnectAllExecute(Sender: TObject);
     procedure actOpenExecute(Sender: TObject);
     procedure actPushMsgExecute(Sender: TObject);
