@@ -27,10 +27,12 @@ type
     btnBufferTester: TButton;
     edtMsg: TEdit;
     btnPushMsg: TButton;
+    tmrHeart: TTimer;
     procedure actDisconnectAllExecute(Sender: TObject);
     procedure actOpenExecute(Sender: TObject);
     procedure actPushMsgExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
+    procedure tmrHeartTimer(Sender: TObject);
   private
     { Private declarations }
     FTcpServer: TDiocpCoderTcpServer;
@@ -46,7 +48,7 @@ var
 implementation
 
 uses
-  uFMMonitor, uDIOCPStreamCoder, uMyClientContext;
+  uFMMonitor, uDIOCPStreamCoder, uMyClientContext, CHATHandler;
 
 {$R *.dfm}
 
@@ -134,6 +136,13 @@ procedure TfrmMain.actStopExecute(Sender: TObject);
 begin
   FTcpServer.safeStop;
   refreshState;
+end;
+
+procedure TfrmMain.tmrHeartTimer(Sender: TObject);
+begin
+  FTcpServer.KickOut(20000);
+  ChatSessions.KickOut(20000);
+
 end;
 
 end.

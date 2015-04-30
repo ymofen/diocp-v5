@@ -9,10 +9,10 @@ type
   TCHATSession = class(TSessionItem)
   private
     FContext: TIocpClientContext;
+    FOwnerTcpServer: TDiocpTcpServer;
     FData: TSimpleMsgPack;
     FState: Integer;
     FUserID: String;
-    FUserKey: string;
     FVerified: Boolean;
   public
     constructor Create; override;
@@ -27,12 +27,16 @@ type
     property Data: TSimpleMsgPack read FData;
 
     /// <summary>
+    ///   断开 Session失效, 移除列表，准备释放SessionItem时执行
+    /// </summary>
+    procedure OnDisconnect(); override;
+
+    /// <summary>
     ///   状态 (0,离线, 1:在线, 2:隐身)
     /// </summary>
     property State: Integer read FState write FState;
     
     property UserID: String read FUserID write FUserID;
-    property UserKey: string read FUserKey write FUserKey;
 
     
 
@@ -97,11 +101,17 @@ begin
       lvContext := TIOCPCoderClientContext(lvList[i]);
       if lvContext <> pvIgnoreContext then
       begin
-        lvContext.WriteObject(lvMS);
+        lvContext.LockContext('推送信息', nil);
+        try
+          lvContext.WriteObject(lvMS);
+        finally
+          lvContext.UnLockContext('推送信息', nil);
+        end;
       end;
     end;
   finally
     lvMS.Free;
+    lvList.Free;
   end;
 
 end;
@@ -273,6 +283,8 @@ var
   lvContext:TIocpClientContext;
 var
   lvSQL, lvPass, lvUserID:String;
+
+  lvCMDObject:TSimpleMsgPack;
 begin
   lvUserID := pvCMDObject.ForcePathObject('params.userid').AsString;
   if lvUserID = '' then
@@ -291,6 +303,9 @@ begin
 
     lvSession := TCHATSession(ChatSessions.CheckSession(lvUserID));
     lvSession.FContext := lvContext;
+    lvSession.FOwnerTcpServer := lvContext.Owner;
+    
+    lvSession.UserID := lvUserID;
     
     // 在线
     lvSession.FState := 1;
@@ -301,7 +316,19 @@ begin
     /// 建立关联关系
     lvContext.Data := lvSession;
 
-
+    // 上线通知推送
+    lvCMDObject := TSimpleMsgPack.Create;
+    try
+      lvCMDObject.ForcePathObject('cmdIndex').AsInteger := 21;
+      lvCMDObject.ForcePathObject('userid').AsString := lvUserID;
+      lvCMDObject.ForcePathObject('type').AsInteger := 1;  // 上线
+      if lvContext <> nil then
+      begin   // 推送消息
+        DispatchCMDObject(lvCMDObject, lvContext.Owner, TIOCPCoderClientContext(lvContext));
+      end;
+    finally
+      lvCMDObject.Free;
+    end;
   finally
     lvContext.UnLockContext('执行登陆', nil);
   end;
@@ -369,12 +396,27 @@ begin
     end;
 
 
-      // 接收用户ID
-      lvUserID2 := pvCMDObject.ForcePathObject('params.userid').AsString;
+    // 接收用户ID <不指定发送给所有用户>
+    lvUserID2 := pvCMDObject.ForcePathObject('params.userid').AsString;
 
-      // 请求ID
-      lvUserID := lvSession.UserID;
+    // 请求ID
+    lvUserID := lvSession.UserID;
 
+    if lvUserID2 = '' then
+    begin    // 发送给所有用户
+      lvSendCMDObject := TSimpleMsgPack.Create;
+      try
+        lvSendCMDObject.ForcePathObject('cmdIndex').AsInteger := 6;
+        lvSendCMDObject.ForcePathObject('userid').AsString := lvUserID;
+        lvSendCMDObject.ForcePathObject('requestID').AsString := pvCMDObject.ForcePathObject('requestID').AsString;
+        lvSendCMDObject.ForcePathObject('msg').AsString :=
+          pvCMDObject.ForcePathObject('params.msg').AsString;
+        DispatchCMDObject(lvSendCMDObject, lvContext.Owner, TIOCPCoderClientContext(lvContext));
+      finally
+        lvSendCMDObject.Free;
+      end;
+    end else
+    begin   
       // 接收用户
       lvSession2 := TCHATSession(ChatSessions.FindSession(lvUserID2));
 
@@ -390,8 +432,7 @@ begin
               try
                 lvSendCMDObject.ForcePathObject('cmdIndex').AsInteger := 6;
                 lvSendCMDObject.ForcePathObject('userid').AsString := lvUserID;
-                lvSendCMDObject.ForcePathObject('requestID').AsString :=
-                  pvCMDObject.ForcePathObject('requestID').AsString;
+                lvSendCMDObject.ForcePathObject('requestID').AsString := pvCMDObject.ForcePathObject('requestID').AsString;
                 lvSendCMDObject.ForcePathObject('msg').AsString :=
                   pvCMDObject.ForcePathObject('params.msg').AsString;
                 TIOCPCoderClientContext(lvSendContext).WriteObject(lvSendCMDObject);
@@ -406,12 +447,13 @@ begin
         end;
       end;
 
-    if not lvSent then
-    begin
-      // 离线信息
-      pvCMDObject.ForcePathObject('result.code').AsInteger := -1;
-      pvCMDObject.ForcePathObject('result.msg').AsString := '用户不在线';
+      if not lvSent then
+      begin
+        // 离线信息
+        pvCMDObject.ForcePathObject('result.code').AsInteger := -1;
+        pvCMDObject.ForcePathObject('result.msg').AsString := '用户不在线';
 
+      end;
     end;
 
   finally
@@ -443,6 +485,7 @@ constructor TCHATSession.Create;
 begin
   inherited;
   FData := TSimpleMsgPack.Create;
+  FOwnerTcpServer := nil;
 end;
 
 
@@ -450,6 +493,24 @@ destructor TCHATSession.Destroy;
 begin
    FData.Free;
    inherited;
+end;
+
+procedure TCHATSession.OnDisconnect;
+var
+  lvCMDObject:TSimpleMsgPack;
+begin
+  lvCMDObject := TSimpleMsgPack.Create;
+  try
+    lvCMDObject.ForcePathObject('cmdIndex').AsInteger := 21;
+    lvCMDObject.ForcePathObject('userid').AsString := Self.UserID;
+    lvCMDObject.ForcePathObject('type').AsInteger := 0;  // 离线
+    if (FOwnerTcpServer <> nil) and (Context <> nil) then
+    begin   // 推送消息
+      DispatchCMDObject(lvCMDObject, FOwnerTcpServer, TIOCPCoderClientContext(Context));
+    end;
+  finally
+    lvCMDObject.Free;
+  end;
 end;
 
 initialization

@@ -23,12 +23,8 @@ object frmMain: TfrmMain
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
-    ExplicitWidth = 640
-    ExplicitHeight = 326
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitWidth = 632
-      ExplicitHeight = 298
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -38,15 +34,11 @@ object frmMain: TfrmMain
         BevelKind = bkTile
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitWidth = 632
-        ExplicitHeight = 298
       end
     end
     object TabSheet2: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
-      ExplicitWidth = 632
-      ExplicitHeight = 298
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -54,15 +46,11 @@ object frmMain: TfrmMain
         Height = 387
         Align = alClient
         TabOrder = 0
-        ExplicitWidth = 632
-        ExplicitHeight = 298
       end
     end
     object tsTest: TTabSheet
       Caption = #27979#35797
       ImageIndex = 2
-      ExplicitWidth = 632
-      ExplicitHeight = 298
       object btnBufferTester: TButton
         Left = 16
         Top = 34
@@ -97,7 +85,6 @@ object frmMain: TfrmMain
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitWidth = 640
     object edtPort: TEdit
       Left = 9
       Top = 7
@@ -132,7 +119,7 @@ object frmMain: TfrmMain
       OnExecute = actOpenExecute
     end
     object actStop: TAction
-      Caption = 'stop'
+      Caption = #20572#27490
       OnExecute = actStopExecute
     end
     object actPushMsg: TAction
@@ -143,5 +130,11 @@ object frmMain: TfrmMain
       Caption = 'Disconnect all'
       OnExecute = actDisconnectAllExecute
     end
+  end
+  object tmrHeart: TTimer
+    Interval = 10000
+    OnTimer = tmrHeartTimer
+    Left = 376
+    Top = 240
   end
 end

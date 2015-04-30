@@ -20,9 +20,6 @@ object frmMain: TfrmMain
     Height = 302
     Align = alClient
     TabOrder = 0
-    ExplicitTop = 59
-    ExplicitWidth = 702
-    ExplicitHeight = 151
   end
   object pnlOperator: TPanel
     Left = 0
@@ -89,14 +86,12 @@ object frmMain: TfrmMain
     Height = 172
     Align = alBottom
     TabOrder = 2
-    ExplicitTop = 216
-    ExplicitWidth = 702
     object btnSendObject: TButton
       Left = 620
       Top = 22
       Width = 105
       Height = 25
-      Caption = 'btnSendObject'
+      Caption = #21457#36865
       TabOrder = 0
       OnClick = btnSendObjectClick
     end
@@ -116,8 +111,6 @@ object frmMain: TfrmMain
     Align = alRight
     ItemHeight = 13
     TabOrder = 3
-    ExplicitTop = 65
-    ExplicitHeight = 286
   end
   object tmrHeart: TTimer
     Enabled = False

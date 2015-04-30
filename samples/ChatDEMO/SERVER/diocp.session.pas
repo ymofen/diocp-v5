@@ -11,11 +11,14 @@ type
     FSessionID:String;
     // 最后交互数据的时间点
     FLastActivity: Cardinal;
-
-
   public
     constructor Create; virtual;
     procedure DoActivity();
+
+    /// <summary>
+    ///   断开 Session失效, 移除列表，准备释放SessionItem时执行
+    /// </summary>
+    procedure OnDisconnect();virtual;
   public
     property SessionID: String read FSessionID;
   end;
@@ -119,6 +122,7 @@ var
   I:Integer;
   lvContext : TSessionItem;
   lvDeleteList:TStrings;
+  lvObj:TObject;
 begin
   lvNowTickCount := GetTickCount;
   lvDeleteList := TStringList.Create;
@@ -148,8 +152,10 @@ begin
     /// 清理对象
     for i := 0 to lvDeleteList.Count - 1 do
     begin
+      lvObj := lvDeleteList.Objects[i];
       FList.Remove(lvDeleteList[i]);
-      TObject(lvDeleteList.Objects[i]).Free;
+      TSessionItem(lvObj).OnDisconnect;
+      TObject(lvObj).Free;
     end;
   finally
     FList.unLock;
@@ -168,6 +174,11 @@ end;
 procedure TSessionItem.DoActivity;
 begin
   FLastActivity := GetTickCount;
+end;
+
+procedure TSessionItem.OnDisconnect;
+begin
+  
 end;
 
 end.

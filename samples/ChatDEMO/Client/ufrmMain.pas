@@ -125,24 +125,12 @@ begin
 end;
 
 procedure TfrmMain.btnSendObjectClick(Sender: TObject);
-var
-  lvStream:TMemoryStream;
-  s:AnsiString;
 begin
-  lvStream := TMemoryStream.Create;
-  try
-   // lvStream.LoadFromFile('C:\1.txt');
-    s := mmoData.Lines.Text;
-    lvStream.Write(s[1], Length(s));
-
-    lvStream.Position := 0;
-
-    //send stream object
-    FDiocpContext.writeObject(lvStream);
-  finally
-    lvStream.Free;
-  end;
-
+  FCMDObject.Clear;
+  FCMDObject.ForcePathObject('cmdIndex').AsInteger := 5;
+  FCMDObject.ForcePathObject('requestID').AsString := 'messageID';
+  FCMDObject.ForcePathObject('params.msg').AsString := mmoData.Lines.Text;
+  SendCMDObject(FCMDObject);                                              
 end;
 
 procedure TfrmMain.OnDisconnected(pvContext: TDiocpCustomContext);
@@ -152,7 +140,7 @@ begin
     exit;
   end;
 
-  sfLogger.logMessage('disconnected');
+  sfLogger.logMessage('与服务器断开连接...');
 end;
 
 procedure TfrmMain.OnRecvObject(pvObject: TObject);
@@ -163,18 +151,51 @@ var
 begin
   lvStream := TMemoryStream(pvObject);
   lvCMDObject:= TSimpleMsgPack.Create;
-  lvCMDObject.DecodeFromStream(lvStream);
-  if lvCMDObject.ForcePathObject('requestID').AsString = 'login' then
-  begin
+  try
+    lvCMDObject.DecodeFromStream(lvStream);
+
+    // 异常信息
     if lvCMDObject.ForcePathObject('result.code').AsInteger = -1 then
     begin
       sfLogger.logMessage(lvCMDObject.ForcePathObject('result.msg').AsString);
-    end else
+    end;
+
+    if lvCMDObject.ForcePathObject('requestID').AsString = 'login' then
     begin
-      sfLogger.logMessage('登陆成功...');
-      iocpTaskManager.PostATask(StartHeart, true);
-    end;                                   
+      if lvCMDObject.ForcePathObject('result.code').AsInteger = 0 then
+      begin
+        sfLogger.logMessage('登陆成功...');
+        iocpTaskManager.PostATask(StartHeart, true);
+      end;
+    end else if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 21 then
+    begin
+      if lvCMDObject.ForcePathObject('type').AsInteger = 0 then
+      begin
+        sfLogger.logMessage(Format('用户[%s]已经下线!', [lvCMDObject.ForcePathObject('userid').AsString]));
+      end else
+      begin
+        sfLogger.logMessage(Format('用户[%s]上线!', [lvCMDObject.ForcePathObject('userid').AsString]));
+      end;
+    end else if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 6 then
+    begin
+      sfLogger.logMessage(Format('用户[%s]说:%s',
+        [lvCMDObject.ForcePathObject('userid').AsString, lvCMDObject.ForcePathObject('msg').AsString]));
+    end else if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 5 then
+    begin
+      if lvCMDObject.ForcePathObject('result.code').AsInteger = 0 then
+      begin
+        sfLogger.logMessage(Format('你说了:%s',
+          [lvCMDObject.ForcePathObject('params.msg').AsString]));
+      end;       
+    end;
+  finally
+    lvCMDObject.Free;
   end;
+
+
+  
+
+
  end;
 
 procedure TfrmMain.SendCMDObject(pvCMDObject: TSimpleMsgPack);
