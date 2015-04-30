@@ -3,7 +3,8 @@ program CHATClient;
 uses
   Forms,
   ufrmMain in 'ufrmMain.pas' {frmMain},
-  uDIOCPDxStreamCoder in '..\..\DiocpCoders\uDIOCPDxStreamCoder.pas';
+  uDIOCPDxStreamCoder in '..\..\DiocpCoders\uDIOCPDxStreamCoder.pas',
+  SimpleMsgPack in '..\COMMON\SimpleMsgPack.pas';
 
 {$R *.res}
 

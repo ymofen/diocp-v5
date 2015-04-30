@@ -60,7 +60,7 @@ var
 implementation
 
 uses
-  utils.safeLogger, SysUtils, ComObj, utils.base64, diocp.coder.tcpServer, Uni,
+  utils.safeLogger, SysUtils, ComObj,diocp.coder.tcpServer,
   Classes;
 
 procedure SendCMDObject(pvCMDObject:TSimpleMsgPack; pvContext: TObject);
@@ -382,8 +382,6 @@ var
   lvItem, lvList, lvSendCMDObject:TSimpleMsgPack;
   lvSendContext:TIocpClientContext;
 
-var
-  lvQuery1, lvQuery2:TUniQuery;
 begin
   lvSent := false;
   lvContext := TIocpClientContext(pvContext);

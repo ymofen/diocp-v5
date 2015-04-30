@@ -6,7 +6,8 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp.coder.tcpClient,
   utils.safeLogger,
-  uDIOCPDxStreamCoder, diocp.task, diocp.sockets, diocp.tcp.client;
+  uDIOCPDxStreamCoder,
+  diocp.task, diocp.sockets, diocp.tcp.client;
 
 type
   TfrmMain = class(TForm)
