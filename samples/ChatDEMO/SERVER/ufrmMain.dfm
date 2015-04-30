@@ -3,8 +3,8 @@ object frmMain: TfrmMain
   Top = 0
   BorderIcons = [biSystemMenu]
   Caption = 'diocp-v5 CHAT SERVER'
-  ClientHeight = 385
-  ClientWidth = 640
+  ClientHeight = 474
+  ClientWidth = 766
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,39 +18,51 @@ object frmMain: TfrmMain
   object PageControl1: TPageControl
     Left = 0
     Top = 59
-    Width = 640
-    Height = 326
+    Width = 766
+    Height = 415
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
+    ExplicitWidth = 640
+    ExplicitHeight = 326
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
+      ExplicitWidth = 632
+      ExplicitHeight = 298
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
-        Width = 632
-        Height = 298
+        Width = 758
+        Height = 387
         Align = alClient
         BevelKind = bkTile
         BevelOuter = bvNone
         TabOrder = 0
+        ExplicitWidth = 632
+        ExplicitHeight = 298
       end
     end
     object TabSheet2: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitWidth = 632
+      ExplicitHeight = 298
       object mmoLog: TMemo
         Left = 0
         Top = 0
-        Width = 632
-        Height = 298
+        Width = 758
+        Height = 387
         Align = alClient
         TabOrder = 0
+        ExplicitWidth = 632
+        ExplicitHeight = 298
       end
     end
     object tsTest: TTabSheet
       Caption = #27979#35797
       ImageIndex = 2
+      ExplicitWidth = 632
+      ExplicitHeight = 298
       object btnBufferTester: TButton
         Left = 16
         Top = 34
@@ -80,11 +92,12 @@ object frmMain: TfrmMain
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 640
+    Width = 766
     Height = 59
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
+    ExplicitWidth = 640
     object edtPort: TEdit
       Left = 9
       Top = 7

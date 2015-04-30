@@ -58,10 +58,13 @@ begin
       end;
     end;
 
-    TMemoryStream(pvObject).Clear; 
-    lvCMDObj.EncodeToStream(TMemoryStream(pvObject));
-    TMemoryStream(pvObject).Position := 0;
-    WriteObject(pvObject);
+    if lvCMDObj.O['cmdIndex'] <> nil then
+    begin
+      TMemoryStream(pvObject).Clear;
+      lvCMDObj.EncodeToStream(TMemoryStream(pvObject));
+      TMemoryStream(pvObject).Position := 0;
+      WriteObject(pvObject);
+    end;
   finally
     lvCMDObj.Free;
   end;

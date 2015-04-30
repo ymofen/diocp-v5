@@ -77,18 +77,29 @@ end;
 /// <summary>
 ///   进行广播
 /// </summary>
-procedure DispatchCMDObject(pvCMDObject:TSimpleMsgPack; pvIgnoreContext:TIOCPCoderClientContext);
+procedure DispatchCMDObject(pvCMDObject: TSimpleMsgPack; pvOwnerTcpServer:
+    TDiocpTcpServer; pvIgnoreContext: TIOCPCoderClientContext);
 var
   lvMS:TMemoryStream;
   i:Integer;
   lvList:TList;
+  lvContext:TIOCPCoderClientContext;
 begin
   lvMS := TMemoryStream.Create;
   lvList := TList.Create;
   try
     pvCMDObject.EncodeToStream(lvMS);
     lvMS.Position := 0;
-    TIOCPCoderClientContext(pvContext).WriteObject(lvMS);
+
+    pvOwnerTcpServer.GetOnlineContextList(lvList);
+    for i := 0 to lvList.Count - 1 do
+    begin
+      lvContext := TIOCPCoderClientContext(lvList[i]);
+      if lvContext <> pvIgnoreContext then
+      begin
+        lvContext.WriteObject(lvMS);
+      end;
+    end;
   finally
     lvMS.Free;
   end;
@@ -100,9 +111,6 @@ end;
 /// <param name="pvCMDObject">
 ///   {
 ///      "cmdIndex": 0,
-///      "B":0,
-///      "L":0,
-///      "H":0,
 ///   }
 /// </param>
 procedure ExecuteHeart(pvCMDObject: TSimpleMsgPack; pvContext: TObject);
@@ -264,18 +272,23 @@ var
   lvSession:TCHATSession;
   lvContext:TIocpClientContext;
 var
-  lvUniOperator:TDUniOperator;
   lvSQL, lvPass, lvUserID:String;
 begin
   lvUserID := pvCMDObject.ForcePathObject('params.userid').AsString;
   if lvUserID = '' then
   begin
     raise Exception.Create('缺少指定用户ID');
+  end;
+
+  if ChatSessions.FindSession(lvUserID) <> nil then
+  begin
+    raise Exception.Create('用户已经登陆!');
   end;  
 
   lvContext := TIocpClientContext(pvContext);
   if lvContext.LockContext('执行登陆', nil) then
   try
+
     lvSession := TCHATSession(ChatSessions.CheckSession(lvUserID));
     lvSession.FContext := lvContext;
     
@@ -337,7 +350,6 @@ var
   lvContext:TIocpClientContext;
   lvSent:Boolean;
 var
-  lvUniOperator:TDUniOperator;
   lvSQL, lvPass, lvUserID, lvUserID2:String;
 var
   lvItem, lvList, lvSendCMDObject:TSimpleMsgPack;
