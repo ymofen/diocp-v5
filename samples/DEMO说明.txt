@@ -93,7 +93,7 @@ samples\socket-Coder\DataModuleDEMO-SimpleMsgPack
   end;
   
 
-samples\socket-Coder\DIOCPFileSERVER
+samples\DIOCPFileSERVER
   演示DIOCP如何作为文件服务器使用
   可以学习到如果分块上传文件和下载文件
   

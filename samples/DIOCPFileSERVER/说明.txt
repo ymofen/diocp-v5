@@ -3,8 +3,11 @@
 2.服务端由DIOCP5提供，如果需要源码可以到DIOCP5项目中找到
   samples\DIOCPFileSERVER
   
-  客户端由MyBean插件提供可以在MyBean项目中找到
+  客户端[BIN\MyBean客户端插件演示]由MyBean插件提供可以在MyBean项目中找到
   samples\DIOCPFileAccess
+  
+  客户端[Client]实现了IdTcpClient和DiocpBlockTcpClient通信组件的切换。
+  (感谢[为我喝彩/bei  36581474]对DiocpV5的赞助)
 
   网站可以找到各个项目的开源地址: wwww.diocp.org
 
