@@ -1,0 +1,11 @@
+1.BIN下面有编译好的EXE文件, 先运行服务端，可以上传文件和下载文件。
+
+2.服务端由DIOCP5提供，如果需要源码可以到DIOCP5项目中找到
+  samples\DIOCPFileSERVER
+  
+  客户端由MyBean插件提供可以在MyBean项目中找到
+  samples\DIOCPFileAccess
+
+  网站可以找到各个项目的开源地址: wwww.diocp.org
+
+DEMO测试过传输4G的文件
