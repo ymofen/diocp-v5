@@ -81,7 +81,7 @@ implementation
 
 
 const
-  SEC_SIZE = 1024 * 50;
+  SEC_SIZE = 1024 * 1024;
 
 procedure TDiocpFileOperator.close;
 begin
