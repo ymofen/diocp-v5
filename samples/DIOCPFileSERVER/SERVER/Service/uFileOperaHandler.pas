@@ -120,8 +120,7 @@ end;
 
 class procedure TFileOperaHandler.FileDelete(pvDataObject: TSimpleMsgPack);
 var
-  lvFileName, lvRealFileName:String;
-  lvCrc, lvSize:Cardinal;
+  lvFileName:String;
 begin
   lvFileName:= extractServerFileName(pvDataObject);
   if not FileExists(lvFileName) then
@@ -149,7 +148,6 @@ end;
 class procedure TFileOperaHandler.forceDirectoryOfFile(pvFile: String);
 var
   lvPath:String;
-  lvLen:Integer;
 begin
   lvPath := ExtractFilePath(pvFile);
   pathWithoutBackslash(lvPath);
@@ -181,9 +179,7 @@ class procedure TFileOperaHandler.readFileINfo(pvDataObject: TSimpleMsgPack);
 const
   SEC_SIZE = 1024 * 4;
 var
-  lvFileStream:TFileStream;
-  lvFileName, lvRealFileName:String;
-  lvCrc, lvSize:Cardinal;
+  lvFileName:String;
   lvINfo:TSimpleMsgPack;
 begin
   lvFileName := extractServerFileName(pvDataObject);
@@ -224,8 +220,8 @@ begin
   if not FileExists(lvFileName) then raise Exception.CreateFmt('(%s)文件不存在!', [pvDataObject.S['fileName']]);
 
 
-  if not Windows.CopyFile(PAnsiChar(AnsiString(lvFileName)),
-     PAnsiChar(AnsiString(lvNewFile)), False)  then
+  if not Windows.CopyFile(PChar(lvFileName),
+     PChar(lvNewFile), False)  then
   begin
     RaiseLastOSError;
   end;               
@@ -236,7 +232,7 @@ const
   SEC_SIZE = 1024 * 1024;  //50K
 var
   lvFileStream:TFileStream;
-  lvFileName, lvRealFileName:String;
+  lvFileName:String;
   lvSize:Cardinal;
 begin
   lvFileName:= extractServerFileName(pvDataObject);
@@ -265,7 +261,6 @@ class procedure TFileOperaHandler.uploadFileData(pvDataObject:TSimpleMsgPack);
 var
   lvFileStream:TFileStream;
   lvFileName, lvRealFileName:String;
-  lvCrc:Cardinal;
 begin
   lvFileName:= extractServerFileName(pvDataObject);
 
