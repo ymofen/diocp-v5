@@ -298,7 +298,7 @@ var
 
   tv: timeval;
   Timeptr: PTimeval;
-
+  valopt,vallen: Cardinal;
 begin
   // 获取原标志
   lvFlags := fcntl(FSocketHandle, F_GETFL, 0);
@@ -311,14 +311,16 @@ begin
 
   FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
   lvRet := Posix.SysSocket.Connect(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in));
-
+  lvErr := GetLastError;
   if lvRet = 0 then
   begin  // 连接成功
     lvFlags := lvFlags AND (NOT O_NONBLOCK);  // 阻塞模式
     fcntl(FSocketHandle, F_SETFL, lvFlags);
     Result := true;
-  end else
+  end else if lvErr = 36 then
   begin
+    //RaiseLastOSError;
+
     FD_ZERO(fs);
     _FD_SET(FSocketHandle, fs);
 
@@ -333,14 +335,24 @@ begin
       Result := false;  //连接超时
 //      lvErr := WSAGetLastError;
       __close(FSocketHandle);
+
 //      Result := lvErr = 0;
     end else
     begin
+      // add by [沈阳]u  83055474
+      // 2015-05-11 11:41:48
+      getsockopt(FSocketHandle, SOL_SOCKET, SO_ERROR,valopt,  vallen);
+      if(valopt>0)then
+      begin
+        Result := false;
+        exit;
+      end;
+      Result := true;
       lvFlags := lvFlags AND (NOT O_NONBLOCK);  // 阻塞模式
       fcntl(FSocketHandle, F_SETFL, lvFlags);
-      Result := true;
     end;
   end;
+
 
 
 end;
