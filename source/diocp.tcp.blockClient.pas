@@ -25,7 +25,7 @@ uses
   {$ENDIF}
 
   ,Classes
-  ;
+  , SysConst;
 
 {$if CompilerVersion < 23}
 type
@@ -95,19 +95,46 @@ begin
   inherited Destroy;
 end;
 
+{$IFDEF POSIX}
+  // posix不知道是否有该函数
+{$ELSE}
+procedure RaiseLastOSErrorException(LastError: Integer);
+var
+  Error: EOSError;
+begin
+  if LastError <> 0 then
+    Error := EOSError.CreateResFmt(@SOSError, [LastError,
+      SysErrorMessage(LastError)])
+  else
+    Error := EOSError.CreateRes(@SUnkOSError);
+  Error.ErrorCode := LastError;
+  raise Error;
+end;
+{$ENDIF}
+
 procedure TDiocpBlockTcpClient.CheckSocketResult(pvSocketResult: Integer);
+var
+  lvErrorCode:Integer;
 begin
   ///  Posix, fail return 0
   ///  ms_windows, fail return -1
   {$IFDEF POSIX}
   if (pvSocketResult = -1) or (pvSocketResult = 0) then
   begin
-    RaiseLastOSError;
-  end;
+     try
+       RaiseLastOSError;
+     except
+       Disconnect;
+       raise;
+     end;
+   end;
   {$ELSE}
   if (pvSocketResult = -1) then
   begin
-    RaiseLastOSError;
+    lvErrorCode := GetLastError;
+    Disconnect;     // 出现异常后断开连接
+    RaiseLastOSErrorException(lvErrorCode);
+
   end;
   {$ENDIF}
 end;
@@ -188,6 +215,7 @@ end;
 function TDiocpBlockTcpClient.sendBuffer(buf: Pointer; len: cardinal): Integer;
 begin
   Result := FRawSocket.SendBuf(buf^, len);
+
   CheckSocketResult(Result);
 end;
 
