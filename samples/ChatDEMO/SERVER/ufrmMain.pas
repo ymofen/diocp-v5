@@ -23,14 +23,9 @@ type
     pnlTop: TPanel;
     btnDisconnectAll: TButton;
     actDisconnectAll: TAction;
-    tsTest: TTabSheet;
-    btnBufferTester: TButton;
-    edtMsg: TEdit;
-    btnPushMsg: TButton;
     tmrHeart: TTimer;
     procedure actDisconnectAllExecute(Sender: TObject);
     procedure actOpenExecute(Sender: TObject);
-    procedure actPushMsgExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure tmrHeartTimer(Sender: TObject);
   private
@@ -98,38 +93,6 @@ begin
   FTcpServer.Port := StrToInt(edtPort.Text);
   FTcpServer.Active := true;
   refreshState;
-end;
-
-procedure TfrmMain.actPushMsgExecute(Sender: TObject);
-var
-  lvList:TList;
-  i: Integer;
-  lvStream:TMemoryStream;
-  s:AnsiString;
-begin
-  lvList := TList.Create;
-  try
-    lvStream := TMemoryStream.Create;
-    try
-      s := edtMsg.Text;
-      lvStream.Write(s[1], Length(s));
-
-      // get all client context to List
-      FTcpServer.getOnlineContextList(lvList);
-
-
-      for i := 0 to lvList.Count-1 do
-      begin
-        //send stream object directly
-        TIOCPCoderClientContext(lvList[i]).writeObject(lvStream);
-      end;
-    finally
-      lvStream.Free;
-    end;
-  finally
-    lvList.Free;
-  end;
-
 end;
 
 procedure TfrmMain.actStopExecute(Sender: TObject);

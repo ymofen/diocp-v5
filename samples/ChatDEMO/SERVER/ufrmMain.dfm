@@ -48,34 +48,6 @@ object frmMain: TfrmMain
         TabOrder = 0
       end
     end
-    object tsTest: TTabSheet
-      Caption = #27979#35797
-      ImageIndex = 2
-      object btnBufferTester: TButton
-        Left = 16
-        Top = 34
-        Width = 121
-        Height = 25
-        Caption = 'btnBufferTester'
-        TabOrder = 0
-      end
-      object edtMsg: TEdit
-        Left = 16
-        Top = 65
-        Width = 232
-        Height = 21
-        TabOrder = 1
-        Text = 'this message will push to all client'
-      end
-      object btnPushMsg: TButton
-        Left = 270
-        Top = 63
-        Width = 75
-        Height = 25
-        Action = actPushMsg
-        TabOrder = 2
-      end
-    end
   end
   object pnlTop: TPanel
     Left = 0
@@ -123,8 +95,7 @@ object frmMain: TfrmMain
       OnExecute = actStopExecute
     end
     object actPushMsg: TAction
-      Caption = 'PushMsg'
-      OnExecute = actPushMsgExecute
+      Caption = #24191#25773
     end
     object actDisconnectAll: TAction
       Caption = 'Disconnect all'

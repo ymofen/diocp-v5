@@ -11,6 +11,7 @@ object frmMain: TfrmMain
   Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
+  OnClose = FormClose
   PixelsPerInch = 96
   TextHeight = 13
   object mmoRecvMessage: TMemo
@@ -78,6 +79,15 @@ object frmMain: TfrmMain
         #23435#32654#40836
         #33931#20171#30707)
     end
+    object btn1: TButton
+      Left = 640
+      Top = 8
+      Width = 75
+      Height = 25
+      Caption = #19979#32447
+      TabOrder = 5
+      OnClick = btn1Click
+    end
   end
   object pnlSendArea: TPanel
     Left = 0
@@ -101,6 +111,15 @@ object frmMain: TfrmMain
       Width = 613
       Height = 166
       TabOrder = 1
+    end
+    object Button2: TButton
+      Left = 624
+      Top = 64
+      Width = 101
+      Height = 25
+      Caption = #31169#32842
+      TabOrder = 2
+      OnClick = Button2Click
     end
   end
   object lstUsers: TListBox

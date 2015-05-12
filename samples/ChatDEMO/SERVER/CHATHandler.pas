@@ -433,7 +433,8 @@ begin
                 lvSendCMDObject.ForcePathObject('requestID').AsString := pvCMDObject.ForcePathObject('requestID').AsString;
                 lvSendCMDObject.ForcePathObject('msg').AsString :=
                   pvCMDObject.ForcePathObject('params.msg').AsString;
-                TIOCPCoderClientContext(lvSendContext).WriteObject(lvSendCMDObject);
+
+                SendCMDObject(lvSendCMDObject, lvSendContext);
                 lvSent := true;
               finally
                 lvSendCMDObject.Free;
