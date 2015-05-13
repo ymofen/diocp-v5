@@ -206,6 +206,13 @@ object FMMonitor: TFMMonitor
     ParentFont = False
     Visible = False
   end
+  object lblFirstRunTime: TLabel
+    Left = 296
+    Top = 16
+    Width = 121
+    Height = 13
+    Caption = 'lblFirstRunTime'
+  end
   object tmrReader: TTimer
     Enabled = False
     OnTimer = tmrReaderTimer

@@ -649,8 +649,8 @@ type
     procedure incPostWSASendCounter();
     procedure incResponseWSASendCounter;
 
-    procedure incPostWSARecvCounter();
-    procedure incResponseWSARecvCounter;
+    procedure IncPostWSARecvCounter;
+    procedure IncResponseWSARecvCounter;
 
 
     procedure IncAcceptExObjectCounter;
@@ -2974,16 +2974,17 @@ begin
   lvDNACounter := Self.FCounter;
 
   {$IFDEF DEBUG_ON}
-  InterlockedDecrement(FOverlapped.refCount);
-  if FOverlapped.refCount <> 0 then
-  begin
+  InterlockedDecrement(FOverlapped.RefCount);
+  if FOverlapped.RefCount <> 0 then
+  begin        // 引用计数异常
     if IsDebugMode then
     begin
-      Assert(FOverlapped.refCount <>0);
+      Assert(FOverlapped.RefCount <>0);
     end;
     {$IFDEF WRITE_LOG}
-    FOwner.logMessage('TIocpRecvRequest.HandleResponse refCount:%d',
-        [FOverlapped.refCount], CORE_DEBUG_FILE, lgvError);
+    FOwner.logMessage(strRecvResponseErr,
+        [Integer(self.FClientContext), Integer(Self), FOverlapped.RefCount],
+        CORE_LOG_FILE, lgvError);
     {$ENDIF}
   end;
   {$ENDIF}
@@ -3025,9 +3026,6 @@ begin
     begin      // no data recvd, socket is break
       if not FClientContext.FRequestDisconnect then
       begin
-        {$IFDEF WRITE_LOG}
-        FOwner.logMessage(strRecvZero,  [FClientContext.FSocketHandle]);
-        {$ENDIF}
         FClientContext.RequestDisconnect(
           Format(strRecvZero,  [FClientContext.FSocketHandle]),  Self);
       end;
@@ -3037,7 +3035,7 @@ begin
     end;
   finally
     lvDebugInfo := FDebugInfo;
-    lvRefCount := FOverlapped.refCount;
+    lvRefCount := FOverlapped.RefCount;
     
     // postWSARecv before decReferenceCounter
     if not FClientContext.FRequestDisconnect then
@@ -3512,7 +3510,7 @@ begin
 end;
 
 
-procedure TIocpDataMonitor.incPostWSARecvCounter;
+procedure TIocpDataMonitor.IncPostWSARecvCounter;
 begin
   InterlockedIncrement(FPostWSARecvCounter);
 end;
@@ -3547,7 +3545,7 @@ begin
   InterlockedIncrement(FResponseSendObjectCounter);
 end;
 
-procedure TIocpDataMonitor.incResponseWSARecvCounter;
+procedure TIocpDataMonitor.IncResponseWSARecvCounter;
 begin
   InterlockedIncrement(FResponseWSARecvCounter);
 end;

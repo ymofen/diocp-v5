@@ -37,6 +37,7 @@ type
     lblSendRequestCaption: TLabel;
     lblPCInfo: TLabel;
     lblDEBUG_ON: TLabel;
+    lblFirstRunTime: TLabel;
     procedure lblRecvCaptionDblClick(Sender: TObject);
     procedure lblWorkerCountClick(Sender: TObject);
     procedure tmrReaderTimer(Sender: TObject);
@@ -45,6 +46,7 @@ type
     FIocpTcpServer: TDiocpTcpServer;
     procedure Translate();
   public
+    constructor Create(AOwner: TComponent); override;
     class function CreateAsChild(pvParent: TWinControl; pvIOCPTcpServer:
         TDiocpTcpServer): TFMMonitor;
     property IocpTcpServer: TDiocpTcpServer read FIocpTcpServer write FIocpTcpServer;
@@ -81,6 +83,12 @@ resourcestring
   strSocketHandle_Info = '创建:%d, 销毁:%d';  //'create:%d, destroy:%d'
   strContext_Info      = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
   strMemory_info       = '工作设置(内存):%f kB';
+
+constructor TFMMonitor.Create(AOwner: TComponent);
+begin
+  inherited;
+  lblFirstRunTime.Caption := '启动时间:' + FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', Now());
+end;
 
 class function TFMMonitor.CreateAsChild(pvParent: TWinControl; pvIOCPTcpServer:
     TDiocpTcpServer): TFMMonitor;

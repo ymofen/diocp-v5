@@ -45,7 +45,7 @@ type
   OVERLAPPEDEx = packed record
     Overlapped: OVERLAPPED;
     iocpRequest: TIocpRequest;
-    refCount: Integer;
+    RefCount: Integer;
   end;
 
   TThreadStackFunc = function(AThread:TThread):string;
