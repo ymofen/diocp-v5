@@ -760,14 +760,26 @@ begin
     try
       if FAddThreadINfo then
       begin
-        lvMsg := Format('%s[%s][PID:%s,ThreadID:%d]:%s',
-            [FormatDateTime('hh:nn:ss:zzz', pvData.FTime)
-              , TLogLevelCaption[pvData.FLogLevel]
-              , FProcessIDStr
-              , pvData.FThreadID
-              , pvData.FMsg
-            ]
-            );
+        if FAddProcessID then
+        begin     // 文件名已经添加了ProcessID
+          lvMsg := Format('%s[%s][ThreadID:%d]:%s',
+              [FormatDateTime('hh:nn:ss:zzz', pvData.FTime)
+                , TLogLevelCaption[pvData.FLogLevel]
+                , pvData.FThreadID
+                , pvData.FMsg
+              ]
+              );
+        end else
+        begin
+          lvMsg := Format('%s[%s][PID:%s,ThreadID:%d]:%s',
+              [FormatDateTime('hh:nn:ss:zzz', pvData.FTime)
+                , TLogLevelCaption[pvData.FLogLevel]
+                , FProcessIDStr
+                , pvData.FThreadID
+                , pvData.FMsg
+              ]
+              );
+        end;
       end else
       begin
         lvMsg := Format('%s[%s]:%s',
