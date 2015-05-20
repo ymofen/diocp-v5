@@ -679,10 +679,7 @@ begin
         end;
       end else
       begin
-        try
-          InnerDoTask;
-        except
-        end;
+        InnerDoTask;
       end;
     end;
     FEndTime := GetTickCount;
@@ -694,21 +691,26 @@ end;
 
 procedure TIocpTaskRequest.InnerDoTask;
 begin
-
-  if Assigned(FOnTaskWork) then
-  begin
-    FOnTaskWork(Self);
-  end else if Assigned(FOnTaskWorkProc) then
-  begin
-    FOnTaskWorkProc(Self);
-  end else if Assigned(FOnTaskWorkStrData) then
-  begin
-    FOnTaskWorkStrData(FStrData);
-  end else if Assigned(FOnTaskWorkNoneData) then
-  begin
-    FOnTaskWorkNoneData();
+  try
+    if Assigned(FOnTaskWork) then
+    begin
+      FOnTaskWork(Self);
+    end else if Assigned(FOnTaskWorkProc) then
+    begin
+      FOnTaskWorkProc(Self);
+    end else if Assigned(FOnTaskWorkStrData) then
+    begin
+      FOnTaskWorkStrData(FStrData);
+    end else if Assigned(FOnTaskWorkNoneData) then
+    begin
+      FOnTaskWorkNoneData();
+    end;
+  except
+    on E:Exception do
+    begin
+      SafeWriteFileMsg('Task¬ﬂº≠¥¶¿Ì“Ï≥£:' + E.Message, 'DIOCP_TASK_DEBUG');
+    end;
   end;
-
 end;
 
 constructor TSimpleDataObject.Create(const ADataString1: String; const
