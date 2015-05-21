@@ -105,8 +105,8 @@ type
 
 
 
-    FDebugINfo: string;
-    procedure SetDebugINfo(const Value: string);
+    FDebugInfo: string;
+    procedure SetDebugInfo(const Value: string);
 
 
 
@@ -177,6 +177,7 @@ type
 
     FRemoteAddr: String;
     FRemotePort: Integer;
+    FTagStr: String;
 
     /// <summary>
     ///   在投递的接收请求响应中调用，触发接收数据事件
@@ -290,8 +291,8 @@ type
     procedure DoDisconnect;
 
     /// <summary>
-    ///   lock context avoid disconnect,
-    ///     lock succ return false else return false( context request disconnect)
+    ///   锁定Context连接，避免关闭归还到Context对象池
+    ///    锁定成功返回True, 否则返回False(连接已经被断开或者申请断开)
     /// </summary>
     function LockContext(pvDebugInfo: string; pvObj: TObject): Boolean;
 
@@ -335,7 +336,9 @@ type
 
     property Data: Pointer read FData write FData;
 
-    property DebugINfo: string read FDebugINfo write SetDebugINfo;
+    property DebugInfo: string read FDebugInfo write SetDebugInfo;
+
+
 
     /// <summary>
     ///  连接时进行 +1
@@ -356,6 +359,7 @@ type
     property RemotePort: Integer read FRemotePort;
     property SocketHandle: TSocket read FSocketHandle;
     property SocketState: TSocketState read FSocketState;
+    property TagStr: String read FTagStr write FTagStr;
   end;
 
 
@@ -1319,12 +1323,12 @@ begin
     {$IFDEF DEBUG_ON}
     if IsDebugMode then
     begin
-      FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, debugInfo:%s',
+      FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
         [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
       Assert(FReferenceCounter >=0);
     end else
     begin
-      FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, debugInfo:%s',
+      FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
           [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
     end;
     {$ENDIF}
@@ -1367,7 +1371,7 @@ begin
       Assert(FReferenceCounter >=0);
     end else
     begin
-      FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, debugInfo:%s',
+      FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, DebugInfo:%s',
           [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
     end;
     {$ENDIF}
@@ -1767,9 +1771,9 @@ end;
 
 
 
-procedure TIocpClientContext.SetDebugINfo(const Value: string);
+procedure TIocpClientContext.SetDebugInfo(const Value: string);
 begin
-  FDebugINfo := Value;
+  FDebugInfo := Value;
 end;
 
 procedure TIocpClientContext.SetOwner(const Value: TDiocpTcpServer);
@@ -3037,7 +3041,7 @@ begin
     lvDebugInfo := FDebugInfo;
     lvRefCount := FOverlapped.RefCount;
     
-    // postWSARecv before decReferenceCounter
+    // PostWSARecv before decReferenceCounter
     if not FClientContext.FRequestDisconnect then
     begin
       FClientContext.PostWSARecvRequest;

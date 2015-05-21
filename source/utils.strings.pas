@@ -81,6 +81,7 @@ function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
 /// <param name="pvChars"> (TSysCharSet) </param>
 function LeftUntil(var p:PChar; pvChars: TSysCharSet): string;
 
+
 /// <summary>
 ///   从左边开始截取字符串
 /// </summary>
@@ -266,7 +267,6 @@ var
   l:Integer;
   lvMatched: Byte;
 begin
-
   lvMatched := 0;
   lvPTemp := p;
   while lvPTemp^ <> #0 do

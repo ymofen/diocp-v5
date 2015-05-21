@@ -77,6 +77,8 @@ type
 
   end;
 
+  TSafeQueue = class(TBaseQueue);
+
   /// <summary>
   ///   without lock
   /// </summary>

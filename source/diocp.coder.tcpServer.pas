@@ -64,15 +64,32 @@ type
 
   TIOCPCoderClientContext = class(diocp.tcp.server.TIOCPClientContext)
   private
-    ///  正在发送的BufferLink
+    /// 是否正在处理请求
+    FIsProcessRequesting:Boolean;
+    
+    /// 请求的任务队列
+    FRequestQueue:TSimpleQueue;
+    
+    /// 正在发送的BufferLink
     FCurrentSendBufferLink: TBufferLink;
 
-    // 待发送队列<TBufferLink队列>
+    //  待发送队列<TBufferLink队列>
     FSendingQueue: TSimpleQueue;
 
     FRecvBuffers: TBufferLink;
     FStateINfo: String;
     function GetStateINfo: String;
+
+    /// <summary>
+    ///  执行一次请求
+    /// </summary>
+    function DoExecuteRequest(pvTaskObj: TDiocpTaskObject): HRESULT;
+
+    /// <summary>
+    ///   清理请求列表中的对象
+    /// </summary>
+    procedure ClearRequestTaskObject();
+
    {$IFDEF QDAC_QWorker}
     procedure OnExecuteJob(pvJob:PQJob);
    {$ELSE}
@@ -196,6 +213,7 @@ constructor TIOCPCoderClientContext.Create;
 begin
   inherited Create;
   FSendingQueue := TSimpleQueue.Create();
+  FRequestQueue := TSimpleQueue.Create();
   FRecvBuffers := TBufferLink.Create();
 end;
 
@@ -208,6 +226,11 @@ begin
 
   FSendingQueue.Free;
   FRecvBuffers.Free;
+
+  // 清理待处理请求队列
+  ClearRequestTaskObject();
+
+  FRequestQueue.Free;
   inherited Destroy;
 end;
 
@@ -220,7 +243,13 @@ begin
   end;
 
   // 清理释放待发送队列的BufferLink实例 
-  FSendingQueue.FreeDataObject;                    
+  FSendingQueue.FreeDataObject;
+
+  // 清理待处理请求队列
+  ClearRequestTaskObject;
+
+  // 正在处理
+  FIsProcessRequesting := False;                   
 
   // 清理已经接收缓存数据
   FRecvBuffers.clearBuffer;
@@ -317,9 +346,73 @@ begin
   end;
 end;
 
+procedure TIOCPCoderClientContext.ClearRequestTaskObject;
+var
+  lvTask:TDiocpTaskObject;
+  lvObj:TObject;
+begin
+  self.Lock;
+  try
+    while True do
+    begin
+      lvTask := TDiocpTaskObject(FRequestQueue.DeQueue);
+      if lvTask = nil then Break;
+
+      lvObj := lvTask.FData;
+      
+      // 归还到任务池
+      lvTask.Close;
+      try
+        // 释放解码对象
+        if lvObj <> nil then FreeAndNil(lvObj);
+      except
+      end; 
+    end;
+  finally
+    self.UnLock;
+  end;
+
+  
+end;
+
 procedure TIOCPCoderClientContext.DoContextAction(const pvDataObject:TObject);
 begin
 
+end;
+
+function TIOCPCoderClientContext.DoExecuteRequest(pvTaskObj: TDiocpTaskObject):
+    HRESULT;
+var
+  lvObj:TObject;
+begin
+  Result := S_FALSE;
+  lvObj := pvTaskObj.FData;
+  // 连接已经断开
+  if Owner = nil then Exit;
+
+  // 连接已经释放
+  if Self = nil then Exit;
+
+  // 已经不是当初投递的连接
+  if self.ContextDNA <> pvTaskObj.FContextDNA then Exit;
+
+  if self.LockContext('处理逻辑', Self) then
+  try
+    try
+      // 执行Owner的事件
+      if Assigned(TDiocpCoderTcpServer(Owner).FOnContextAction) then
+        TDiocpCoderTcpServer(Owner).FOnContextAction(Self, lvObj);
+      DoContextAction(lvObj);
+    except
+     on E:Exception do
+      begin
+        FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+      end;
+    end;
+    Result := S_OK;
+  finally
+    self.UnLockContext('处理逻辑', Self);
+  end; 
 end;
 
 function TIOCPCoderClientContext.DecodeObject: TObject;
@@ -352,43 +445,44 @@ var
   lvTask:TDiocpTaskObject;
   lvObj:TObject;
 begin
-  lvTask := TDiocpTaskObject(pvJob.Data);
-  lvObj := lvTask.FData;
   try
-    // 连接已经断开
-    if Owner = nil then Exit;
-
-    // 连接已经释放
-    if Self = nil then Exit;
-
-    // 已经不是当初投递的连接
-    if self.ContextDNA <> lvTask.FContextDNA then Exit;
-
-    if self.LockContext('处理逻辑', Self) then
-    try
+    while (Self.Active) do
+    begin
+      //取出一个任务
+      //取出一个任务
+      self.Lock;
       try
-        // 执行Owner的事件
-        if Assigned(TDiocpCoderTcpServer(Owner).FOnContextAction) then
-          TDiocpCoderTcpServer(Owner).FOnContextAction(Self, lvObj);
-
-        DoContextAction(lvObj);
-      except
-       on E:Exception do
-        begin
-          FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+        lvTask := TDiocpTaskObject(FRequestQueue.DeQueue);
+      finally
+        self.UnLock;
+      end;
+      if lvTask = nil then Break;
+      
+      lvObj := lvTask.FData;
+      try
+        try
+          // 执行任务
+          if DoExecuteRequest(lvTask) <> S_OK then
+          begin
+            Break;
+          end;
+        except          
+        end;
+      finally
+        // 归还到任务池
+        lvTask.Close;
+        try
+          // 释放解码对象
+          if lvObj <> nil then FreeAndNil(lvObj);
+        except
         end;
       end;
-    finally
-      self.UnLockContext('处理逻辑', Self);
     end;
   finally
-    // 归还到任务池
-    lvTask.Close;
-    try
-      // 释放解码对象
-      if lvObj <> nil then FreeAndNil(lvObj);
-    except
-    end;
+    // 置正在处理任务标记
+    self.Lock();
+    FIsProcessRequesting := False;
+    self.Unlock(); 
   end;
 
 end;
@@ -399,47 +493,90 @@ var
   lvTask:TDiocpTaskObject;
   lvObj:TObject;
 begin
-  lvTask := TDiocpTaskObject(pvTaskRequest.TaskData);
-  lvObj := lvTask.FData;
   try
-    // 连接已经断开
-    if Owner = nil then Exit;
-
-    // 连接已经释放
-    if Self = nil then Exit;
-
-    // 已经不是当初投递的连接
-    if self.ContextDNA <> lvTask.FContextDNA then Exit;
-
-    if self.LockContext('处理逻辑', Self) then
-    try
+    while (Self.Active) do
+    begin
+      //取出一个任务
+      self.Lock;
       try
-        if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
-          pvTaskRequest.iocpWorker.checkCoInitializeEx();
+        lvTask := TDiocpTaskObject(FRequestQueue.DeQueue);
+      finally
+        self.UnLock;
+      end;
+      if lvTask = nil then Break;
+      
+      lvObj := lvTask.FData;
+      try
+        try
+          // 如果需要执行
+          if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
+            pvTaskRequest.iocpWorker.checkCoInitializeEx();
 
-        // 执行Owner的事件
-        if Assigned(TDiocpCoderTcpServer(Owner).FOnContextAction) then
-          TDiocpCoderTcpServer(Owner).FOnContextAction(Self, lvObj);
-
-        DoContextAction(lvObj);
-      except
-       on E:Exception do
-        begin
-          FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+          // 执行任务
+          if DoExecuteRequest(lvTask) <> S_OK then
+          begin
+            Break;
+          end;
+        except          
+        end;
+      finally
+        // 归还到任务池
+        lvTask.Close;
+        try
+          // 释放解码对象
+          if lvObj <> nil then FreeAndNil(lvObj);
+        except
         end;
       end;
-    finally
-      self.UnLockContext('处理逻辑', Self);
     end;
   finally
-    // 归还到任务池
-    lvTask.Close;
-    try
-      // 释放解码对象
-      if lvObj <> nil then FreeAndNil(lvObj);
-    except
-    end;
+    // 置正在处理任务标记
+    self.Lock();
+    FIsProcessRequesting := False;
+    self.Unlock(); 
   end;
+//
+//  lvTask := TDiocpTaskObject(pvTaskRequest.TaskData);
+//  lvObj := lvTask.FData;
+//  try
+//    // 连接已经断开
+//    if Owner = nil then Exit;
+//
+//    // 连接已经释放
+//    if Self = nil then Exit;
+//
+//    // 已经不是当初投递的连接
+//    if self.ContextDNA <> lvTask.FContextDNA then Exit;
+//
+//    if self.LockContext('处理逻辑', Self) then
+//    try
+//      try
+//        if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
+//          pvTaskRequest.iocpWorker.checkCoInitializeEx();
+//
+//        // 执行Owner的事件
+//        if Assigned(TDiocpCoderTcpServer(Owner).FOnContextAction) then
+//          TDiocpCoderTcpServer(Owner).FOnContextAction(Self, lvObj);
+//
+//        DoContextAction(lvObj);
+//      except
+//       on E:Exception do
+//        begin
+//          FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+//        end;
+//      end;
+//    finally
+//      self.UnLockContext('处理逻辑', Self);
+//    end;
+//  finally
+//    // 归还到任务池
+//    lvTask.Close;
+//    try
+//      // 释放解码对象
+//      if lvObj <> nil then FreeAndNil(lvObj);
+//    except
+//    end;
+//  end;
 end;
 {$ENDIF}
 
@@ -476,11 +613,25 @@ begin
       try
         self.StateINfo := '解码成功,准备调用dataReceived进行逻辑处理';
 
-       {$IFDEF QDAC_QWorker}
-         Workers.Post(OnExecuteJob, lvTaskObject);
-       {$ELSE}
-         iocpTaskManager.PostATask(OnExecuteJob, lvTaskObject);
-       {$ENDIF}
+
+        // 加入到请求处理队列
+        self.Lock;
+        try
+          FRequestQueue.EnQueue(lvTaskObject);
+          
+          if not FIsProcessRequesting then
+          begin
+            FIsProcessRequesting := true;
+           {$IFDEF QDAC_QWorker}
+             Workers.Post(OnExecuteJob, FRequestQueue);
+           {$ELSE}
+             iocpTaskManager.PostATask(OnExecuteJob, FRequestQueue);
+           {$ENDIF}
+          end;
+        finally
+          self.UnLock();
+        end;
+
       except
         on E:Exception do
         begin
