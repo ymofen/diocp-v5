@@ -282,7 +282,7 @@ end;
 
 function TBaseQueue.IsEmpty: Boolean;
 begin
-  Result := (FHead.next = nil);
+  Result := (FHead = nil);
 end;
 
 function TBaseQueue.DeQueue: Pointer;
@@ -543,7 +543,7 @@ end;
 
 function TSimpleQueue.IsEmpty: Boolean;
 begin
-  Result := (FHead.next = nil);
+  Result := (FHead = nil);
 end;
 
 function TSimpleQueue.DeQueue: Pointer;
