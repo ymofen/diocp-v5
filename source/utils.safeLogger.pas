@@ -483,46 +483,44 @@ procedure TSafeLogger.logMessage(pvMsg: string; pvMsgType: string = '';
 var
   lvPData:TLogDataObject;
 begin
-//  if (not FEnable) and (FName = 'gateLogger') then
-//  begin
-//    Assert(FName = 'gateLogger');
-//  end;
-
   if not FEnable then exit;
 
   if not (pvLevel in FLogFilter) then Exit;
-  
 
-
-  
-
-  lvPData := __dataObjectPool.DeQueue;
-  if lvPData = nil then lvPData:=TLogDataObject.Create;
-{$IFDEF MSWINDOWS}
-  lvPData.FThreadID := GetCurrentThreadId;
-{$ELSE}
-  lvPData.FThreadID := TThread.CurrentThread.ThreadID;
-{$ENDIF};
-  lvPData.FTime := Now();
-  lvPData.FLogLevel := pvLevel;
-  lvPData.FMsg := pvMsg;
-  lvPData.FMsgType := pvMsgType;
-  FDataQueue.EnQueue(lvPData);
-  InterlockedIncrement(FPostCounter);
-{$IFDEF MSWINDOWS}
-  if (FAppendInMainThread) and (FSyncMainThreadType = rtPostMessage) then
-  begin
-    if not isWorking then
+  try
+    lvPData := __dataObjectPool.DeQueue;
+    if lvPData = nil then lvPData:=TLogDataObject.Create;
+  {$IFDEF MSWINDOWS}
+    lvPData.FThreadID := GetCurrentThreadId;
+  {$ELSE}
+    lvPData.FThreadID := TThread.CurrentThread.ThreadID;
+  {$ENDIF};
+    lvPData.FTime := Now();
+    lvPData.FLogLevel := pvLevel;
+    lvPData.FMsg := pvMsg;
+    lvPData.FMsgType := pvMsgType;
+    FDataQueue.EnQueue(lvPData);
+    InterlockedIncrement(FPostCounter);
+  {$IFDEF MSWINDOWS}
+    if (FAppendInMainThread) and (FSyncMainThreadType = rtPostMessage) then
     begin
-      PostMessage(FMessageHandle, WM_NOTIFY_WORK, 0, 0);
+      if not isWorking then
+      begin
+        PostMessage(FMessageHandle, WM_NOTIFY_WORK, 0, 0);
+      end;
+    end else
+    begin
+      checkForWorker;
     end;
-  end else
-  begin
+  {$ELSE}
     checkForWorker;
+  {$ENDIF};
+  except
+    on E:Exception do
+    begin
+      SafeWriteFileMsg('TSafeLogger.logMessageº«¬º' + pvMsg +'“Ï≥£:' + e.Message, 'SafeLogger“Ï≥£_');
+    end;                                                                      
   end;
-{$ELSE}
-  checkForWorker;
-{$ENDIF};
 end;
 
 procedure TSafeLogger.logMessage(pvMsg: string; const args: array of const;
