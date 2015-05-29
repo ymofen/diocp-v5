@@ -205,6 +205,7 @@ type
 
 
     procedure SetOwner(const Value: TDiocpTcpServer);
+    function GetDebugInfo: string;
 
 
   protected
@@ -336,7 +337,7 @@ type
 
     property Data: Pointer read FData write FData;
 
-    property DebugInfo: string read FDebugInfo write SetDebugInfo;
+    property DebugInfo: string read GetDebugInfo write SetDebugInfo;
 
 
 
@@ -1595,6 +1596,13 @@ begin
   end;
 end;
 
+function TIocpClientContext.GetDebugInfo: string;
+begin
+  FContextLocker.lock();
+  Result := FDebugInfo;
+  FContextLocker.unLock();  
+end;
+
 function TIocpClientContext.GetSendQueueSize: Integer;
 begin
   Result := FSendRequestLink.Count;
@@ -1773,7 +1781,9 @@ end;
 
 procedure TIocpClientContext.SetDebugInfo(const Value: string);
 begin
+  FContextLocker.lock();
   FDebugInfo := Value;
+  FContextLocker.unLock();
 end;
 
 procedure TIocpClientContext.SetOwner(const Value: TDiocpTcpServer);
