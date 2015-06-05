@@ -537,6 +537,8 @@ begin
     end;
     Inc(FUseCount);
     Result.Next := nil;
+    result.NextEx := nil;
+    result.PrevEx := nil;
     if FUseHead = nil then
     begin
       FUseHead := Result;
