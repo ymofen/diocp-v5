@@ -41,6 +41,8 @@ resourcestring
 
   strConnectTimeOut = '建立连接超时(%s:%d)';
 
+  strEngineIsOff = '[%s]IOCP引擎未启动,请确保IOCP引擎开启!';
+
 
 
   //strContextCloseErr = '

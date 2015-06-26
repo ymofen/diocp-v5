@@ -20,3 +20,10 @@ Q:服务端在线信息显示为何与实际有差异?
 Q:服务端许多死链接都显示在线?
 A:DIOCP默认关闭了心跳。所以会造成很多死链接，仍然显示在线，详细原因点击查看该文章：http://www.diocp.org/?p=189
  (【DIOCP3-说明书】关于服务端的KeepAlive属性(心跳))
+
+ 
+Q: 在Diocp中我需要另外开线程去处理逻辑吗？
+A: 在编码层(TDiocpCoderTcpServer), 逻辑处理事件(OnContextAction), 是由DiocpTask/Qworker(编译开关(QDAC_QWorker)可以进行切换)驱动的，和底层的通信线程是不相干扰。所以在编码层不需要使用另外的线程池，来处理逻辑。
+
+Q: 同一个连接的OnContextAction会同时被多个线程触发吗？
+A：编码层的OnContextAction是排队处理的，底层接收到数据后交由注册的解码器进行解码, 解码成功后，放到任务队列，然后依次触发OnContextAction,所以同一个连接的OnContextAction同时只会有一个线程调用。

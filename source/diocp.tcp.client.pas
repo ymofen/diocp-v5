@@ -17,7 +17,7 @@ interface
 uses
   diocp.sockets, SysUtils, diocp.sockets.utils
   {$IFDEF UNICODE}, Generics.Collections{$ELSE}, Contnrs {$ENDIF}
-  , Classes, Windows, utils.objectPool;
+  , Classes, Windows, utils.objectPool, diocp.res;
 
 type
   TIocpRemoteContext = class(TDiocpCustomContext)
@@ -174,6 +174,8 @@ procedure TIocpRemoteContext.Connect;
 var
   lvRemoteIP:String;
 begin
+  if not Owner.Active then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
+
   if SocketState <> ssDisconnected then raise Exception.Create(strCannotConnect);
 
   ReCreateSocket;
@@ -192,6 +194,8 @@ end;
 
 procedure TIocpRemoteContext.ConnectASync;
 begin
+  if not Owner.Active then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
+
   if SocketState <> ssDisconnected then raise Exception.Create(strCannotConnect);
 
   ReCreateSocket;

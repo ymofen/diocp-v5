@@ -3230,6 +3230,8 @@ begin
       FOwner.FDataMoniter.incResponseWSASendCounter;
     end;
 
+
+
     // 响应完成事件
     lvContext.DoSendRequestRespnonse(Self);
 
