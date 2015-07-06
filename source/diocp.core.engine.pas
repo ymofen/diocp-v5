@@ -50,6 +50,8 @@ type
 
   TThreadStackFunc = function(AThread:TThread):string;
 
+
+
   /// <summary>
   ///   iocp request root class
   /// </summary>
@@ -127,8 +129,10 @@ type
     ///   À©Õ¹DataÊý¾Ý
     /// </summary>
     property Data: Pointer read FData write FData;
-    
+
     property Tag: Integer read FTag write FTag;
+
+
   end;
 
   TIocpASyncRequest = class;

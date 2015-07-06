@@ -131,10 +131,7 @@ type
     FErrorCounter: Integer;
     FPostCounter: Integer;
     FResponseCounter: Integer;
-    procedure incErrorCounter;
 
-
-    procedure incResponseCounter;
     /// <summary>
     ///   check worker thread is alive
     /// </summary>
@@ -156,7 +153,9 @@ type
   {$ENDIF}
     procedure incWorkerCount;
     procedure decWorker(pvWorker: TLogWorker);
-
+  public
+    procedure IncErrorCounter;
+    procedure IncResponseCounter;
   public
     constructor Create;
     destructor Destroy; override;
@@ -167,6 +166,7 @@ type
     ///   task current info
     /// </summary>
     function getStateINfo: String;
+
 
     procedure setAppender(pvAppender: TBaseAppender; pvOwnsAppender: Boolean =
         true);
@@ -395,7 +395,7 @@ begin
         FDebugData := lvPData;
         ExecuteLogData(lvPData);
       except
-        incErrorCounter;
+        IncErrorCounter;
       end;
       __dataObjectPool.EnQueue(lvPData);
     end;
@@ -426,10 +426,10 @@ end;
 
 procedure TSafeLogger.ExecuteLogData(const pvData:TLogDataObject);
 begin
-  incResponseCounter;
+  IncResponseCounter;
   if FAppender = nil then
   begin
-    incErrorCounter;
+    IncErrorCounter;
   end else
   begin
     FAppender.AppendLog(pvData);
@@ -437,7 +437,7 @@ begin
 
 end;
 
-procedure TSafeLogger.incErrorCounter;
+procedure TSafeLogger.IncErrorCounter;
 begin
   InterlockedIncrement(FErrorCounter);
 end;
@@ -471,7 +471,7 @@ begin
   end;
 end;
 
-procedure TSafeLogger.incResponseCounter;
+procedure TSafeLogger.IncResponseCounter;
 begin
   InterlockedIncrement(FResponseCounter);
 end;

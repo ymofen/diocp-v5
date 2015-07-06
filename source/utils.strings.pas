@@ -181,7 +181,7 @@ function UpperChar(c: Char): Char;
 /// <returns>
 ///   如果在列表中返回true
 /// </returns>
-/// <param name="pvStr"> (string) </param>
+/// <param name="pvStr"> sensors,1,3.1415926,1.1,1.2,1.3 </param>
 /// <param name="pvStringList"> (array of string) </param>
 function StrIndexOf(const pvStr: string; const pvStringList: array of string):
     Integer;
