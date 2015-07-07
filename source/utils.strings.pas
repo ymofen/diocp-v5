@@ -46,6 +46,7 @@ PWChar = PChar;
 {$ELSE}
 WChar = WideChar;
 PWChar = PWideChar;
+IntPtr = Integer;
 {$ENDIF}
 
 
@@ -188,19 +189,17 @@ function StrIndexOf(const pvStr: string; const pvStringList: array of string):
 
 /// <summary>
 ///   查找PSub在P中出现的第一个位置
-///   精确查找
-///   如果PSub为nil或者pvSubLen为0则直接返回P
 /// </summary>
 /// <returns>
-///   如果找到, 返回P
-///   找不到返回False
+///   如果找到, 返回指向第一个pvSub的位置
+///   找不到返回 Nil
 /// </returns>
 /// <param name="pvSource"> 数据 </param>
 /// <param name="pvSourceLen"> 数据长度 </param>
 /// <param name="pvSub"> 查找的数据 </param>
 /// <param name="pvSubLen"> 查找的数据长度 </param>
-function SearchPointer(pvSource: Pointer; pvSourceLen: Integer; pvSub: Pointer;
-    pvSubLen: Integer): Pointer;
+function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
+    pvSub: Pointer; pvSubLen: Integer): Pointer;
 
 
 implementation
@@ -645,19 +644,21 @@ begin
 
 end;
 
-function SearchPointer(pvSource: Pointer; pvSourceLen: Integer; pvSub: Pointer;
-    pvSubLen: Integer): Pointer;
+function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
+    pvSub: Pointer; pvSubLen: Integer): Pointer;
 var
   I, j, l: Integer;
   lvTempP, lvTempPSub, lvTempP2, lvTempPSub2:PByte;
 begin
   if (pvSub = nil) then
-    Result := pvSource
+    Result := nil
   else
   begin
     Result := nil;
     j := 0;
     lvTempP := PByte(pvSource);
+    Inc(lvTempP, pvStartIndex);
+
     lvTempPSub := PByte(pvSub);
     while j<pvSourceLen do
     begin
