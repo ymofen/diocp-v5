@@ -44,7 +44,7 @@ samples\socket-Coder\diocpCoders
   推荐搭建使用TStream的编码和解码模式，因为很多对象都能序列化到流和从流中还原。
   例如 msgpack -> TStream -> diocp -> TStream ->msgpack
   
-samples\socket-Coder\StreamCoder
+samples\StreamCoderDEMO
   Stream编码器模式例子。
   可以在该DEMO中学习到如果直接发送一个TStream对象,如何在服务端中接收到到这个对象，如果将一个Stream对象推送给客户端。
   可以在该DEMO学习到iocpCoderClient(客户端iocp)的使用。
@@ -61,28 +61,6 @@ samples\DataModuleDEMO-Andriod
     如果出现类似的错误, 需要你修正DBClient.pas才能正确运行。
     
   你可以手工修改DBClient.pas文件, 修改该方法，注释掉下面三行
-  然后把修改的文件，放到你的工程目录,然后添加到工程了
-  function TCustomClientDataSet.CreateDSBase: IDSBase;
-  begin
-    CreateDbClientObject(CLSID_DSBase, IDSBase, Result);
-  //  Check(Result.SetProp(dspropANSICODEPAGE, DefaultSystemCodePage));
-  //  Check(Result.SetProp(dspropUTF8METADATA, NativeUInt(True)));
-  //  Check(Result.SetProp(dspropUTF8ERRORMSG, NativeUInt(True)));
-  end;
-  
-samples\socket-Coder\DataModuleDEMO
-  三层数据演示
-  可以学习到如何在客户端中请求diocp执行sql语句返回一个TClientDataSet的数据，并在客户端进行显示
-samples\socket-Coder\DataModuleDEMO-SimpleMsgPack
-  使用simpleMsgPack代替QMsgPack，可以在D7中使用
-  ==============================================
-  * 注意 不知道从那个版本开始 XE中就存在一个对ClientDataSet.Data赋值出现AV异常的bug
-    你可以进行简单的测试
-    datasetProvider1.DataSet := adoDataSet;
-    clientDataSet.Data := datasetProvider1.Data;  //进行打包的时候出现非法访问异常
-    如果出现类似的错误, 需要你修正DBClient.pas才能正确运行。
-    
-  你可以手工修改DBClient.pas文件, 修改该方法，注释掉下面三行, 
   然后把修改的文件，放到你的工程目录,然后添加到工程了
   function TCustomClientDataSet.CreateDSBase: IDSBase;
   begin
