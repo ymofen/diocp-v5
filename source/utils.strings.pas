@@ -186,6 +186,22 @@ function UpperChar(c: Char): Char;
 function StrIndexOf(const pvStr: string; const pvStringList: array of string):
     Integer;
 
+/// <summary>
+///   查找PSub在P中出现的第一个位置
+///   精确查找
+///   如果PSub为nil或者pvSubLen为0则直接返回P
+/// </summary>
+/// <returns>
+///   如果找到, 返回P
+///   找不到返回False
+/// </returns>
+/// <param name="pvSource"> 数据 </param>
+/// <param name="pvSourceLen"> 数据长度 </param>
+/// <param name="pvSub"> 查找的数据 </param>
+/// <param name="pvSubLen"> 查找的数据长度 </param>
+function SearchPointer(pvSource: Pointer; pvSourceLen: Integer; pvSub: Pointer;
+    pvSubLen: Integer): Pointer;
+
 
 implementation
 
@@ -627,6 +643,50 @@ begin
   end;
   
 
+end;
+
+function SearchPointer(pvSource: Pointer; pvSourceLen: Integer; pvSub: Pointer;
+    pvSubLen: Integer): Pointer;
+var
+  I, j, l: Integer;
+  lvTempP, lvTempPSub, lvTempP2, lvTempPSub2:PByte;
+begin
+  if (pvSub = nil) then
+    Result := pvSource
+  else
+  begin
+    Result := nil;
+    j := 0;
+    lvTempP := PByte(pvSource);
+    lvTempPSub := PByte(pvSub);
+    while j<pvSourceLen do
+    begin
+      if lvTempP^ = lvTempPSub^ then
+      begin
+        I := 1;     // 从后面第二个字符开始对比
+        lvTempP2 := lvTempP;
+        Inc(lvTempP2);
+
+        lvTempPSub2 := lvTempPSub;
+        Inc(lvTempPSub2);
+        while (I < pvSubLen) do
+        begin
+          if lvTempP2^ = lvTempPSub2^ then
+            Inc(I)
+          else
+            Break;
+        end;
+
+        if I = pvSubLen then
+        begin  // P1和P2已经匹配到了末尾(匹配成功)
+          Result := lvTempP;
+          Break;
+        end;
+      end;
+      Inc(lvTempP);
+      inc(j);
+    end;
+  end;
 end;
 
 
