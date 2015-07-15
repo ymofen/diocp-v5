@@ -19,20 +19,11 @@ type
   TDiocpExContext = class;
   TDiocpStringContext = class;
   
-{$IFDEF UNICODE}
-  TContextDataActionEvent = reference to procedure(pvContext:TDiocpExContext; pvData: Pointer;
-      pvDataLen: Integer);
-
-  TContextStringActionEvent = reference to procedure(pvContext:TDiocpExContext;
-      pvDataString:String);
-{$ELSE}
   TContextDataActionEvent = procedure(pvContext:TDiocpExContext; pvData: Pointer;
       pvDataLen: Integer) of object;
 
   TContextStringActionEvent = procedure(pvContext:TDiocpStringContext;
       pvDataString:String) of object;
-{$ENDIF}
-
 
 
   TDiocpExContext = class(TIocpClientContext)
