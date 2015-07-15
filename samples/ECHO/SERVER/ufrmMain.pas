@@ -29,7 +29,12 @@ type
     tmrTest: TTimer;
     tmrInfo: TTimer;
     chkLogDetails: TCheckBox;
+    tsOperator: TTabSheet;
+    mmoPushData: TMemo;
+    btnPushToAll: TButton;
+    actPushToAll: TAction;
     procedure actOpenExecute(Sender: TObject);
+    procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
@@ -101,6 +106,28 @@ begin
   FTcpServer.OnDataReceived := self.OnRecvBuffer;
   FTcpServer.Active := true;
   RefreshState;
+end;
+
+procedure TfrmMain.actPushToAllExecute(Sender: TObject);
+var
+  ansiStr:AnsiString;
+var
+  lvList:TList;
+  i:Integer;
+  lvContext:TIocpClientContext;
+begin
+  ansiStr := AnsiToUtf8(mmoPushData.Lines.Text);
+  lvList := TList.Create;
+  try
+    FTcpServer.getOnlineContextList(lvList);
+    for i:=0 to lvList.Count -1 do
+    begin
+      lvContext := TIocpClientContext(lvList[i]);
+      lvContext.PostWSASendRequest(PAnsiChar(ansiStr), Length(ansiStr));
+    end;
+  finally
+    lvList.Free;
+  end;
 end;
 
 procedure TfrmMain.actStopExecute(Sender: TObject);
@@ -222,6 +249,7 @@ begin
 
 
   actOpen.Execute;
+
 end;
 
 end.

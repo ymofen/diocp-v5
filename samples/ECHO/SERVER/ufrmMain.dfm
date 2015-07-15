@@ -2,7 +2,7 @@ object frmMain: TfrmMain
   Left = 391
   Top = 275
   BorderIcons = [biSystemMenu]
-  Caption = 'diocp3 echo server'
+  Caption = 'diocp5 echo server'
   ClientHeight = 455
   ClientWidth = 812
   Color = clBtnFace
@@ -20,13 +20,11 @@ object frmMain: TfrmMain
     Top = 59
     Width = 812
     Height = 396
-    ActivePage = TabSheet1
+    ActivePage = tsOperator
     Align = alClient
     TabOrder = 0
-    ExplicitHeight = 328
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitHeight = 300
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -35,13 +33,11 @@ object frmMain: TfrmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitHeight = 300
       end
     end
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
-      ExplicitHeight = 300
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -51,7 +47,27 @@ object frmMain: TfrmMain
         Lines.Strings = (
           'mmoLog')
         TabOrder = 0
-        ExplicitHeight = 300
+      end
+    end
+    object tsOperator: TTabSheet
+      Caption = #27979#35797#25805#20316
+      ImageIndex = 2
+      object mmoPushData: TMemo
+        Left = 3
+        Top = 16
+        Width = 430
+        Height = 113
+        Lines.Strings = (
+          'diocpv5'#25512#36865#27979#35797'....')
+        TabOrder = 0
+      end
+      object btnPushToAll: TButton
+        Left = 448
+        Top = 14
+        Width = 129
+        Height = 25
+        Action = actPushToAll
+        TabOrder = 1
       end
     end
   end
@@ -146,6 +162,10 @@ object frmMain: TfrmMain
     object actStop: TAction
       Caption = #20851#38381
       OnExecute = actStopExecute
+    end
+    object actPushToAll: TAction
+      Caption = #25512#36865#32473#25152#26377#30340#23458#25143#31471
+      OnExecute = actPushToAllExecute
     end
   end
   object tmrKickOut: TTimer
