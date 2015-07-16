@@ -43,6 +43,20 @@ type
   TDiocpHttpResponse = class;
   TDiocpHttpClientContext = class;
   TDiocpHttpServer = class;
+  TDiocpHttpRequest = class;
+
+{$IFDEF UNICODE}
+
+  /// <summary>
+  /// Request事件类型
+  /// </summary>
+  TOnDiocpHttpRequestEvent = reference to procedure(pvRequest: TDiocpHttpRequest);
+{$ELSE}
+  /// <summary>
+  /// Request事件类型
+  /// </summary>
+  TOnDiocpHttpRequestEvent = procedure(pvRequest: TDiocpHttpRequest) of object;
+{$ENDIF}
 
   TDiocpHttpRequest = class(TObject)
   private
@@ -224,9 +238,6 @@ type
 
     property RequestReferer: String read FRequestReferer;
 
-
-
-
     /// <summary>
     /// 应答完毕，发送会客户端
     /// </summary>
@@ -263,20 +274,34 @@ type
   private
     FResponseHeader: string;
     FContentType: String;
+    FCookieData : String;
     FData: TMemoryStream;
     FDiocpContext : TDiocpHttpClientContext;
+    FHttpCodeStr: String;
   public
     procedure Clear;
     constructor Create;
     destructor Destroy; override;
     procedure WriteBuf(pvBuf: Pointer; len: Cardinal);
     procedure WriteString(pvString: string; pvUtf8Convert: Boolean = true);
+
+    // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+    procedure SetCookie(pvCookie:String);
+
+    function EncodeHeader: String;
+
     /// <summary>
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
 
     property ContentType: String read FContentType write FContentType;
+
+    property HttpCodeStr: String read FHttpCodeStr write FHttpCodeStr;
+
+
+
+
 
     procedure RedirectURL(pvURL:String);
   end;
@@ -314,18 +339,7 @@ type
       override;
   end;
 
-{$IFDEF UNICODE}
 
-  /// <summary>
-  /// Request事件类型
-  /// </summary>
-  TOnDiocpHttpRequestEvent = reference to procedure(pvRequest: TDiocpHttpRequest);
-{$ELSE}
-  /// <summary>
-  /// Request事件类型
-  /// </summary>
-  TOnDiocpHttpRequestEvent = procedure(pvRequest: TDiocpHttpRequest) of object;
-{$ENDIF}
 
   /// <summary>
   /// Http 解析服务
@@ -892,8 +906,7 @@ var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
-  lvFixedHeader := MakeHeader('200 OK', FRequestVersionStr, FKeepAlive, FResponse.FContentType,
-    FResponse.FResponseHeader, FResponse.FData.Size);
+  lvFixedHeader := FResponse.EncodeHeader;
 
   if (lvFixedHeader <> '') then
     lvFixedHeader := FixHeader(lvFixedHeader)
@@ -944,6 +957,37 @@ begin
   inherited Destroy;
 end;
 
+function TDiocpHttpResponse.EncodeHeader: String;
+var
+  lvVersionStr:string;
+begin
+  Result := '';
+
+  lvVersionStr := 'HTTP/1.0';
+
+  if (FHttpCodeStr = '') then FHttpCodeStr := '200 OK';
+  Result := Result + lvVersionStr + ' ' + FHttpCodeStr + #13#10;
+
+  if (FContentType = '') then FContentType := 'text/html';
+  Result := Result + 'Content-Type: ' + FContentType + #13#10;
+
+  if (FData.Size > 0) then
+    Result := Result + 'Content-Length: ' + IntToStr(FData.Size) + #13#10;
+
+  Result := Result + 'Connection: close'#13#10;
+
+  if FCookieData <> '' then
+  begin             // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+    Result := Result + 'Set-Cookie:' + FCookieData + sLineBreak;
+  end;
+
+  Result := Result + 'Server: DIOCP-V5/1.1'#13#10;
+
+  //MakeHeader('200 OK', FRequestVersionStr, FKeepAlive, FResponse.FContentType,
+  //  FResponse.FResponseHeader, FResponse.FData.Size);
+
+end;
+
 procedure TDiocpHttpResponse.RedirectURL(pvURL: String);
 var
   lvFixedHeader: AnsiString;
@@ -964,6 +1008,11 @@ begin
     FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
   end;
 
+end;
+
+procedure TDiocpHttpResponse.SetCookie(pvCookie:String);
+begin
+  FCookieData := pvCookie;
 end;
 
 procedure TDiocpHttpResponse.WriteBuf(pvBuf: Pointer; len: Cardinal);

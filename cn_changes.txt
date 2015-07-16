@@ -85,3 +85,20 @@ DIOCP-v5 0.0.2
  *      2015-07-15 09:00:09
 
 
+
+17  2015年7月16日 18:19:00
+    TDiocpBlockTcpClient添加RecvBufEnd函数
+    /// <summary>
+    ///   阻塞接收数据直到接收到一个endBuf为止
+    ///   如果收到的数据到达len大小，会直接返回
+    /// </summary>
+    /// <returns>
+    ///   返回接收到的数据长度
+    /// </returns>
+    /// <param name="buf"> 用来存放的起始内存地址 </param>
+    /// <param name="len"> 内存大小 </param>
+    /// <param name="endBuf"> 判断结束的起始内存地址 </param>
+    /// <param name="endBufLen"> 内存大小 </param>
+    function RecvBufferEnd(buf: Pointer; len: cardinal; endBuf: Pointer; endBufLen:
+        Integer): Integer;
+ 

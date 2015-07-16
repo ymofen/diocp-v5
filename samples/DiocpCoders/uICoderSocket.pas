@@ -27,6 +27,11 @@ type
     function RecvBuf(buf:Pointer; len:Cardinal): Cardinal; stdcall;
 
     /// <summary>
+    ///   PeekBuf
+    /// </summary>
+    function PeekBuf(buf:Pointer; len:Cardinal): Cardinal; stdcall;
+
+    /// <summary>
     ///   πÿ±’¡¨Ω”
     /// </summary>
     procedure CloseSocket; stdcall;

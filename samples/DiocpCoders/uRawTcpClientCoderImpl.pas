@@ -18,7 +18,13 @@ type
     FTcpClient: TDiocpBlockTcpClient;
   protected
     function sendBuf(buf:Pointer; len:Cardinal):Cardinal; stdcall;
-    function recvBuf(buf:Pointer; len:Cardinal):Cardinal; stdcall;    
+    function recvBuf(buf:Pointer; len:Cardinal):Cardinal; stdcall;
+
+    /// <summary>
+    ///   PeekBuf
+    /// </summary>
+    function PeekBuf(buf:Pointer; len:Cardinal): Cardinal; stdcall;
+
     procedure closeSocket; stdcall;
   public
     constructor Create(ATcpClient: TDiocpBlockTcpClient; pvReconnect: Boolean = true);
@@ -45,6 +51,25 @@ end;
 procedure TRawTcpClientCoderImpl.closeSocket;
 begin
   FTcpClient.Disconnect;
+end;
+
+function TRawTcpClientCoderImpl.PeekBuf(buf:Pointer; len:Cardinal): Cardinal;
+begin
+  if FReconnect then
+  begin
+    if not FTcpClient.Active then FTcpClient.connect;
+    try
+      FTcpClient.recv(buf, len);
+      Result := len;
+    except
+      FTcpClient.Disconnect;
+      raise;
+    end;
+  end else
+  begin
+     FTcpClient.recv(buf, len);
+     Result := len;
+  end;
 end;
 
 function TRawTcpClientCoderImpl.recvBuf(buf: Pointer; len: Cardinal): Cardinal;

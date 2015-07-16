@@ -3,6 +3,9 @@
  *	       blog: http://www.cnblogs.com/dksoft
  *     homePage: www.diocp.org
  *
+ *   2015-07-16 18:15:25
+ *     TDiocpBlockTcpClient添加RecvBufEnd函数
+ *
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
@@ -67,8 +70,23 @@ type
     ///  recv buffer
     /// </summary>
     procedure recv(buf: Pointer; len: cardinal);
+
+    function Peek(buf: Pointer; len: Cardinal): Integer;
     function RecvBuffer(buf: Pointer; len: cardinal): Integer;
     function SendBuffer(buf: Pointer; len: cardinal): Integer;
+    /// <summary>
+    ///   阻塞接收数据直到接收到一个endBuf为止
+    ///   如果收到的数据到达len大小，会直接返回
+    /// </summary>
+    /// <returns>
+    ///   返回接收到的数据长度
+    /// </returns>
+    /// <param name="buf"> 用来存放的起始内存地址 </param>
+    /// <param name="len"> 内存大小 </param>
+    /// <param name="endBuf"> 判断结束的起始内存地址 </param>
+    /// <param name="endBufLen"> 内存大小 </param>
+    function RecvBufferEnd(buf: Pointer; len: cardinal; endBuf: Pointer; endBufLen:
+        Integer): Integer;
     property Active: Boolean read FActive write SetActive;
     property RawSocket: TRawSocket read FRawSocket;
   published
@@ -187,6 +205,11 @@ begin
   FActive := false;
 end;
 
+function TDiocpBlockTcpClient.Peek(buf: Pointer; len: Cardinal): Integer;
+begin
+  Result := FRawSocket.PeekBuf(buf^, len);
+end;
+
 procedure TDiocpBlockTcpClient.recv(buf: Pointer; len: cardinal);
 var
   lvTempL :Integer;
@@ -198,9 +221,9 @@ begin
   while lvReadL < len do
   begin
     lvTempL := FRawSocket.RecvBuf(lvPBuf^, len - lvReadL);
-    
+
     CheckSocketResult(lvTempL);
-    
+
     lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));
     lvReadL := lvReadL + Cardinal(lvTempL);
   end;
@@ -209,6 +232,13 @@ end;
 function TDiocpBlockTcpClient.RecvBuffer(buf: Pointer; len: cardinal): Integer;
 begin
   Result := FRawSocket.RecvBuf(buf^, len);
+  CheckSocketResult(Result);
+end;
+
+function TDiocpBlockTcpClient.RecvBufferEnd(buf: Pointer; len: cardinal;
+    endBuf: Pointer; endBufLen: Integer): Integer;
+begin
+  Result := FRawSocket.RecvBufEnd(buf, len, endBuf, endBufLen);
   CheckSocketResult(Result);
 end;
 

@@ -16,7 +16,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer
+  ComCtrls, diocp.ex.httpServer, System.Actions
   ;
 
 type
@@ -95,6 +95,8 @@ begin
   pvRequest.DecodePostDataParam(false);
   pvRequest.DecodeURLParam(false);
   {$ENDIF}
+
+  // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
 
   // 输出客户端IP信息
   pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,
