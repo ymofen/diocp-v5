@@ -1,18 +1,32 @@
-{内存管理}
-
-//// 作者:QQ:75492895(不得闲)
-////   感谢作者提供的内存池，用于接收业务数据的内存池.
-//// 替换原有uBuffer单元
+(*
+ *	 Unit owner: 不得闲, d10.天地弦
+ *	       blog: http://www.cnblogs.com/dksoft
+ *     homePage: www.diocp.org
+ *
+ *
+ *1. 2015年7月17日 15:01:12
+ *    TBufferLink添加函数
+ *     /// <summary>
+ *    ///  从当前位置开始搜索Buffer
+ *    ///   返回搜索到subBuf的起始位置
+ *    ///   如果搜索不到返回-1
+ *    /// </summary>
+ *    function SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal): Integer;
+ *
+ *)
 
 unit utils.buffer;
 
 /// 2014年2月26日 11:33:38
 ///  杨茂丰
 ///  inline
-{$IF defined(FPC) or defined(VER170) or defined(VER180) or defined(VER190) or defined(VER200) or defined(VER210)}
-  {$DEFINE HAVE_INLINE}
-{$IFEND}
+//{$IF defined(FPC) or defined(VER170) or defined(VER180) or defined(VER190) or defined(VER200) or defined(VER210)}
+//  {$DEFINE HAVE_INLINE}
+//{$IFEND}
 
+{$if CompilerVersion > 18}
+  {$DEFINE HAVE_INLINE}
+{$ifend}
 interface
 
 uses
@@ -140,6 +154,15 @@ type
     ///   跳过一段
     /// </summary>
     function Skip(len:Cardinal): Cardinal;
+
+    /// <summary>
+    ///  从当前位置开始搜索Buffer
+    ///   返回搜索到subBuf的起始位置
+    ///   如果搜索不到返回-1
+    /// </summary>
+    function SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal): Integer;
+
+
     procedure clearBuffer;
     procedure clearHaveReadBuffer;
 
@@ -228,6 +251,65 @@ var
   LargeMPool: TDxMemoryPool = nil;
   SPLargeMPool: TDxMemoryPool = nil;
   MaxMPool: TDxMemoryPool = nil;
+
+
+/// <summary>
+///   来自于utils.strings
+///   查找PSub在P中出现的第一个位置
+/// </summary>
+/// <returns>
+///   如果找到, 返回指向第一个pvSub的位置
+///   找不到返回 Nil
+/// </returns>
+/// <param name="pvSource"> 数据 </param>
+/// <param name="pvSourceLen"> 数据长度 </param>
+/// <param name="pvSub"> 查找的数据 </param>
+/// <param name="pvSubLen"> 查找的数据长度 </param>
+function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
+    pvSub: Pointer; pvSubLen: Integer): Pointer;
+var
+  I, j, l: Integer;
+  lvTempP, lvTempPSub, lvTempP2, lvTempPSub2:PByte;
+begin
+  if (pvSub = nil) then
+    Result := nil
+  else
+  begin
+    Result := nil;
+    j := 0;
+    lvTempP := PByte(pvSource);
+    Inc(lvTempP, pvStartIndex);
+
+    lvTempPSub := PByte(pvSub);
+    while j<pvSourceLen do
+    begin
+      if lvTempP^ = lvTempPSub^ then
+      begin
+        I := 1;     // 从后面第二个字符开始对比
+        lvTempP2 := lvTempP;
+        Inc(lvTempP2);
+
+        lvTempPSub2 := lvTempPSub;
+        Inc(lvTempPSub2);
+        while (I < pvSubLen) do
+        begin
+          if lvTempP2^ = lvTempPSub2^ then
+            Inc(I)
+          else
+            Break;
+        end;
+
+        if I = pvSubLen then
+        begin  // P1和P2已经匹配到了末尾(匹配成功)
+          Result := lvTempP;
+          Break;
+        end;
+      end;
+      Inc(lvTempP);
+      inc(j);
+    end;
+  end;
+end;
 
 
 function CalcMemType(MemSize: Integer): TDxMemBlockType;
@@ -1668,6 +1750,49 @@ procedure TBufferLink.markReaderIndex;
 begin
   FMark := FRead;
   FMarkPosition := FReadPosition;
+end;
+
+function TBufferLink.SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal):
+    Integer;
+var
+  lvBufBlock: PMemoryBlock;
+
+  lvPRes:Pointer;
+
+  l, x, lvPosition:Cardinal;
+begin
+  Result := -1;
+  l := 0;
+
+  lvBufBlock := FRead;
+  lvPosition := FReadPosition;
+
+  if lvBufBlock = nil then
+  begin   // 从头开始
+    lvBufBlock := FHead;
+    lvPosition := 0;
+  end;
+
+  if lvBufBlock <> nil then
+  begin
+    while lvBufBlock <> nil do
+    begin
+      lvPRes := SearchPointer(lvBufBlock.Memory, lvBufBlock.DataLen, lvPosition, subBuf, subBufLen);
+      if lvPRes <> nil then
+      begin
+        x := PAnsiChar(lvPRes) - PAnsiChar(lvBufBlock.Memory) - lvPosition;
+        Result := l + x;
+        Break;
+      end else
+      begin
+        l := l + lvBufBlock.DataLen - lvPosition;
+
+        // 查找下一块
+        lvBufBlock := lvBufBlock.NextEx;
+        lvPosition := 0;
+      end;
+    end;
+  end;
 end;
 
 function TBufferLink.validCount: Integer;
