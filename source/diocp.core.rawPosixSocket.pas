@@ -62,7 +62,7 @@ type
     procedure CreateUdpSocket;
     function RecvBuf(var data; const len: Cardinal): Integer;
     function PeekBuf(var data; const len: Cardinal): Integer;
-    function RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar; endBufLen:
+    function RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte; endBufLen:
         Integer): Integer;
 
 
@@ -553,12 +553,12 @@ begin
   Result := recv(FSocketHandle, data, len, MSG_PEEK);
 end;
 
-function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;
+function TRawSocket.RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte;
     endBufLen: Integer): Integer;
 var
   lvRecvByte:byte;
   lvRet, j:Integer;
-  lvTempEndBuf:PAnsiChar;
+  lvTempEndBuf:PByte;
   lvMatchCounter:Integer;
 begin
   lvTempEndBuf := endBuf;
@@ -573,7 +573,7 @@ begin
       Result := lvRet;
       exit;
     end;
-    if buf^ = lvTempEndBuf^ then
+    if Byte(buf^) = Byte(lvTempEndBuf^) then
     begin
       Inc(lvMatchCounter);
       Inc(lvTempEndBuf);
