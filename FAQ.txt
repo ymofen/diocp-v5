@@ -6,10 +6,16 @@
   
 
 
-2.diocp-v5怎么样编译DEMO
-  
+2.diocp-v5怎么样编译DEMO  
   <<关于DEMO的编译>>
   http://www.diocp.org/?p=16
+  
+2.1 
+Q:在编译DiocpV5DEMO是编译不通过
+A:你编译DEMO的时候，把diocpv5\source加入到路径就好
+  不要把所有Source下的文件添加到工程,因为有一些文件是给android/ios平台用的当然不能在windows下面编译,
+  例如:diocp.core.rawPosixSocket.pas
+
   
   
 3.服务端避免不了和多线程打交道，请先好好熟悉多线程的基础知识和注意实现。下面有多线程的一些文章，请认真看看。

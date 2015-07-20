@@ -8,6 +8,12 @@
  *
  *)
  
+{$IFDEF POSIX}
+
+{$ELSE}
+  警告：该文件是跨平台的RawSocket，不要在Windows工程下加入该文件
+{$ENDIF}
+ 
 unit diocp.core.rawPosixSocket;
 
 interface
