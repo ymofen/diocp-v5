@@ -141,85 +141,129 @@ begin
   lvEndData := @lvOwner.FEndData[0];
   lvEndDataLen := lvOwner.FEndDataLen;
 
-  pbuf := PAnsiChar(buf);
-  r := len;
-  
-  // 已经有数据了
-  if (FCacheBuffer.validCount > 0) then
-  begin
-    // 查找结束字符串   
-    prsearch := SearchPointer(pbuf, len, 0, lvEndData, lvEndDataLen);
-    if prsearch = nil then
-    begin  // 没有结束标志
-      FCacheBuffer.AddBuffer(buf, len);
-      Exit;
-    end else
-    begin   // 有结束标志了，拼包
-      j := prsearch-pbuf;
-      i := self.FCacheBuffer.validCount;
-      if i > 0 then
-      begin
-        SetLength(FRecvData, i + j);
-        pstr := PAnsiChar(@FRecvData[0]);
-        FCacheBuffer.readBuffer(pstr, i);
-        pstr := pstr + i;
-        Move(pbuf^, pstr^, j);
-        Inc(pbuf, j);
-        Dec(r, j);
+  FCacheBuffer.AddBuffer(buf, len);
 
-        FCacheBuffer.clearBuffer();
-        OnDataAction(@FRecvData[0], i + j);
-      end;
-    end;
-  end;  
-  
-  while r > 0 do
+  while FCacheBuffer.validCount > 0 do
   begin
     if lvStartDataLen > 0 then
     begin
-      prsearch := SearchPointer(pbuf, r, 0, lvStartData, lvStartDataLen); 
-      if prsearch = nil then
-      begin  // 没有开始标志buf无效
-        Break;
+      // 不够数据，跳出
+      if FCacheBuffer.validCount < lvStartDataLen + lvEndDataLen then Break;
+      
+      j := FCacheBuffer.SearchBuffer(lvStartData, lvStartDataLen);
+      if j = -1 then
+      begin  // 没有搜索到开始标志
+        FCacheBuffer.clearBuffer();
+        Exit;
       end else
       begin
-        j := prsearch - pbuf;
-        // 丢弃到开始标志之前的数据
-        Inc(pbuf, j + lvStartDataLen);   // 跳过开始标志
-        Dec(r, j + lvStartDataLen);
+        // 跳过开头标志
+        FCacheBuffer.Skip(j + lvStartDataLen);
       end;
     end;
 
+    // 不够数据，跳出
+    if FCacheBuffer.validCount < lvEndDataLen then Break;
 
-    prsearch := SearchPointer(pbuf, r, 0, lvEndData, lvEndDataLen);//(pbuf, r, 0);
-    if prsearch <> nil then
+    j := FCacheBuffer.SearchBuffer(lvEndData, lvEndDataLen);
+    if j <> -1 then
     begin
-      j := prsearch - pbuf;
-      if j = 0 then
-      begin  // 只有一个结束标志
-
-      end else
-      begin
-        SetLength(FRecvData, j);
-        pstr := PAnsiChar(@FRecvData[0]);
-        Move(pbuf^, pstr^, j);
-        Inc(pbuf, j);
-        Dec(r, j);
-        OnDataAction(pstr, j);
-      end;
-      Inc(pbuf, lvEndDataLen);   // 跳过结束标志
-      Dec(r, lvEndDataLen); 
+      SetLength(FRecvData, j);
+      FCacheBuffer.readBuffer(@FRecvData[0], j);
+      OnDataAction(@FRecvData[0], j);
+      FCacheBuffer.Skip(lvEndDataLen);
     end else
-    begin     // 剩余数据处理
-      if r > 0 then FCacheBuffer.AddBuffer(pbuf, r);
-      if FCacheBuffer.validCount > lvOwner.FMaxDataLen then
-      begin                      // 超过最大数据包大小
-        FCacheBuffer.clearBuffer();
-      end;
-
+    begin
       Break;
     end;
   end;
+  FCacheBuffer.clearHaveReadBuffer();
+
+
+
+//  pbuf := PAnsiChar(buf);
+//  r := len;
+//
+//
+//
+//  // 已经有数据了
+//  if (FCacheBuffer.validCount > 0) then
+//  begin
+//    // 不够数据
+//    if FCacheBuffer.validCount < lvEndDataLen then Exit;
+//    
+//    // 查找结束字符串   
+//    prsearch := SearchPointer(pbuf, len, 0, lvEndData, lvEndDataLen);
+//    if prsearch = nil then
+//    begin  // 没有结束标志
+//      FCacheBuffer.AddBuffer(buf, len);
+//      Exit;
+//    end else
+//    begin   // 有结束标志了，拼包
+//      j := prsearch-pbuf;
+//      i := self.FCacheBuffer.validCount;
+//      if i > 0 then
+//      begin
+//        SetLength(FRecvData, i + j);
+//        pstr := PAnsiChar(@FRecvData[0]);
+//        FCacheBuffer.readBuffer(pstr, i);
+//        pstr := pstr + i;
+//        Move(pbuf^, pstr^, j);
+//        Inc(pbuf, j);
+//        Dec(r, j);
+//
+//        FCacheBuffer.clearBuffer();
+//        OnDataAction(@FRecvData[0], i + j);
+//      end;
+//    end;
+//  end;  
+//  
+//  while r > 0 do
+//  begin
+//    if lvStartDataLen > 0 then
+//    begin
+//      prsearch := SearchPointer(pbuf, r, 0, lvStartData, lvStartDataLen);
+//      if prsearch = nil then
+//      begin  // 没有开始标志buf无效
+//        Break;
+//      end else
+//      begin
+//        j := prsearch - pbuf;
+//        // 丢弃到开始标志之前的数据
+//        Inc(pbuf, j + lvStartDataLen);   // 跳过开始标志
+//        Dec(r, j + lvStartDataLen);
+//      end;
+//    end;
+//
+//    prsearch := SearchPointer(pbuf, r, 0, lvEndData, lvEndDataLen);//(pbuf, r, 0);
+//    if prsearch <> nil then
+//    begin
+//      j := prsearch - pbuf;
+//      if j = 0 then
+//      begin  // 只有一个结束标志
+//
+//      end else
+//      begin
+//        SetLength(FRecvData, j);
+//        pstr := PAnsiChar(@FRecvData[0]);
+//        Move(pbuf^, pstr^, j);
+//        Inc(pbuf, j);
+//        Dec(r, j);
+//        OnDataAction(pstr, j);
+//      end;
+//      Inc(pbuf, lvEndDataLen);   // 跳过结束标志
+//      Dec(r, lvEndDataLen); 
+//    end else
+//    begin     // 剩余数据处理
+//      if r > 0 then FCacheBuffer.AddBuffer(pbuf, r);
+//      if FCacheBuffer.validCount > lvOwner.FMaxDataLen then
+//      begin                      // 超过最大数据包大小
+//        FCacheBuffer.clearBuffer();
+//      end;
+//
+//      Break;
+//    end;
+//  end;
 end;
 
 procedure TDiocpExContext.OnDataAction(pvData: Pointer; pvDataLen: Integer);

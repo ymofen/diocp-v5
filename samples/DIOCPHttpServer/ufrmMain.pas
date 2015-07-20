@@ -60,7 +60,7 @@ var
 implementation
 
 uses
-  uFMMonitor, diocp.core.engine;
+  uFMMonitor, diocp.core.engine, utils.strings;
 
 {$R *.dfm}
 
@@ -96,7 +96,13 @@ begin
   pvRequest.DecodeURLParam(false);
   {$ENDIF}
 
-  // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+  //   // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+  if pvRequest.RequestCookies = '' then
+  begin
+    pvRequest.Response.SetCookie('JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1;');
+  end;
+
+
 
   // 输出客户端IP信息
   pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,

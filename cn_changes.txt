@@ -101,4 +101,21 @@ DIOCP-v5 0.0.2
     /// <param name="endBufLen"> 内存大小 </param>
     function RecvBufferEnd(buf: Pointer; len: cardinal; endBuf: Pointer; endBufLen:
         Integer): Integer;
+
+18: utils.buffer.pas中添加函数
+ *1. 2015年7月17日 15:01:12
+ *    TBufferLink添加函数
+ *     /// <summary>
+ *    ///  从当前位置开始搜索Buffer
+ *    ///   返回搜索到subBuf的起始位置
+ *    ///   如果搜索不到返回-1
+ *    /// </summary>
+ *    function SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal): Integer;
+ 
+19: diocp.tcp.client.pas中添加TDiocpExRemoteContext可以定义包的开始和结束位置。
+ 
+
+    
+ 
+ 
  

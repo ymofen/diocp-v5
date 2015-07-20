@@ -44,6 +44,8 @@ type
 
   TOnBufferReceived = procedure(pvContext: TDiocpCustomContext; buf: Pointer; len:
       cardinal; pvErrorCode: Integer) of object;
+
+  TOnContextBufferNotifyEvent = procedure(pvContext: TDiocpCustomContext; buf: Pointer; len: cardinal) of object;
   
   TNotifyContextEvent = procedure(pvContext: TDiocpCustomContext) of object;
 

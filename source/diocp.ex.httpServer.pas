@@ -58,6 +58,28 @@ type
   TOnDiocpHttpRequestEvent = procedure(pvRequest: TDiocpHttpRequest) of object;
 {$ENDIF}
 
+  /// <summary>
+  ///   设置客户端时进行的Cookie设置类
+  /// </summary>
+  TDiocpHttpCookie = class(TObject)
+  private
+    FExpires: TDateTime;
+    FName: String;
+    FPath: String;
+    FValue: String;
+  public
+    /// <summary>
+    ///   编码成一个String
+    /// </summary>
+    function ToString: String;
+
+    property Expires: TDateTime read FExpires write FExpires;
+    property Name: String read FName write FName;
+    property Path: String read FPath write FPath;
+    property Value: String read FValue write FValue;
+  end;
+
+
   TDiocpHttpRequest = class(TObject)
   private
 
@@ -273,11 +295,13 @@ type
   TDiocpHttpResponse = class(TObject)
   private
     FResponseHeader: string;
+    FCookies: TList;
     FContentType: String;
     FCookieData : String;
     FData: TMemoryStream;
     FDiocpContext : TDiocpHttpClientContext;
     FHttpCodeStr: String;
+    procedure ClearAllCookieObjects;
   public
     procedure Clear;
     constructor Create;
@@ -943,17 +967,20 @@ begin
   FContentType := '';
   FData.Clear;
   FResponseHeader := '';
+  ClearAllCookieObjects;
 end;
 
 constructor TDiocpHttpResponse.Create;
 begin
   inherited Create;
   FData := TMemoryStream.Create();
+  FCookies := TList.Create();
 end;
 
 destructor TDiocpHttpResponse.Destroy;
 begin
   FreeAndNil(FData);
+  FCookies.Free;
   inherited Destroy;
 end;
 
@@ -982,10 +1009,17 @@ begin
   end;
 
   Result := Result + 'Server: DIOCP-V5/1.1'#13#10;
+end;
 
-  //MakeHeader('200 OK', FRequestVersionStr, FKeepAlive, FResponse.FContentType,
-  //  FResponse.FResponseHeader, FResponse.FData.Size);
-
+procedure TDiocpHttpResponse.ClearAllCookieObjects;
+var
+  i: Integer;
+begin
+  for i := 0 to FCookies.Count-1 do
+  begin
+    TObject(FCookies[i]).Free;
+  end;
+  FCookies.Clear();
 end;
 
 procedure TDiocpHttpResponse.RedirectURL(pvURL: String);
@@ -1307,6 +1341,11 @@ end;
 procedure TDiocpHttpServer.GiveBackRequest(pvRequest: TDiocpHttpRequest);
 begin
   FRequestPool.EnQueue(pvRequest);
+end;
+
+function TDiocpHttpCookie.ToString: String;
+begin
+  Result := Format('%s=%s; Path=%s;', [self.FName, self.FValue, Self.FPath]);
 end;
 
 end.
