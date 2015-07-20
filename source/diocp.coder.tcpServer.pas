@@ -445,45 +445,42 @@ var
   lvTask:TDiocpTaskObject;
   lvObj:TObject;
 begin
-  try
-    while (Self.Active) do
-    begin
-      //取出一个任务
-      //取出一个任务
-      self.Lock;
-      try
-        lvTask := TDiocpTaskObject(FRequestQueue.DeQueue);
-      finally
-        self.UnLock;
+  while (Self.Active) do
+  begin
+    //取出一个任务
+    self.Lock;
+    try
+      lvTask := TDiocpTaskObject(FRequestQueue.DeQueue);
+      if lvTask = nil then
+      begin
+        FIsProcessRequesting := False;
+        Break;
       end;
-      if lvTask = nil then Break;
-      
-      lvObj := lvTask.FData;
+    finally
+      self.UnLock;
+    end;
+
+    lvObj := lvTask.FData;
+    try
       try
-        try
-          // 执行任务
-          if DoExecuteRequest(lvTask) <> S_OK then
-          begin
-            Break;
-          end;
-        except          
+        // 执行任务
+        if DoExecuteRequest(lvTask) <> S_OK then
+        begin
+          Break;
         end;
-      finally
-        // 归还到任务池
-        lvTask.Close;
-        try
-          // 释放解码对象
-          if lvObj <> nil then FreeAndNil(lvObj);
-        except
-        end;
+      except
+      end;
+    finally
+      // 归还到任务池
+      lvTask.Close;
+      try
+        // 释放解码对象
+        if lvObj <> nil then FreeAndNil(lvObj);
+      except
       end;
     end;
-  finally
-    // 置正在处理任务标记
-    self.Lock();
-    FIsProcessRequesting := False;
-    self.Unlock(); 
   end;
+
 
 end;
 {$ELSE}
@@ -493,48 +490,47 @@ var
   lvTask:TDiocpTaskObject;
   lvObj:TObject;
 begin
-  try
-    while (Self.Active) do
-    begin
-      //取出一个任务
-      self.Lock;
-      try
-        lvTask := TDiocpTaskObject(FRequestQueue.DeQueue);
-      finally
-        self.UnLock;
-      end;
-      if lvTask = nil then Break;
-      
-      lvObj := lvTask.FData;
-      try
-        try
-          // 如果需要执行
-          if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
-            pvTaskRequest.iocpWorker.checkCoInitializeEx();
 
-          // 执行任务
-          if DoExecuteRequest(lvTask) <> S_OK then
-          begin
-            Break;
-          end;
-        except          
+  while (Self.Active) do
+  begin
+    //取出一个任务
+    self.Lock;
+    try
+      lvTask := TDiocpTaskObject(FRequestQueue.DeQueue);
+      if lvTask = nil then
+      begin
+        FIsProcessRequesting := False;
+        Break;
+      end;
+    finally
+      self.UnLock;
+    end;
+
+    lvObj := lvTask.FData;
+    try
+      try
+        // 如果需要执行
+        if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
+          pvTaskRequest.iocpWorker.checkCoInitializeEx();
+
+        // 执行任务
+        if DoExecuteRequest(lvTask) <> S_OK then
+        begin
+          Break;
         end;
-      finally
-        // 归还到任务池
-        lvTask.Close;
-        try
-          // 释放解码对象
-          if lvObj <> nil then FreeAndNil(lvObj);
-        except
-        end;
+      except          
+      end;
+    finally
+      // 归还到任务池
+      lvTask.Close;
+      try
+        // 释放解码对象
+        if lvObj <> nil then FreeAndNil(lvObj);
+      except
       end;
     end;
-  finally
-    // 置正在处理任务标记
-    self.Lock();
-    FIsProcessRequesting := False;
-    self.Unlock(); 
   end;
+
 //
 //  lvTask := TDiocpTaskObject(pvTaskRequest.TaskData);
 //  lvObj := lvTask.FData;
