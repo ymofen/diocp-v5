@@ -62,6 +62,10 @@ type
     procedure CreateUdpSocket;
     function RecvBuf(var data; const len: Cardinal): Integer;
     function PeekBuf(var data; const len: Cardinal): Integer;
+    function RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar; endBufLen:
+        Integer): Integer;
+
+
     function SendBuf(const data; const len: Cardinal): Integer;
     function SendBufTo(const data; const len: Integer): Integer;
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
@@ -547,6 +551,44 @@ end;
 function TRawSocket.PeekBuf(var data; const len:Cardinal): Integer;
 begin
   Result := recv(FSocketHandle, data, len, MSG_PEEK);
+end;
+
+function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;
+    endBufLen: Integer): Integer;
+var
+  lvRecvByte:byte;
+  lvRet, j:Integer;
+  lvTempEndBuf:PAnsiChar;
+  lvMatchCounter:Integer;
+begin
+  lvTempEndBuf := endBuf;
+  lvMatchCounter := 0;
+  j:=0;
+  while j < len do
+  begin
+    lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
+    inc(j);
+    if lvRet = -1 then
+    begin
+      Result := lvRet;
+      exit;
+    end;
+    if buf^ = lvTempEndBuf^ then
+    begin
+      Inc(lvMatchCounter);
+      Inc(lvTempEndBuf);
+      if lvMatchCounter = endBufLen then
+      begin    // 读取成功
+        Break;
+      end;
+    end else
+    begin
+      lvTempEndBuf := endBuf;
+      lvMatchCounter := 0;
+    end;
+    inc(buf);
+  end;
+  Result := j;
 end;
 
 function TRawSocket.RecvdCount: Integer;
