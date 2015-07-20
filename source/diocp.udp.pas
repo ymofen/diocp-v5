@@ -1,3 +1,11 @@
+(*
+ *	 Unit owner: d10.ÃÏµÿœ“
+ *	       blog: http://www.cnblogs.com/dksoft
+ *     homePage: www.diocp.org
+ *
+ *   
+ *)
+ 
 unit diocp.udp;
 
 interface
