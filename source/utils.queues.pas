@@ -115,11 +115,6 @@ type
     /// </summary>
     procedure EnQueue(AData: Pointer);
 
-//    /// <summary>
-//    ///   add to head
-//    /// </summary>
-//    procedure AddToHead(AData: Pointer);
-
     /// <summary>
     ///  invoke Only Data Pointer is TObject
     /// </summary>
@@ -241,16 +236,12 @@ var
 begin
   FLocker.Enter;
   try
-    if FHead = nil then Exit;
-
-    while FHead.Next <> nil do
+    while FHead <> nil do
     begin
-      ANext := FHead.Next;     
-      
+      ANext := FHead.Next;
       queueDataPool.Push(FHead);
       FHead := ANext;
-    end;
-
+    end; 
     FCount := 0;
   finally
     FLocker.Leave;
@@ -504,21 +495,16 @@ procedure TSimpleQueue.Clear;
 var
   ANext: PQueueData;
 begin
-  if FHead = nil then Exit;
-
-  while FHead.Next <> nil do
+  while FHead <> nil do
   begin
     ANext := FHead.Next;
-
     queueDataPool.Push(FHead);
     FHead := ANext;
   end;
-
-  FCount := 0;
-
+  FCount := 0; 
 end;
 
-procedure TSimpleQueue.freeDataObject;
+procedure TSimpleQueue.FreeDataObject;
 var
   lvData:Pointer;
 begin
