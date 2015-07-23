@@ -3,6 +3,9 @@
  *	       blog: http://www.cnblogs.com/dksoft
  *     homePage: www.diocp.org
  *
+ *   2015-07-23 15:13:44
+ *     修改Clear清空方式,去掉确保FHead不为nil的方式
+ *
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
