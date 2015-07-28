@@ -23,8 +23,6 @@ object Form1: TForm1
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #25509#25910#25968#25454
-      ExplicitWidth = 281
-      ExplicitHeight = 165
       object mmoOutput: TMemo
         Left = 0
         Top = 0
@@ -34,10 +32,6 @@ object Form1: TForm1
         Lines.Strings = (
           'mmoOutput')
         TabOrder = 0
-        ExplicitLeft = -529
-        ExplicitTop = -69
-        ExplicitWidth = 810
-        ExplicitHeight = 234
       end
     end
     object tsSend: TTabSheet
@@ -78,9 +72,6 @@ object Form1: TForm1
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitLeft = 400
-    ExplicitTop = 88
-    ExplicitWidth = 185
     object btnStart: TButton
       Left = 152
       Top = 9
@@ -97,6 +88,15 @@ object Form1: TForm1
       Height = 21
       TabOrder = 1
       Text = '9983'
+    end
+    object chkLogRecv: TCheckBox
+      Left = 264
+      Top = 14
+      Width = 97
+      Height = 17
+      Caption = #35760#24405#25910#21040#20449#24687
+      TabOrder = 2
+      OnClick = chkLogRecvClick
     end
   end
 end

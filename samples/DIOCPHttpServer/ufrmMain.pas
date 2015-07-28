@@ -16,7 +16,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer, System.Actions
+  ComCtrls, diocp.ex.httpServer
   ;
 
 type
@@ -36,8 +36,11 @@ type
     btnFindContext: TButton;
     pnlTop: TPanel;
     tmrHeart: TTimer;
+    tsTester: TTabSheet;
+    btn1: TButton;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
+    procedure btn1Click(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
@@ -97,9 +100,10 @@ begin
   {$ENDIF}
 
   //   // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
-  if pvRequest.RequestCookies = '' then
+  if pvRequest.GetCookie('diocp_session_id') = '' then
   begin
-    pvRequest.Response.SetCookie('JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1;');
+    pvRequest.Response.AddCookie('diocp_session_id', '4918D6ED22B81B587E7AF7517CE24E25.diocp.http');
+//    pvRequest.Response.SetCookie('JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1;');
   end;
 
 
@@ -253,6 +257,19 @@ procedure TfrmMain.actStopExecute(Sender: TObject);
 begin
   FTcpServer.safeStop;
   refreshState;
+end;
+
+procedure TfrmMain.btn1Click(Sender: TObject);
+var
+  lvStrings:TStrings;
+  s :string;
+begin
+  lvStrings := TStringList.Create();
+  s := '__gads=ID=6ff3a79a032e04d0:T=1425100914:S=ALNI_MZWDCQuaEqZV3ZYri0E4GU8osX7rw; pgv_pvi=5995954176;lzstat_uv=25556556142595371638|754770@2240623;';
+  SplitStrings(s, lvStrings, [';']);
+  ShowMessage(StringsValueOfName(lvStrings, 'lzstat_uv', ['='], true));
+  lvStrings.Free;
+
 end;
 
 procedure TfrmMain.btnDisconectAllClick(Sender: TObject);

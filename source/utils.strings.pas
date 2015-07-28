@@ -202,6 +202,15 @@ function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
     pvSub: Pointer; pvSubLen: Integer): Pointer;
 
 
+/// <summary>procedure DeleteChars
+/// </summary>
+/// <returns> string
+/// </returns>
+/// <param name="s"> (string) </param>
+/// <param name="pvCharSets"> (TSysCharSet) </param>
+function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
+
+
 implementation
 
 
@@ -226,6 +235,26 @@ begin
 end;
 {$ifend}
 
+
+function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
+var
+  i, l, times: Integer;
+  lvStr: string;
+begin
+  l := Length(s);
+  SetLength(lvStr, l);
+  times := 0;
+  for i := 1 to l do
+  begin
+    if not CharInSet(s[i], pvCharSets) then
+    begin
+      inc(times);
+      lvStr[times] := s[i];
+    end;
+  end;
+  SetLength(lvStr, times);
+  Result := lvStr;
+end;
 
 
 function StrIndexOf(const pvStr: string; const pvStringList: array of string):

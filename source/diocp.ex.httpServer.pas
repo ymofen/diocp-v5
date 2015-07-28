@@ -29,6 +29,7 @@ interface
 uses
   Classes, StrUtils, SysUtils, utils.buffer, utils.strings
 
+
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp.task{$ENDIF}
   , diocp.tcp.server, utils.queues;
@@ -115,6 +116,10 @@ type
 
     FRequestParamsList: TStringList; // TODO:存放http参数的StringList
 
+    // 存放客户端请求的Cookie信息
+    FRequestCookieList: TStrings;
+    FRequestCookies: string;
+    
     FContextType: string;
     FContextLength: Int64;
     FKeepAlive: Boolean;
@@ -124,7 +129,7 @@ type
     FRequestAcceptEncoding: string;
     FRequestUserAgent: string;
     FRequestAuth: string;
-    FRequestCookies: string;
+
     FRequestHostName: string;
     FRequestHostPort: string;
 
@@ -196,6 +201,11 @@ type
     /// </summary>
     procedure Clear;
 
+    /// <summary>
+    ///  读取传入的Cookie值
+    /// </summary>
+    function GetCookie(pvCookieName:string):String;
+
     property ContextLength: Int64 read FContextLength;
 
 
@@ -211,6 +221,7 @@ type
     property RequestAccept: String read FRequestAccept;
     property RequestAcceptEncoding: string read FRequestAcceptEncoding;
     property RequestAcceptLanguage: string read FRequestAcceptLanguage;
+    property RequestCookieList: TStrings read FRequestCookieList;
     property RequestCookies: string read FRequestCookies;
 
     /// <summary>
@@ -309,8 +320,9 @@ type
     procedure WriteBuf(pvBuf: Pointer; len: Cardinal);
     procedure WriteString(pvString: string; pvUtf8Convert: Boolean = true);
 
-    // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
-    procedure SetCookie(pvCookie:String);
+    function AddCookie: TDiocpHttpCookie; overload;
+
+    function AddCookie(pvName:String; pvValue:string): TDiocpHttpCookie; overload;
 
     function EncodeHeader: String;
 
@@ -421,6 +433,9 @@ type
 
 implementation
 
+uses
+  ComObj;
+
 function FixHeader(const Header: string): string;
 begin
   Result := Header;
@@ -477,6 +492,7 @@ begin
   FRequestMethod := '';
   FRequestCookies := '';
   FRequestParamsList.Clear;
+  FRequestCookieList.Clear;
   FContextLength := 0;
   FPostDataLen := 0;
   FResponse.Clear;  
@@ -491,6 +507,11 @@ end;
 procedure TDiocpHttpRequest.CloseContext;
 begin
   FDiocpContext.PostWSACloseRequest();
+end;
+
+function TDiocpHttpRequest.GetCookie(pvCookieName: string): String;
+begin
+  Result := StringsValueOfName(FRequestCookieList, pvCookieName, ['='], true);
 end;
 
 function TDiocpHttpRequest.GetRequestParam(ParamsKey: string): string;
@@ -531,6 +552,7 @@ begin
   FResponse := TDiocpHttpResponse.Create();
 
   FRequestParamsList := TStringList.Create; // TODO:创建存放http参数的StringList
+  FRequestCookieList := TStringList.Create;
 end;
 
 destructor TDiocpHttpRequest.Destroy;
@@ -541,6 +563,7 @@ begin
   FRequestHeader.Free;
 
   FreeAndNil(FRequestParamsList); // TODO:释放存放http参数的StringList
+  FRequestCookieList.Free;
 
   inherited Destroy;
 end;
@@ -765,7 +788,9 @@ begin
       FRequestAuth := lvRemainStr;
     end else if SameText(lvTempStr, 'Cookie') then
     begin
+      // Cookie:__gads=ID=6ff3a79a032e04d0:T=1425100914:S=ALNI_MZWDCQuaEqZV3ZYri0E4GU8osX7rw; pgv_pvi=5995954176; lzstat_uv=25556556142595371638|754770@2240623; Hm_lvt_674430fbddd66a488580ec86aba288f7=1433747304,1435200001; Hm_lvt_95eb98507622b340bc1da73ed59cfe34=1435906572; AJSTAT_ok_times=2; __utma=226521935.635858515.1425100841.1436162631.1437634125.12; __utmz=226521935.1437634125.12.12.utmcsr=baidu|utmccn=(organic)|utmcmd=organic; _gat=1; _ga=GA1.2.635858515.1425100841; .CNBlogsCookie=B70AF05C246EE95507A6B4E1206C55C394843B6EB1376064B7CE2199A3441791D09AB86E934DF47E48B2E409BC57F7F4C43950430B29D3B23CAC82C7E58212D912F3ECB144B6971C4D9A7EB4E609A900A50016DA
       FRequestCookies := lvRemainStr;
+      SplitStrings(FRequestCookies, FRequestCookieList, [';']);
     end else if SameText(lvTempStr, 'Host') then
     begin
       lvTempStr := lvRemainStr;
@@ -984,9 +1009,25 @@ begin
   inherited Destroy;
 end;
 
+function TDiocpHttpResponse.AddCookie: TDiocpHttpCookie;
+begin
+  Result := TDiocpHttpCookie.Create;
+  Result.Path := '/';
+  FCookies.Add(Result);
+end;
+
+function TDiocpHttpResponse.AddCookie(pvName:String; pvValue:string):
+    TDiocpHttpCookie;
+begin
+  Result := AddCookie;
+  Result.Name := pvName;
+  Result.Value := pvValue;
+end;
+
 function TDiocpHttpResponse.EncodeHeader: String;
 var
   lvVersionStr:string;
+  i: Integer;
 begin
   Result := '';
 
@@ -1003,10 +1044,16 @@ begin
 
   Result := Result + 'Connection: close'#13#10;
 
-  if FCookieData <> '' then
-  begin             // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
-    Result := Result + 'Set-Cookie:' + FCookieData + sLineBreak;
+
+  for i := 0 to FCookies.Count - 1 do
+  begin
+    Result := Result + 'Set-Cookie:' + TDiocpHttpCookie(FCookies[i]).ToString() + sLineBreak;
   end;
+
+//  if FCookieData <> '' then
+//  begin             // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+//    Result := Result + 'Set-Cookie:' + FCookieData + sLineBreak;
+//  end;
 
   Result := Result + 'Server: DIOCP-V5/1.1'#13#10;
 end;
@@ -1042,11 +1089,6 @@ begin
     FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
   end;
 
-end;
-
-procedure TDiocpHttpResponse.SetCookie(pvCookie:String);
-begin
-  FCookieData := pvCookie;
 end;
 
 procedure TDiocpHttpResponse.WriteBuf(pvBuf: Pointer; len: Cardinal);
@@ -1312,6 +1354,12 @@ end;
 
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
 begin
+  // 对session的处理
+  if pvRequest.GetCookie('diocp_sessionid') = '' then
+  begin
+    pvRequest.Response.AddCookie('diocp_sessionid', 'diocp_session_' + DeleteChars(CreateClassID, ['-', '{', '}']));
+  end;
+
   if Assigned(FOnDiocpHttpRequest) then
   begin
     FOnDiocpHttpRequest(pvRequest);

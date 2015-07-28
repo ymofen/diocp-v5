@@ -19,8 +19,10 @@ type
     btnSend: TButton;
     edtRemoteHost: TEdit;
     edtRemotePort: TEdit;
+    chkLogRecv: TCheckBox;
     procedure btnSendClick(Sender: TObject);
     procedure btnStartClick(Sender: TObject);
+    procedure chkLogRecvClick(Sender: TObject);
   private
     { Private declarations }
     FRawSocket:TRawSocket;
@@ -34,8 +36,10 @@ type
 
 var
   Form1: TForm1;
+  __logRecv:Boolean;
 
 implementation
+
 
 {$R *.dfm}
 
@@ -88,18 +92,39 @@ end;
 
 procedure TForm1.btnStartClick(Sender: TObject);
 begin
-  FDiocpUdp.DefaultListener.Port := StrToInt(edtPort.Text);
-  FDiocpUdp.Start();
+  if FDiocpUdp.Active then
+  begin
+    FDiocpUdp.Stop();
+    btnStart.Caption := '点击开启';
+  end else
+  begin
+    FDiocpUdp.DefaultListener.Port := StrToInt(edtPort.Text);
+    FDiocpUdp.Start();
+    __logRecv := chkLogRecv.Checked;
+    btnStart.Caption := '点击关闭';
+  end;
+
+end;
+
+procedure TForm1.chkLogRecvClick(Sender: TObject);
+begin
+  __logRecv := chkLogRecv.Checked;
 end;
 
 procedure TForm1.OnRecv(pvReqeust:TDiocpUdpRecvRequest);
 var
   s:AnsiString;
 begin
-  s := PAnsiChar(pvReqeust.RecvBuffer);
-  s[pvReqeust.RecvBufferLen + 1] := #0;
-  sfLogger.logMessage(s);
-  Sleep(1);
+  if __logRecv then
+  begin
+    s := PAnsiChar(pvReqeust.RecvBuffer);
+    s[pvReqeust.RecvBufferLen + 1] := #0;
+    sfLogger.logMessage(s);
+    Sleep(1);
+  end else
+  begin
+    pvReqeust.SendResponse(pvReqeust.RecvBuffer, pvReqeust.RecvBufferLen);
+  end;
 end;
 
 end.

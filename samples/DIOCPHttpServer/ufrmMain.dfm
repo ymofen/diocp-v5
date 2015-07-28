@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 41
     Width = 661
     Height = 346
-    ActivePage = TabSheet1
+    ActivePage = tsTester
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -38,10 +38,6 @@ object frmMain: TfrmMain
     object TabSheet2: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -49,6 +45,19 @@ object frmMain: TfrmMain
         Height = 318
         Align = alClient
         TabOrder = 0
+      end
+    end
+    object tsTester: TTabSheet
+      Caption = 'tsTester'
+      ImageIndex = 2
+      object btn1: TButton
+        Left = 176
+        Top = 88
+        Width = 75
+        Height = 25
+        Caption = 'btn1'
+        TabOrder = 0
+        OnClick = btn1Click
       end
     end
   end
