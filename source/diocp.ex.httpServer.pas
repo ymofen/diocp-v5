@@ -14,6 +14,9 @@
   *    改为异步处理Http请求后
   *      当连接已经关闭，但是请求还没有来得及处理，然后连接上下文已经归还到池，这个时候应该放弃处理任务()
   *
+  *   2015-07-29 12:06:08
+  *   diocp.ex.httpServer初步完成Cookie和Session
+  *
   *
 *)
 unit diocp.ex.httpServer;

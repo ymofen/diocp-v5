@@ -116,6 +116,9 @@ DIOCP-v5 0.0.2
  
 
 20. 添加diocp.udp.pas，和samples\UDPTester
+
+21. diocp.ex.httpServer初步完成Cookie和Session 2015-07-29 12:04:57
+    
  
  
  
