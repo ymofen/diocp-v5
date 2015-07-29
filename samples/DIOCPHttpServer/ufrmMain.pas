@@ -63,7 +63,7 @@ var
 implementation
 
 uses
-  uFMMonitor, diocp.core.engine, utils.strings;
+  uFMMonitor, diocp.core.engine, utils.strings, diocp.ex.SimpleMsgPackSession;
 
 {$R *.dfm}
 
@@ -75,6 +75,7 @@ begin
   FTcpServer.SetMaxSendingQueueSize(10000);
   FTcpServer.createDataMonitor;
   FTcpServer.OnDiocpHttpRequest := OnHttpSvrRequest;
+  FTcpServer.RegisterSessionClass(TDiocpSimpleMsgPackSession);
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
   
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
@@ -86,76 +87,27 @@ var
   lvJSon:ISuperObject;
   s:String;
   lvRawData:AnsiString;
-begin
-  // Context Type                        返回的是UTF-8的编码
-  pvRequest.Response.ContentType := 'text/html; charset=utf-8';
-
-  // 解码Post数据参数
-  {$IFDEF UNICODE}
-  pvRequest.DecodePostDataParam(nil);
-  pvRequest.DecodeURLParam(nil);
-  {$ELSE}
-  pvRequest.DecodePostDataParam(false);
-  pvRequest.DecodeURLParam(false);
-  {$ENDIF}
-
-  //   // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
-  if pvRequest.GetCookie('diocp_session_id') = '' then
+  lvSession:TDiocpSimpleMsgPackSession;
+  procedure WriteLoginForm();
   begin
-    pvRequest.Response.AddCookie('diocp_session_id', '4918D6ED22B81B587E7AF7517CE24E25.diocp.http');
-//    pvRequest.Response.SetCookie('JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1;');
+    pvRequest.Response.WriteString('你还没有进行登陆，登陆成功后可以看到更多的演示(本功能借助服务端Session完成)<br>');
+    pvRequest.Response.WriteString('<a href="/login">点击进行登陆</a><br>');
   end;
 
+  procedure WriteLogOutUrl();
+  begin
+    pvRequest.Response.WriteString('<a href="/logout">点击进行注销登陆</a><br>');
+  end;
 
-
-  // 输出客户端IP信息
-  pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,
-    pvRequest.Connection.RemotePort]));
-
-  pvRequest.Response.WriteString('请求方法:' + pvRequest.RequestMethod);
-  pvRequest.Response.WriteString('<br>');
-  pvRequest.Response.WriteString('=======================================<br>');
-
-  if pvRequest.RequestURI = '/diocp-v5' then
-  begin  // 输出diocp运行信息
-    Sleep(1000);
-    pvRequest.Response.WriteString('DIOCP运行信息<br>');
-    s := FTcpServer.GetStateInfo;
-    s := ReplaceText(s, sLineBreak, '<br>');
-    pvRequest.Response.WriteString(s);
-    pvRequest.Response.WriteString('<br>');
-
-    pvRequest.Response.WriteString('IOCP线程信息<br>');
-    s := FTcpServer.IocpEngine.GetStateINfo;
-    s := ReplaceText(s, sLineBreak, '<br>');
-    pvRequest.Response.WriteString(s);
-  end else if pvRequest.RequestURI = '/redirect' then
-  begin                                       //重新定向
-    s := pvRequest.GetRequestParam('url');
-    if s = '' then
+  procedure WriteNormalPage();
+  begin     
+    if pvRequest.GetCookie('diocp_cookie') = '' then
     begin
-      pvRequest.Response.WriteString('重定向例子:<a href="/redirect?url=http://www.diocp.org">' +
-       Format('http://%s:%s/redirect?url=http://www.diocp.org',[pvRequest.RequestHostName, pvRequest.RequestHostPort]) + '</a>');
+      pvRequest.Response.AddCookie('diocp_cookie', '这是一个diocp的cookie演示,Cookie会传递到客户端去');
     end else
     begin
-      pvRequest.Response.RedirectURL(s);
-      pvRequest.CloseContext;
-      Exit;
+      pvRequest.Response.WriteString('客户端Cookie读取演示:' + pvRequest.GetCookie('diocp_cookie'));
     end;
-  end else if pvRequest.RequestURI = '/input' then
-  begin  // 输出diocp运行信息
-    pvRequest.Response.WriteString('DIOCP HTTP 表单提交测试<br>');
-    pvRequest.Response.WriteString('<form id="form1" name="form1" method="post" action="/post?param1=''汉字''&time=' + DateTimeToStr(Now()) +'">');
-    pvRequest.Response.WriteString('<table width="50%" border="1" align="center">');
-    pvRequest.Response.WriteString('<tr><td width="35%">请输入你的名字:</td>');
-    pvRequest.Response.WriteString('<td width="35%"><input name="a" type="text" value="DIOCP-V5" /></td></tr>');
-    pvRequest.Response.WriteString('<tr><td width="35%">请输入你的爱好:</td>');
-    pvRequest.Response.WriteString('<td width="35%"><input name="b" type="text" value="LOL英雄联盟" /></td></tr>');
-    pvRequest.Response.WriteString('<tr><td width="35%">操作:</td>');
-    pvRequest.Response.WriteString('<td width="35%"><input type="submit" name="Submit" value="提交"/></td></tr>');
-    pvRequest.Response.WriteString('</table></form>');
-  end else
-  begin
 
     // 回写数据
     pvRequest.Response.WriteString('北京时间:' + DateTimeToStr(Now()) + '<br>');
@@ -220,6 +172,88 @@ begin
     s := ReplaceText(s, sLineBreak, '<br>');
     pvRequest.Response.WriteString(s);
     pvRequest.Response.WriteString('</div>');
+  end;
+
+begin
+  // Context Type                        返回的是UTF-8的编码
+  pvRequest.Response.ContentType := 'text/html; charset=utf-8';
+
+  // 解码Post数据参数
+  {$IFDEF UNICODE}
+  pvRequest.DecodePostDataParam(nil);
+  pvRequest.DecodeURLParam(nil);
+  {$ELSE}
+  pvRequest.DecodePostDataParam(false);
+  pvRequest.DecodeURLParam(false);
+  {$ENDIF}
+
+  //   // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+
+
+  // 输出客户端IP信息
+  pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,
+    pvRequest.Connection.RemotePort]));
+
+  pvRequest.Response.WriteString('请求方法:' + pvRequest.RequestMethod);
+  pvRequest.Response.WriteString('<br>');
+  WriteLogOutUrl();
+  pvRequest.Response.WriteString('=======================================<br>');
+
+
+  lvSession := TDiocpSimpleMsgPackSession(pvRequest.GetSession);
+  if pvRequest.RequestURI = '/login' then
+  begin
+    lvSession.MsgPack.B['login'] := true;
+    pvRequest.Response.WriteString('登陆成功<br>');
+    WriteNormalPage();
+  end else if (not lvSession.MsgPack.B['login']) then
+  begin
+    WriteLoginForm();
+  end else if pvRequest.RequestURI = '/diocp-v5' then
+  begin  // 输出diocp运行信息
+    Sleep(1000);
+    pvRequest.Response.WriteString('DIOCP运行信息<br>');
+    s := FTcpServer.GetStateInfo;
+    s := ReplaceText(s, sLineBreak, '<br>');
+    pvRequest.Response.WriteString(s);
+    pvRequest.Response.WriteString('<br>');
+
+    pvRequest.Response.WriteString('IOCP线程信息<br>');
+    s := FTcpServer.IocpEngine.GetStateINfo;
+    s := ReplaceText(s, sLineBreak, '<br>');
+    pvRequest.Response.WriteString(s);
+  end else if pvRequest.RequestURI = '/logout' then
+  begin
+    lvSession.MsgPack.B['login'] := false;
+    WriteLoginForm();
+  end else if pvRequest.RequestURI = '/redirect' then
+  begin                                       //重新定向
+    s := pvRequest.GetRequestParam('url');
+    if s = '' then
+    begin
+      pvRequest.Response.WriteString('重定向例子:<a href="/redirect?url=http://www.diocp.org">' +
+       Format('http://%s:%s/redirect?url=http://www.diocp.org',[pvRequest.RequestHostName, pvRequest.RequestHostPort]) + '</a>');
+    end else
+    begin
+      pvRequest.Response.RedirectURL(s);
+      pvRequest.CloseContext;
+      Exit;
+    end;
+  end else if pvRequest.RequestURI = '/input' then
+  begin  // 输出diocp运行信息
+    pvRequest.Response.WriteString('DIOCP HTTP 表单提交测试<br>');
+    pvRequest.Response.WriteString('<form id="form1" name="form1" method="post" action="/post?param1=''汉字''&time=' + DateTimeToStr(Now()) +'">');
+    pvRequest.Response.WriteString('<table width="50%" border="1" align="center">');
+    pvRequest.Response.WriteString('<tr><td width="35%">请输入你的名字:</td>');
+    pvRequest.Response.WriteString('<td width="35%"><input name="a" type="text" value="DIOCP-V5" /></td></tr>');
+    pvRequest.Response.WriteString('<tr><td width="35%">请输入你的爱好:</td>');
+    pvRequest.Response.WriteString('<td width="35%"><input name="b" type="text" value="LOL英雄联盟" /></td></tr>');
+    pvRequest.Response.WriteString('<tr><td width="35%">操作:</td>');
+    pvRequest.Response.WriteString('<td width="35%"><input type="submit" name="Submit" value="提交"/></td></tr>');
+    pvRequest.Response.WriteString('</table></form>');
+  end else
+  begin
+    WriteNormalPage();
   end;
 
   // 应答完毕，发送会客户端

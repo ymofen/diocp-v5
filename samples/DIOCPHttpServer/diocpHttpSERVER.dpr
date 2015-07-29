@@ -5,7 +5,9 @@ uses
   ufrmMain in 'ufrmMain.pas' {frmMain},
   uFMMonitor in '..\Common\Frames\uFMMonitor.pas' {FMMonitor: TFrame},
   uRunTimeINfoTools in '..\Common\Frames\uRunTimeINfoTools.pas',
-  superobject in 'superobject.pas';
+  superobject in 'superobject.pas',
+  diocp.ex.SimpleMsgPackSession in 'diocp.ex.SimpleMsgPackSession.pas',
+  SimpleMsgPack in 'SimpleMsgPack.pas';
 
 {$R *.res}
 

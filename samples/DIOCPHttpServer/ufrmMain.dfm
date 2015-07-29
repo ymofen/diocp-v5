@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 41
     Width = 661
     Height = 346
-    ActivePage = tsTester
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -48,7 +48,7 @@ object frmMain: TfrmMain
       end
     end
     object tsTester: TTabSheet
-      Caption = 'tsTester'
+      Caption = #27979#35797#38754#26495
       ImageIndex = 2
       object btn1: TButton
         Left = 176
