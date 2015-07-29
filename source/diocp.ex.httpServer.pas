@@ -32,12 +32,13 @@ uses
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp.task{$ENDIF}
-  , diocp.tcp.server, utils.queues;
+  , diocp.tcp.server, utils.queues, utils.hashs;
 
 
 
 const
   HTTPLineBreak = #13#10;
+  SESSIONID = 'diocp_sid';
 
 type
   TDiocpHttpState = (hsCompleted, hsRequest { 接收请求 } , hsRecvingPost { 接收数据 } );
@@ -45,6 +46,9 @@ type
   TDiocpHttpClientContext = class;
   TDiocpHttpServer = class;
   TDiocpHttpRequest = class;
+  TDiocpHttpSession = class;
+
+  TDiocpHttpSessionClass = class of TDiocpHttpSession;
 
 {$IFDEF UNICODE}
 
@@ -58,6 +62,14 @@ type
   /// </summary>
   TOnDiocpHttpRequestEvent = procedure(pvRequest: TDiocpHttpRequest) of object;
 {$ENDIF}
+
+  /// <summary>
+  ///  基础的Session类，用户可以自己扩展该类，然后注册
+  /// </summary>
+  TDiocpHttpSession = class(TObject)
+  public
+    constructor Create; virtual;
+  end;
 
   /// <summary>
   ///   设置客户端时进行的Cookie设置类
@@ -83,6 +95,7 @@ type
 
   TDiocpHttpRequest = class(TObject)
   private
+    FSessionID : String;
 
     /// <summary>
     ///   投递之前记录DNA，用于做异步任务时，是否取消当前任务
@@ -176,10 +189,14 @@ type
     /// 接收到的Buffer,写入数据
     /// </summary>
     procedure WriteRawBuffer(const buffer: Pointer; len: Integer);
+
+    procedure CheckCookieSession;
   protected
   public
     constructor Create;
     destructor Destroy; override;
+
+    function GetSession: TDiocpHttpSession;
 
 
     /// <summary>
@@ -382,7 +399,9 @@ type
   /// </summary>
   TDiocpHttpServer = class(TDiocpTcpServer)
   private
-    FRequestPool: TBaseQueue;
+    FRequestPool: TSafeQueue;
+    FSessionList: TDHashTableSafe;
+    FSessionClass : TDiocpHttpSessionClass;
 
     FOnDiocpHttpRequest: TOnDiocpHttpRequestEvent;
     FOnDiocpHttpRequestPostDone: TOnDiocpHttpRequestEvent;
@@ -407,10 +426,17 @@ type
     /// </summary>
     procedure GiveBackRequest(pvRequest:TDiocpHttpRequest);
 
+    /// <summary>
+    ///   获取一个Session对象
+    /// </summary>
+    function GetSession(pvSessionID:string): TDiocpHttpSession;
+
   public
     constructor Create(AOwner: TComponent); override;
 
     destructor Destroy; override;
+
+    procedure RegisterSessionClass(pvClass:TDiocpHttpSessionClass);
 
 
 
@@ -566,6 +592,17 @@ begin
   FRequestCookieList.Free;
 
   inherited Destroy;
+end;
+
+procedure TDiocpHttpRequest.CheckCookieSession;
+begin
+  // 对session的处理
+  FSessionID := GetCookie(SESSIONID);
+  if FSessionID = '' then
+  begin
+    FSessionID := SESSIONID + '_' + DeleteChars(CreateClassID, ['-', '{', '}']);
+    Response.AddCookie(SESSIONID, FSessionID);
+  end;
 end;
 
 function TDiocpHttpRequest.DecodeHttpRequestMethod: Integer;
@@ -937,6 +974,12 @@ begin
     lvStrings.Free;
   end;
 
+end;
+
+function TDiocpHttpRequest.GetSession: TDiocpHttpSession;
+begin
+  CheckCookieSession;
+  Result := TDiocpHttpServer(Connection.Owner).GetSession(FSessionID);
 end;
 
 /// <summary>
@@ -1340,25 +1383,25 @@ end;
 constructor TDiocpHttpServer.Create(AOwner: TComponent);
 begin
   inherited;
-  FRequestPool := TBaseQueue.Create;
+  FRequestPool := TSafeQueue.Create;
+  FSessionList := TDHashTableSafe.Create;
   KeepAlive := false;
   RegisterContextClass(TDiocpHttpClientContext);
+  RegisterSessionClass(TDiocpHttpSession);
 end;
 
 destructor TDiocpHttpServer.Destroy;
 begin
   FRequestPool.FreeDataObject;
   FRequestPool.Free;
+  FSessionList.FreeAllDataAsObject;
+  FSessionList.Free;
   inherited;
 end;
 
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
 begin
-  // 对session的处理
-  if pvRequest.GetCookie('diocp_sessionid') = '' then
-  begin
-    pvRequest.Response.AddCookie('diocp_sessionid', 'diocp_session_' + DeleteChars(CreateClassID, ['-', '{', '}']));
-  end;
+  pvRequest.CheckCookieSession;
 
   if Assigned(FOnDiocpHttpRequest) then
   begin
@@ -1386,14 +1429,41 @@ begin
   Result.FDiocpHttpServer := Self;
 end;
 
+function TDiocpHttpServer.GetSession(pvSessionID:string): TDiocpHttpSession;
+begin
+  FSessionList.Lock;
+  try
+    Result := TDiocpHttpSession(FSessionList.ValueMap[pvSessionID]);
+    if Result = nil then
+    begin
+      Result := FSessionClass.Create();
+      FSessionList.ValueMap[pvSessionID] := Result;      
+    end;
+  finally
+    FSessionList.unLock;
+  end;
+end;
+
 procedure TDiocpHttpServer.GiveBackRequest(pvRequest: TDiocpHttpRequest);
 begin
   FRequestPool.EnQueue(pvRequest);
+end;
+
+procedure TDiocpHttpServer.RegisterSessionClass(pvClass:TDiocpHttpSessionClass);
+begin
+  FSessionClass := pvClass;
 end;
 
 function TDiocpHttpCookie.ToString: String;
 begin
   Result := Format('%s=%s; Path=%s;', [self.FName, self.FValue, Self.FPath]);
 end;
+
+constructor TDiocpHttpSession.Create;
+begin
+
+end;
+
+
 
 end.
