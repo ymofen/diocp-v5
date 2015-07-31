@@ -55,12 +55,19 @@ type
   TStringsAppender = class(TBaseAppender)
   private
     FAddThreadINfo: Boolean;
+    FAddTimeInfo: Boolean;
+    FMaxLines: Integer;
     FStrings: TStrings;
   protected
     procedure AppendLog(pvData:TLogDataObject); override;
   public
     constructor Create(AStrings: TStrings);
     property AddThreadINfo: Boolean read FAddThreadINfo write FAddThreadINfo;
+    property AddTimeInfo: Boolean read FAddTimeInfo write FAddTimeInfo;
+    property MaxLines: Integer read FMaxLines write FMaxLines;
+
+
+
   end;
 
   TLogFileAppender = class(TBaseAppender)
@@ -704,6 +711,9 @@ constructor TStringsAppender.Create(AStrings: TStrings);
 begin
   inherited Create;
   FStrings := AStrings;
+  FAddTimeInfo := true;
+  FAddThreadINfo := false;
+  FMaxLines := 500;
 end;
 
 procedure TStringsAppender.AppendLog(pvData:TLogDataObject);
@@ -712,26 +722,25 @@ var
 begin
   inherited;
   Assert(FStrings <> nil);
+  if FAddTimeInfo then
+  begin
+    lvMsg := Format('%s[%s]',
+        [FormatDateTime('hh:nn:ss:zzz', pvData.FTime)
+          , TLogLevelCaption[pvData.FLogLevel]
+        ]);
+  end;
 
-      if FAddThreadINfo then
-      begin
-        lvMsg := Format('%s[%s][PID:%d,ThreadID:%d]:%s',
-            [FormatDateTime('hh:nn:ss:zzz', pvData.FTime)
-              , TLogLevelCaption[pvData.FLogLevel]
-              , GetCurrentProcessID()
-              , pvData.FThreadID
-              , pvData.FMsg
-            ]
-            );
-      end else
-      begin
-        lvMsg := Format('%s[%s]:%s',
-            [FormatDateTime('hh:nn:ss:zzz', pvData.FTime)
-              , TLogLevelCaption[pvData.FLogLevel]
-              , pvData.FMsg
-            ]
-            );
-      end;
+  if FAddThreadINfo then
+  begin
+    lvMsg := lvMsg + Format('[PID:%d,ThreadID:%d]',
+        [GetCurrentProcessID(), pvData.FThreadID]);
+  end;
+
+  if lvMsg <> '' then lvMsg := lvMsg + ':' + pvData.FMsg else lvMsg := pvData.FMsg;
+
+  if FStrings.Count > FMaxLines then FStrings.Clear;
+  
+  
   FStrings.Add(lvMsg);
 end;
 

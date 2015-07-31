@@ -372,7 +372,7 @@ end;
 
 procedure TDiocpUdpListener.DoRecv(pvRequest:TDiocpUdpRecvRequest);
 begin
-  FOwner.DoRecv(pvRequest);
+  if pvRequest.RecvBufferLen > 0 then FOwner.DoRecv(pvRequest);
   if FEnable then
   begin
     if pvRequest.PostRequest(pvRequest.FWSARecvBuffer.buf, pvRequest.FWSARecvBuffer.len) then
