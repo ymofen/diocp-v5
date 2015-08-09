@@ -69,6 +69,15 @@ object frmMain: TfrmMain
     TabOrder = 5
     OnClick = btnOpenClick
   end
+  object btnOpenASync: TButton
+    Left = 703
+    Top = 88
+    Width = 106
+    Height = 25
+    Caption = 'btnOpenASync'
+    TabOrder = 6
+    OnClick = btnOpenASyncClick
+  end
   object cdsMain: TClientDataSet
     Aggregates = <>
     Params = <>
