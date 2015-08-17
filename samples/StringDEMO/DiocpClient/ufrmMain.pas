@@ -54,6 +54,7 @@ begin
   inherited;
   sfLogger.setAppender(TStringsAppender.Create(mmoRecvMessage.Lines));
   sfLogger.AppendInMainThread := true;
+  TStringsAppender(sfLogger.Appender).MaxLines := 5000;
   FDiocpTcpClient := TDiocpTcpClient.Create(Self);
   FDiocpTcpClient.RegisterContextClass(TDiocpExRemoteContext);
   FDiocpContext :=TDiocpExRemoteContext(FDiocpTcpClient.Add);

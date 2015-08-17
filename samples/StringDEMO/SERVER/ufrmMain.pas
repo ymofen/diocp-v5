@@ -65,7 +65,8 @@ begin
 
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
   sfLogger.AppendInMainThread := true;
-
+  TStringsAppender(sfLogger.Appender).MaxLines := 5000;
+  
   FTcpServer := TDiocpStringTcpServer.Create(Self);
   FTcpServer.Name := 'iocpSVR';
   FTcpServer.OnContextStringAction := OnContextStringAction;

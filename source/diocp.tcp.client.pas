@@ -6,6 +6,8 @@
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
+ *   1. 修复ex.tcpclient编码问题，发送大数据时，无法解码的bug
+ *      2015-08-17 14:25:56
  *)
 unit diocp.tcp.client;
 
@@ -431,6 +433,9 @@ begin
   FCacheBuffer.AddBuffer(buf, len);
   while FCacheBuffer.validCount > 0 do
   begin
+    // 标记读取的开始位置，如果数据不够，进行恢复，以便下一次解码
+    FCacheBuffer.markReaderIndex;
+    
     if FStartBufferLen > 0 then
     begin
       // 不够数据，跳出
@@ -443,6 +448,8 @@ begin
         Exit;
       end else
       begin
+        FCacheBuffer.restoreReaderIndex;
+
         // 跳过开头标志
         FCacheBuffer.Skip(j + FStartBufferLen);
       end;
@@ -462,7 +469,8 @@ begin
       end;
       FCacheBuffer.Skip(FEndBufferLen);
     end else
-    begin
+    begin      // 没有结束符
+      FCacheBuffer.restoreReaderIndex;
       Break;
     end;
   end;                               

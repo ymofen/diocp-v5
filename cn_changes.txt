@@ -119,6 +119,7 @@ DIOCP-v5 0.0.2
 
 21. diocp.ex.httpServer初步完成Cookie和Session 2015-07-29 12:04:57
     
- 
+22. 修复ex.tcpclient, ex.tcpserver编码问题，发送大数据时，无法解码的bug
+    2015-08-17 14:25:56
  
  

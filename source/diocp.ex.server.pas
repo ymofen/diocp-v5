@@ -6,6 +6,9 @@
  *   1. 扩展服务器TDiocpExTcpServer, 可以定义开始标志和结束标志(也可以只设定结束标志)，然后自动进行解包触发OnContextDataAction事件。
  *   2. 字符串服务器TDiocpStringTcpServer, 可以设定开始字符串和结束字符串(也可以只设定结束字符串)，然后自动进行解包触发OnContextStringAction事件。
  *      2015-07-15 09:00:09
+ *
+ *   3. 修复ex.server编码问题，发送大数据时，无法解码的bug
+ *      2015-08-17 14:25:56
 
 *)
 unit diocp.ex.server;
@@ -145,6 +148,8 @@ begin
 
   while FCacheBuffer.validCount > 0 do
   begin
+    // 标记读取的开始位置，如果数据不够，进行恢复，以便下一次解码
+    FCacheBuffer.markReaderIndex;
     if lvStartDataLen > 0 then
     begin
       // 不够数据，跳出
@@ -163,7 +168,11 @@ begin
     end;
 
     // 不够数据，跳出
-    if FCacheBuffer.validCount < lvEndDataLen then Break;
+    if FCacheBuffer.validCount < lvEndDataLen then
+    begin
+      FCacheBuffer.restoreReaderIndex;
+      Break;
+    end;
 
     j := FCacheBuffer.SearchBuffer(lvEndData, lvEndDataLen);
     if j <> -1 then
@@ -173,7 +182,8 @@ begin
       OnDataAction(@FRecvData[0], j);
       FCacheBuffer.Skip(lvEndDataLen);
     end else
-    begin
+    begin      // 没有结束符
+      FCacheBuffer.restoreReaderIndex;
       Break;
     end;
   end;
