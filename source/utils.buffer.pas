@@ -1340,7 +1340,9 @@ begin
     FCurBlockPos := 0;
     if FCurBlock = FLast then
     begin
-      if FPosition + Count > FSize then
+      if Count > MPool.FBlockSize then //已经超过最后一块的大小
+        SetSize(FPosition + Count)
+      else if FPosition + Count > FSize then
         FSize := FPosition + Count;
     end;
   end;
@@ -1368,7 +1370,9 @@ begin
       FCurBlockPos := 0;
       if FCurBlock = FLast then
       begin
-        if FPosition + Count > FSize then
+        if Count > MPool.FBlockSize then //已经超过最后一块的大小
+          SetSize(FPosition + Count)
+        else if FPosition + Count > FSize then
           FSize := FPosition + Count;
       end;
     end;
