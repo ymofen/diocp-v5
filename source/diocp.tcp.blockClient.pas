@@ -117,7 +117,7 @@ end;
   // posix不知道是否有该函数
 {$ELSE}
 procedure RaiseLastOSErrorException(LastError: Integer);
-var
+var       // 高版本的 SOSError带3个参数
   Error: EOSError;
 begin
   if LastError <> 0 then
@@ -151,8 +151,12 @@ begin
   begin
     lvErrorCode := GetLastError;
     Disconnect;     // 出现异常后断开连接
-    RaiseLastOSErrorException(lvErrorCode);
 
+    {$if CompilerVersion < 23}
+    RaiseLastOSErrorException(lvErrorCode);
+    {$ELSE}
+    RaiseLastOSError(lvErrorCode);
+    {$ifend} 
   end;
   {$ENDIF}
 end;
