@@ -415,7 +415,10 @@ procedure TDiocpUdpListener.Start;
 begin
   FEnable := true;
   FRawSocket.CreateUdpOverlappedSocket();
-  FRawSocket.Bind(FHost, FPort);
+  if not FRawSocket.Bind(FHost, FPort) then
+  begin
+    RaiseLastOSError;
+  end;
 end;
 
 procedure TDiocpUdpListener.Stop;
