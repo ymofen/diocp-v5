@@ -82,6 +82,8 @@ type
     function selectSocket(vReadReady, vWriteReady, vExceptFlag: PBoolean;
         pvTimeOut: Integer = 0): Integer;
 
+    function Readable(pvTimeOut:Integer): Boolean;
+
     function SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
 
     function CancelIO: Boolean;
@@ -303,6 +305,19 @@ end;
 function TRawSocket.PeekBuf(var data; const len: Integer): Integer;
 begin
   Result := diocp.winapi.winsock2.recv(FSocketHandle, data, len, MSG_PEEK);
+end;
+
+function TRawSocket.Readable(pvTimeOut:Integer): Boolean;
+var
+  lvFDSet:TFDSet;
+  lvTime_val: TTimeval;
+begin
+  FD_ZERO(lvFDSet);
+  _FD_SET(FSocketHandle, lvFDSet);
+
+  lvTime_val.tv_sec := pvTimeOut div 1000;
+  lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
+  Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
 end;
 
 

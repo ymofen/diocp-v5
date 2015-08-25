@@ -67,6 +67,11 @@ type
     procedure Disconnect;
 
     /// <summary>
+    ///  是否可以接收数据,如果返回true， 代表可以执行RecvBuffer接收数据
+    /// </summary>
+    function CanRecvBuffer(pvTimeOut:Integer): Boolean;
+
+    /// <summary>
     ///  recv buffer
     /// </summary>
     procedure recv(buf: Pointer; len: cardinal);
@@ -129,6 +134,15 @@ begin
   raise Error;
 end;
 {$ENDIF}
+
+function TDiocpBlockTcpClient.CanRecvBuffer(pvTimeOut:Integer): Boolean;
+begin
+  {$IFDEF POSIX}
+  Result := FRawSocket.Readable(pvTimeout);
+  {$ELSE}
+  Result := FRawSocket.Readable(pvTimeout);
+  {$ENDIF}
+end;
 
 procedure TDiocpBlockTcpClient.CheckSocketResult(pvSocketResult: Integer);
 var
