@@ -1439,6 +1439,7 @@ begin
     Result := TDiocpHttpSession(FSessionList.ValueMap[pvSessionID]);
     if Result = nil then
     begin
+      if FSessionClass = nil then raise Exception.Create('尚未注册SessionClass, 不能获取Session');
       Result := FSessionClass.Create();
       FSessionList.ValueMap[pvSessionID] := Result;      
     end;
