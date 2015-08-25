@@ -8,6 +8,7 @@
 
 {$IFDEF DEBUG}
   {$DEFINE DEBUG_ON}
+  {$DEFINE WRITE_LOG}
 {$ENDIF}
 
 unit diocp.udp;
@@ -17,7 +18,7 @@ interface
 uses
   diocp.core.engine, Classes, SysUtils, diocp.core.rawWinSocket,
   diocp.winapi.winsock2, SyncObjs, Windows, utils.locker, utils.queues,
-  utils.hashs;
+  utils.hashs, utils.safeLogger, diocp.res;
 
 type
   /// <summary>
@@ -200,10 +201,15 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel: TLogLevel
+        = lgvMessage); overload;
+    procedure LogMessage(pvMsg: string; const args: array of const; pvMsgType:
+        string = ''; pvLevel: TLogLevel = lgvMessage); overload;
     procedure Stop();
     procedure Start();
 
-    procedure WSASendTo(const ToAddr: TSockAddrIn; buf: Pointer; len: Cardinal; CopyBuf: Boolean = true); overload;
+    function WSASendTo(const ToAddr: TSockAddrIn; buf: Pointer; len: Cardinal;
+        CopyBuf: Boolean = true): Boolean; overload;
 
     procedure WSASendTo(pvRemoteIP:String; pvRemotePort:Integer; buf: Pointer; len:
         Cardinal; CopyBuf: Boolean = true); overload;
@@ -218,6 +224,7 @@ type
   end;
 
 implementation
+
 
 constructor TDiocpUdp.Create(AOwner: TComponent);
 begin
@@ -277,6 +284,18 @@ begin
 
 end;
 
+procedure TDiocpUdp.LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel:
+    TLogLevel = lgvMessage);
+begin
+  sfLogger.logMessage(pvMsg, pvMsgType, pvLevel);
+end;
+
+procedure TDiocpUdp.LogMessage(pvMsg: string; const args: array of const;
+    pvMsgType: string = ''; pvLevel: TLogLevel = lgvMessage);
+begin
+  sfLogger.logMessage(pvMsg, args, pvMsgType, pvLevel);
+end;
+
 procedure TDiocpUdp.RegisterSessionClass(pvClass:TDiocpUdpSessionClass);
 begin
   FSessionClass := pvClass;
@@ -304,8 +323,8 @@ begin
   FIocpEngine.SafeStop(); 
 end;
 
-procedure TDiocpUdp.WSASendTo(const ToAddr: TSockAddrIn; buf: Pointer;
-  len: Cardinal; CopyBuf: Boolean);
+function TDiocpUdp.WSASendTo(const ToAddr: TSockAddrIn; buf: Pointer; len:
+    Cardinal; CopyBuf: Boolean = true): Boolean;
 var
   lvRequest:TDiocpUdpSendRequest;
 begin
@@ -314,7 +333,7 @@ begin
   lvRequest.FUdpOwner := Self;
   lvRequest.FWSAToAddr := ToAddr;
   lvRequest.SetBuffer(buf, len, CopyBuf);
-  lvRequest.PostRequest();
+  Result := lvRequest.PostRequest();
 end;
 
 procedure TDiocpUdp.WSASendTo(pvRemoteIP:String; pvRemotePort:Integer; buf:
@@ -506,7 +525,7 @@ begin
     begin
       FRequestState := rsNone;
       {$IFDEF WRITE_LOG}
-      FOwner.logMessage(strRecvPostError, [FListener.FRawSocket.SocketHandle, lvRet]);
+      FListener.Owner.LogMessage(strRecvPostError, [FListener.FRawSocket.SocketHandle, lvRet]);
       {$ENDIF}
     end else
     begin
@@ -593,7 +612,7 @@ begin
     begin
       FRequestState := rsNone;
       {$IFDEF WRITE_LOG}
-      FOwner.logMessage(strRecvPostError, [FSocket, lvRet]);
+      FUdpOwner.logMessage(strRecvPostError, [FSocket, lvRet]);
       {$ENDIF}
     end else
     begin
