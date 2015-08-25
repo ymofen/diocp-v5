@@ -18,6 +18,10 @@
   *   diocp.ex.httpServer初步完成Cookie和Session
   *
   *
+  *   2015-08-25 09:56:05
+  *   修正TDiocpHttpRequest回归对象池时，进行清理对象。避免残留多余的Cookie对象。(感谢阿木反馈bug)
+  *
+  *
 *)
 unit diocp.ex.httpServer;
 
@@ -1050,6 +1054,7 @@ end;
 
 destructor TDiocpHttpResponse.Destroy;
 begin
+  Clear;
   FreeAndNil(FData);
   FCookies.Free;
   inherited Destroy;
@@ -1450,6 +1455,7 @@ end;
 
 procedure TDiocpHttpServer.GiveBackRequest(pvRequest: TDiocpHttpRequest);
 begin
+  pvRequest.Clear;
   FRequestPool.EnQueue(pvRequest);
 end;
 
