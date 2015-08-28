@@ -4,14 +4,20 @@
  *     homePage: www.diocp.org
  *
  *
- *1. 2015年7月17日 15:01:12
- *    TBufferLink添加函数
+ *   1. 2015年7月17日 15:01:12
+ *      TBufferLink添加函数
  *     /// <summary>
  *    ///  从当前位置开始搜索Buffer
  *    ///   返回搜索到subBuf的起始位置
  *    ///   如果搜索不到返回-1
  *    /// </summary>
  *    function SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal): Integer;
+ *
+ *  2 . 修正TDiocpExTcpServer和TDiocpExTcpClient的一处解码严重bug(谢谢 沈阳-想  14667479反馈和提供有缺陷的DEMO)
+ *     修正了SearchBuffer中用于搜索数据的函数SearchPointer bug，
+ *     由于没有赋值j = pvStartIndex导致判断 j < sourcelen时，会出现超越内存块搜寻。导致搜寻了无效的数据。
+ *     2015-08-28 14:06:14
+
  *
  *)
 
@@ -159,6 +165,7 @@ type
     ///  从当前位置开始搜索Buffer
     ///   返回搜索到subBuf的起始位置
     ///   如果搜索不到返回-1
+    ///
     /// </summary>
     function SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal): Integer;
 
@@ -263,6 +270,7 @@ var
 /// </returns>
 /// <param name="pvSource"> 数据 </param>
 /// <param name="pvSourceLen"> 数据长度 </param>
+/// <param name="pvStartIndex"> 开始位置0开始 </param>
 /// <param name="pvSub"> 查找的数据 </param>
 /// <param name="pvSubLen"> 查找的数据长度 </param>
 function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
@@ -276,12 +284,12 @@ begin
   else
   begin
     Result := nil;
-    j := 0;
+    j := pvStartIndex;   // 开始位置
     lvTempP := PByte(pvSource);
     Inc(lvTempP, pvStartIndex);
 
     lvTempPSub := PByte(pvSub);
-    while j<pvSourceLen do
+    while j<pvSourceLen do          // 小于原长度进行搜索
     begin
       if lvTempP^ = lvTempPSub^ then
       begin
