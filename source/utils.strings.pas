@@ -684,7 +684,7 @@ begin
   else
   begin
     Result := nil;
-    j := 0;
+    j := pvStartIndex;
     lvTempP := PByte(pvSource);
     Inc(lvTempP, pvStartIndex);
 
