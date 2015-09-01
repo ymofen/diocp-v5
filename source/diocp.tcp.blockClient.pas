@@ -25,6 +25,7 @@ uses
   , diocp.core.rawPosixSocket
   {$ELSE}
   , diocp.core.rawWinSocket
+  , diocp.winapi.winsock2
   {$ENDIF}
 
   ,Classes
@@ -119,8 +120,10 @@ begin
 end;
 
 {$IFDEF POSIX}
-  // posix不知道是否有该函数
+  ;
 {$ELSE}
+// <2007版本的Windows平台使用
+//   SOSError = 'System Error.  Code: %d.'+sLineBreak+'%s';
 procedure RaiseLastOSErrorException(LastError: Integer);
 var       // 高版本的 SOSError带3个参数
   Error: EOSError;
@@ -161,7 +164,7 @@ begin
      end;
    end;
   {$ELSE}
-  if (pvSocketResult = -1) then
+  if (pvSocketResult = SOCKET_ERROR) then
   begin
     lvErrorCode := GetLastError;
     Disconnect;     // 出现异常后断开连接

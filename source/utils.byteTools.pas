@@ -13,15 +13,15 @@ unit utils.byteTools;
 interface
 
 uses
-  SysUtils;
+  SysUtils, Classes;
 
 type
   {$IF RTLVersion<25}
   IntPtr=Integer;
   {$IFEND IntPtr}
-  
+
   TByteTools = class(TObject)
-  public   
+  public
      class function varToByteString(const v; len: Cardinal; Split: string = ' '):
          String;
 
@@ -57,6 +57,16 @@ type
      ///   高低位进行交换
      /// </summary>
      class function swap16(const v):Word;
+
+     /// <summary>
+     ///   生成数据校验码
+     /// </summary>
+     class function verifyData(const buf; len:Cardinal): Cardinal;
+
+     /// <summary>
+     ///  生成数据校验码
+     /// </summary>
+     class function verifyStream(pvStream:TStream; len:Cardinal): Cardinal;
   end;
 
 implementation
@@ -170,6 +180,51 @@ begin
     Inc(lvSource);
   end;
   
+end;
+
+class function TByteTools.verifyData(const buf; len: Cardinal): Cardinal;
+var
+  i:Cardinal;
+  p:PByte;
+begin
+  i := 0;
+  Result := 0;
+  p := PByte(@buf);
+  while i < len do
+  begin
+    Result := Result + p^;
+    Inc(p);
+    Inc(i);
+  end;
+end;
+
+class function TByteTools.verifyStream(pvStream:TStream; len:Cardinal):
+    Cardinal;
+var
+  l, j:Cardinal;
+  lvBytes:TBytes;
+begin
+  SetLength(lvBytes, 1024);
+
+  if len = 0 then
+  begin
+    j := pvStream.Size - pvStream.Position;
+  end else
+  begin
+    j := len;
+  end;
+
+  Result := 0;
+
+  while j > 0 do
+  begin
+    if j <1024 then l := j else l := 1024;
+
+    pvStream.ReadBuffer(lvBytes[0], l);
+
+    Result := Result + verifyData(lvBytes[0], l);
+    Dec(j, l);
+  end;
 end;
 
 end.
