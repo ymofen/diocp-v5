@@ -157,7 +157,7 @@ type
   private
     ///异步任务投递对象池
     FTaskObjectPool: TBaseQueue;
-  protected
+
     FInnerEncoder: TIOCPEncoder;
     FInnerDecoder: TIOCPDecoder;
 
