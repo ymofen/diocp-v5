@@ -39,6 +39,8 @@ constructor TRemoteServerDIOCPImpl.Create;
 begin
   inherited Create;
   FTcpClient := TDiocpBlockTcpClient.Create(nil);
+  FTcpClient.ReadTimeOut := 1000 * 60 * 11;  // …Ë÷√≥¨ ±µ»¥˝
+  
   FCoderSocket := TRawTcpClientCoderImpl.Create(FTcpClient);
   
   FMsgPack := TSimpleMsgPack.Create;

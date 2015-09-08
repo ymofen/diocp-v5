@@ -579,6 +579,12 @@ procedure TDiocpUdpSendRequest.HandleResponse;
 begin
   inherited;
   FRequestState := rsResponding;
+  if FErrorCode <> 0 then
+  begin
+    {$IFDEF WRITE_LOG}
+    FUdpOwner.logMessage(strRecvError, [FSocket, FErrorCode]);
+    {$ENDIF}
+  end;
 
   FUdpOwner.ReleaseSendRequest(Self);
 end;
