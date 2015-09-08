@@ -91,7 +91,6 @@ type
 
     function incReferenceCounter(pvDebugInfo: string; pvObj: TObject): Boolean;
 
-    procedure RequestDisconnect(pvDebugInfo: string = ''; pvObj: TObject = nil);
   private
     FAlive:Boolean;
 
@@ -250,6 +249,7 @@ type
     /// </summary>
     function PostWSASendRequest(buf: Pointer; len: Cardinal; pvBufReleaseType:
         TDataReleaseType): Boolean; overload;
+    procedure RequestDisconnect(pvDebugInfo: string = ''; pvObj: TObject = nil);
     procedure SetMaxSendingQueueSize(pvSize:Integer);
 
     property Active: Boolean read FActive;
@@ -1314,8 +1314,8 @@ begin
 
 end;
 
-procedure TDiocpCustomContext.RequestDisconnect(pvDebugInfo: string = ''; pvObj:
-    TObject = nil);
+procedure TDiocpCustomContext.RequestDisconnect(pvDebugInfo: string = '';
+    pvObj: TObject = nil);
 var
   lvCloseContext:Boolean;
 begin
