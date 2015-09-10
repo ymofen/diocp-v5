@@ -80,8 +80,8 @@ type
     destructor Destroy;override;
     procedure Lock; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
     procedure Unlock; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
-    function GetMemory(Zero: Boolean): Pointer;
-    procedure FreeMemory(P: Pointer);
+    function GetMemory(Zero: Boolean): Pointer;deprecated;
+    procedure FreeMemory(P: Pointer);deprecated;
 
     function GetMemoryBlock: PMemoryBlock;
     procedure FreeMemoryBlock(p: PMemoryBlock);
@@ -477,6 +477,13 @@ begin
     begin
       if PBlock^.Memory = p then
       begin
+        //先判定是否是头
+        if pBlock = FUseHead then
+        begin
+          FUseHead := pBlock^.Next;
+          if FUseHead <> nil then
+            FUseHead^.Prev := nil;
+        end;
         if PBlock^.Prev <> nil then
           PBlock^.Prev^.Next := PBlock^.Next;
         if FUseLast = pBlock then
