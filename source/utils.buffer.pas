@@ -276,7 +276,7 @@ var
 function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
     pvSub: Pointer; pvSubLen: Integer): Pointer;
 var
-  I, j, l: Integer;
+  I, j: Integer;
   lvTempP, lvTempPSub, lvTempP2, lvTempPSub2:PByte;
 begin
   if (pvSub = nil) then
