@@ -182,10 +182,14 @@ begin
     raise Exception.CreateFmt('远程文件[%s]不存在!', [pvRFile]);
   end;
 
-  lvLocalCheckSum := CheckSumAFile(pvLocalFile);
-  if lvCheckSum = lvLocalCheckSum then
+  lvCheckSum := FFileCheckSum;
+  if lvCheckSum <> 0 then      // 服务端支持crc数据
   begin
-    Exit;
+    lvLocalCheckSum := ChecksumAFile(pvLocalFile);
+    if lvCheckSum = lvLocalCheckSum then
+    begin          // 和本地文件一致
+      Exit;
+    end;
   end;
         
   //将文件分段下载<每段固定大小>
