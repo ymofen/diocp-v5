@@ -120,7 +120,7 @@ begin
 end;
 
 {$IFDEF POSIX}
-  ;
+
 {$ELSE}
 // <2007版本的Windows平台使用
 //   SOSError = 'System Error.  Code: %d.'+sLineBreak+'%s';
