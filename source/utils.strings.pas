@@ -12,7 +12,9 @@
  *   2015-04-02 12:52:43
  *     修复SplitStrings,分隔符最后一个字符串没有加入的bug  abcd&33&eef
  *       感谢(Xjumping  990669769)反馈bug
- *
+
+ *  修正SearchPointer中的一严重bug(只比较了前两位字符的匹配性)
+      2015-09-11 09:08:22
  *)
  
 unit utils.strings;
@@ -676,7 +678,7 @@ end;
 function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
     pvSub: Pointer; pvSubLen: Integer): Pointer;
 var
-  I, j, l: Integer;
+  I, j: Integer;
   lvTempP, lvTempPSub, lvTempP2, lvTempPSub2:PByte;
 begin
   if (pvSub = nil) then
@@ -693,17 +695,25 @@ begin
     begin
       if lvTempP^ = lvTempPSub^ then
       begin
-        I := 1;     // 从后面第二个字符开始对比
-        lvTempP2 := lvTempP;
-        Inc(lvTempP2);
 
+
+        // 临时指针，避免移动顺序比较指针
+        lvTempP2 := lvTempP;
+        Inc(lvTempP2);    // 移动到第二位(前一个已经进行了比较
+        I := 1;           // 初始化计数器(从后面第二个字符开始对比)
+
+        // 临时比较字符指针
         lvTempPSub2 := lvTempPSub;
-        Inc(lvTempPSub2);
+        Inc(lvTempPSub2);  // 移动到第二位(前一个已经进行了比较
+
         while (I < pvSubLen) do
         begin
           if lvTempP2^ = lvTempPSub2^ then
-            Inc(I)
-          else
+          begin
+            Inc(I);
+            inc(lvTempP2);   // 移动到下一位进行比较
+            inc(lvTempPSub2);
+          end else
             Break;
         end;
 

@@ -127,6 +127,8 @@ DIOCP-v5 0.0.2
      由于没有赋值j = pvStartIndex导致判断 j < sourcelen时，会出现超越内存块搜寻。导致搜寻了无效的数据。
      2015-08-28 14:06:14
 
-
+24. 修正SearchBuffer中的一严重bug(只比较了前两位字符的匹配性)
+    影响范围: doicp.ex.tcpClient.pas, diocp.ex.tcpserver.pas, utils.buffer.pas, utils.strings.pas
+     2015-09-10 20:10:41
  
  

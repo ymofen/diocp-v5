@@ -18,6 +18,9 @@
  *     由于没有赋值j = pvStartIndex导致判断 j < sourcelen时，会出现超越内存块搜寻。导致搜寻了无效的数据。
  *     2015-08-28 14:06:14
 
+ * 3. 修正SearchBuffer中的一严重bug(只比较了前两位字符的匹配性)
+      2015-09-11 09:08:22
+
  *
  *)
 
@@ -163,9 +166,9 @@ type
 
     /// <summary>
     ///  从当前位置开始搜索Buffer
-    ///   返回搜索到subBuf的起始位置
+    ///   返回搜索到subBuf的起始位置到当前读取位置直接的字符个数
     ///   如果搜索不到返回-1
-    ///
+    ///   searchbuffer('12', '1234') = 0;
     /// </summary>
     function SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal): Integer;
 
@@ -284,26 +287,34 @@ begin
   else
   begin
     Result := nil;
-    j := pvStartIndex;   // 开始位置
+    j := pvStartIndex;
     lvTempP := PByte(pvSource);
     Inc(lvTempP, pvStartIndex);
 
     lvTempPSub := PByte(pvSub);
-    while j<pvSourceLen do          // 小于原长度进行搜索
+    while j<pvSourceLen do
     begin
       if lvTempP^ = lvTempPSub^ then
       begin
-        I := 1;     // 从后面第二个字符开始对比
-        lvTempP2 := lvTempP;
-        Inc(lvTempP2);
 
+
+        // 临时指针，避免移动顺序比较指针
+        lvTempP2 := lvTempP;
+        Inc(lvTempP2);    // 移动到第二位(前一个已经进行了比较
+        I := 1;           // 初始化计数器(从后面第二个字符开始对比)
+
+        // 临时比较字符指针
         lvTempPSub2 := lvTempPSub;
-        Inc(lvTempPSub2);
+        Inc(lvTempPSub2);  // 移动到第二位(前一个已经进行了比较
+
         while (I < pvSubLen) do
         begin
           if lvTempP2^ = lvTempPSub2^ then
-            Inc(I)
-          else
+          begin
+            Inc(I);
+            inc(lvTempP2);   // 移动到下一位进行比较
+            inc(lvTempPSub2);
+          end else
             Break;
         end;
 
