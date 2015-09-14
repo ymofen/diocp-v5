@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 59
     Width = 812
     Height = 396
-    ActivePage = tsOperator
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -38,6 +38,10 @@ object frmMain: TfrmMain
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0

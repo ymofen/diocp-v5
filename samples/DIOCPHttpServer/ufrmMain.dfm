@@ -2,7 +2,7 @@ object frmMain: TfrmMain
   Left = 391
   Top = 275
   BorderIcons = [biSystemMenu]
-  Caption = 'diocp3 http server'
+  Caption = 'diocp-v5 http server'
   ClientHeight = 387
   ClientWidth = 661
   Color = clBtnFace
@@ -38,6 +38,10 @@ object frmMain: TfrmMain
     object TabSheet2: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -50,6 +54,10 @@ object frmMain: TfrmMain
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object btn1: TButton
         Left = 176
         Top = 88

@@ -330,7 +330,6 @@ end;
 function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;
     endBufLen: Integer): Integer;
 var
-  lvRecvByte:byte;
   lvRet, j:Integer;
   lvTempEndBuf:PAnsiChar;
   lvMatchCounter:Integer;

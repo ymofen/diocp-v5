@@ -55,14 +55,14 @@ resourcestring
   strState_Off         = '服务状态: 关闭';
   strRecv_SizeInfo     = '接收数据: %s';
   strSend_SizeInfo     = '发送数据: %s';
-  strRecv_PostInfo     = '接收信息: 投递:%d, 回应:%d, 剩余:%d';  //post:%d, response:%d, remain:%d
-  strSend_Info         = '发送信息: 投递:%d, 回应:%d, 剩余:%d';  //post:%d, response:%d, remain:%d
+  strRecv_PostInfo     = '接收信息: 投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
+  strSend_Info         = '发送信息: 投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
   strSendQueue_Info    = '发送队列: 压入/弹出/完成/终止:%d, %d, %d, %d';//push/pop/complted/abort:%d, %d, %d, %d
   strSendRequest_Info  = '发送对象: 创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
   strAcceptEx_Info     = 'AcceptEx: 投递:%d, 回应:%d';      //'post:%d, response:%d'
   strSocketHandle_Info = '套接字句柄: 创建:%d, 销毁:%d';  //'create:%d, destroy:%d'
   strContext_Info      = '连接对象: 创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
-  strOnline_Info       = '在线信息: %d';
+  strOnline_Info       = '在线信息: %d(max.%d)';
   strWorkers_Info      = '工作线程: %d';
   strRunTime_Info      = '运行信息: %s';
   /// =========== 服务端状态信息============

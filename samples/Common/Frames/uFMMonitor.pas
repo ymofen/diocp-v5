@@ -75,8 +75,8 @@ resourcestring
   strState_MonitorNull = '没有创建监控器';
   strState_ObjectNull  = '没有监控对象';    //'iocp server is null'
   strState_Off         = '关闭';
-  strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d';  //post:%d, response:%d, remain:%d
-  strSend_Info         = '投递:%d, 回应:%d, 剩余:%d';  //post:%d, response:%d, remain:%d
+  strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
+  strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
   strSendQueue_Info    = '压入/弹出/完成/终止:%d, %d, %d, %d';//push/pop/complted/abort:%d, %d, %d, %d
   strSendRequest_Info  = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
   strAcceptEx_Info     = '创建:%d, 投递:%d, 回应:%d';      //'post:%d, response:%d'
@@ -196,13 +196,20 @@ begin
     lblsvrState.Caption := strState_Off;
   end;
 
+  // 统计速度信息
+  FIocpTcpServer.DataMoniter.SpeedCalcuEnd();
+
+  // 开始记录
+  FIocpTcpServer.DataMoniter.SpeedCalcuStart();
+
 
   lblPostRecvINfo.Caption :=   Format(strRecv_PostInfo,
      [
        FIocpTcpServer.DataMoniter.PostWSARecvCounter,
        FIocpTcpServer.DataMoniter.ResponseWSARecvCounter,
        FIocpTcpServer.DataMoniter.PostWSARecvCounter -
-       FIocpTcpServer.DataMoniter.ResponseWSARecvCounter
+       FIocpTcpServer.DataMoniter.ResponseWSARecvCounter,
+       FIocpTcpServer.DataMoniter.Speed_WSARecvResponse
      ]
     );
 
@@ -221,7 +228,8 @@ begin
      [
        FIocpTcpServer.DataMoniter.PostWSASendCounter,
        FIocpTcpServer.DataMoniter.ResponseWSASendCounter,
-       FIocpTcpServer.DataMoniter.PostWSASendCounter - FIocpTcpServer.DataMoniter.ResponseWSASendCounter
+       FIocpTcpServer.DataMoniter.PostWSASendCounter - FIocpTcpServer.DataMoniter.ResponseWSASendCounter,
+       FIocpTcpServer.DataMoniter.Speed_WSASendResponse
      ]
     );
 
@@ -265,11 +273,10 @@ begin
        FIocpTcpServer.DataMoniter.ContextOutCounter,
        FIocpTcpServer.DataMoniter.ContextReturnCounter
 
-
      ]
     );
 
-  lblOnlineCounter.Caption := Format('%d', [FIocpTcpServer.ClientCount]);
+  lblOnlineCounter.Caption := Format('%d(max.:%d)', [FIocpTcpServer.ClientCount, FIocpTcpServer.DataMoniter.MaxOnlineCount]);
   
   lblWorkerCount.Caption := Format('%d', [FIocpTcpServer.WorkerCount]);
 

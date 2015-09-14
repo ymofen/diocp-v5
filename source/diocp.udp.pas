@@ -99,7 +99,7 @@ type
     procedure HandleResponse; override;
   public
 
-    function PostRequest(pvBlockSize:Integer): Boolean; overload;
+    function PostRequest(pvBlockSize: Cardinal): Boolean; overload;
 
     procedure SendResponse(pvBuffer:PAnsiChar; pvBufferLen:Cardinal; pvCopyBuf:
         Boolean = True);
@@ -475,7 +475,7 @@ begin
   Result := FListener.Owner.GetSession(lvSessionID);
 end;
 
-function TDiocpUdpRecvRequest.PostRequest(pvBlockSize:Integer): Boolean;
+function TDiocpUdpRecvRequest.PostRequest(pvBlockSize: Cardinal): Boolean;
 begin
   if FInnerBuffer.len <> pvBlockSize then
   begin
@@ -496,10 +496,9 @@ end;
 function TDiocpUdpRecvRequest.PostRequest(pvBuffer: PAnsiChar; pvBufferLen:
     Cardinal): Boolean;
 var
-  lvRet, lvDNACounter:Integer;
+  lvRet:Integer;
   lpNumberOfBytesRecvd: Cardinal;
 begin
-  Result := False;
   lpNumberOfBytesRecvd := 0;
   FWSARecvdFlag := 0;
   FWSAFromLen := SizeOf(FWSARecvFrom);
@@ -591,10 +590,9 @@ end;
 
 function TDiocpUdpSendRequest.PostRequest: Boolean;
 var
-  lvRet, lvDNACounter:Integer;
+  lvRet:Integer;
   lpNumberOfBytesRecvd: Cardinal;
 begin
-  Result := False;
   lpNumberOfBytesRecvd := 0;
   FWSASendFlag := 0;
   FWSAToAddrLen := SizeOf(FWSAToAddr);

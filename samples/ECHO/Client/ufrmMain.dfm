@@ -70,10 +70,18 @@ object frmMain: TfrmMain
     object tsMonitor: TTabSheet
       Caption = 'tsMonitor'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
     end
     object tsOperator: TTabSheet
       Caption = 'tsOperator'
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoData: TMemo
         Left = 3
         Top = 3

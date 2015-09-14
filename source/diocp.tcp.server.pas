@@ -615,6 +615,27 @@ type
   /// </summary>
   TIocpDataMonitor = class(TObject)
   private
+    // 记录开始时间点
+    FLastSpeedTick : Cardinal;
+    
+    // 记录开始时间点_数据
+    FLastSpeed_WSASendResponse: Int64;
+    FLastSpeed_WSARecvResponse: Int64;
+
+    // 已发送字节
+    FLastSpeed_WSASentSize    : Int64;
+    // 已接收字节
+    FLastSpeed_RecvSize       : Int64;
+
+    // 速度信息
+    FSpeed_WSASendResponse    : Int64;
+    FSpeed_WSARecvResponse    : Int64;
+    FSpeed_WSASentSize        : Int64;
+    FSpeed_WSARecvSize        : Int64;
+
+    // 最高在线数量
+    FMaxOnlineCount:Integer;
+
     FSentSize:Int64;
     FRecvSize:Int64;
     FPostWSASendSize: Int64;
@@ -673,6 +694,22 @@ type
 
     procedure Clear;
 
+    /// <summary>
+    ///  开始统计速度
+    ///  记录当前信息
+    /// </summary>
+    procedure SpeedCalcuStart;
+
+    /// <summary>
+    ///   统计数据，计算时间信息
+    /// </summary>
+    procedure SpeedCalcuEnd;
+
+    /// <summary>
+    ///   计算最高在线数量
+    /// </summary>
+    procedure CalcuMaxOnlineCount(pvOnlineCount:Integer);
+
     property AcceptExObjectCounter: Integer read FAcceptExObjectCounter;
     property ContextCreateCounter: Integer read FContextCreateCounter;
     property ContextOutCounter: Integer read FContextOutCounter;
@@ -680,6 +717,7 @@ type
     property HandleCreateCounter: Integer read FHandleCreateCounter;
     property HandleDestroyCounter: Integer read FHandleDestroyCounter;
     property Locker: TCriticalSection read FLocker;
+    property MaxOnlineCount: Integer read FMaxOnlineCount;
     property PushSendQueueCounter: Integer read FPushSendQueueCounter;
     property PostSendObjectCounter: Integer read FPostSendObjectCounter;
     property ResponseSendObjectCounter: Integer read FResponseSendObjectCounter;
@@ -700,6 +738,8 @@ type
     property SendRequestOutCounter: Integer read FSendRequestOutCounter;
     property SendRequestReturnCounter: Integer read FSendRequestReturnCounter;
     property SentSize: Int64 read FSentSize;
+    property Speed_WSARecvResponse: Int64 read FSpeed_WSARecvResponse;
+    property Speed_WSASendResponse: Int64 read FSpeed_WSASendResponse;
   end;
 
   {$IF RTLVersion>22}
@@ -1815,9 +1855,15 @@ begin
   FLocker.lock('AddToOnlineList');
   try
     FOnlineContextList.Add(pvObject.FSocketHandle, pvObject);
+    if DataMoniter <> nil then
+    begin
+      DataMoniter.CalcuMaxOnlineCount(FOnlineContextList.Count);
+    end;
   finally
     FLocker.unLock;
-  end; 
+  end;
+
+
 end;
 
 function TDiocpTcpServer.checkClientContextValid(const pvClientContext: TIocpClientContext): Boolean;
@@ -2502,7 +2548,8 @@ begin
            DataMoniter.PostWSARecvCounter,
            DataMoniter.ResponseWSARecvCounter,
            DataMoniter.PostWSARecvCounter -
-           DataMoniter.ResponseWSARecvCounter
+           DataMoniter.ResponseWSARecvCounter,
+           DataMoniter.Speed_WSARecvResponse
          ]
         ));
 
@@ -2523,6 +2570,7 @@ begin
          DataMoniter.PostWSASendCounter,
          DataMoniter.ResponseWSASendCounter,
          DataMoniter.PostWSASendCounter -
+         DataMoniter.ResponseWSASendCounter,
          DataMoniter.ResponseWSASendCounter
        ]
       ));
@@ -2568,7 +2616,7 @@ begin
        ]
       ));
 
-    lvStrings.Add(Format(strOnline_Info, [ClientCount]));
+    lvStrings.Add(Format(strOnline_Info, [ClientCount, DataMoniter.FMaxOnlineCount]));
   
     lvStrings.Add(Format(strWorkers_Info, [WorkerCount]));
 
@@ -3458,6 +3506,11 @@ begin
   Result := @FWSABuf;
 end;
 
+procedure TIocpDataMonitor.CalcuMaxOnlineCount(pvOnlineCount: Integer);
+begin
+  if pvOnlineCount > FMaxOnlineCount then FMaxOnlineCount := pvOnlineCount;
+end;
+
 procedure TIocpDataMonitor.Clear;
 begin
   FLocker.Enter;
@@ -3579,6 +3632,33 @@ begin
   finally
     FLocker.Leave;
   end;
+end;
+
+procedure TIocpDataMonitor.SpeedCalcuEnd;
+var
+  lvTick:Cardinal;
+  lvSec:Double;
+begin
+  if FLastSpeedTick = 0 then exit;
+
+  lvTick := tick_diff(FLastSpeedTick, GetTickCount);
+  if lvTick = 0 then Exit;
+
+  lvSec := (lvTick / 1000.000);
+  if lvSec = 0 then Exit;
+
+  FSpeed_WSASendResponse := Trunc((FResponseWSASendCounter - FLastSpeed_WSASendResponse) / lvSec);
+
+
+  FSpeed_WSARecvResponse := Trunc((self.FResponseWSARecvCounter - FLastSpeed_WSARecvResponse) / lvSec);
+
+end;
+
+procedure TIocpDataMonitor.SpeedCalcuStart;
+begin
+  FLastSpeedTick := GetTickCount;
+  FLastSpeed_WSASendResponse := FResponseWSASendCounter;
+  FLastSpeed_WSARecvResponse := FResponseWSARecvCounter;
 end;
 
 { TIocpDisconnectExRequest }

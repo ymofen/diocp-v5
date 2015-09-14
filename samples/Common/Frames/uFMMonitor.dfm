@@ -209,7 +209,7 @@ object FMMonitor: TFMMonitor
   object lblFirstRunTime: TLabel
     Left = 296
     Top = 16
-    Width = 121
+    Width = 72
     Height = 13
     Caption = 'lblFirstRunTime'
   end
