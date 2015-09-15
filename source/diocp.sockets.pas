@@ -252,6 +252,9 @@ type
     procedure RequestDisconnect(pvDebugInfo: string = ''; pvObj: TObject = nil);
     procedure SetMaxSendingQueueSize(pvSize:Integer);
 
+    /// <summary>
+    ///  是否已经连接
+    /// </summary>
     property Active: Boolean read FActive;
 
     property Data: Pointer read FData write FData;

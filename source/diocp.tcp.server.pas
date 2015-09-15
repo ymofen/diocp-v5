@@ -2571,7 +2571,7 @@ begin
          DataMoniter.ResponseWSASendCounter,
          DataMoniter.PostWSASendCounter -
          DataMoniter.ResponseWSASendCounter,
-         DataMoniter.ResponseWSASendCounter
+         DataMoniter.Speed_WSASendResponse
        ]
       ));
 
