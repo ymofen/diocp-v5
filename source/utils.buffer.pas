@@ -125,6 +125,7 @@ type
     procedure SaveCurBlock;
     procedure RestoreCurBlock;
     procedure LinkToBufferList(BufList: TBufferLink);
+    procedure ReadToBufferList(BufList: TBufferLink;Len: Integer);
     procedure SwapBufferBlock(Stream: TDxMemoryStream); //交换内部连接
     procedure LoadFromBufferList(BufList: TBufferLink;const DataLen: Integer);
     procedure WriteStream(Stream: TStream;Len: Integer);
@@ -985,6 +986,75 @@ begin
       else
       begin
         Stream.WriteBuffer(FCurBlock^.Memory^,Len);
+        Inc(FPosition,Len);
+        FCurBlockPos := Len;
+        Len := 0;
+      end;
+      if FCurBlockPos = MPool.FBlockSize then
+      begin
+        FCurBlock := FCurBlock^.NextEx;
+        FCurBlockPos := 0;
+      end;
+    end;
+  end;
+end;
+
+procedure TDxMemoryStream.ReadToBufferList(BufList: TBufferLink; Len: Integer);
+var
+  MPool: TDxMemoryPool;
+  pBuf: Pointer;
+begin
+  if FCurBlock <> nil then
+  begin
+    case FMemBlockType of
+      MB_Small: MPool := SmallMemoryPool;
+      MB_Normal: MPool := MemoryPool;
+      MB_SpBig: MPool := SuperMemoryPool;
+      MB_Large: MPool := LargeMemoryPool;
+      MB_SPLarge: MPool := SuperLargeMemoryPool;
+      MB_Max: MPool := MaxMemoryPool;
+      else MPool := BigMemoryPool;
+    end;
+    if FPosition + Len > FSize then
+      Len := FSize - FPosition;
+    //先读取当前块剩下的区域
+    pBuf := Pointer(NativeUInt(FCurBlock^.Memory) + DWORD(FCurBlockPos));
+    if Len <= MPool.FBlockSize - FCurBlockPos then //足够写了
+    begin
+      BufList.AddBuffer(PBuf,Len);
+      Inc(FPosition,Len);
+      inc(FCurBlockPos,Len);
+      Len := 0;
+    end
+    else
+    begin
+      BufList.AddBuffer(PBuf,MPool.FBlockSize - FCurBlockPos);
+      Dec(Len,MPool.FBlockSize - FCurBlockPos);
+      Inc(FPosition,MPool.FBlockSize - FCurBlockPos);
+      FCurBlock := FCurBlock^.NextEx;
+      FCurBlockPos := 0;
+
+      if FCurBlock = FLast then
+      begin
+        if Len > MPool.FBlockSize then//最后一块，并且超过了块大小
+          SetSize(FPosition + Len)
+        else if FPosition + Len > FSize then
+          FSize := FPosition + Len;
+      end;
+    end;
+
+    while Len > 0 do
+    begin
+      if Len > MPool.FBlockSize then
+      begin
+        BufList.AddBuffer(FCurBlock^.Memory,MPool.FBlockSize);
+        Dec(Len,MPool.FBlockSize);
+        FCurBlockPos := MPool.FBlockSize;
+        Inc(FPosition,MPool.FBlockSize);
+      end
+      else
+      begin
+        BufList.AddBuffer(FCurBlock^.Memory,Len);
         Inc(FPosition,Len);
         FCurBlockPos := Len;
         Len := 0;
