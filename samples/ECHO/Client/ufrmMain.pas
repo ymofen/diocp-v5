@@ -23,10 +23,12 @@ type
     btnCreate: TButton;
     edtCount: TEdit;
     chkSendData: TCheckBox;
+    btnFill1K: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnCreateClick(Sender: TObject);
+    procedure btnFill1KClick(Sender: TObject);
     procedure chkSendDataClick(Sender: TObject);
   private
     FSendDataOnConnected:Boolean;
@@ -133,6 +135,15 @@ begin
     lvClient.connectASync;
   end;
 
+end;
+
+procedure TfrmMain.btnFill1KClick(Sender: TObject);
+var
+  s:AnsiString;
+begin
+  SetLength(s, 1024);
+  FillChar(PAnsiChar(s)^, 1024, 'a');
+  mmoData.Lines.Text :=  s;
 end;
 
 procedure TfrmMain.chkSendDataClick(Sender: TObject);
