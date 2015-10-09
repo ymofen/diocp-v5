@@ -52,7 +52,7 @@ object frmMain: TfrmMain
     Top = 56
     Width = 795
     Height = 292
-    ActivePage = TabSheet1
+    ActivePage = tsOperator
     TabOrder = 4
     object TabSheet1: TTabSheet
       Caption = 'TabSheet1'
@@ -70,18 +70,10 @@ object frmMain: TfrmMain
     object tsMonitor: TTabSheet
       Caption = 'tsMonitor'
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
     end
     object tsOperator: TTabSheet
       Caption = 'tsOperator'
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoData: TMemo
         Left = 3
         Top = 3
@@ -90,6 +82,15 @@ object frmMain: TfrmMain
         Lines.Strings = (
           '0123456789')
         TabOrder = 0
+      end
+      object btnFill1K: TButton
+        Left = 459
+        Top = 3
+        Width = 75
+        Height = 25
+        Caption = 'btnFill1K'
+        TabOrder = 1
+        OnClick = btnFill1KClick
       end
     end
   end

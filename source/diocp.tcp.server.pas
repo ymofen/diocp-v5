@@ -1011,6 +1011,9 @@ type
     property OnContextAccept: TOnContextAcceptEvent read FOnContextAccept write
         FOnContextAccept;
 
+    /// <summary>
+    ///  响应发送完成事件
+    /// </summary>
     property OnSendRequestResponse: TOnSendRequestResponse read
         FOnSendRequestResponse write FOnSendRequestResponse;
 
