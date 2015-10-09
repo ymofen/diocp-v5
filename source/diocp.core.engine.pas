@@ -796,7 +796,7 @@ begin
   inherited Create;
   FWorkerLocker := TIocpLocker.Create;
 
-  FWorkerCount := GetCPUCount shl 2 - 1;
+  FWorkerCount := GetCPUCount shl 1 - 1;
   FWorkerList := TList.Create();
   FIocpCore := TIocpCore.Create;
   FIocpCore.doInitialize;
