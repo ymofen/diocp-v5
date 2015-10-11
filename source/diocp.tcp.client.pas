@@ -124,6 +124,11 @@ type
     destructor Destroy; override;
   public
     /// <summary>
+    ///   清理Add创建的所有连接
+    /// </summary>
+    procedure ClearContexts;
+
+    /// <summary>
     ///   添加一个连对象
     /// </summary>
     function Add: TIocpRemoteContext;
@@ -307,6 +312,12 @@ begin
       TDiocpTcpClient(Owner).PostReconnectRequestEvent(Self);
     end;
   end;
+end;
+
+procedure TDiocpTcpClient.ClearContexts;
+begin
+  FReconnectRequestPool.WaitFor(20000);
+  FList.Clear;
 end;
 
 constructor TDiocpTcpClient.Create(AOwner: TComponent);
