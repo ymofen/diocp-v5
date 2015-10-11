@@ -3,7 +3,9 @@
  *	       blog: http://www.cnblogs.com/dksoft
  *     homePage: www.diocp.org
  *
- *   
+ *  1. 2015-10-11 21:08:25
+ *    解决TDiocpUdpRecvRequest释放时，可能导致FInnerBuffer未释放导致的内存泄漏([湖南]成浩  675318反馈)
+
  *)
 
 {$IFDEF DEBUG}
@@ -98,6 +100,7 @@ type
     FRequestState: TRequestState;
     procedure HandleResponse; override;
   public
+    destructor Destroy; override;
 
     function PostRequest(pvBlockSize: Cardinal): Boolean; overload;
 
@@ -450,6 +453,15 @@ end;
 function TDiocpUdpRecvRequest.GetRecvBufferLen: Integer;
 begin
   Result := FBytesTransferred;
+end;
+
+destructor TDiocpUdpRecvRequest.Destroy;
+begin
+  if FInnerBuffer.len > 0 then
+  begin
+    FreeMem(FInnerBuffer.buf);
+  end;
+  inherited;
 end;
 
 function TDiocpUdpRecvRequest.GetRecvBuffer: PAnsiChar;
