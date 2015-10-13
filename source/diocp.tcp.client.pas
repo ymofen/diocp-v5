@@ -51,7 +51,9 @@ type
     ///  阻塞方式建立连接
     ///    连接状态变化: ssDisconnected -> ssConnected/ssDisconnected
     /// </summary>
-    procedure Connect;
+    procedure Connect; overload;
+
+    procedure Connect(pvTimeOut:Integer); overload;
 
     /// <summary>
     ///  请求异步连接
@@ -158,6 +160,8 @@ uses
 resourcestring
   strCannotConnect = '当前状态下不能进行连接...';
   strConnectError  = '建立连接失败, 错误代码:%d';
+  strConnectTimeOut= '建立连接超时';
+
 
 const
   // 重连间隔，避免连接过快，导致OnDisconnected还没有处理完成, 1秒
@@ -217,6 +221,33 @@ begin
     RaiseLastOSError;
 
   DoConnected;
+end;
+
+procedure TIocpRemoteContext.Connect(pvTimeOut: Integer);
+var
+  lvRemoteIP:String;
+begin
+  if not Owner.Active then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
+
+  if SocketState <> ssDisconnected then raise Exception.Create(strCannotConnect);
+
+  ReCreateSocket;
+
+  try
+    lvRemoteIP := RawSocket.GetIpAddrByName(FHost);
+  except
+    lvRemoteIP := FHost;
+  end;
+
+  
+
+  if not RawSocket.ConnectTimeOut(lvRemoteIP, FPort, pvTimeOut) then
+  begin
+    raise Exception.Create(strConnectTimeOut);
+  end;
+
+  DoConnected;
+  
 end;
 
 procedure TIocpRemoteContext.ConnectASync;

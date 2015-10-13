@@ -2325,15 +2325,20 @@ procedure TDiocpTcpServer.SafeStop;
 begin
   if FActive then
   begin
-    FActive := false;
+    if FIocpEngine.WorkingCount = 0 then
+    begin
+      Assert(False);
+    end;
 
-
+    FActive := false; 
 
     // Close listen socket
     FListenSocket.Close;
 
 
     DisconnectAll;
+
+
 
     // 等等所有的投递的AcceptEx请求回归
     // 感谢 Xjumping  990669769, 反馈bug
@@ -2387,11 +2392,11 @@ begin
   begin
     if pvActive then
     begin
-      if FDataMoniter <> nil then FDataMoniter.clear;
-      
       // 开启IOCP引擎
       FIocpEngine.CheckStart;
-      
+
+      if FDataMoniter <> nil then FDataMoniter.clear;
+
       // 创建侦听的套接字
       FListenSocket.CreateTcpOverlappedSocket;
 
@@ -2875,6 +2880,8 @@ begin
     begin
       {$IFDEF WRITE_LOG}
       FOwner.logMessage('WaitForCancel End Current AccepEx num:%d', [c], CORE_LOG_FILE, lgvError);
+      FOwner.logMessage('WaitForCancel false:' + sLineBreak +  FOwner.IocpEngine.GetStateINfo, CORE_LOG_FILE, lgvError);
+
       {$ENDIF}
       Break;
     end;

@@ -108,7 +108,7 @@ begin
   lvClient.Host := edtHost.Text;
   lvClient.Port := StrToInt(edtPort.Text);
   lvClient.AutoReConnect := true;
-  lvClient.connectASync;
+  lvClient.ConnectASync;
 
 
 

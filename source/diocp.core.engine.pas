@@ -6,6 +6,12 @@
   *     DIOCP-V5 发布
  *
  *   thanks qsl's suggestion
+
+
+*  优化IocpEngine的开启和关闭过程, SafeStop时关闭IOCP句柄，在Start(开启引擎)时重建IOCP句柄。
+    (SafeStop在等待所有工作线程停止时会重复投递退出请求，如果不重建句柄，会在重新工作线程的时候，可能会继续收到退出请求，导致工作线程退出。)
+	  可能会导致，程序无法退出，并有内存泄漏, 因为重新开启服务后的工作线程为0时,无法处理任何的IOCP请求。
+	  2015-10-13 21:05:34
  *)
 unit diocp.core.engine;
 
@@ -340,6 +346,7 @@ type
 
     procedure IncAliveWorker;
     procedure DecAliveWorker(const pvWorker: TIocpWorker);
+    function GetWorkingCount: Integer;
   public
     constructor Create;
 
@@ -419,6 +426,8 @@ type
 
 
 
+
+
     /// <summary>
     ///  获取工作线程数量
     /// </summary>
@@ -433,6 +442,11 @@ type
     ///   工作线程需要进行CoInitalize初始化
     /// </summary>
     property WorkerNeedCoInitialize: Boolean read FWorkerNeedCoInitialize write FWorkerNeedCoInitialize;
+
+    /// <summary>
+    ///   正在工作的线程数量
+    /// </summary>
+    property WorkingCount: Integer read GetWorkingCount;
   end;
 
 var
@@ -539,7 +553,11 @@ end;
 
 procedure TIocpCore.DoFinalize;
 begin
-  if FIOCPHandle <> 0 then CloseHandle(FIOCPHandle);
+  if FIOCPHandle <> 0 then
+  begin
+    CloseHandle(FIOCPHandle);
+    FIOCPHandle := 0;
+  end;
 end;
 
 procedure TIocpCore.DoInitialize;
@@ -934,6 +952,12 @@ begin
   end;
 end;
 
+function TIocpEngine.GetWorkingCount: Integer;
+begin
+  // TODO -cMM: TIocpEngine.GetWorkingCount default body inserted
+  Result := FWorkerList.Count;
+end;
+
 procedure TIocpEngine.IncAliveWorker;
 begin
   InterlockedIncrement(FActiveWorkerCount);
@@ -950,13 +974,18 @@ end;
 
 procedure TIocpEngine.SafeStop(pvTimeOut: Integer = 120000);
 begin
-  if FActiveWorkerCount > 0 then
-  begin
-    StopWorkers(pvTimeOut);
-  end;
+  try
+    if FActiveWorkerCount > 0 then
+    begin
+      StopWorkers(pvTimeOut);
+    end;
 
-  FWorkerList.Clear;
-  FActive := false;
+    FWorkerList.Clear;
+    FActive := false;
+  finally
+    /// 关闭IO句柄等工作，重新开启时, 重建句柄(可以避免在停止时，投递了多余的退出请求，而导致重新开启服务时，又处理消息)
+    FIocpCore.DoFinalize();
+  end;
 end;
 
 procedure TIocpEngine.SetMaxWorkerCount(AWorkerCount: Word);
@@ -983,6 +1012,8 @@ var
   lvCpuCount:Integer;
 begin
   lvCpuCount := GetCPUCount;
+
+  FIocpCore.DoInitialize;
 
   if FSafeStopSign <> nil then
   begin
@@ -1023,7 +1054,7 @@ begin
   begin
     for i := 0 to FWorkerList.Count -1 do
     begin
-      if not FIocpCore.postIOExitRequest then
+      if not FIocpCore.PostIOExitRequest then
       begin
         RaiseLastOSError;
       end;

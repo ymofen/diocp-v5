@@ -23,12 +23,14 @@ type
 
   TObjectPool = class(TObject)
   private
-    FCreateCounter:Integer;
     FName: String;
-    FOutCounter:Integer;
-    
+    FUsingCount: Integer;
+
     FObjectList: TBaseQueue;
     FOnCreateObjectEvent: TOnCreateObjectEvent;
+    FCount: Integer;
+    FOutTime: Integer;
+    FReleaseTime: Integer;
   public
     constructor Create(AOnCreateObjectEvent: TOnCreateObjectEvent);
 
@@ -50,7 +52,38 @@ type
     /// </summary>
     procedure ReleaseObject(pvObject:TObject);
 
+    /// <summary>
+    ///   正在使用数量
+    /// </summary>
+    property UsingCount: Integer read FUsingCount;
+
+    /// <summary>
+    ///   对象数量
+    /// </summary>
+    property Count: Integer read FCount;
+
+    /// <summary>
+    ///   名称，可以用于监控调试
+    /// </summary>
     property Name: String read FName write FName;
+
+
+    /// <summary>
+    ///  借出次数
+    /// </summary>
+    property OutTime: Integer read FOutTime write FOutTime;
+
+    /// <summary>
+    ///   还回次数
+    /// </summary>
+    property ReleaseTime: Integer read FReleaseTime write FReleaseTime;
+
+
+
+
+
+
+
 
     /// <summary>
     ///   创建对象事件
@@ -95,7 +128,8 @@ end;
 constructor TObjectPool.Create(AOnCreateObjectEvent: TOnCreateObjectEvent);
 begin
   inherited Create;
-  FOutCounter := 0;
+  FCount := 0;
+  FUsingCount := 0;
   FObjectList := TBaseQueue.Create();
   FOnCreateObjectEvent := AOnCreateObjectEvent;
 end;
@@ -115,15 +149,19 @@ begin
     Assert(Assigned(FOnCreateObjectEvent));
     Result := FOnCreateObjectEvent();
     Assert(Result <> nil);
-    InterlockedIncrement(FCreateCounter);
+    InterlockedIncrement(FCount);
   end;
-  InterlockedIncrement(FOutCounter); 
+  InterlockedIncrement(FUsingCount);
+  
+  InterlockedIncrement(FOutTime);
+
 end;
 
 procedure TObjectPool.ReleaseObject(pvObject:TObject);
 begin
   FObjectList.EnQueue(pvObject);
-  InterlockedDecrement(FOutCounter);
+  InterlockedDecrement(FUsingCount);
+  InterlockedIncrement(FReleaseTime);
 end;
 
 function TObjectPool.WaitFor(pvTimeOut: Cardinal): Boolean;
@@ -132,7 +170,7 @@ var
   c:Integer;
 begin
   l := GetTickCount;
-  c := FOutCounter;
+  c := FUsingCount;
   while (c > 0) do
   begin
     {$IFDEF MSWINDOWS}
@@ -146,10 +184,10 @@ begin
       WriteFileMsg(Format('(%s)WaitFor 等待超时, 当前未归还数量:%d', [FName, c]), 'WaitFor');
       Break;
     end;
-    c := FOutCounter;
+    c := FUsingCount;
   end;
 
-  Result := FOutCounter = 0;
+  Result := FUsingCount = 0;
 end;
 
 initialization

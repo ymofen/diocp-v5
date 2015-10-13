@@ -131,4 +131,8 @@ DIOCP-v5 0.0.2
     影响范围: doicp.ex.tcpClient.pas, diocp.ex.tcpserver.pas, utils.buffer.pas, utils.strings.pas
      2015-09-10 20:10:41
  
+25. 优化IocpEngine的开启和关闭过程, SafeStop时关闭IOCP句柄，在Start(开启引擎)时重建IOCP句柄。
+    (SafeStop在等待所有工作线程停止时会重复投递退出请求，如果不重建句柄，会在重新工作线程的时候，可能会继续收到退出请求，导致工作线程退出。)
+	可能会导致，程序无法退出，并有内存泄漏, 因为重新开启服务后的工作线程为0时,无法处理任何的IOCP请求.
+	2015-10-13 21:05:34
  
