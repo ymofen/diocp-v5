@@ -40,12 +40,14 @@ type
 // before delphi 2007
 {$if CompilerVersion < 18}
 type
-     ULONG_PTR = Cardinal;
+   ULONG_PTR = Cardinal;
 {$ifend}
 
 type
 
-
+  {$IF RTLVersion>22}
+  [ComponentPlatformsAttribute(pidWin32 or pidWin64 or pidOSX32 or pidAndroid or pidiOSSimulator)]
+  {$IFEND}
   TDiocpBlockTcpClient = class(TComponent)
   private
     FActive: Boolean;
@@ -63,7 +65,7 @@ type
     /// <summary>
     ///   超时连接
     /// </summary>
-    /// <param name="pvMs"> (Cardinal) </param>
+    /// <param name="pvMs"> 超时毫秒数 </param>
     procedure ConnectTimeOut(pvMs:Cardinal);
     procedure Disconnect;
 
@@ -93,9 +95,10 @@ type
     /// <param name="endBufLen"> 内存大小 </param>
     function RecvBufferEnd(buf: Pointer; len: cardinal; endBuf: Pointer; endBufLen:
         Integer): Integer;
-    property Active: Boolean read FActive write SetActive;
     property RawSocket: TRawSocket read FRawSocket;
   published
+    property Active: Boolean read FActive write SetActive;
+
     property Host: String read FHost write FHost;
     property Port: Integer read FPort write FPort;
     /// <summary>

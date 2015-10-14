@@ -944,7 +944,7 @@ type
     /// </summary>
     procedure SafeStop;
 
-    property Active: Boolean read FActive write SetActive;
+
 
     procedure Open;
 
@@ -980,12 +980,19 @@ type
     /// </summary>
     property Locker: TIocpLocker read FLocker;
 
-    /// <summary>
-    ///   最大的待发送缓存队列
-    /// </summary>
-    property MaxSendingQueueSize: Integer read FMaxSendingQueueSize;
+
     property Logger: TSafeLogger read FLogger;
   published
+
+    /// <summary>
+    ///   服务开启/关闭
+    /// </summary>
+    property Active: Boolean read FActive write SetActive;
+
+    /// <summary>
+    ///   最大的待发送缓存队列, 服务开启时不允许设定
+    /// </summary>
+    property MaxSendingQueueSize: Integer read FMaxSendingQueueSize write SetMaxSendingQueueSize;
 
     /// <summary>
     ///   当连接断开时触发事件
