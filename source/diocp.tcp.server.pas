@@ -143,9 +143,14 @@ type
   {$ENDIF}
   private
     FAlive:Boolean;
-    
+
+    /// 开始工作时间
+    FWorkerStartTick:Cardinal;
+
+    /// 结束工作时间
+    FWorkerEndTick: Cardinal;
+
     FContextLocker: TIocpLocker;
-    
 
 
     /// <summary>
@@ -278,7 +283,18 @@ type
     procedure OnConnected; virtual;
 
     procedure SetSocketState(pvState:TSocketState); virtual;
+
+    procedure RecordWorkerStartTick;
+    procedure RecordWorkerEndTick;
   public
+
+    /// <summary>
+    ///   检测当前正在工作耗用时间
+    /// </summary>
+    /// <returns>
+    ///  耗用毫秒数, 如果没有工作（或者已经结束工作)，则返回0
+    /// </returns>
+    function CheckWorkingTick: Cardinal;
 
     /// <summary>
     ///   获取当前待发送队列中的请求数量
@@ -887,6 +903,11 @@ type
     /// </summary>
     procedure KickOut(pvTimeOut:Cardinal = 60000);
 
+    /// <summary>
+    ///   获取逻辑超过3秒未完成的连接信息
+    /// </summary>
+    function GetContextWorkingInfo(pvTimeOut:Cardinal = 3000): String;
+
     procedure LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel: TLogLevel
         = lgvMessage); overload;
 
@@ -1454,45 +1475,46 @@ begin
 {$ENDIF}
 
   FContextLocker.lock('RequestDisconnect');
-  {$IFDEF DEBUG_ON}
-  if pvDebugInfo <> '' then
-  begin
-    AddDebugString(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-  end;
-  {$ENDIF}
-  
-  {$IFDEF SOCKET_REUSE}
-  lvCloseContext := False;
-  if not FRequestDisconnect then
-  begin
-    // cancel
-    FRawSocket.ShutDown();
-    FRawSocket.CancelIO;
-
-    // post succ, in handleReponse Event do
-    if not FDisconnectExRequest.PostRequest then
-    begin      // post fail,
-      FRawSocket.close;
-      if FReferenceCounter = 0 then  lvCloseContext := true;    //      lvCloseContext := true;   //directly close
+  try
+    {$IFDEF DEBUG_ON}
+    if pvDebugInfo <> '' then
+    begin
+      AddDebugString(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     end;
+    {$ENDIF}
+  
+    {$IFDEF SOCKET_REUSE}
+    lvCloseContext := False;
+    if not FRequestDisconnect then
+    begin
+      // cancel
+      FRawSocket.ShutDown();
+      FRawSocket.CancelIO;
+
+      // post succ, in handleReponse Event do
+      if not FDisconnectExRequest.PostRequest then
+      begin      // post fail,
+        FRawSocket.close;
+        if FReferenceCounter = 0 then  lvCloseContext := true;    //      lvCloseContext := true;   //directly close
+      end;
+      FRequestDisconnect := True;
+    end;
+    {$ELSE}
+
+
+    lvCloseContext := False;
     FRequestDisconnect := True;
+    if FReferenceCounter = 0 then  lvCloseContext := true;
+    {$ENDIF}
+  finally
+    FContextLocker.unLock;
   end;
-  {$ELSE}
-
-
-  lvCloseContext := False;
-  FRequestDisconnect := True;
-  if FReferenceCounter = 0 then  lvCloseContext := true;
-  {$ENDIF}
-
-  FContextLocker.unLock;
 
   {$IFDEF SOCKET_REUSE}
   if lvCloseContext then InnerCloseContext;
   {$ELSE}
   if lvCloseContext then InnerCloseContext else FRawSocket.close;
   {$ENDIF}
-
 end;
 
 destructor TIocpClientContext.Destroy;
@@ -1530,6 +1552,18 @@ begin
   inherited Destroy;
 end;
 
+function TIocpClientContext.CheckWorkingTick: Cardinal;
+begin
+  Result := 0;
+  // 已经完成工作
+  if FWorkerEndTick <> 0 then Exit;
+
+  // 还没有开始工作
+  if FWorkerStartTick = 0 then Exit;
+
+  Result := tick_diff(FWorkerStartTick, GetTickCount);  
+end;
+
 procedure TIocpClientContext.DoCleanUp;
 begin
   FLastActivity := 0;
@@ -1537,6 +1571,9 @@ begin
   FOwner := nil;
   FRequestDisconnect := false;
   FSending := false;
+
+  FWorkerEndTick := 0;
+  FWorkerStartTick := 0;
 
   {$IFDEF DEBUG_ON}
   AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), '-----DoCleanUp-----']));
@@ -1825,6 +1862,17 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TIocpClientContext.RecordWorkerEndTick;
+begin
+  FWorkerEndTick := GetTickCount;
+end;
+
+procedure TIocpClientContext.RecordWorkerStartTick;
+begin
+  FWorkerStartTick := GetTickCount;
+  FWorkerEndTick := 0;
 end;
 
 
@@ -2478,6 +2526,32 @@ end;
 function TDiocpTcpServer.GetClientCount: Integer;
 begin
   Result := FOnlineContextList.Count;
+end;
+
+function TDiocpTcpServer.GetContextWorkingInfo(pvTimeOut:Cardinal = 3000):
+    String;
+var
+  lvList:TList;
+  lvContext:TIocpClientContext;
+  i:Integer;
+  lvUseTime:Cardinal;
+begin
+  lvList := TList.Create;
+  try
+    Result := '';
+    GetOnlineContextList(lvList);
+    for i := 0 to lvList.Count - 1 do
+    begin
+      lvContext := TIocpClientContext(lvList[i]);
+      lvUseTime := lvContext.CheckWorkingTick;
+      if lvUseTime > pvTimeOut then
+      begin
+        Result := Result + Format('[%s:%d(%d)]:%s', [lvContext.RemoteAddr, lvContext.RemotePort, lvUseTime, lvContext.DebugInfo]) + sLineBreak;
+      end;
+    end;
+  finally
+    lvList.Free;
+  end;
 end;
 
 procedure TDiocpTcpServer.GetOnlineContextList(pvList:TList);

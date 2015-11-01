@@ -66,6 +66,18 @@ type
     function SendBuf(const data; const len: Integer): Integer;
     function PeekBuf(var data; const len: Integer): Integer;
 
+    /// <summary>
+    ///   接收字符
+    /// </summary>
+    /// <returns>
+    ///   0: 代表连接被优雅的关闭
+    ///   > 0：收到的数据长度
+    ///  -1: 接收错误
+    /// </returns>
+    /// <param name="buf"> (PAnsiChar) </param>
+    /// <param name="len"> (Integer) </param>
+    /// <param name="endBuf"> (PAnsiChar) </param>
+    /// <param name="endBufLen"> (Integer) </param>
     function RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar; endBufLen:
         Integer): Integer;
 
@@ -79,7 +91,7 @@ type
         Boolean;
 
     //zero if the time limit expired, or SOCKET_ERROR if an error occurred.
-    function selectSocket(vReadReady, vWriteReady, vExceptFlag: PBoolean;
+    function SelectSocket(vReadReady, vWriteReady, vExceptFlag: PBoolean;
         pvTimeOut: Integer = 0): Integer;
 
     function Readable(pvTimeOut:Integer): Boolean;
@@ -340,12 +352,17 @@ begin
   while j < len do
   begin
     lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
-    inc(j);
     if lvRet = -1 then
     begin
       Result := lvRet;
       exit;
     end;
+    if lvRet = 0 then
+    begin  // 被关闭
+      Result := 0;
+      exit;
+    end;
+    inc(j);
     if buf^ = lvTempEndBuf^ then
     begin
       Inc(lvMatchCounter);
@@ -364,7 +381,7 @@ begin
   Result := j;
 end;
 
-function TRawSocket.selectSocket(vReadReady, vWriteReady, vExceptFlag:
+function TRawSocket.SelectSocket(vReadReady, vWriteReady, vExceptFlag:
     PBoolean; pvTimeOut: Integer = 0): Integer;
 var
   ReadFds: TFDset;

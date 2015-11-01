@@ -567,12 +567,17 @@ begin
   while j < len do
   begin
     lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
-    inc(j);
     if lvRet = -1 then
     begin
       Result := lvRet;
       exit;
     end;
+    if lvRet = 0 then
+    begin  // 被关闭
+      Result := 0;
+      exit;
+    end;
+    inc(j);
     if Byte(buf^) = Byte(lvTempEndBuf^) then
     begin
       Inc(lvMatchCounter);

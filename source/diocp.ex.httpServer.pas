@@ -230,6 +230,8 @@ type
     /// </summary>
     function GetCookie(pvCookieName:string):String;
 
+    property ContextType: String read FContextType;
+
     property ContextLength: Int64 read FContextLength;
 
 
@@ -237,6 +239,7 @@ type
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
+
     property HttpVersion: Word read FHttpVersion;
     /// <summary>
     ///   原始的Post过来的数据
@@ -357,11 +360,9 @@ type
 
     property ContentType: String read FContentType write FContentType;
 
+    property Data: TMemoryStream read FData;
+
     property HttpCodeStr: String read FHttpCodeStr write FHttpCodeStr;
-
-
-
-
 
     procedure RedirectURL(pvURL:String);
   end;
@@ -527,6 +528,7 @@ begin
   FRequestParamsList.Clear;
   FRequestCookieList.Clear;
   FContextLength := 0;
+  FContextType := '';
   FPostDataLen := 0;
   FResponse.Clear;  
 end;
@@ -867,9 +869,10 @@ end;
 procedure TDiocpHttpRequest.DecodePostDataParam({$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 var
   lvRawData : AnsiString;
-  lvRawParams, s:String;
+  lvRawParams, s, lvName, lvValue:String;
   i:Integer;
   lvStrings:TStrings;
+  lvSpliteStrings: TArrayStrings;
 {$IFDEF UNICODE}
 var
   lvBytes:TBytes;
@@ -877,11 +880,13 @@ var
 {$ENDIF}
 begin
   if FRawPostData.Size = 0 then exit;
+
+  SetLength(lvSpliteStrings, 2);
   
   // 读取原始数据
   SetLength(lvRawData, FRawPostData.Size);
   FRawPostData.Position := 0;
-  FRawPostData.Read(lvRawData[1], FRawPostData.Size);
+  FRawPostData.Read(PAnsiChar(lvRawData)^, FRawPostData.Size);
 
   lvStrings := TStringList.Create;
   try
@@ -890,32 +895,41 @@ begin
 
     for i := 0 to lvStrings.Count - 1 do
     begin
-      lvRawData := URLDecode(lvStrings.ValueFromIndex[i]);
-      if lvRawData <> '' then   // 不合法的Key-Value会导致空字符串
+      s := Trim(lvStrings[i]);
+      if length(s) > 0 then
       begin
-        {$IFDEF UNICODE}
-        if pvEncoding <> nil then
+        if SplitStr(s, '=', lvName, lvValue) then
         begin
-          // 字符编码转换
-          SetLength(lvBytes, length(lvRawData));
-          Move(PByte(lvRawData)^, lvBytes[0], Length(lvRawData));
-          s := pvEncoding.GetString(lvBytes);
-        end else
-        begin
-          s := lvRawData;
-        end;
-        {$ELSE}
-        if pvUseUtf8Decode then
-        begin
-          s := UTF8Decode(lvRawData);
-        end else
-        begin
-          s := lvRawData;
-        end;
-        {$ENDIF}
+          lvRawData := URLDecode(lvValue);
+          if lvRawData <> '' then   // 不合法的Key-Value会导致空字符串
+          begin
+            {$IFDEF UNICODE}
+            if pvEncoding <> nil then
+            begin
+              // 字符编码转换
+              SetLength(lvBytes, length(lvRawData));
+              Move(PByte(lvRawData)^, lvBytes[0], Length(lvRawData));
+              s := pvEncoding.GetString(lvBytes);
+            end else
+            begin
+              s := lvRawData;
+            end;
+            {$ELSE}
+            if pvUseUtf8Decode then
+            begin
+              s := UTF8Decode(lvRawData);
+            end else
+            begin
+              s := lvRawData;
+            end;
+            {$ENDIF}
+            if s = '' then s := lvRawData;
+            
 
-        // 解码参数
-        lvStrings.ValueFromIndex[i] := s;
+            // 解码参数
+            lvStrings.ValueFromIndex[i] := s;
+          end;
+        end;
       end;
     end;
     FRequestParamsList.AddStrings(lvStrings);
@@ -929,7 +943,7 @@ procedure TDiocpHttpRequest.DecodeURLParam(
   {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 var
   lvRawData : AnsiString;
-  lvRawParams, s:String;
+  s:String;
   i:Integer;
   lvStrings:TStrings;
 {$IFDEF UNICODE}
@@ -1082,7 +1096,7 @@ var
 begin
   Result := '';
 
-  lvVersionStr := 'HTTP/1.0';
+  lvVersionStr := 'HTTP/1.1';
 
   if (FHttpCodeStr = '') then FHttpCodeStr := '200 OK';
   Result := Result + lvVersionStr + ' ' + FHttpCodeStr + #13#10;
@@ -1418,8 +1432,6 @@ begin
 end;
 
 procedure TDiocpHttpServer.DoRequestPostDataDone(pvRequest: TDiocpHttpRequest);
-var
-  lvRawData:AnsiString;
 begin 
   if Assigned(FOnDiocpHttpRequestPostDone) then
   begin

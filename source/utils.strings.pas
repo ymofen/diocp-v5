@@ -43,13 +43,17 @@ type
 {$ENDIF}
 
 {$IFDEF UNICODE}
-WChar = Char;
-PWChar = PChar;
+  WChar = Char;
+  PWChar = PChar;
 {$ELSE}
-WChar = WideChar;
-PWChar = PWideChar;
-IntPtr = Integer;
+  WChar = WideChar;
+  PWChar = PWideChar;
+  IntPtr = Integer;
 {$ENDIF}
+
+  TArrayStrings = array of string;
+  PArrayStrings = ^ TArrayStrings;
+
 
 
 /// <summary>
@@ -63,6 +67,8 @@ IntPtr = Integer;
 function SkipUntil(var p:PChar; pvChars: TSysCharSet): Integer;
 
 
+
+
 /// <summary>
 ///   跳过字符
 /// </summary>
@@ -72,6 +78,35 @@ function SkipUntil(var p:PChar; pvChars: TSysCharSet): Integer;
 /// <param name="p"> 源(字符串)位置 </param>
 /// <param name="pvChars"> (TSysCharSet) </param>
 function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
+
+/// <summary>
+///   跳过字符串
+///   // p = pchar("abcabcefggg");
+///   // 执行后 p = "efgg"
+///   // 返回结果 = 2 //2个abc
+///   SkipStr(p, "abc");
+///
+/// </summary>
+/// <returns>
+///   返回跳过的字符串个数
+/// </returns>
+/// <param name="P"> 源字符，如果符合条件跳过 </param>
+/// <param name="pvSkipStr"> 开头需要跳过的字符 </param>
+/// <param name="pvIgnoreCase"> 忽略大小写 </param>
+function SkipStr(var P:PChar; pvSkipStr: PChar; pvIgnoreCase: Boolean = true):
+    Integer;
+
+
+/// <summary>
+///   检测是否以pvStart开头
+/// </summary>
+/// <returns> 如果为真返回true
+/// </returns>
+/// <param name="P"> (PChar) </param>
+/// <param name="pvStart"> (PChar) </param>
+/// <param name="pvIgnoreCase"> (Boolean) </param>
+function StartWith(P:PChar; pvStart:PChar; pvIgnoreCase: Boolean = true):
+    Boolean;
 
 
 /// <summary>
@@ -108,6 +143,20 @@ function LeftUntilStr(var P: PChar; pvSpliter: PChar; pvIgnoreCase: Boolean =
 /// <param name="pvSpliterChars"> 分隔符 </param>
 function SplitStrings(s:String; pvStrings:TStrings; pvSpliterChars
     :TSysCharSet): Integer;
+
+
+/// <summary>
+///  将一个字符串分割成2个字符串
+///  splitStr("key=abcd", "=", s1, s2)
+///  // s1=key, s2=abcd
+/// </summary>
+/// <returns> 成功返回true
+/// </returns>
+/// <param name="s"> 要分割的字符串 </param>
+/// <param name="pvSpliterStr"> (string) </param>
+/// <param name="s1"> (String) </param>
+/// <param name="s2"> (String) </param>
+function SplitStr(s:string; pvSpliterStr:string; var s1, s2:String): Boolean;
 
 /// <summary>
 ///   URL数据解码,
@@ -650,7 +699,8 @@ begin
   if lvPUntil = nil then
   begin
     Result := '';
-    P := nil;
+    //P := nil;
+    // 匹配失败不移动P
   end else
   begin
     l := lvPUntil-P;
@@ -727,6 +777,91 @@ begin
       inc(j);
     end;
   end;
+end;
+
+
+function SkipStr(var P:PChar; pvSkipStr: PChar; pvIgnoreCase: Boolean = true):
+    Integer;
+var
+  lvSkipLen : Integer;
+begin
+  Result := 0;
+
+  lvSkipLen := Length(pvSkipStr) * SizeOf(Char);
+
+  while True do
+  begin
+    if StartWith(P, pvSkipStr) then
+    begin
+      Inc(Result);
+      P := PChar(IntPtr(P) + lvSkipLen);
+    end else
+    begin
+      Break;
+    end;    
+  end; 
+end;
+
+function StartWith(P:PChar; pvStart:PChar; pvIgnoreCase: Boolean = true):
+    Boolean;
+var
+  lvSubUP: String;
+  PSubUP : PChar;
+begin
+  Result := False;
+
+  if pvIgnoreCase then
+  begin
+    lvSubUP := UpperCase(pvStart^);
+    PSubUP := PChar(lvSubUP);
+    if (P = nil) or (PSubUP = nil) then  Exit;
+    
+    if P^ = #0 then Exit;
+    while PSubUP^ <> #0 do
+    begin
+      if UpperChar(P^) = PSubUP^ then
+      begin
+        Inc(P);
+        Inc(PSubUP);
+      end else
+        Break;
+    end;
+    if PSubUP^ = #0 then  // 比较到最后
+    begin
+      Result := true;
+    end;
+
+  end else
+  begin
+    Result := CompareMem(P, pvStart, Length(pvStart));
+  end;
+end;
+
+function SplitStr(s:string; pvSpliterStr:string; var s1, s2:String): Boolean;
+var
+  pSource, pSpliter:PChar;
+  lvTemp:string;
+begin
+  pSource := PChar(s);
+
+  pSpliter := PChar(pvSpliterStr);
+
+  // 跳过开头的分隔符
+  SkipStr(pSource, pSpliter);
+
+  lvTemp := LeftUntilStr(pSource, pSpliter);
+  if lvTemp <> '' then
+  begin
+    Result := true;
+    s1 := lvTemp;
+    // 跳过开头的分隔符
+    SkipStr(pSource, pSpliter);
+    s2 := pSource;
+  end else
+  begin
+    Result := False;
+  end;  
+
 end;
 
 
