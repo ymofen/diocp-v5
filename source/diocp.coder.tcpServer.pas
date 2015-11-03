@@ -161,6 +161,7 @@ type
     FInnerEncoder: TIOCPEncoder;
     FInnerDecoder: TIOCPDecoder;
 
+  protected
     FEncoder: TIOCPEncoder;
     FDecoder: TIOCPDecoder;
     FLogicWorkerNeedCoInitialize: Boolean;
