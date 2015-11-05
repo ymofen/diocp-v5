@@ -48,7 +48,7 @@ type
 {$ifend}
 
 type
-  TDxMemBlockType = (MB_Small,MB_Normal,MB_Big,MB_SpBig,MB_Large,MB_SPLarge,MB_Max); //内存块模式
+  TDxMemBlockType = (MB_Small,MB_Normal,MB_Big,MB_SpBig,MB_Large,MB_SPLarge,MB_Max,MB_MaxBlock); //内存块模式
   PMemoryBlock = ^TMemoryBlock;
   TMemoryBlock = record
     Memory: Pointer;
@@ -248,8 +248,11 @@ type
     property DataSize: Integer read GetDataSize; //能读取的数据长度
   end;
 
+const
+  MAX_SEND_BLOCK_SIZE: Integer= 1460*44;
 
 procedure FreeMemBlock(Block: PMemoryBlock);
+function GetMemBlock(BlockType: TDxMemBlockType): PMemoryBlock;
 function CalcMemType(MemSize: Integer): TDxMemBlockType;
 implementation
 
@@ -262,6 +265,7 @@ var
   LargeMPool: TDxMemoryPool = nil;
   SPLargeMPool: TDxMemoryPool = nil;
   MaxMPool: TDxMemoryPool = nil;
+  FMaxBlockMPool: TDxMemoryPool = nil;
 
 
 /// <summary>
@@ -336,6 +340,8 @@ function CalcMemType(MemSize: Integer): TDxMemBlockType;
 begin
   if MemSize > 1024 * 128 then
     Result := MB_Max
+  else if MemSize >= MAX_SEND_BLOCK_SIZE then
+    Result := MB_MaxBlock
   else if MemSize > 4096*4  then
     Result := MB_SPLarge
   else if MemSize > 2048 then
@@ -346,6 +352,7 @@ begin
     Result := MB_Normal
   else Result := MB_Small;
 end;
+
 
 function SuperMemoryPool: TDxMemoryPool;
 begin
@@ -375,6 +382,13 @@ begin
   Result := SPLargeMPool;
 end;
 
+function MaxBlockMPool: TDxMemoryPool;
+begin
+  if FMaxBlockMPool = nil then
+    FMaxBlockMPool := TDxMemoryPool.Create(MAX_SEND_BLOCK_SIZE,30,MB_MaxBlock,100);
+  Result := FMaxBlockMPool;
+end;
+
 function MemoryPool: TDxMemoryPool;
 begin
   if NormalMPool = nil then
@@ -394,6 +408,22 @@ begin
   if BigMPool = nil then
     BigMPool := TDxMemoryPool.Create(1024,30,MB_Big,100); //大内存块
   Result := BigMPool;
+end;
+
+
+function GetMemBlock(BlockType: TDxMemBlockType): PMemoryBlock;
+begin
+  case BlockType of
+    MB_Small: Result := SmallMemoryPool.GetMemoryBlock;
+    MB_Normal: Result := MemoryPool.GetMemoryBlock;
+    MB_Big: Result := BigMemoryPool.GetMemoryBlock;
+    MB_SpBig: Result := SuperMemoryPool.GetMemoryBlock;
+    MB_Large: Result := LargeMemoryPool.GetMemoryBlock;
+    MB_SPLarge: Result := SuperLargeMemoryPool.GetMemoryBlock;
+    MB_Max: Result := MaxMemoryPool.GetMemoryBlock;
+    MB_MaxBlock: Result := MaxBlockMPool.GetMemoryBlock;
+  else Result := nil;
+  end;
 end;
 
 { TDxMemoryPool }
@@ -711,6 +741,7 @@ begin
     MB_Large: Result := LargeMemoryPool.FBlockSize;
     MB_SPLarge: Result := SuperLargeMemoryPool.FBlockSize;
     MB_Max: Result := MaxMemoryPool.FBlockSize;
+    MB_MaxBlock: Result := MaxBlockMPool.FBlockSize;
   else Result := 0;
   end;
 end;
@@ -2057,6 +2088,8 @@ begin
     SPLargeMPool.Free;
   if MaxMPool <> nil then
     MaxMPool.Free;
+  if FMaxBlockMPool <>nil then
+    FMaxBlockMPool.Free;
 end;
 
 { TDxRingStream }
@@ -2648,6 +2681,7 @@ begin
     MB_Large: LargeMemoryPool.FreeMemoryBlock(Block);
     MB_SPLarge: SuperLargeMemoryPool.FreeMemoryBlock(Block);
     MB_Max: MaxMemoryPool.FreeMemoryBlock(Block);
+    MB_MaxBlock: MaxBlockMPool.FreeMemoryBlock(Block);
    else BigMemoryPool.FreeMemoryBlock(Block);
    end;
 end;

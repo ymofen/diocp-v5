@@ -38,6 +38,7 @@ type
   TDiocpCoderSendRequest = class(TIocpSendRequest)
   private
     FMemBlock:PMemoryBlock;
+    FBlockMem: Boolean;
   protected
     procedure ResponseDone; override;
     procedure CancelRequest;override;
@@ -78,6 +79,7 @@ type
 
     FRecvBuffers: TBufferLink;
     FStateINfo: String;
+    FSendBlock: PMemoryBlock; //不得闲
     function GetStateINfo: String;
 
     /// <summary>
@@ -160,6 +162,7 @@ type
 
     FInnerEncoder: TIOCPEncoder;
     FInnerDecoder: TIOCPDecoder;
+    FUseMaxSendBlock: Boolean;
 
   protected
     FEncoder: TIOCPEncoder;
@@ -201,6 +204,14 @@ type
     ///   收到一个完整的数据包的执行事件(在IocpTask/Qworker线程中触发)
     /// </summary>
     property OnContextAction: TOnContextAction read FOnContextAction write FOnContextAction;
+
+    /// <summary>
+    ///  不得闲，增加一个是否使用大数据块发送模式，如果设置为True，那么就是在发送的时候，每次发送按照
+    ///  TCP的协议包进行组合，一般默认最大发送的是64K
+    ///  TCP 包的大小就应该是 1500 - IP头(20) - TCP头(20) = 1460 (BYTES)，也就相当于1460*44的块进行发送一个包
+    ///   收到一个完整的数据包的执行事件(在IocpTask/Qworker线程中触发)
+    /// </summary>
+    property UseMaxSendBlock: Boolean read FUseMaxSendBlock write FUseMaxSendBlock;
   end;
 
 
@@ -209,6 +220,7 @@ implementation
 
 uses
   utils.safeLogger;
+
 
 constructor TIOCPCoderClientContext.Create;
 begin
@@ -242,6 +254,11 @@ begin
   begin
     FCurrentSendBufferLink.Free;
   end;
+  if FSendBlock <> nil then //不得闲
+  begin
+    FreeMemBlock(FSendBlock);
+    FSendBlock := nil;
+  end;
 
   // 清理释放待发送队列的BufferLink实例 
   FSendingQueue.FreeDataObject;
@@ -268,12 +285,92 @@ var
   lvMemBlock:PMemoryBlock;
   lvValidCount, lvDataLen: Integer;
   lvSendRequest:TDiocpCoderSendRequest;
+label ReDo;
 begin
+  //不得闲，发送最大块设置
+  if TDiocpCoderTcpServer(Owner).FUseMaxSendBlock then
+  begin
+    Lock;
+    try
+      if FCurrentSendBufferLink = nil then
+      begin
+        UnLock; //不得闲增加解锁
+        if FSendBlock <> nil then
+        begin
+          FreeMemBlock(FSendBlock);
+          FSendBlock := nil;
+        end;
+        Exit;
+      end;
+      ReDo:
+      lvValidCount := FCurrentSendBufferLink.validCount;
+      if lvValidCount = 0 then
+      begin
+        FCurrentSendBufferLink.Free;
+        FCurrentSendBufferLink := TBufferLink(FSendingQueue.DeQueue);
+        if FCurrentSendBufferLink = nil then
+        begin
+          if FSendBlock <> nil then
+          begin
+            FreeMemBlock(FSendBlock);
+            FSendBlock := nil;
+          end;
+          UnLock;
+          Exit;
+        end;
+        goto ReDo;
+      end;
+    finally
+      UnLock;
+    end;
+    if FSendBlock = nil then
+      FSendBlock := GetMemBlock(MB_MaxBlock);
+
+    if lvValidCount >= MAX_SEND_BLOCK_SIZE then
+    begin
+      FCurrentSendBufferLink.readBuffer(FSendBlock^.Memory,MAX_SEND_BLOCK_SIZE);
+      FCurrentSendBufferLink.clearHaveReadBuffer;
+      lvDataLen := MAX_SEND_BLOCK_SIZE;
+    end
+    else
+    begin
+      lvDataLen := lvValidCount;
+      FCurrentSendBufferLink.readBuffer(FSendBlock^.Memory,lvDataLen);
+      FCurrentSendBufferLink.clearBuffer;
+    end;
+
+    lvSendRequest := TDiocpCoderSendRequest(GetSendRequest);
+    lvSendRequest.FBlockMem := True;
+    lvSendRequest.FMemBlock := FSendBlock;
+    lvSendRequest.SetBuffer(FSendBlock.Memory, lvDataLen, dtNone);
+    if not InnerPostSendRequestAndCheckStart(lvSendRequest) then
+    begin
+      lvSendRequest.UnBindingSendBuffer;
+      lvSendRequest.FMemBlock := nil;
+      lvSendRequest.CancelRequest;
+      lvSendRequest.FBlockMem := False;
+
+      /// 释放掉内存块
+      FreeMemBlock(FSendBlock);
+      FSendBlock := nil;
+      TDiocpCoderTcpServer(FOwner).ReleaseSendRequest(lvSendRequest);
+    end;
+    Exit;
+  end;
+
   lock();
   try
     // 如果当前发送Buffer为nil 则退出
-    if FCurrentSendBufferLink = nil then Exit;
-
+    if FCurrentSendBufferLink = nil then
+    begin
+      UnLock; //不得闲增加解锁
+      if FSendBlock <> nil then
+      begin
+        FreeMemBlock(FSendBlock);
+        FSendBlock := nil;
+      end;
+      Exit;
+    end;
     // 获取第一块
     lvMemBlock := FCurrentSendBufferLink.FirstBlock;
 
@@ -286,7 +383,11 @@ begin
       // 如果当前块 没有任何数据, 则获取下一个要发送的BufferLink
       FCurrentSendBufferLink := TBufferLink(FSendingQueue.DeQueue);
       // 如果当前发送Buffer为nil 则退出
-      if FCurrentSendBufferLink = nil then Exit;
+      if FCurrentSendBufferLink = nil then
+      begin
+        UnLock; //不得闲增加解锁
+        Exit;
+      end;
 
       // 获取需要发送的一块数据
       lvMemBlock := FCurrentSendBufferLink.FirstBlock;
@@ -295,6 +396,7 @@ begin
       if (lvValidCount = 0) or (lvMemBlock = nil) then
       begin  // 没有需要发送的数据了
         FCurrentSendBufferLink := nil;  // 没有数据了, 下次压入时执行释放
+        UnLock; //不得闲增加解锁
         exit;      
       end; 
     end;
@@ -317,6 +419,7 @@ begin
     FCurrentSendBufferLink.RemoveBlock(lvMemBlock);
 
     lvSendRequest := TDiocpCoderSendRequest(GetSendRequest);
+    lvSendRequest.FBlockMem := False;
     lvSendRequest.FMemBlock := lvMemBlock;
     lvSendRequest.SetBuffer(lvMemBlock.Memory, lvDataLen, dtNone);
     if InnerPostSendRequestAndCheckStart(lvSendRequest) then
@@ -327,6 +430,7 @@ begin
       lvSendRequest.UnBindingSendBuffer;
       lvSendRequest.FMemBlock := nil;
       lvSendRequest.CancelRequest;
+      lvSendRequest.FBlockMem := False;
 
       /// 释放掉内存块
       FreeMemBlock(lvMemBlock);
@@ -770,7 +874,9 @@ end;
 
 procedure TDiocpCoderSendRequest.CancelRequest;
 begin
-  if FMemBlock <> nil then
+  if FBlockMem then
+    FMemBlock := nil
+  else if FMemBlock <> nil then
   begin
     FreeMemBlock(FMemBlock);
     FMemBlock := nil;
@@ -780,7 +886,9 @@ end;
 
 procedure TDiocpCoderSendRequest.ResponseDone;
 begin
-  if FMemBlock <> nil then
+  if FBlockMem then
+    FMemBlock := nil
+  else if FMemBlock <> nil then
   begin
     FreeMemBlock(FMemBlock);
     FMemBlock := nil;
