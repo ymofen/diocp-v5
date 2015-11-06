@@ -414,6 +414,8 @@ type
     FOnDiocpHttpRequest: TOnDiocpHttpRequestEvent;
     FOnDiocpHttpRequestPostDone: TOnDiocpHttpRequestEvent;
 
+    FLogicWorkerNeedCoInitialize: Boolean;
+
     /// <summary>
     /// 响应Http请求， 执行响应事件
     /// </summary>
@@ -461,6 +463,12 @@ type
     property OnDiocpHttpRequest: TOnDiocpHttpRequestEvent read FOnDiocpHttpRequest
         write FOnDiocpHttpRequest;
 
+  published
+    /// <summary>
+    ///   处理逻辑线程执行逻辑前执行CoInitalize
+    /// </summary>
+    property LogicWorkerNeedCoInitialize: Boolean read FLogicWorkerNeedCoInitialize
+        write FLogicWorkerNeedCoInitialize;
   end;
 
 
@@ -1206,6 +1214,10 @@ begin
      iocpTaskManager.PostATask(OnExecuteJob, pvRequest);
      {$ELSE}
      try
+      // 如果需要执行
+      if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+        FRecvRequest.IocpWorker.checkCoInitializeEx();
+        
        // 直接触发事件
        TDiocpHttpServer(FOwner).DoRequest(pvRequest);
      finally
@@ -1263,6 +1275,10 @@ begin
 
     // 连接已经断开, 放弃处理逻辑
     if (FOwner = nil) then Exit;
+
+    // 如果需要执行
+    if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+      pvTaskRequest.iocpWorker.checkCoInitializeEx();
 
      // 已经不是当时请求的连接， 放弃处理逻辑
      if lvObj.FContextDNA <> self.ContextDNA then
