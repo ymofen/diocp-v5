@@ -294,7 +294,6 @@ begin
     try
       if FCurrentSendBufferLink = nil then
       begin
-        UnLock; //不得闲增加解锁
         if FSendBlock <> nil then
         begin
           FreeMemBlock(FSendBlock);
@@ -315,7 +314,6 @@ begin
             FreeMemBlock(FSendBlock);
             FSendBlock := nil;
           end;
-          UnLock;
           Exit;
         end;
         goto ReDo;
@@ -363,7 +361,6 @@ begin
     // 如果当前发送Buffer为nil 则退出
     if FCurrentSendBufferLink = nil then
     begin
-      UnLock; //不得闲增加解锁
       if FSendBlock <> nil then
       begin
         FreeMemBlock(FSendBlock);
@@ -385,7 +382,6 @@ begin
       // 如果当前发送Buffer为nil 则退出
       if FCurrentSendBufferLink = nil then
       begin
-        UnLock; //不得闲增加解锁
         Exit;
       end;
 
@@ -396,7 +392,6 @@ begin
       if (lvValidCount = 0) or (lvMemBlock = nil) then
       begin  // 没有需要发送的数据了
         FCurrentSendBufferLink := nil;  // 没有数据了, 下次压入时执行释放
-        UnLock; //不得闲增加解锁
         exit;      
       end; 
     end;
