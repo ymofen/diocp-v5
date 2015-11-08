@@ -45,9 +45,10 @@ type
 
 type
 
-  {$IF RTLVersion>22}
+  {$IF CompilerVersion > 22}
   [ComponentPlatformsAttribute(pidWin32 or pidWin64 or pidOSX32 or pidAndroid or pidiOSSimulator)]
   {$IFEND}
+
   TDiocpBlockTcpClient = class(TComponent)
   private
     FActive: Boolean;
