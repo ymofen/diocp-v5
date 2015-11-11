@@ -872,76 +872,109 @@ var
   lvBuffer:TBytes;
   
 begin
-  if FNtripRequest = nil then
-  begin // 完成后重置，重新处理下一个包
-    FNtripRequest := TDiocpNtripServer(Owner).GetRequest;
-    FNtripRequest.FDiocpContext := self;
-    FNtripRequest.Response.FDiocpContext := self;
-    FNtripRequest.Clear;
-    FNtripState := hsRequest;
-  end;
-
-
-  if self.FNtripState = hsRecvingSource then
-  begin   // 直接接收NtripSource数据
-    if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer) then
-    begin
-      TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer(Self, buf, len);
-    end;
-  end else if FNtripState = hsRecevingBodyData then
-  begin
-    if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer) then
-    begin
-      TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer(Self, buf, len);
-    end;
-  end else
-  begin
-    FRecvBuffer.AddBuffer(buf, len);
-
-    j := FRecvBuffer.SearchBuffer(@__HEAD_END[0], 4);
-    if j = -1 then
-    begin      // 没有接收到头
-      Exit;
-    end;
-
-    FNtripRequest.FRawHeaderData.Clear;
-    FNtripRequest.FRawHeaderData.SetSize(j + 4);
-    /// 写入到原始头，便于解码
-    FRecvBuffer.readBuffer(FNtripRequest.FRawHeaderData.Memory, j + 4);
-
-    if FNtripRequest.DecodeRequestHeader = 0 then
-    begin
-      self.RequestDisconnect('无效的Http协议数据', self);
-      Exit;
+  RecordWorkerStartTick;
+  try
+    if FNtripRequest = nil then
+    begin // 完成后重置，重新处理下一个包
+      FNtripRequest := TDiocpNtripServer(Owner).GetRequest;
+      FNtripRequest.FDiocpContext := self;
+      FNtripRequest.Response.FDiocpContext := self;
+      FNtripRequest.Clear;
+      FNtripState := hsRequest;
     end;
 
 
-
-    // 设置Context的挂机点
-    Self.FMountPoint := FNtripRequest.FMountPoint;
-
-    if SameText(FNtripRequest.FRequestMethod, 'SOURCE') then
-    begin    // NtripSource进行认证
-      if FNtripRequest.SourceRequestPass <> TDiocpNtripServer(FOwner).FNtripSourcePassword then
+    if self.FNtripState = hsRecvingSource then
+    begin   // 直接接收NtripSource数据
+      if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer) then
       begin
-        FNtripRequest.Response.BadPassword;
-        self.RequestDisconnect('NtripSource验证失败', self);
+        TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer(Self, buf, len);
+      end;
+    end else if FNtripState = hsRecevingBodyData then
+    begin
+      if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer) then
+      begin
+        TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer(Self, buf, len);
+      end;
+    end else
+    begin
+      FRecvBuffer.AddBuffer(buf, len);
+
+      j := FRecvBuffer.SearchBuffer(@__HEAD_END[0], 4);
+      if j = -1 then
+      begin      // 没有接收到头
         Exit;
-      end else
+      end;
+
+      FNtripRequest.FRawHeaderData.Clear;
+      FNtripRequest.FRawHeaderData.SetSize(j + 4);
+      /// 写入到原始头，便于解码
+      FRecvBuffer.readBuffer(FNtripRequest.FRawHeaderData.Memory, j + 4);
+
+      if FNtripRequest.DecodeRequestHeader = 0 then
       begin
-        Self.FContextMode := ncmNtripSource;
+        self.RequestDisconnect('无效的Http协议数据', self);
+        Exit;
+      end;
 
-        // 改变装入进入接收数据模式
-        FNtripState := hsRecvingSource;
 
-        // 添加到NtripSource对应表中
-        TDiocpNtripServer(FOwner).FNtripSources.Lock;
-        TDiocpNtripServer(FOwner).FNtripSources.ValueMap[FMountPoint] := Self;
-        TDiocpNtripServer(FOwner).FNtripSources.unLock;
 
-        // 回应请求
-        FNtripRequest.Response.ICY200OK;
+      // 设置Context的挂机点
+      Self.FMountPoint := FNtripRequest.FMountPoint;
 
+      if SameText(FNtripRequest.FRequestMethod, 'SOURCE') then
+      begin    // NtripSource进行认证
+        if FNtripRequest.SourceRequestPass <> TDiocpNtripServer(FOwner).FNtripSourcePassword then
+        begin
+          FNtripRequest.Response.BadPassword;
+          self.RequestDisconnect('NtripSource验证失败', self);
+          Exit;
+        end else
+        begin
+          Self.FContextMode := ncmNtripSource;
+
+          // 改变装入进入接收数据模式
+          FNtripState := hsRecvingSource;
+
+          // 添加到NtripSource对应表中
+          TDiocpNtripServer(FOwner).FNtripSources.Lock;
+          TDiocpNtripServer(FOwner).FNtripSources.ValueMap[FMountPoint] := Self;
+          TDiocpNtripServer(FOwner).FNtripSources.unLock;
+
+          // 回应请求
+          FNtripRequest.Response.ICY200OK;
+
+
+          j := FRecvBuffer.validCount;
+          if j > 0 then
+          begin
+
+            SetLength(lvBuffer, j);
+            FRecvBuffer.readBuffer(@lvBuffer[0], j);
+
+
+            if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer) then
+            begin
+              TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer(Self, buf, len);
+            end;
+          end;
+        end;
+        // 清空所有
+        FRecvBuffer.clearBuffer;
+      end else
+      begin   // client请求模式
+
+        FContextMode := ncmNtripClient;
+
+        lvIsNMEA := false;
+        if Assigned(TDiocpNtripServer(FOwner).OnRequestAcceptEvent) then
+        begin
+          TDiocpNtripServer(FOwner).OnRequestAcceptEvent(FNtripRequest, lvIsNMEA);
+        end;
+        // 触发事件
+        DoRequest(FNtripRequest);
+
+        FNtripState := hsRecevingBodyData;
 
         j := FRecvBuffer.validCount;
         if j > 0 then
@@ -950,46 +983,18 @@ begin
           SetLength(lvBuffer, j);
           FRecvBuffer.readBuffer(@lvBuffer[0], j);
 
-
-          if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer) then
+          if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer) then
           begin
-            TDiocpNtripServer(FOwner).FOnDiocpRecvNtripSourceBuffer(Self, buf, len);
+            TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer(Self, @lvBuffer[0], j);
           end;
         end;
+
+        // 清空所有
+        FRecvBuffer.clearBuffer;
       end;
-      // 清空所有
-      FRecvBuffer.clearBuffer;
-    end else
-    begin   // client请求模式
-
-      FContextMode := ncmNtripClient;
-
-      lvIsNMEA := false;
-      if Assigned(TDiocpNtripServer(FOwner).OnRequestAcceptEvent) then
-      begin
-        TDiocpNtripServer(FOwner).OnRequestAcceptEvent(FNtripRequest, lvIsNMEA);
-      end;
-      // 触发事件
-      DoRequest(FNtripRequest);
-
-      FNtripState := hsRecevingBodyData;
-
-      j := FRecvBuffer.validCount;
-      if j > 0 then
-      begin
-
-        SetLength(lvBuffer, j);
-        FRecvBuffer.readBuffer(@lvBuffer[0], j);
-
-        if Assigned(TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer) then
-        begin
-          TDiocpNtripServer(FOwner).FOnDiocpRecvNtripClientBuffer(Self, @lvBuffer[0], j);
-        end;
-      end;
-
-      // 清空所有
-      FRecvBuffer.clearBuffer;
     end;
+  finally
+    RecordWorkerEndTick;
   end;
 end;
 
