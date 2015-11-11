@@ -829,6 +829,7 @@ type
     FDataMoniter: TIocpDataMonitor;
 
     FActive: Boolean;
+    FDefaultListenAddress: String;
 
 
 
@@ -1046,9 +1047,20 @@ type
         FOnSendRequestResponse write FOnSendRequestResponse;
 
     /// <summary>
+    ///   默认侦听地址, 设置后，指侦听某个IP
+    /// </summary>
+    property DefaultListenAddress: String read FDefaultListenAddress write
+        FDefaultListenAddress;
+
+    /// <summary>
     ///   默认侦听的端口
     /// </summary>
     property Port: Integer read FPort write FPort;
+
+
+
+
+
 
     /// <summary>
     ///   iocp工作线程
@@ -2458,7 +2470,7 @@ begin
 //       FListenSocket.CreateTcpSocket;
 
       // 绑定侦听端口
-      if not FListenSocket.Bind('', FPort) then
+      if not FListenSocket.Bind(FDefaultListenAddress, FPort) then
       begin
         RaiseLastOSError;
       end;

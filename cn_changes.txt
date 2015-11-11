@@ -142,4 +142,7 @@ DIOCP-v5 0.0.2
 27.+ 添加source_cb文件夹(为cb编译使用的源码)
   cb中不能有含有 utils/winapi的文件名，否则会冲突
   2015-10-14 22:47:23
+
+28: + TDiocpTcpServer添加DefaultListenAddresss属性(可以单独侦听单个IP)
+   2015-11-11 09:10:24
  
