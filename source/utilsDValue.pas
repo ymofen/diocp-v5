@@ -1,4 +1,12 @@
+(*
+ * 版权所有:
+      qdac.swish, d10.天地弦
+ * 参考qdac中qvalue进行实现
+*)
 unit utilsDValue;
+
+
+
 
 interface
 
@@ -11,9 +19,12 @@ type
 {$ELSE}
   DStringW = WideString;
 {$ENDIF UNICODE}
+  DCharW = WideChar;
+  PDCharW = PWideChar;
   PDStringW = ^DStringW;
 
-  {$IF RTLVersion<25}
+  // XE5
+  {$IF CompilerVersion<26}
   IntPtr=Integer;
   {$IFEND IntPtr}
 
@@ -109,6 +120,9 @@ function DValueGetAsInteger(ADValue: PDValueRecord): Integer;
 procedure DValueSetAsFloat(ADValue:PDValueRecord; pvValue:Double);
 function DValueGetAsFloat(ADValue: PDValueRecord): Double;
 
+function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW; overload;
+function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW; overload;
+
 implementation
 
 resourcestring
@@ -120,6 +134,51 @@ const
   QValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'Currency', 'Guid',
     'DateTime', 'String', 'Stream', 'Array');
+
+
+function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW;
+const
+  B2HConvert: array [0 .. 15] of DCharW = ('0', '1', '2', '3', '4', '5', '6',
+    '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F');
+  B2HConvertL: array [0 .. 15] of DCharW = ('0', '1', '2', '3', '4', '5', '6',
+    '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f');
+var
+  pd: PDCharW;
+  pb: PByte;
+begin
+  SetLength(Result, l shl 1);
+  pd := PDCharW(Result);
+  pb := p;
+  if ALowerCase then
+  begin
+    while l > 0 do
+    begin
+      pd^ := B2HConvertL[pb^ shr 4];
+      Inc(pd);
+      pd^ := B2HConvertL[pb^ and $0F];
+      Inc(pd);
+      Inc(pb);
+      Dec(l);
+    end;
+  end
+  else
+  begin
+    while l > 0 do
+    begin
+      pd^ := B2HConvert[pb^ shr 4];
+      Inc(pd);
+      pd^ := B2HConvert[pb^ and $0F];
+      Inc(pd);
+      Inc(pb);
+      Dec(l);
+    end;
+  end;
+end;
+
+function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW;
+begin
+  Result := BinToHex(@ABytes[0], Length(ABytes), ALowerCase);
+end;
 
 function GetDValueSize(ADValue: PDValueRecord): Integer;
 var
@@ -251,7 +310,7 @@ end;
 
 function DValueGetAsString(ADValue:PDValueRecord): DStringW;
 var
-  lvHexStr:String;
+  lvHexStr:DStringW;
   function DTToStr(ADValue: PDValueRecord): DStringW;
   begin
     if Trunc(ADValue.Value.AsFloat) = 0 then
@@ -293,10 +352,8 @@ begin
     vdtStream:
       begin
         SetLength(lvHexStr, TMemoryStream(ADValue.Value.AsStream).Size * 2);
-        BinToHex(
-          TMemoryStream(ADValue.Value.AsStream).Memory,
-          PChar(lvHexStr),
-          TMemoryStream(ADValue.Value.AsStream).Size);
+        lvHexStr := BinToHex(
+          TMemoryStream(ADValue.Value.AsStream).Memory, TMemoryStream(ADValue.Value.AsStream).Size, False);
 
         Result := lvHexStr;
       end;
