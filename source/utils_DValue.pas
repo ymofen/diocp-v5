@@ -3,7 +3,7 @@
       qdac.swish, d10.天地弦
  * 参考qdac中qvalue进行实现
 *)
-unit utilsDValue;
+unit utils_DValue;
 
 
 
@@ -90,8 +90,67 @@ type
     Value: TDValueData;
     ValueType: TDValueDataType;
   end;
-
   TDValues = array of TDValueRecord;
+  
+  TDValueObject = class(TObject)
+  private
+    FName: String;
+    FRawValue: TDValueRecord;
+    function GetAsBoolean: Boolean;
+    function GetAsFloat: Double;
+    function GetAsInetger: Int64;
+    function GetAsString: String;
+    function GetDataType: TDValueDataType;
+    procedure SetAsBoolean(const Value: Boolean);
+    procedure SetAsFloat(const Value: Double);
+    procedure SetAsInetger(const Value: Int64);
+    procedure SetAsString(const Value: String);
+  public
+    destructor Destroy; override;
+    property AsFloat: Double read GetAsFloat write SetAsFloat;
+    property AsString: String read GetAsString write SetAsString;
+    property AsInetger: Int64 read GetAsInetger write SetAsInetger;
+    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
+
+    property DataType: TDValueDataType read GetDataType;
+            
+    property Name: String read FName write FName;
+  end;
+
+
+  TDValueList = class(TObject)
+  private
+    FList: TList;
+    function GetCount: Integer;
+    function GetItems(pvIndex: Integer): TDValueObject;
+    function InnerAdd(pvValueName:string): TDValueObject;
+  public
+    constructor Create();
+    destructor Destroy; override;
+    function Add(pvValueName:String): TDValueObject;
+
+    function FindByName(pvValueName:string): TDValueObject;
+
+    function ParamByName(pvValueName:String): TDValueObject;
+
+    /// <summary>
+    ///   如果参数不存在会进行创建,如果存在直接返回
+    /// </summary>
+    function ForceByName(pvValueName: String): TDValueObject;
+
+    /// <summary>
+    ///   清空所有的对象
+    /// </summary>
+    procedure Clear;    
+    
+    property Count: Integer read GetCount;
+
+    property Items[pvIndex: Integer]: TDValueObject read GetItems; default;
+  end;
+
+
+
+
 
 
 
@@ -104,6 +163,7 @@ function GetDValueItem(ADValue: PDValueRecord; pvIndex: Integer): PDValueRecord;
 /// <param name="ADValue"> (PDValueRecord) </param>
 procedure ClearDValue(ADValue:PDValueRecord);
 procedure CheckDValueSetType(ADValue:PDValueRecord; AType: TDValueDataType);
+
 procedure CheckDValueSetArrayLength(ADValue: PDValueRecord; ALen: Integer);
 
 
@@ -120,6 +180,10 @@ function DValueGetAsInteger(ADValue: PDValueRecord): Integer;
 procedure DValueSetAsFloat(ADValue:PDValueRecord; pvValue:Double);
 function DValueGetAsFloat(ADValue: PDValueRecord): Double;
 
+
+procedure DValueSetAsBoolean(ADValue:PDValueRecord; pvValue:Boolean);
+function DValueGetAsBoolean(ADValue: PDValueRecord): Boolean;
+
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW; overload;
 function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW; overload;
 
@@ -129,6 +193,9 @@ resourcestring
   SValueNotArray = '当前值不是数组类型，无法按数组方式访问。';
   SConvertError = '无法将 %s 转换为 %s 类型的值。';
   SUnsupportStreamSource = '无法将 Variant 类型转换为流。';
+
+  SItemNotFound = '找不到对应的项目:%s';
+  SItemExists   = '项目[%s]已经存在,不能重复添加.';
 
 const
   QValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
@@ -453,6 +520,169 @@ begin
   else
     raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
       QValueTypeName[vdtFloat]]);
+  end;
+end;
+
+procedure DValueSetAsBoolean(ADValue:PDValueRecord; pvValue:Boolean);
+begin
+  CheckDValueSetType(ADValue, vdtBoolean);
+  ADValue.Value.AsBoolean := pvValue;
+end;
+
+function DValueGetAsBoolean(ADValue: PDValueRecord): Boolean;
+begin
+  case ADValue.ValueType of
+    vdtFloat, vdtDateTime:
+      Result := not IsZero(ADValue.Value.AsFloat);
+    vdtSingle:
+      Result := not IsZero(ADValue.Value.AsSingle);
+    vdtUnset, vdtNull:
+      Result := false;
+    vdtBoolean:
+      Result := ADValue.Value.AsBoolean;
+    vdtInteger:
+      Result :=  ADValue.Value.AsInteger <> 0;
+    vdtInt64:
+      Result := ADValue.Value.AsInt64 <> 0;
+    vdtCurrency:
+      Result := not IsZero(ADValue.Value.AsCurrency);
+    vdtString:
+      Result := StrToBoolDef(ADValue.Value.AsString^, False)
+  else
+    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
+      QValueTypeName[vdtBoolean]]);
+  end;
+end;
+
+destructor TDValueObject.Destroy;
+begin
+  ClearDValue(@FRawValue);
+  inherited;
+end;
+
+function TDValueObject.GetAsBoolean: Boolean;
+begin
+  Result := DValueGetAsBoolean(@FRawValue);
+end;
+
+function TDValueObject.GetAsFloat: Double;
+begin
+  Result := DValueGetAsFloat(@FRawValue);
+end;
+
+function TDValueObject.GetAsInetger: Int64;
+begin
+  Result := DValueGetAsInt64(@FRawValue);
+end;
+
+function TDValueObject.GetAsString: String;
+begin
+  Result := DValueGetAsString(@FRawValue);
+end;
+
+function TDValueObject.GetDataType: TDValueDataType;
+begin
+  Result := FRawValue.ValueType;
+end;
+
+procedure TDValueObject.SetAsBoolean(const Value: Boolean);
+begin
+  DValueSetAsBoolean(@FRawValue, Value);
+end;
+
+procedure TDValueObject.SetAsFloat(const Value: Double);
+begin
+  DValueSetAsFloat(@FRawValue, Value);
+end;
+
+procedure TDValueObject.SetAsInetger(const Value: Int64);
+begin
+  DValueSetAsInt64(@FRawValue, Value);
+end;
+
+procedure TDValueObject.SetAsString(const Value: String);
+begin
+  DValueSetAsString(@FRawValue, Value);
+end;
+
+function TDValueList.Add(pvValueName:String): TDValueObject;
+begin
+  if FindByName(pvValueName) <> nil then
+    raise Exception.CreateFmt(SItemExists, [pvValueName]);
+
+  Result := InnerAdd(pvValueName);
+end;
+
+procedure TDValueList.Clear;
+var
+  i: Integer;
+begin
+  for i := 0 to FList.Count - 1 do
+  begin
+    TObject(FList[i]).Free;
+  end;
+  FList.Clear;
+end;
+
+constructor TDValueList.Create;
+begin
+  inherited Create;
+  FList := TList.Create;
+end;
+
+destructor TDValueList.Destroy;
+begin
+  Clear;
+  FList.Free;
+  inherited;
+end;
+
+function TDValueList.GetCount: Integer;
+begin
+  Result := FList.Count;
+end;
+
+function TDValueList.GetItems(pvIndex: Integer): TDValueObject;
+begin
+  Result :=TDValueObject(FList[pvIndex]);
+end;
+
+function TDValueList.FindByName(pvValueName:string): TDValueObject;
+var
+  i:Integer;
+  lvItem:TDValueObject;
+begin
+  Result := nil;
+  for i := 0 to FList.Count - 1 do
+  begin
+    lvItem := TDValueObject(FList[i]);
+    if SameText(lvItem.Name, pvValueName)  then
+    begin
+      Result := lvItem;
+      Break;    
+    end;
+  end;
+end;
+
+function TDValueList.ForceByName(pvValueName: String): TDValueObject;
+begin
+  Result := FindByName(pvValueName);
+  if Result = nil then Result := InnerAdd(pvValueName);
+end;
+
+function TDValueList.InnerAdd(pvValueName:string): TDValueObject;
+begin
+  Result := TDValueObject.Create;
+  Result.Name := pvValueName;
+  FList.Add(Result);
+end;
+
+function TDValueList.ParamByName(pvValueName:String): TDValueObject;
+begin
+  Result := FindByName(pvValueName);
+  if Result = nil then
+  begin
+    Raise Exception.CreateFmt(SItemNotFound, [pvValueName]);
   end;
 end;
 

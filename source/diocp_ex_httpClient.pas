@@ -11,7 +11,7 @@ uses
   , diocp.winapi.winsock2
   , SysConst
   {$ENDIF}
-  , SysUtils, utilsUrl, utils.strings;
+  , SysUtils, utils_URL, utils.strings;
 
 
 
@@ -31,6 +31,7 @@ type
     FRawSocket: TRawSocket;
     FRequestAccept: String;
     FRequestAcceptEncoding: String;
+    FRawCookie:String;
 
     FRequestBody: TMemoryStream;
     FRequestContentType: String;
@@ -272,6 +273,12 @@ begin
     FRequestHeader.Add(Format('GET %s HTTP/1.1', [FURL.URI + '?' + FURL.ParamStr]));
   end;
   FRequestHeader.Add(Format('Host: %s', [FURL.RawHostStr]));
+  
+  if FRawCookie <> '' then
+  begin
+    FRequestHeader.Add('Cookie:' + FRawCookie);
+  end;
+  
   FRequestHeader.Add('');                 // 添加一个回车符
 
   FRawSocket.CreateTcpSocket;
@@ -342,6 +349,15 @@ begin
     FResponseBody.SetSize(l);
     CheckRecv(FResponseBody.Memory, l);    
   end;
+
+  lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
+
+  if lvTempStr <> '' then
+  begin  
+    FRawCookie := lvTempStr;
+  end;
+
+
   
 
   
@@ -369,6 +385,12 @@ begin
   begin
     FRequestHeader.Add(Format('POST %s HTTP/1.1', [FURL.URI + '?' + FURL.ParamStr]));
   end;
+
+  if FRawCookie <> '' then
+  begin
+    FRequestHeader.Add('Cookie:' + FRawCookie);
+  end;
+
   FRequestHeader.Add(Format('Host: %s', [FURL.RawHostStr]));
   FRequestHeader.Add(Format('Content-Length: %d', [self.FRequestBody.Size]));
   if FRequestContentType = '' then

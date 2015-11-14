@@ -39,7 +39,7 @@ uses
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp.task{$ENDIF}
-  , diocp.tcp.server, utils.queues, utils.hashs;
+  , diocp.tcp.server, utils.queues, utils.hashs, utils_DValue;
 
 
 
@@ -76,6 +76,18 @@ type
   TDiocpHttpSession = class(TObject)
   public
     constructor Create; virtual;
+  end;
+
+  /// <summary>
+  ///   使用DValue存储数据的Session
+  /// </summary>
+  TDiocpHttpDValueSessoin = class(TDiocpHttpSession)
+  private
+    FDValues: TDValueList;
+  public
+    constructor Create; override;
+    destructor Destroy; override;
+    property DValues: TDValueList read FDValues;
   end;
 
   /// <summary>
@@ -441,6 +453,9 @@ type
     /// </summary>
     function GetSession(pvSessionID:string): TDiocpHttpSession;
 
+    
+    function GetSessionCount: Integer;
+
   public
     constructor Create(AOwner: TComponent); override;
 
@@ -448,6 +463,10 @@ type
 
     procedure RegisterSessionClass(pvClass:TDiocpHttpSessionClass);
 
+    /// <summary>
+    ///   获取Session总数
+    /// </summary>
+    property SessionCount: Integer read GetSessionCount;
 
 
     /// <summary>
@@ -462,6 +481,8 @@ type
     /// </summary>
     property OnDiocpHttpRequest: TOnDiocpHttpRequestEvent read FOnDiocpHttpRequest
         write FOnDiocpHttpRequest;
+
+    
 
   published
     /// <summary>
@@ -1425,7 +1446,7 @@ begin
   FSessionList := TDHashTableSafe.Create;
   KeepAlive := false;
   RegisterContextClass(TDiocpHttpClientContext);
-  RegisterSessionClass(TDiocpHttpSession);
+  RegisterSessionClass(TDiocpHttpDValueSessoin);
 end;
 
 destructor TDiocpHttpServer.Destroy;
@@ -1481,6 +1502,11 @@ begin
   end;
 end;
 
+function TDiocpHttpServer.GetSessionCount: Integer;
+begin
+  Result := FSessionList.Count;
+end;
+
 procedure TDiocpHttpServer.GiveBackRequest(pvRequest: TDiocpHttpRequest);
 begin
   pvRequest.Clear;
@@ -1500,6 +1526,18 @@ end;
 constructor TDiocpHttpSession.Create;
 begin
 
+end;
+
+constructor TDiocpHttpDValueSessoin.Create;
+begin
+  inherited Create;
+  FDValues := TDValueList.Create();
+end;
+
+destructor TDiocpHttpDValueSessoin.Destroy;
+begin
+  FDValues.Free;
+  inherited Destroy;
 end;
 
 
