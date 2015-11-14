@@ -145,4 +145,6 @@ DIOCP-v5 0.0.2
 
 28: + TDiocpTcpServer添加DefaultListenAddresss属性(可以单独侦听单个IP)
    2015-11-11 09:10:24
+
+29: + 添加http_ex_httpClient请求单元
  
