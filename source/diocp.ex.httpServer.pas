@@ -39,7 +39,8 @@ uses
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp.task{$ENDIF}
-  , diocp.tcp.server, utils.queues, utils.hashs, utils_DValue;
+  , diocp.tcp.server, utils.queues, utils.hashs, utils_DValue,
+  utils.objectPool, utils.safeLogger;
 
 
 
@@ -74,8 +75,13 @@ type
   ///  基础的Session类，用户可以自己扩展该类，然后注册
   /// </summary>
   TDiocpHttpSession = class(TObject)
+  private
+    FLastActivity: Integer;
+  protected
+    procedure DoCleanup; virtual;
   public
     constructor Create; virtual;
+    property LastActivity: Integer read FLastActivity;
   end;
 
   /// <summary>
@@ -84,6 +90,8 @@ type
   TDiocpHttpDValueSessoin = class(TDiocpHttpSession)
   private
     FDValues: TDValueList;
+  protected
+    procedure DoCleanup; override;
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -209,13 +217,26 @@ type
     /// </summary>
     procedure WriteRawBuffer(const buffer: Pointer; len: Integer);
 
+    /// <summary>
+    ///   检测Cookie中的SessionID信息
+    ///   不创建Session对象
+    /// </summary>
     procedure CheckCookieSession;
   protected
   public
     constructor Create;
     destructor Destroy; override;
 
+    /// <summary>
+    ///   获取当前Session
+    ///    如果没有会进行创建    
+    /// </summary>
     function GetSession: TDiocpHttpSession;
+
+    /// <summary>
+    ///   手动清理当前Session
+    /// </summary>
+    procedure RemoveSession;
 
 
     /// <summary>
@@ -420,6 +441,7 @@ type
   TDiocpHttpServer = class(TDiocpTcpServer)
   private
     FRequestPool: TSafeQueue;
+    FSessionObjectPool: TObjectPool;
     FSessionList: TDHashTableSafe;
     FSessionClass : TDiocpHttpSessionClass;
 
@@ -453,8 +475,20 @@ type
     /// </summary>
     function GetSession(pvSessionID:string): TDiocpHttpSession;
 
+    /// <summary>
+    ///   移除掉一个Session，释放
+    /// </summary>
+    function RemoveSession(pvSessionID:String): Boolean;
+
     
     function GetSessionCount: Integer;
+
+    function OnCreateSessionObject: TObject;
+
+    /// <summary>
+    ///   SessionMap删除的时候事件，归还到Session池
+    /// </summary>
+    procedure OnSessionRemove(pvData:Pointer);
 
   public
     constructor Create(AOwner: TComponent); override;
@@ -574,7 +608,20 @@ begin
 end;
 
 function TDiocpHttpRequest.GetCookie(pvCookieName: string): String;
+var
+  i:Integer;
+  lvCookie:TDiocpHttpCookie;
 begin
+  for i := 0 to FResponse.FCookies.Count - 1 do
+  begin
+    lvCookie := FResponse.FCookies[i];
+    if lvCookie.Name = pvCookieName then
+    begin
+      Result := lvCookie.Value;
+      Exit;
+    end;
+  end;
+
   Result := StringsValueOfName(FRequestCookieList, pvCookieName, ['='], true);
 end;
 
@@ -1026,6 +1073,12 @@ begin
 
 end;
 
+procedure TDiocpHttpRequest.RemoveSession;
+begin
+  CheckCookieSession;
+  TDiocpHttpServer(Connection.Owner).RemoveSession(FSessionID);
+end;
+
 function TDiocpHttpRequest.GetSession: TDiocpHttpSession;
 begin
   CheckCookieSession;
@@ -1443,7 +1496,9 @@ constructor TDiocpHttpServer.Create(AOwner: TComponent);
 begin
   inherited;
   FRequestPool := TSafeQueue.Create;
+  FSessionObjectPool := TObjectPool.Create(OnCreateSessionObject);
   FSessionList := TDHashTableSafe.Create;
+  FSessionList.OnDelete := OnSessionRemove;
   KeepAlive := false;
   RegisterContextClass(TDiocpHttpClientContext);
   RegisterSessionClass(TDiocpHttpDValueSessoin);
@@ -1453,8 +1508,13 @@ destructor TDiocpHttpServer.Destroy;
 begin
   FRequestPool.FreeDataObject;
   FRequestPool.Free;
-  FSessionList.FreeAllDataAsObject;
+
+  /// 只需要清理，清理时会归还到Session对象池
+  FSessionList.Clear;
   FSessionList.Free;
+
+  FSessionObjectPool.WaitFor(10000);
+  FSessionObjectPool.Free;
   inherited;
 end;
 
@@ -1493,8 +1553,7 @@ begin
     Result := TDiocpHttpSession(FSessionList.ValueMap[pvSessionID]);
     if Result = nil then
     begin
-      if FSessionClass = nil then raise Exception.Create('尚未注册SessionClass, 不能获取Session');
-      Result := FSessionClass.Create();
+      Result := TDiocpHttpSession(FSessionObjectPool.GetObject);
       FSessionList.ValueMap[pvSessionID] := Result;      
     end;
   finally
@@ -1513,9 +1572,46 @@ begin
   FRequestPool.EnQueue(pvRequest);
 end;
 
+function TDiocpHttpServer.OnCreateSessionObject: TObject;
+begin
+  if FSessionClass = nil then raise Exception.Create('尚未注册SessionClass, 不能获取Session');
+  Result := FSessionClass.Create();
+end;
+
+procedure TDiocpHttpServer.OnSessionRemove(pvData: Pointer);
+begin
+  try
+    // 清理Session
+    TDiocpHttpSession(pvData).DoCleanup();
+  except
+    on E:Exception do
+    begin
+      LogMessage('Session DoCleanUp Error:' + e.Message, 'rpc_exception', lgvError);
+    end;
+  end;
+  FSessionObjectPool.ReleaseObject(TObject(pvData));
+end;
+
 procedure TDiocpHttpServer.RegisterSessionClass(pvClass:TDiocpHttpSessionClass);
 begin
   FSessionClass := pvClass;
+end;
+
+function TDiocpHttpServer.RemoveSession(pvSessionID:String): Boolean;
+var
+  lvSession:TDiocpHttpSession;
+begin
+  FSessionList.Lock;
+  try
+    lvSession := TDiocpHttpSession(FSessionList.ValueMap[pvSessionID]);
+    if lvSession <> nil then
+    begin
+      // 会触发OnSessionRemove, 归还对应的对象到池
+      FSessionList.Remove(pvSessionID);
+    end;
+  finally
+    FSessionList.unLock;
+  end;  
 end;
 
 function TDiocpHttpCookie.ToString: String;
@@ -1541,5 +1637,16 @@ begin
 end;
 
 
+
+procedure TDiocpHttpDValueSessoin.DoCleanup;
+begin
+  inherited;
+  FDValues.Clear;
+end;
+
+procedure TDiocpHttpSession.DoCleanup;
+begin
+
+end;
 
 end.

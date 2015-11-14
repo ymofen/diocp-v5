@@ -37,7 +37,7 @@ type
     FRequestContentType: String;
     FRequestHeader: TStringList;
     FResponseBody: TMemoryStream;
-    FResponseContextType: String;
+    FResponseContentType: String;
     FResponseHeader: TStringList;
     /// <summary>
     ///  CheckRecv buffer
@@ -74,16 +74,19 @@ type
         FRequestContentType;
 
     property RequestBody: TMemoryStream read FRequestBody;
-    property ResponseBody: TMemoryStream read FResponseBody;
+    property RequestHeader: TStringList read FRequestHeader;
 
+    property ResponseBody: TMemoryStream read FResponseBody;
+    property ResponseHeader: TStringList read FResponseHeader;
+    
     /// <summary>
     ///   响应得到的头信息
     ///   返回的数据类型
     ///     Content-Type:image/png
     ///     Content-Type:text/html; charset=utf-8
     /// </summary>
-    property ResponseContextType: String read FResponseContextType write
-        FResponseContextType;
+    property ResponseContentType: String read FResponseContentType;
+
   end;
 
 
@@ -341,7 +344,7 @@ begin
   {$ENDIF}
 
   FResponseHeader.Text := lvRawHeaderStr;
-  FResponseContextType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
+  FResponseContentType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
   lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
   l := StrToIntDef(lvTempStr, 0);
   if l > 0 then
