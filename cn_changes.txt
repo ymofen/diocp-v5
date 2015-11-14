@@ -147,4 +147,8 @@ DIOCP-v5 0.0.2
    2015-11-11 09:10:24
 
 29: + 添加http_ex_httpClient请求单元
- 
+    * utilsDValue->utils_DValue, utilsUrl -> utils_URL
+
+    * httpClient 处理Cookie
+    * httpServer 添加HttpDValueSession
+    2015-11-14 16:12:01
