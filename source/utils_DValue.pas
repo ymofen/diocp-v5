@@ -2,15 +2,20 @@
  * 版权所有:
       qdac.swish, d10.天地弦
  * 参考qdac中qvalue进行实现
+ *
+ * 1. android下面DValuelist使用 TList会有出现异常, 使用TList<TDValueObject>正常
+ *    2015-11-15 16:08:04(感谢CP46反馈)
 *)
 unit utils_DValue;
 
 
-
-
 interface
 
-uses classes, sysutils, variants, varutils, math;
+uses classes, sysutils, variants,
+{$IFDEF UNICODE}
+     System.Generics.Collections,
+{$ENDIF}
+     varutils, math;
 
 
 type
@@ -120,7 +125,11 @@ type
 
   TDValueList = class(TObject)
   private
+    {$IFDEF UNICODE}
+    FList: TList<TDValueObject>;
+    {$ELSE}
     FList: TList;
+    {$ENDIF}
     function GetCount: Integer;
     function GetItems(pvIndex: Integer): TDValueObject;
     function InnerAdd(pvValueName:string): TDValueObject;
@@ -627,7 +636,12 @@ end;
 constructor TDValueList.Create;
 begin
   inherited Create;
+{$IFDEF UNICODE}
+  FList := TList<TDValueObject>.Create;
+{$ELSE}
   FList := TList.Create;
+{$ENDIF}
+
 end;
 
 destructor TDValueList.Destroy;
