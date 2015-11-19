@@ -11,8 +11,12 @@ unit utils_DValue;
 
 interface
 
+{$IF CompilerVersion>25}  // XE4(VER250)
+  {$DEFINE HAVE_GENERICS}
+{$ENDIF}
+
 uses classes, sysutils, variants,
-{$IFDEF UNICODE}
+{$IFDEF HAVE_GENERICS}
      System.Generics.Collections,
 {$ENDIF}
      varutils, math;
@@ -125,7 +129,7 @@ type
 
   TDValueList = class(TObject)
   private
-    {$IFDEF UNICODE}
+    {$IFDEF HAVE_GENERICS}
     FList: TList<TDValueObject>;
     {$ELSE}
     FList: TList;
@@ -636,7 +640,7 @@ end;
 constructor TDValueList.Create;
 begin
   inherited Create;
-{$IFDEF UNICODE}
+{$IFDEF HAVE_GENERICS}
   FList := TList<TDValueObject>.Create;
 {$ELSE}
   FList := TList.Create;
