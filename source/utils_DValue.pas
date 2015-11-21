@@ -8,12 +8,12 @@
 *)
 unit utils_DValue;
 
+{$IF CompilerVersion>25}  // XE4(VER250)
+  {$DEFINE HAVE_GENERICS}
+{$IFEND}
 
 interface
 
-{$IF CompilerVersion>25}  // XE4(VER250)
-  {$DEFINE HAVE_GENERICS}
-{$ENDIF}
 
 uses classes, sysutils, variants,
 {$IFDEF HAVE_GENERICS}
