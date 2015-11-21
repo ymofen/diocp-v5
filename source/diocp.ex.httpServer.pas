@@ -1481,6 +1481,9 @@ begin
         // 避免断开后还回对象池，造成重复还回
         FCurrentRequest := nil;
 
+        //
+        lvTempRequest.FRawPostData.Position := 0;
+
         // 触发事件
         DoRequest(lvTempRequest);
       end;
