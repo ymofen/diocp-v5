@@ -17,7 +17,8 @@ uses
 
 
 type
-{$IF RTLVersion<25}
+// 25:XE5
+{$IF CompilerVersion<=25}
   IntPtr = Integer;
 {$IFEND}
 

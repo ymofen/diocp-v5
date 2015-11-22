@@ -48,8 +48,12 @@ type
 {$ELSE}
   WChar = WideChar;
   PWChar = PWideChar;
-  IntPtr = Integer;
 {$ENDIF}
+
+  // 25:XE5
+  {$IF CompilerVersion<=25}
+  IntPtr=Integer;
+  {$IFEND}
 
   TArrayStrings = array of string;
   PArrayStrings = ^ TArrayStrings;

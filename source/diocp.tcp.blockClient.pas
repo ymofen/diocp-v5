@@ -31,7 +31,8 @@ uses
   ,Classes
   , SysConst;
 
-{$if CompilerVersion < 23}
+// 25:XE5
+{$IF CompilerVersion<=25}
 type
      NativeUInt = Cardinal;
      IntPtr = Cardinal;
@@ -45,8 +46,9 @@ type
 
 type
 
-  {$IF CompilerVersion > 22}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64 or pidOSX32 or pidAndroid or pidiOSSimulator)]
+  // 22 :XE  25:XE5
+  {$IF CompilerVersion >= 22}  // 大于25有Android和iOS
+  [ComponentPlatformsAttribute(pidWin32 or pidWin64 {$IF CompilerVersion >= 25} or pidOSX32 or pidAndroid or pidiOSSimulator{$IFEND})]
   {$IFEND}
 
   TDiocpBlockTcpClient = class(TComponent)

@@ -20,21 +20,13 @@ interface
 
 uses
   SysUtils
-{$IFDEF POSIX}
-    , Posix.Base, Posix.SysSocket, Posix.arpainet, Posix.NetinetIn, Posix.UniStd
-    , Posix.NetDB
-    , Posix.Fcntl
-    , Posix.SysSelect
-    , Posix.SysTime
-{$ELSE}
-    , Windows, winsock
-{$ENDIF};
+  , Posix.Base, Posix.SysSocket, Posix.arpainet, Posix.NetinetIn, Posix.UniStd
+  , Posix.NetDB
+  , Posix.Fcntl
+  , Posix.SysSelect
+  , Posix.SysTime;
 
-{$if CompilerVersion < 23}
-type
-     NativeUInt = Cardinal;
-     IntPtr = Cardinal;
-{$ifend}
+
 
 const
   SOCKET_ERROR   = -1;
@@ -141,46 +133,6 @@ type
 
 implementation
 
-
-{$IFDEF MSWINDOWS}
-const
-  winsocket = 'wsock32.dll';
-
-var
-  __WSAStartupDone:Boolean;
-
-{$EXTERNALSYM send}
-function send(s: TSocket; const Buf; len, flags: Integer): Integer; stdcall;
-  external winsocket name 'send';
-{$EXTERNALSYM sendto}
-function sendto(s: TSocket; const Buf; len, flags: Integer; var addrto: TSockAddr;
-  tolen: Integer): Integer; stdcall; external    winsocket name 'sendto';
-
-/// <summary>
-///  compare target, cmp_val same set target = new_val
-///    return old value
-/// </summary>
-function lock_cmp_exchange(cmp_val, new_val: Boolean; var target: Boolean): Boolean;
-asm
-  lock cmpxchg [ecx], dl
-end;
-
-procedure __CheckWSAStartup;
-var
-  AData: WSAData;
-begin
-  if lock_cmp_exchange(False, True, __WSAStartupDone) = False then
-  begin
-    if WSAStartup(MakeWord(1, 1), AData) <> 0 then
-    begin
-      __WSAStartupDone := false;
-      RaiseLastOSError(WSAGetLastError);
-    end;
-  end;
-end;
-
-{$ENDIF}
-
 {$IFDEF POSIX}
 function TranslateTInAddrToString(var AInAddr): string;
 type
@@ -272,30 +224,18 @@ begin
   if lvTempSocket <> INVALID_HANDLE_VALUE then
   begin
     FSocketHandle := INVALID_HANDLE_VALUE;
-    {$IFDEF MSWINDOWS}
-      shutdown(lvTempSocket, SD_BOTH);
-      closesocket(lvTempSocket);
-    {$ELSE}
       __close(lvTempSocket);
-    {$ENDIF}
   end;
 end;
 
 function TRawSocket.Connect(const pvAddr: string; pvPort: Integer): Boolean;
-{$IFDEF POSIX}
-{$ELSE}
-{$ENDIF}
 begin
   FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
   FSockaddr.sin_family := AF_INET;
   FSockaddr.sin_port := htons(pvPort);
-{$IFDEF POSIX}
   FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
   Result := Posix.SysSocket.Connect(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in))  = 0;
-{$ELSE}
-  FSockaddr.sin_addr.s_addr :=inet_addr(PAnsichar(AnsiString(pvAddr)));
-  Result := winsock.Connect(FSocketHandle, FSockaddr, sizeof(sockaddr_in))  = 0;
-{$ENDIF}
+
 end;
 
 function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;

@@ -41,7 +41,8 @@ interface
 uses
   Windows, SyncObjs, SysUtils, Classes;
 
-{$if CompilerVersion < 23}
+// 25:XE5
+{$IF CompilerVersion<=25}
 type
      NativeUInt = Cardinal;
      IntPtr = Cardinal;
