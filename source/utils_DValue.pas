@@ -23,6 +23,9 @@ uses classes, sysutils, variants,
 
 
 type
+
+  TDValueException = class(Exception);
+  
 {$IFDEF UNICODE}
   DStringW = UnicodeString;
 {$ELSE}
@@ -43,7 +46,15 @@ type
 
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
     vdtInteger, vdtInt64, vdtCurrency, vdtGuid, vdtDateTime,
-    vdtString, vdtStream, vdtArray);
+    vdtString, vdtStringW, vdtStream, vdtArray);
+
+  // 节点类型
+  TDValueNodeType = (vntNull,        // 没有值
+                     vntArray,       // 列表-数组
+                     vntObject,      // 列表-Key-Value
+                     vntValue        // 值
+                     );
+
 
 
   PDValueRecord = ^TDValueRecord;
@@ -64,31 +75,33 @@ type
       6:
         (AsDateTime: TDateTime);
       7:
-        (AsString: PDStringW);
-      8:
+        (AsString: PString);
+      9:
+        (AsStringW: PDStringW);
+      15:
         (AsStream: Pointer);
-      9:    // Array
+      16:    // Array
         (
           ArrayLength: Cardinal;
           ArrayItemsEntry: PDValueRecord;
         );
-      10:
-        (AsCurrency: Currency);
-      11:
-        (AsSingle: Single);
-      13:
-        (AsShort: Shortint);
-      14:
-        (AsByte: Byte);
-      15:
-        (AsSmallint: Smallint);
-      16:
-        (AsWord: Word);
       17:
-        (AsExtend: Extended);
+        (AsCurrency: Currency);
       18:
+        (AsSingle: Single);
+      20:
+        (AsShort: Shortint);
+      21:
+        (AsByte: Byte);
+      22:
+        (AsSmallint: Smallint);
+      23:
+        (AsWord: Word);
+      24:
+        (AsExtend: Extended);
+      25:
         (AsPointer: Pointer);
-      19:
+      30:
         (
           ValueType: TDValueDataType;
           Value: PDValueRecord;
@@ -100,7 +113,14 @@ type
     ValueType: TDValueDataType;
   end;
   TDValues = array of TDValueRecord;
-  
+
+const
+  TDValueNodeTypeStr: array[TDValueNodeType] of string = ('vntNull', 'vntArray', 'vntObject', 'vntValue');
+
+
+type
+  TDValueItem = class;
+  TDValueNode = class;
   TDValueObject = class(TObject)
   private
     FName: String;
@@ -122,7 +142,7 @@ type
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
 
     property DataType: TDValueDataType read GetDataType;
-            
+
     property Name: String read FName write FName;
   end;
 
@@ -162,12 +182,77 @@ type
   end;
 
 
+  /// <summary>
+  ///   DValue节点
+  /// </summary>
+  TDValueNode = class(TObject)
+  private
+    FName: TDValueItem;
+    FValue: TDValueItem;
+    FNodeType: TDValueNodeType;
+    
+    {$IFDEF HAVE_GENERICS}
+    FChildren: TList<TDValueNode>;
+    {$ELSE}
+    FChildren: TList;
+    {$ENDIF}
+  private
+    function GetCount: Integer;
+    procedure ClearChildren();
+    procedure CheckCreateChildren;
+    procedure CreateName();
+    procedure DeleteName();
+    /// <summary>
+    ///   根据名称查找子节点
+    /// </summary>
+    function IndexOf(pvName: string): Integer;
+  public
+    constructor Create(pvType: TDValueNodeType);
+    
+    destructor Destroy; override;
+
+    /// <summary>
+    ///   设置节点类型, 类型转换时会丢失数据
+    /// </summary>
+    procedure CheckSetNodeType(pvType:TDValueNodeType);
+
+    function ItemByName(pvName:string):TDValueItem;
+
+    property Count: Integer read GetCount;
+    property Name: TDValueItem read FName;
+    property Value: TDValueItem read FValue;
+  end;
+
+  TDValueItem = class(TObject)
+  private
+    FRawValue: TDValueRecord;
+    function GetAsBoolean: Boolean;
+    function GetAsFloat: Double;
+    function GetAsInetger: Int64;
+    function GetAsString: String;
+    function GetDataType: TDValueDataType;
+    procedure SetAsBoolean(const Value: Boolean);
+    procedure SetAsFloat(const Value: Double);
+    procedure SetAsInetger(const Value: Int64);
+    procedure SetAsString(const Value: String);
+  public
+    destructor Destroy; override;
+    function Equal(pvItem:TDValueItem): Boolean;
+    property AsFloat: Double read GetAsFloat write SetAsFloat;
+    property AsString: String read GetAsString write SetAsString;
+    property AsInetger: Int64 read GetAsInetger write SetAsInetger;
+    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
+    property DataType: TDValueDataType read GetDataType;
+  end;
 
 
 
 
 
 
+
+function CompareDValue(pvDValue1: PDValueRecord; pvDValue2:PDValueRecord):
+    Integer;
 
 function GetDValueSize(ADValue: PDValueRecord): Integer;
 function GetDValueItem(ADValue: PDValueRecord; pvIndex: Integer): PDValueRecord;
@@ -179,9 +264,13 @@ procedure CheckDValueSetType(ADValue:PDValueRecord; AType: TDValueDataType);
 
 procedure CheckDValueSetArrayLength(ADValue: PDValueRecord; ALen: Integer);
 
+procedure DValueSetAsString(ADValue:PDValueRecord; pvString:String);
+function DValueGetAsString(ADValue:PDValueRecord): string;
 
-procedure DValueSetAsString(ADValue:PDValueRecord; pvString:DStringW);
-function DValueGetAsString(ADValue:PDValueRecord): DStringW;
+procedure DValueSetAsStringW(ADValue:PDValueRecord; pvString:DStringW);
+function DValueGetAsStringW(ADValue:PDValueRecord): DStringW;
+
+
 
 procedure DValueSetAsInt64(ADValue:PDValueRecord; pvValue:Int64);
 function DValueGetAsInt64(ADValue: PDValueRecord): Int64;
@@ -209,11 +298,13 @@ resourcestring
 
   SItemNotFound = '找不到对应的项目:%s';
   SItemExists   = '项目[%s]已经存在,不能重复添加.';
+  SNoNameNode   = '该类型[%s]节点不保护名字';
+  SNoValueNode  = '该类型[%s]节点不包含值';
 
 const
   QValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'Currency', 'Guid',
-    'DateTime', 'String', 'Stream', 'Array');
+    'DateTime', 'String', 'StringW', 'Stream', 'Array');
 
 
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW;
@@ -325,6 +416,8 @@ begin
         Dispose(ADValue.Value.AsGuid);
       vdtString:
         Dispose(ADValue.Value.AsString);
+      vdtStringW:
+        Dispose(ADValue.Value.AsStringW);
       vdtStream:
         FreeAndNil(ADValue.Value.AsStream);
       vdtArray:
@@ -344,6 +437,8 @@ begin
         New(ADValue.Value.AsGuid);
       vdtString:
         New(ADValue.Value.AsString);
+      vdtStringW:
+        New(ADValue.Value.AsStringW);
       vdtStream:
         ADValue.Value.AsStream := TMemoryStream.Create;
       vdtArray:
@@ -382,13 +477,13 @@ begin
   end;
 end;
 
-procedure DValueSetAsString(ADValue:PDValueRecord; pvString:DStringW);
+procedure DValueSetAsStringW(ADValue:PDValueRecord; pvString:DStringW);
 begin
   CheckDValueSetType(ADValue, vdtString);
   ADValue.Value.AsString^ := pvString;
 end;
 
-function DValueGetAsString(ADValue:PDValueRecord): DStringW;
+function DValueGetAsStringW(ADValue:PDValueRecord): DStringW;
 var
   lvHexStr:DStringW;
   function DTToStr(ADValue: PDValueRecord): DStringW;
@@ -567,6 +662,82 @@ begin
   end;
 end;
 
+function CompareDValue(pvDValue1: PDValueRecord; pvDValue2:PDValueRecord): Integer;
+begin
+  if pvDValue1.ValueType in [vdtInteger, vdtInt64] then
+  begin
+    Result := CompareValue(DValueGetAsInt64(pvDValue1), DValueGetAsInt64(pvDValue2));
+  end else if pvDValue1.ValueType in [vdtSingle, vdtFloat] then
+  begin
+    Result := CompareValue(DValueGetAsFloat(pvDValue1), DValueGetAsFloat(pvDValue2));
+  end else if pvDValue1.ValueType in [vdtBoolean] then
+  begin
+    Result := CompareValue(Ord(DValueGetAsBoolean(pvDValue1)), Ord(DValueGetAsBoolean(pvDValue2)));
+  end else
+  begin
+    Result := CompareText(DValueGetAsString(pvDValue1), DValueGetAsString(pvDValue2));
+  end;   
+end;
+
+procedure DValueSetAsString(ADValue:PDValueRecord; pvString:String);
+begin
+  
+end;
+
+function DValueGetAsString(ADValue:PDValueRecord): string;
+var
+  lvHexStr:DStringW;
+  function DTToStr(ADValue: PDValueRecord): DStringW;
+  begin
+    if Trunc(ADValue.Value.AsFloat) = 0 then
+      Result := FormatDateTime({$IF RTLVersion>=22} FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime)
+    else if IsZero(ADValue.Value.AsFloat - Trunc(ADValue.Value.AsFloat)) then
+      Result := FormatDateTime
+        ({$IF RTLVersion>=22}FormatSettings.{$IFEND}LongDateFormat,
+        ADValue.Value.AsDateTime)
+    else
+      Result := FormatDateTime
+        ({$IF RTLVersion>=22}FormatSettings.{$IFEND}LongDateFormat + ' ' +
+{$IF RTLVersion>=22}FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime);
+  end;
+
+begin
+  case ADValue.ValueType of
+    vdtString:
+      Result := ADValue.Value.AsString^;
+    vdtUnset:
+      Result := 'default';
+    vdtNull:
+      Result := 'null';
+    vdtBoolean:
+      Result := BoolToStr(ADValue.Value.AsBoolean, True);
+    vdtSingle:
+      Result := FloatToStr(ADValue.Value.AsSingle);
+    vdtFloat:
+      Result := FloatToStr(ADValue.Value.AsFloat);
+    vdtInteger:
+      Result := IntToStr(ADValue.Value.AsInteger);
+    vdtInt64:
+      Result := IntToStr(ADValue.Value.AsInt64);
+    vdtCurrency:
+      Result := CurrToStr(ADValue.Value.AsCurrency);
+    vdtGuid:
+      Result := GuidToString(ADValue.Value.AsGuid^);
+    vdtDateTime:
+      Result := DTToStr(ADValue);
+    vdtStream:
+      begin
+        SetLength(lvHexStr, TMemoryStream(ADValue.Value.AsStream).Size * 2);
+        lvHexStr := BinToHex(
+          TMemoryStream(ADValue.Value.AsStream).Memory, TMemoryStream(ADValue.Value.AsStream).Size, False);
+
+        Result := lvHexStr;
+      end;
+    vdtArray:
+      Result := '@@Array';
+  end;
+end;
+
 destructor TDValueObject.Destroy;
 begin
   ClearDValue(@FRawValue);
@@ -702,6 +873,161 @@ begin
   begin
     Raise Exception.CreateFmt(SItemNotFound, [pvValueName]);
   end;
+end;
+
+procedure TDValueNode.ClearChildren;
+var
+  i: Integer;
+begin
+  if Assigned(FChildren) then
+  begin
+    for i := 0 to FChildren.Count - 1 do
+    begin
+      TDValueItem(FChildren[i]).Free;
+    end;
+    FChildren.Clear;
+  end;
+end;
+
+constructor TDValueNode.Create(pvType: TDValueNodeType);
+begin
+  inherited Create;
+  FNodeType := vntNull;
+  CreateName;
+  FValue := TDValueItem.Create;
+  
+  CheckSetNodeType(pvType);
+end;
+
+procedure TDValueNode.CreateName;
+begin
+  if not Assigned(FName) then FName := TDValueItem.Create;
+end;
+
+procedure TDValueNode.DeleteName;
+begin
+  if Assigned(FName) then
+  begin
+    FName.Free;
+    FName := nil;
+  end;    
+end;
+
+destructor TDValueNode.Destroy;
+begin
+  if Assigned(FChildren) then
+  begin
+    ClearChildren();
+    FChildren.Free;
+    FChildren := nil;
+  end;
+
+  if Assigned(FValue) then FValue.Free;
+  DeleteName;
+  inherited;
+end;
+
+procedure TDValueNode.CheckCreateChildren;
+begin
+  if not Assigned(FChildren) then
+  begin
+    {$IFDEF HAVE_GENERICS}
+      FChildren := TList<TDValueNode>.Create;
+    {$ELSE}
+      FChildren := TList.Create;
+    {$ENDIF} 
+  end;
+end;
+
+function TDValueNode.GetCount: Integer;
+begin
+  if Assigned(FChildren) then
+    Result := 0
+  else
+  begin
+    Result := FChildren.Count;
+  end;
+end;
+
+function TDValueNode.ItemByName(pvName: string): TDValueItem;
+begin
+  
+end;
+
+procedure TDValueNode.CheckSetNodeType(pvType:TDValueNodeType);
+begin
+  if pvType in [vntObject, vntArray] then
+  begin
+    CheckCreateChildren;
+  end else if pvType = vntValue then
+  begin
+    ClearChildren;    
+    if not Assigned(FName) then FName := TDValueItem.Create;
+    if not Assigned(FValue) then FValue := TDValueItem.Create;
+  end;
+
+  FNodeType := pvType;
+end;
+
+function TDValueNode.IndexOf(pvName: string): Integer;
+begin
+  Result := -1;
+end;
+
+destructor TDValueItem.Destroy;
+begin
+  ClearDValue(@FRawValue);
+  inherited;
+end;
+
+function TDValueItem.Equal(pvItem:TDValueItem): Boolean;
+begin
+  Result := CompareDValue(@FRawValue, @pvItem.FRawValue) = 0;
+end;
+
+function TDValueItem.GetAsBoolean: Boolean;
+begin
+  Result := DValueGetAsBoolean(@FRawValue);
+end;
+
+function TDValueItem.GetAsFloat: Double;
+begin
+  Result := DValueGetAsFloat(@FRawValue);
+end;
+
+function TDValueItem.GetAsInetger: Int64;
+begin
+  Result := DValueGetAsInt64(@FRawValue);
+end;
+
+function TDValueItem.GetAsString: String;
+begin
+  Result := DValueGetAsString(@FRawValue);
+end;
+
+function TDValueItem.GetDataType: TDValueDataType;
+begin
+  Result := FRawValue.ValueType;
+end;
+
+procedure TDValueItem.SetAsBoolean(const Value: Boolean);
+begin
+  DValueSetAsBoolean(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetAsFloat(const Value: Double);
+begin
+  DValueSetAsFloat(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetAsInetger(const Value: Int64);
+begin
+  DValueSetAsInt64(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetAsString(const Value: String);
+begin
+  DValueSetAsString(@FRawValue, Value);
 end;
 
 end.
