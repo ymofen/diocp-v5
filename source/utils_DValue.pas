@@ -117,6 +117,8 @@ type
 const
   TDValueNodeTypeStr: array[TDValueNodeType] of string = ('vntNull', 'vntArray', 'vntObject', 'vntValue');
 
+  Path_SplitChars : TSysCharSet = ['.', '/' , '\'];
+
 
 type
   TDValueItem = class;
@@ -190,7 +192,8 @@ type
     FName: TDValueItem;
     FValue: TDValueItem;
     FNodeType: TDValueNodeType;
-    
+    FParent: TDValueNode;
+
     {$IFDEF HAVE_GENERICS}
     FChildren: TList<TDValueNode>;
     {$ELSE}
@@ -202,10 +205,23 @@ type
     procedure CheckCreateChildren;
     procedure CreateName();
     procedure DeleteName();
+    function GetItems(Index: Integer): TDValueNode;
     /// <summary>
     ///   根据名称查找子节点
     /// </summary>
     function IndexOf(pvName: string): Integer;
+
+    /// <summary>
+    ///   根据路径查找对象，如果不存在返回nil
+    /// </summary>
+    /// <returns>
+    ///   如果存在返回找到的对象，如果不存在返回nil
+    /// </returns>
+    /// <param name="pvPath"> 要查找的路径 </param>
+    /// <param name="vParent"> 如果查找到对象返回找到对象的父节点 </param>
+    /// <param name="vIndex"> 如果查找到对象,表示在父节点中的索引值 </param>
+    function InnerFindByPath(pvPath: string; var vParent:TDValueNode; var vIndex:
+        Integer): TDValueNode;
   public
     constructor Create(pvType: TDValueNodeType);
     
@@ -216,11 +232,26 @@ type
     /// </summary>
     procedure CheckSetNodeType(pvType:TDValueNodeType);
 
-    function ItemByName(pvName:string):TDValueItem;
+    function FindByName(pvName:String): TDValueNode;
+
+    function FindByPath(pvPath:string): TDValueNode;
+
+    function ItemByName(pvName:string): TDValueNode;
+
+    function ForceByName(pvName:string): TDValueNode;
+
+    function ForceByPath(pvPath:String): TDValueNode;
+
 
     property Count: Integer read GetCount;
+    property Items[Index: Integer]: TDValueNode read GetItems; default;
     property Name: TDValueItem read FName;
+
+    property Parent: TDValueNode read FParent;
+
     property Value: TDValueItem read FValue;
+
+
   end;
 
   TDValueItem = class(TObject)
@@ -349,6 +380,49 @@ end;
 function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW;
 begin
   Result := BinToHex(@ABytes[0], Length(ABytes), ALowerCase);
+end;
+
+
+function GetFirst(var strPtr: PChar; splitChars: TSysCharSet): string;
+var
+  oPtr:PChar;
+  l:Cardinal;
+begin
+  oPtr := strPtr;
+  Result := '';
+  while True do
+  begin
+    if (strPtr^ in splitChars) then
+    begin
+      l := strPtr - oPtr;
+      if l > 0 then
+      begin
+      {$IFDEF UNICODE}
+        SetLength(Result, l);
+        Move(oPtr^, PChar(Result)^, l shl 1);
+      {$ELSE}
+        SetLength(Result, l);
+        Move(oPtr^, PChar(Result)^, l);
+      {$ENDIF}
+        break;
+      end;
+    end else if (strPtr^ = #0) then
+    begin
+      l := strPtr - oPtr;
+      if l > 0 then
+      begin
+      {$IFDEF UNICODE}
+        SetLength(Result, l);
+        Move(oPtr^, PChar(Result)^, l shl 1);
+      {$ELSE}
+        SetLength(Result, l);
+        Move(oPtr^, PChar(Result)^, l);
+      {$ENDIF}
+      end;
+      break;
+    end;
+    Inc(strPtr);
+  end;
 end;
 
 function GetDValueSize(ADValue: PDValueRecord): Integer;
@@ -949,9 +1023,10 @@ begin
   end;
 end;
 
-function TDValueNode.ItemByName(pvName: string): TDValueItem;
+function TDValueNode.ItemByName(pvName:string): TDValueNode;
 begin
-  
+  Result := FindByName(pvName);
+  if Result = nil then raise TDValueException.CreateFmt(SItemNotFound, [pvName]);
 end;
 
 procedure TDValueNode.CheckSetNodeType(pvType:TDValueNodeType);
@@ -969,9 +1044,142 @@ begin
   FNodeType := pvType;
 end;
 
+function TDValueNode.FindByName(pvName:String): TDValueNode;
+var
+  i:Integer;
+begin
+  i := IndexOf(pvName);
+  if i = -1 then Result := nil else Result := Items[i];
+end;
+
+function TDValueNode.FindByPath(pvPath:string): TDValueNode;
+var
+  lvParent:TDValueNode;
+  j:Integer;
+begin
+  Result := InnerFindByPath(pvPath, lvParent, j);
+end;
+
+function TDValueNode.ForceByName(pvName:string): TDValueNode;
+begin
+  Result := FindByName(pvName);
+  if Result = nil then
+  begin
+    CheckSetNodeType(vntObject);
+    Result := TDValueNode.Create(vntValue);
+    Result.FName.AsString := pvName;
+    Result.FParent := Self;
+    FChildren.Add(Result);
+  end;
+end;
+
+function TDValueNode.ForceByPath(pvPath:String): TDValueNode;
+var
+  lvName:string;
+  s:string;
+  sPtr:PChar;
+  lvParent:TDValueNode;
+  j:Integer;
+
+begin
+  Result := nil;
+  s := pvPath;
+
+  lvParent := Self;
+  sPtr := PChar(s);
+  while sPtr^ <> #0 do
+  begin
+    lvName := GetFirst(sPtr, Path_SplitChars);
+    if lvName = '' then
+    begin
+      Break;
+    end else
+    begin
+      if sPtr^ = #0 then
+      begin           // end
+        Result := lvParent.ForceByName(lvName);
+      end else
+      begin
+        // find or create childrean
+        lvParent := lvParent.ForceByName(lvName);
+      end;
+    end;
+    if sPtr^ = #0 then Break;
+    Inc(sPtr);
+  end;
+end;
+
+function TDValueNode.GetItems(Index: Integer): TDValueNode;
+begin
+  Result := TDValueNode(FChildren[Index]);
+end;
+
 function TDValueNode.IndexOf(pvName: string): Integer;
+var
+  i:Integer;
 begin
   Result := -1;
+  for i := 0 to FChildren.Count do
+  begin
+    if CompareText(Items[i].FName.AsString, pvName) = 0 then
+    begin
+      Result := i;
+      Break;
+    end;
+  end;
+end;
+
+function TDValueNode.InnerFindByPath(pvPath: string; var vParent:TDValueNode;
+    var vIndex: Integer): TDValueNode;
+var
+  lvName:string;
+  s:string;
+  sPtr:PChar;
+  lvTempObj, lvParent:TDValueNode;
+  j:Integer;
+begin
+  s := pvPath;
+
+  Result := nil;
+
+  lvParent := Self;
+  sPtr := PChar(s);
+  while sPtr^ <> #0 do
+  begin
+    lvName := GetFirst(sPtr, ['.', '/','\']);
+    if lvName = '' then
+    begin
+      Break;
+    end else
+    begin
+      if sPtr^ = #0 then
+      begin           // end
+        j := lvParent.IndexOf(lvName);
+        if j <> -1 then
+        begin
+          Result := lvParent.Items[j];
+          vIndex := j;
+          vParent := lvParent;
+        end else
+        begin
+          Break;
+        end;
+      end else
+      begin
+        // find childrean
+        lvTempObj := lvParent.FindByName(lvName);
+        if lvTempObj = nil then
+        begin
+          Break;
+        end else
+        begin
+          lvParent := lvTempObj;
+        end;
+      end;
+    end;
+    if sPtr^ = #0 then Break;
+    Inc(sPtr);
+  end;
 end;
 
 destructor TDValueItem.Destroy;
