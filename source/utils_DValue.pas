@@ -34,6 +34,7 @@ type
   DCharW = WideChar;
   PDCharW = PWideChar;
   PDStringW = ^DStringW;
+  PInterface = ^IInterface;
 
   // XE5
   {$IF CompilerVersion<26}
@@ -46,7 +47,7 @@ type
 
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
     vdtInteger, vdtInt64, vdtCurrency, vdtGuid, vdtDateTime,
-    vdtString, vdtStringW, vdtStream, vdtArray);
+    vdtString, vdtStringW, vdtStream, vdtInterface, vdtReferObject, vdtOwnerObject, vdtArray);
 
   // 节点类型
   TDValueNodeType = (vntNull,        // 没有值
@@ -101,6 +102,8 @@ type
         (AsExtend: Extended);
       25:
         (AsPointer: Pointer);
+      26:
+        (AsInterface: PInterface);
       30:
         (
           ValueType: TDValueDataType;
@@ -242,6 +245,13 @@ type
 
     function ForceByPath(pvPath:String): TDValueNode;
 
+    function AddArrayChild: TDValueNode;
+
+    function RemoveByName(pvName:String): Integer;
+
+    procedure RemoveAll;
+
+    procedure Delete(pvIndex:Integer);
 
     property Count: Integer read GetCount;
     property Items[Index: Integer]: TDValueNode read GetItems; default;
@@ -260,11 +270,15 @@ type
     function GetAsBoolean: Boolean;
     function GetAsFloat: Double;
     function GetAsInetger: Int64;
+    function GetAsInterface: IInterface;
+
     function GetAsString: String;
     function GetDataType: TDValueDataType;
     procedure SetAsBoolean(const Value: Boolean);
     procedure SetAsFloat(const Value: Double);
     procedure SetAsInetger(const Value: Int64);
+    procedure SetAsInterface(const Value: IInterface);
+
     procedure SetAsString(const Value: String);
   public
     destructor Destroy; override;
@@ -273,6 +287,13 @@ type
     property AsString: String read GetAsString write SetAsString;
     property AsInetger: Int64 read GetAsInetger write SetAsInetger;
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
+
+
+
+    property AsInterface: IInterface read GetAsInterface write SetAsInterface;
+    function GetAsObject: TObject;
+    procedure SetAsOwnerObject(const Value: TObject);
+    
     property DataType: TDValueDataType read GetDataType;
   end;
 
@@ -301,7 +322,12 @@ function DValueGetAsString(ADValue:PDValueRecord): string;
 procedure DValueSetAsStringW(ADValue:PDValueRecord; pvString:DStringW);
 function DValueGetAsStringW(ADValue:PDValueRecord): DStringW;
 
+procedure DValueSetAsOwnerObject(ADValue:PDValueRecord; pvObject:TObject);
+function DValueGetAsObject(ADValue:PDValueRecord): TObject;
 
+procedure DValueSetAsInterface(ADValue: PDValueRecord; const pvValue:
+    IInterface);
+function DValueGetAsInterface(ADValue:PDValueRecord): IInterface;
 
 procedure DValueSetAsInt64(ADValue:PDValueRecord; pvValue:Int64);
 function DValueGetAsInt64(ADValue: PDValueRecord): Int64;
@@ -335,7 +361,7 @@ resourcestring
 const
   QValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'Currency', 'Guid',
-    'DateTime', 'String', 'StringW', 'Stream', 'Array');
+    'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'ReferObject', 'OwnerObject', 'Array');
 
 
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW;
@@ -494,6 +520,10 @@ begin
         Dispose(ADValue.Value.AsStringW);
       vdtStream:
         FreeAndNil(ADValue.Value.AsStream);
+      vdtInterface:
+        Dispose(ADValue.Value.AsInterface);
+      vdtOwnerObject:
+        TObject(ADValue.Value.AsPointer).Free;
       vdtArray:
         ClearArray;
     end;
@@ -513,6 +543,8 @@ begin
         New(ADValue.Value.AsString);
       vdtStringW:
         New(ADValue.Value.AsStringW);
+      vdtInterface:
+        New(ADValue.Value.AsInterface);
       vdtStream:
         ADValue.Value.AsStream := TMemoryStream.Create;
       vdtArray:
@@ -553,8 +585,8 @@ end;
 
 procedure DValueSetAsStringW(ADValue:PDValueRecord; pvString:DStringW);
 begin
-  CheckDValueSetType(ADValue, vdtString);
-  ADValue.Value.AsString^ := pvString;
+  CheckDValueSetType(ADValue, vdtStringW);
+  ADValue.Value.AsStringW^ := pvString;
 end;
 
 function DValueGetAsStringW(ADValue:PDValueRecord): DStringW;
@@ -578,6 +610,8 @@ begin
   case ADValue.ValueType of
     vdtString:
       Result := ADValue.Value.AsString^;
+    vdtStringW:
+      Result := ADValue.Value.AsStringW^;
     vdtUnset:
       Result := 'default';
     vdtNull:
@@ -755,7 +789,8 @@ end;
 
 procedure DValueSetAsString(ADValue:PDValueRecord; pvString:String);
 begin
-  
+  CheckDValueSetType(ADValue, vdtString);
+  ADValue.Value.AsString^ := pvString;
 end;
 
 function DValueGetAsString(ADValue:PDValueRecord): string;
@@ -779,6 +814,8 @@ begin
   case ADValue.ValueType of
     vdtString:
       Result := ADValue.Value.AsString^;
+    vdtStringW:
+      Result := ADValue.Value.AsStringW^;
     vdtUnset:
       Result := 'default';
     vdtNull:
@@ -809,6 +846,60 @@ begin
       end;
     vdtArray:
       Result := '@@Array';
+  end;
+end;
+
+procedure DValueSetAsOwnerObject(ADValue:PDValueRecord; pvObject:TObject);
+begin
+  if pvObject = nil then
+  begin       // 清空
+    ClearDValue(ADValue);
+  end else
+  begin
+    CheckDValueSetType(ADValue, vdtOwnerObject);
+    ADValue.Value.AsPointer := pvObject;
+  end;
+end;
+
+function DValueGetAsObject(ADValue:PDValueRecord): TObject;
+begin
+  case ADValue.ValueType of
+    vdtUnset, vdtNull:
+      Result := nil;
+    vdtOwnerObject, vdtReferObject:
+      Result :=  TObject(ADValue.Value.AsPointer);
+  else
+    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
+      'Object']);
+  end;
+end;
+
+procedure DValueSetAsInterface(ADValue: PDValueRecord; const pvValue:
+    IInterface);
+begin
+  if pvValue = nil then
+  begin       // 清空
+    ClearDValue(ADValue);
+  end else
+  begin
+    CheckDValueSetType(ADValue, vdtInterface);
+    ADValue.Value.AsInterface^ := pvValue;
+  end;
+end;
+
+function DValueGetAsInterface(ADValue:PDValueRecord): IInterface;
+begin
+
+  case ADValue.ValueType of
+    vdtUnset, vdtNull:
+      Result := nil;
+    vdtInterface:
+      Result :=  ADValue.Value.AsInterface^;
+    vdtOwnerObject, vdtReferObject:
+      TObject(ADValue.Value.AsPointer).GetInterface(IInterface, Result);
+  else
+    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
+      QValueTypeName[vdtInterface]]);
   end;
 end;
 
@@ -1001,6 +1092,14 @@ begin
   inherited;
 end;
 
+function TDValueNode.AddArrayChild: TDValueNode;
+begin
+  CheckSetNodeType(vntArray);
+  Result := TDValueNode.Create(vntValue);
+  Result.FParent := Self;
+  FChildren.Add(Result);
+end;
+
 procedure TDValueNode.CheckCreateChildren;
 begin
   if not Assigned(FChildren) then
@@ -1016,10 +1115,10 @@ end;
 function TDValueNode.GetCount: Integer;
 begin
   if Assigned(FChildren) then
-    Result := 0
+    Result := FChildren.Count
   else
   begin
-    Result := FChildren.Count;
+    Result := 0;
   end;
 end;
 
@@ -1042,6 +1141,12 @@ begin
   end;
 
   FNodeType := pvType;
+end;
+
+procedure TDValueNode.Delete(pvIndex:Integer);
+begin
+  TDValueItem(FChildren[pvIndex]).Free;
+  FChildren.Delete(pvIndex);
 end;
 
 function TDValueNode.FindByName(pvName:String): TDValueNode;
@@ -1119,7 +1224,7 @@ var
   i:Integer;
 begin
   Result := -1;
-  for i := 0 to FChildren.Count do
+  for i := 0 to FChildren.Count - 1 do
   begin
     if CompareText(Items[i].FName.AsString, pvName) = 0 then
     begin
@@ -1182,6 +1287,20 @@ begin
   end;
 end;
 
+procedure TDValueNode.RemoveAll;
+begin
+  while GetCount > 0 do Delete(0);
+end;
+
+function TDValueNode.RemoveByName(pvName:String): Integer;
+begin
+  Result := IndexOf(pvName);
+  if Result >= 0 then
+  begin
+    Delete(Result);
+  end;
+end;
+
 destructor TDValueItem.Destroy;
 begin
   ClearDValue(@FRawValue);
@@ -1208,6 +1327,17 @@ begin
   Result := DValueGetAsInt64(@FRawValue);
 end;
 
+function TDValueItem.GetAsInterface: IInterface;
+begin
+  // TODO -cMM: TDValueItem.GetAsInterface default body inserted
+  Result := DValueGetAsInterface(@FRawValue);
+end;
+
+function TDValueItem.GetAsObject: TObject;
+begin
+  Result := DValueGetAsObject(@FRawValue);
+end;
+
 function TDValueItem.GetAsString: String;
 begin
   Result := DValueGetAsString(@FRawValue);
@@ -1231,6 +1361,16 @@ end;
 procedure TDValueItem.SetAsInetger(const Value: Int64);
 begin
   DValueSetAsInt64(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetAsInterface(const Value: IInterface);
+begin
+  DValueSetAsInterface(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetAsOwnerObject(const Value: TObject);
+begin
+  DValueSetAsOwnerObject(@FRawValue, Value);
 end;
 
 procedure TDValueItem.SetAsString(const Value: String);
