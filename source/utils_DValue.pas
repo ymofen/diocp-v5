@@ -204,6 +204,10 @@ type
     {$ENDIF}
   private
     function GetCount: Integer;
+    /// <summary>
+    ///   释放所有的子对象
+    ///   清空列表
+    /// </summary>
     procedure ClearChildren();
     procedure CheckCreateChildren;
     procedure CreateName();
@@ -245,23 +249,47 @@ type
 
     function ForceByPath(pvPath:String): TDValueNode;
 
+    /// <summary>
+    ///   本身作为一个数组添加一个子节点
+    ///     如果之前不是数组类型，将会被清除
+    /// </summary>
     function AddArrayChild: TDValueNode;
 
+    /// <summary>
+    ///   根据名称移除掉一个子对象
+    /// </summary>
     function RemoveByName(pvName:String): Integer;
 
+    /// <summary>
+    ///   释放所有的子对象
+    ///   清空列表
+    /// </summary>
     procedure RemoveAll;
 
+    /// <summary>
+    ///   根据索引删除掉一个子对象
+    /// </summary>
     procedure Delete(pvIndex:Integer);
 
     property Count: Integer read GetCount;
+
+    
     property Items[Index: Integer]: TDValueNode read GetItems; default;
+
+    /// <summary>
+    ///   键值对象
+    /// </summary>
     property Name: TDValueItem read FName;
 
+    /// <summary>
+    ///   父节点
+    /// </summary>
     property Parent: TDValueNode read FParent;
 
+    /// <summary>
+    ///   值对象
+    /// </summary>
     property Value: TDValueItem read FValue;
-
-
   end;
 
   TDValueItem = class(TObject)
@@ -1130,17 +1158,24 @@ end;
 
 procedure TDValueNode.CheckSetNodeType(pvType:TDValueNodeType);
 begin
-  if pvType in [vntObject, vntArray] then
+  if pvType <> FNodeType then
   begin
-    CheckCreateChildren;
-  end else if pvType = vntValue then
-  begin
-    ClearChildren;    
-    if not Assigned(FName) then FName := TDValueItem.Create;
-    if not Assigned(FValue) then FValue := TDValueItem.Create;
-  end;
+    if not (FNodeType in [vntNull]) then
+    begin
+      ClearChildren;
+    end;
+    
+    if pvType in [vntObject, vntArray] then
+    begin
+      CheckCreateChildren;
+    end else if pvType = vntValue then
+    begin 
+      if not Assigned(FName) then FName := TDValueItem.Create;
+      if not Assigned(FValue) then FValue := TDValueItem.Create;
+    end;
 
-  FNodeType := pvType;
+    FNodeType := pvType;
+  end;
 end;
 
 procedure TDValueNode.Delete(pvIndex:Integer);
@@ -1184,8 +1219,6 @@ var
   s:string;
   sPtr:PChar;
   lvParent:TDValueNode;
-  j:Integer;
-
 begin
   Result := nil;
   s := pvPath;
@@ -1289,7 +1322,7 @@ end;
 
 procedure TDValueNode.RemoveAll;
 begin
-  while GetCount > 0 do Delete(0);
+  ClearChildren();
 end;
 
 function TDValueNode.RemoveByName(pvName:String): Integer;
