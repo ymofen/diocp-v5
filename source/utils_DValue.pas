@@ -845,9 +845,9 @@ begin
     vdtStringW:
       Result := ADValue.Value.AsStringW^;
     vdtUnset:
-      Result := 'default';
+      Result := '';
     vdtNull:
-      Result := 'null';
+      Result := '';
     vdtBoolean:
       Result := BoolToStr(ADValue.Value.AsBoolean, True);
     vdtSingle:
@@ -1257,14 +1257,15 @@ var
   i:Integer;
 begin
   Result := -1;
-  for i := 0 to FChildren.Count - 1 do
-  begin
-    if CompareText(Items[i].FName.AsString, pvName) = 0 then
+  if Assigned(FChildren) then   
+    for i := 0 to FChildren.Count - 1 do
     begin
-      Result := i;
-      Break;
+      if CompareText(Items[i].FName.AsString, pvName) = 0 then
+      begin
+        Result := i;
+        Break;
+      end;
     end;
-  end;
 end;
 
 function TDValueNode.InnerFindByPath(pvPath: string; var vParent:TDValueNode;
@@ -1327,6 +1328,7 @@ end;
 
 function TDValueNode.RemoveByName(pvName:String): Integer;
 begin
+
   Result := IndexOf(pvName);
   if Result >= 0 then
   begin
