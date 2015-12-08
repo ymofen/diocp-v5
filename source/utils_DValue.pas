@@ -295,6 +295,8 @@ type
   TDValueItem = class(TObject)
   private
     FRawValue: TDValueRecord;
+    function GetArrayItem(pvIndex: Integer): TDValueItem;
+    function GetArraySize: Integer;
     function GetAsBoolean: Boolean;
     function GetAsFloat: Double;
     function GetAsInetger: Int64;
@@ -302,12 +304,14 @@ type
 
     function GetAsString: String;
     function GetDataType: TDValueDataType;
+    procedure SetArraySize(const Value: Integer);
     procedure SetAsBoolean(const Value: Boolean);
     procedure SetAsFloat(const Value: Double);
     procedure SetAsInetger(const Value: Int64);
     procedure SetAsInterface(const Value: IInterface);
 
     procedure SetAsString(const Value: String);
+
   public
     destructor Destroy; override;
     function Equal(pvItem:TDValueItem): Boolean;
@@ -316,12 +320,17 @@ type
     property AsInetger: Int64 read GetAsInetger write SetAsInetger;
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
 
-
-
     property AsInterface: IInterface read GetAsInterface write SetAsInterface;
     function GetAsObject: TObject;
     procedure SetAsOwnerObject(const Value: TObject);
-    
+    procedure SetReferObject(const value:TObject);
+
+    property ArrayItem[pvIndex: Integer]: TDValueItem read GetArrayItem;
+    property ArraySize: Integer read GetArraySize write SetArraySize;
+
+
+
+
     property DataType: TDValueDataType read GetDataType;
   end;
 
@@ -350,6 +359,7 @@ function DValueGetAsString(ADValue:PDValueRecord): string;
 procedure DValueSetAsStringW(ADValue:PDValueRecord; pvString:DStringW);
 function DValueGetAsStringW(ADValue:PDValueRecord): DStringW;
 
+procedure DValueSetAsReferObject(ADValue:PDValueRecord; pvData:TObject);
 procedure DValueSetAsOwnerObject(ADValue:PDValueRecord; pvObject:TObject);
 function DValueGetAsObject(ADValue:PDValueRecord): TObject;
 
@@ -387,7 +397,7 @@ resourcestring
   SNoValueNode  = '该类型[%s]节点不包含值';
 
 const
-  QValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
+  DValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'Currency', 'Guid',
     'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'ReferObject', 'OwnerObject', 'Array');
 
@@ -502,7 +512,13 @@ begin
     vdtDateTime:
       Result := SizeOf(TDateTime);
     vdtString:
+    {$IFDEF UNICODE}
       Result := Length(ADValue.Value.AsString^) shl 1;
+    {$ELSE}
+      Result := Length(ADValue.Value.AsString^);
+    {$ENDIF}
+    vdtStringW:
+      Result := Length(ADValue.Value.AsStringW^) shl 1;
     vdtStream:
       Result := TMemoryStream(ADValue.Value.AsStream).Size;
     vdtArray:
@@ -699,8 +715,8 @@ begin
     vdtString:
       Result := StrToInt64(ADValue.Value.AsString^)
   else
-    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
-      QValueTypeName[vdtInteger]]);
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
+      DValueTypeName[vdtInteger]]);
   end;
 end;
 
@@ -724,8 +740,8 @@ begin
     vdtString:
       Result := StrToInt64(ADValue.Value.AsString^)
   else
-    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
-      QValueTypeName[vdtInt64]]);
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
+      DValueTypeName[vdtInt64]]);
   end;
 end;
 
@@ -762,8 +778,8 @@ begin
     vdtString:
       Result := StrToFloat(ADValue.Value.AsString^)
   else
-    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
-      QValueTypeName[vdtFloat]]);
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
+      DValueTypeName[vdtFloat]]);
   end;
 end;
 
@@ -793,8 +809,8 @@ begin
     vdtString:
       Result := StrToBoolDef(ADValue.Value.AsString^, False)
   else
-    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
-      QValueTypeName[vdtBoolean]]);
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
+      DValueTypeName[vdtBoolean]]);
   end;
 end;
 
@@ -897,7 +913,7 @@ begin
     vdtOwnerObject, vdtReferObject:
       Result :=  TObject(ADValue.Value.AsPointer);
   else
-    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
       'Object']);
   end;
 end;
@@ -926,8 +942,22 @@ begin
     vdtOwnerObject, vdtReferObject:
       TObject(ADValue.Value.AsPointer).GetInterface(IInterface, Result);
   else
-    raise EConvertError.CreateFmt(SConvertError, [QValueTypeName[ADValue.ValueType],
-      QValueTypeName[vdtInterface]]);
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
+      DValueTypeName[vdtInterface]]);
+  end;
+end;
+
+
+
+procedure DValueSetAsReferObject(ADValue:PDValueRecord; pvData:TObject);
+begin
+  if pvData = nil then
+  begin       // 清空
+    ClearDValue(ADValue);
+  end else
+  begin
+    CheckDValueSetType(ADValue, vdtReferObject);
+    ADValue.Value.AsPointer := pvData;
   end;
 end;
 
@@ -1347,6 +1377,24 @@ begin
   Result := CompareDValue(@FRawValue, @pvItem.FRawValue) = 0;
 end;
 
+function TDValueItem.GetArrayItem(pvIndex: Integer): TDValueItem;
+var
+  lvObj:TObject;
+begin
+  if DataType <> vdtArray then
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[DataType],
+      DValueTypeName[vdtArray]]);
+
+  lvObj := DValueGetAsObject(GetDValueItem(@FRawValue, pvIndex));
+  Result := TDValueItem(lvObj);
+end;
+
+function TDValueItem.GetArraySize: Integer;
+begin
+  if FRawValue.ValueType <> vdtArray then Result := 0
+  else Result := FRawValue.Value.ArrayLength;
+end;
+
 function TDValueItem.GetAsBoolean: Boolean;
 begin
   Result := DValueGetAsBoolean(@FRawValue);
@@ -1383,6 +1431,24 @@ begin
   Result := FRawValue.ValueType;
 end;
 
+procedure TDValueItem.SetArraySize(const Value: Integer);
+var
+  lvOldSize:Integer;
+  i, l: Integer;
+  lvDValueItem:TDValueItem;
+begin
+  lvOldSize := GetArraySize;
+  CheckDValueSetArrayLength(@FRawValue, Value);
+  l := GetArraySize;
+  if l > lvOldSize then
+    for i := lvOldSize to l - 1 do
+    begin
+      lvDValueItem := TDValueItem.Create();
+      // 设置Item为TDValueItem对象
+      DValueSetAsOwnerObject(GetDValueItem(@FRawValue, i), lvDValueItem);
+    end;
+end;
+
 procedure TDValueItem.SetAsBoolean(const Value: Boolean);
 begin
   DValueSetAsBoolean(@FRawValue, Value);
@@ -1411,6 +1477,11 @@ end;
 procedure TDValueItem.SetAsString(const Value: String);
 begin
   DValueSetAsString(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetReferObject(const value:TObject);
+begin
+  DValueSetAsReferObject(@FRawValue, Value);
 end;
 
 end.
