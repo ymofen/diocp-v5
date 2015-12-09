@@ -134,6 +134,11 @@ type
     /// </summary>
     FDiocpHttpServer:TDiocpHttpServer;
 
+    /// <summary>
+    ///  请求头
+    /// </summary>
+    FHeader : TDValueNode;
+
     FDiocpContext: TDiocpHttpClientContext;
 
     /// 头信息
@@ -177,7 +182,7 @@ type
 
     FXForwardedFor: string;
 
-    FRawHeaderData: TMemoryStream;
+    FRawHeader: TMemoryStream;
 
     /// <summary>
     ///   原始的POST数据
@@ -272,6 +277,7 @@ type
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
+    property Header: TDValueNode read FHeader;
 
     property HttpVersion: Word read FHttpVersion;
     
@@ -280,7 +286,7 @@ type
     /// </summary>
     property RawPostData: TMemoryStream read FRawPostData;
 
-    property RawHeader: TMemoryStream read FRawHeaderData;
+    property RawHeader: TMemoryStream read FRawHeader;
 
 
     property RequestAccept: String read FRequestAccept;
@@ -383,7 +389,7 @@ type
     FContentType: String;
     FCookieData : String;
     FData: TMemoryStream;
-    FHeader: TMemoryStream;
+    FHeader: TDValueNode;
     FDiocpContext : TDiocpHttpClientContext;
     FHttpCodeStr: String;
     procedure ClearAllCookieObjects;
@@ -400,6 +406,8 @@ type
 
     function EncodeHeader: String;
 
+    function EncodeResponseHeader: string;
+
     /// <summary>
     ///   与客户端建立的连接
     /// </summary>
@@ -409,7 +417,7 @@ type
 
     property Data: TMemoryStream read FData;
 
-    property Header: TMemoryStream read FHeader;
+    property Header: TDValueNode read FHeader;
 
     property HttpCodeStr: String read FHttpCodeStr write FHttpCodeStr;
 
@@ -596,7 +604,7 @@ end;
 
 procedure TDiocpHttpRequest.Clear;
 begin
-  FRawHeaderData.Clear;
+  FRawHeader.Clear;
   FRawPostData.Clear;
   FRequestURL := '';
   FRequestURI := '';
@@ -673,7 +681,9 @@ end;
 constructor TDiocpHttpRequest.Create;
 begin
   inherited Create;
-  FRawHeaderData := TMemoryStream.Create();
+  FHeader := TDValueNode.Create(vntObject);
+  
+  FRawHeader := TMemoryStream.Create();
   FRawPostData := TMemoryStream.Create();
   FRequestHeader := TStringList.Create();
   FResponse := TDiocpHttpResponse.Create();
@@ -686,11 +696,13 @@ destructor TDiocpHttpRequest.Destroy;
 begin
   FreeAndNil(FResponse);
   FRawPostData.Free;
-  FRawHeaderData.Free;
+  FRawHeader.Free;
   FRequestHeader.Free;
 
   FreeAndNil(FRequestParamsList); // TODO:释放存放http参数的StringList
   FRequestCookieList.Free;
+
+  FHeader.Free;
 
   inherited Destroy;
 end;
@@ -711,10 +723,10 @@ var
   lvBuf: PAnsiChar;
 begin
   Result := 0;
-  if FRawHeaderData.Size <= 7 then
+  if FRawHeader.Size <= 7 then
     Exit;
 
-  lvBuf := FRawHeaderData.Memory;
+  lvBuf := FRawHeader.Memory;
 
   if FRequestMethod <> '' then
   begin
@@ -785,9 +797,9 @@ var
   p : PChar;
 begin
   Result := 1;
-  SetLength(lvRawString, FRawHeaderData.Size);
-  FRawHeaderData.Position := 0;
-  FRawHeaderData.Read(lvRawString[1], FRawHeaderData.Size);
+  SetLength(lvRawString, FRawHeader.Size);
+  FRawHeader.Position := 0;
+  FRawHeader.Read(lvRawString[1], FRawHeader.Size);
   FRequestHeader.Text := lvRawString;
 
   // GET /test?v=abc HTTP/1.1
@@ -885,6 +897,7 @@ begin
   // 2、请求报头后述
   // 3、请求正文(略)
 
+  FHeader.RemoveAll;
   for I := 0 to FRequestHeader.Count - 1 do
   begin
     lvRequestCmdLine := FRequestHeader[I];
@@ -899,6 +912,8 @@ begin
 
     if (lvRequestCmdLine = '') then
       Continue;
+
+    FHeader.ForceByName(lvTempStr).Value.AsString := lvRemainStr;
 
     if SameText(lvTempStr, 'Content-Type') then
     begin
@@ -1145,18 +1160,37 @@ begin
 end;
 
 procedure TDiocpHttpRequest.SendResponse;
+var
+  lvFixedHeader: AnsiString;
+  len: Integer;
 begin
-  FDiocpContext.PostWSASendRequest(FResponse.Header.Memory, FResponse.Header.Size);
-  if FResponse.Data.Size > 0 then
+  lvFixedHeader := FResponse.EncodeResponseHeader;
+
+  if (lvFixedHeader <> '') then
+    lvFixedHeader := FixHeader(lvFixedHeader)
+  else
+    lvFixedHeader := lvFixedHeader + HTTPLineBreak;
+
+  // FResponseSize必须准确指定发送的数据包大小
+  // 用于在发送完之后(Owner.TriggerClientSentData)断开客户端连接
+  if lvFixedHeader <> '' then
   begin
-    FDiocpContext.PostWSASendRequest(FResponse.FData.Memory, FResponse.FData.Size);
+    len := Length(lvFixedHeader);
+    FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
   end;
+
+  if FResponse.FData.Size > 0 then
+  begin
+    FDiocpContext.PostWSASendRequest(FResponse.FData.Memory,
+      FResponse.FData.Size);
+  end;
+
 end;
 
 procedure TDiocpHttpRequest.WriteRawHeaderBuffer(const buffer: Pointer; len:
     Integer);
 begin
-  FRawHeaderData.WriteBuffer(buffer^, len);
+  FRawHeader.WriteBuffer(buffer^, len);
 end;
 
 procedure TDiocpHttpResponse.Clear;
@@ -1171,7 +1205,7 @@ constructor TDiocpHttpResponse.Create;
 begin
   inherited Create;
   FData := TMemoryStream.Create();
-  FHeader := TMemoryStream.Create();
+  FHeader := TDValueNode.Create(vntObject);
   FCookies := TList.Create();
 end;
 
@@ -1242,6 +1276,44 @@ begin
     TObject(FCookies[i]).Free;
   end;
   FCookies.Clear();
+end;
+
+function TDiocpHttpResponse.EncodeResponseHeader: string;
+var
+  lvVersionStr:string;
+  i: Integer;
+  lvItem:TDValueNode;
+begin
+  Result := '';
+
+  lvVersionStr := 'HTTP/1.1';
+
+  if (FHttpCodeStr = '') then FHttpCodeStr := '200 OK';
+  Result := Result + lvVersionStr + ' ' + FHttpCodeStr + #13#10;
+
+  for i := 0 to FHeader.Count - 1 do
+  begin
+    lvItem := FHeader.Items[i];
+    Result := Result + lvItem.Name.AsString + ':' + lvItem.Value.AsString + HTTPLineBreak;
+  end;
+
+  if (FData.Size > 0) then
+    Result := Result + 'Content-Length: ' + IntToStr(FData.Size) + #13#10;
+
+  Result := Result + 'Connection: close'#13#10;
+
+
+  for i := 0 to FCookies.Count - 1 do
+  begin
+    Result := Result + 'Set-Cookie:' + TDiocpHttpCookie(FCookies[i]).ToString() + sLineBreak;
+  end;
+
+//  if FCookieData <> '' then
+//  begin             // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+//    Result := Result + 'Set-Cookie:' + FCookieData + sLineBreak;
+//  end;
+
+  Result := Result + 'Server: DIOCP-V5/1.1'#13#10;
 end;
 
 procedure TDiocpHttpResponse.RedirectURL(pvURL: String);
