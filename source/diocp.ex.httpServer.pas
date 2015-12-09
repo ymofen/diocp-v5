@@ -215,7 +215,7 @@ type
     /// <summary>
     /// 接收到的Buffer,写入数据
     /// </summary>
-    procedure WriteRawBuffer(const buffer: Pointer; len: Integer);
+    procedure WriteRawHeaderBuffer(const buffer: Pointer; len: Integer);
 
     /// <summary>
     ///   检测Cookie中的SessionID信息
@@ -274,10 +274,15 @@ type
     property Connection: TDiocpHttpClientContext read FDiocpContext;
 
     property HttpVersion: Word read FHttpVersion;
+    
     /// <summary>
     ///   原始的Post过来的数据
     /// </summary>
     property RawPostData: TMemoryStream read FRawPostData;
+
+    property RawHeader: TMemoryStream read FRawHeaderData;
+
+
     property RequestAccept: String read FRequestAccept;
     property RequestAcceptEncoding: string read FRequestAcceptEncoding;
     property RequestAcceptLanguage: string read FRequestAcceptLanguage;
@@ -336,6 +341,14 @@ type
     /// </summary>
     procedure ResponseEnd;
 
+
+    /// <summary>
+    ///   直接发送Response.Header和Data数据
+    /// </summary>
+    procedure SendResponse;
+
+
+
     /// <summary>
     ///  关闭连接
     /// </summary>
@@ -370,6 +383,7 @@ type
     FContentType: String;
     FCookieData : String;
     FData: TMemoryStream;
+    FHeader: TMemoryStream;
     FDiocpContext : TDiocpHttpClientContext;
     FHttpCodeStr: String;
     procedure ClearAllCookieObjects;
@@ -394,6 +408,8 @@ type
     property ContentType: String read FContentType write FContentType;
 
     property Data: TMemoryStream read FData;
+
+    property Header: TMemoryStream read FHeader;
 
     property HttpCodeStr: String read FHttpCodeStr write FHttpCodeStr;
 
@@ -1128,7 +1144,17 @@ begin
   end;
 end;
 
-procedure TDiocpHttpRequest.WriteRawBuffer(const buffer: Pointer; len: Integer);
+procedure TDiocpHttpRequest.SendResponse;
+begin
+  FDiocpContext.PostWSASendRequest(FResponse.Header.Memory, FResponse.Header.Size);
+  if FResponse.Data.Size > 0 then
+  begin
+    FDiocpContext.PostWSASendRequest(FResponse.FData.Memory, FResponse.FData.Size);
+  end;
+end;
+
+procedure TDiocpHttpRequest.WriteRawHeaderBuffer(const buffer: Pointer; len:
+    Integer);
 begin
   FRawHeaderData.WriteBuffer(buffer^, len);
 end;
@@ -1145,6 +1171,7 @@ constructor TDiocpHttpResponse.Create;
 begin
   inherited Create;
   FData := TMemoryStream.Create();
+  FHeader := TMemoryStream.Create();
   FCookies := TList.Create();
 end;
 
@@ -1152,6 +1179,7 @@ destructor TDiocpHttpResponse.Destroy;
 begin
   Clear;
   FreeAndNil(FData);
+  FHeader.Free;
   FCookies.Free;
   inherited Destroy;
 end;
@@ -1417,7 +1445,7 @@ begin
       end;
 
       // 写入请求数据
-      FCurrentRequest.WriteRawBuffer(lvTmpBuf, 1);
+      FCurrentRequest.WriteRawHeaderBuffer(lvTmpBuf, 1);
 
       if FCurrentRequest.DecodeHttpRequestMethod = 2 then
       begin // 无效的Http请求
