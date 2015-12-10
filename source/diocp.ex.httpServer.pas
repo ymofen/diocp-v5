@@ -122,6 +122,9 @@ type
 
   TDiocpHttpRequest = class(TObject)
   private
+    FReleaseLater:Boolean;
+    FReleaseLaterMsg:String;
+    
     FSessionID : String;
 
     /// <summary>
@@ -137,7 +140,7 @@ type
     /// <summary>
     ///  请求头
     /// </summary>
-    FHeader : TDValueNode;
+    FHeader : TDValue;
 
     FDiocpContext: TDiocpHttpClientContext;
 
@@ -232,6 +235,14 @@ type
     constructor Create;
     destructor Destroy; override;
 
+
+
+    /// <summary>
+    ///   设置Request暂时不进行释放
+    /// </summary>
+    /// <param name="pvMsg"> 信息(便于状态观察) </param>
+    procedure SetReleaseLater(pvMsg:String);
+
     /// <summary>
     ///   获取当前Session
     ///    如果没有会进行创建    
@@ -277,7 +288,7 @@ type
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
-    property Header: TDValueNode read FHeader;
+    property Header: TDValue read FHeader;
 
     property HttpVersion: Word read FHttpVersion;
     
@@ -343,6 +354,12 @@ type
     property RequestReferer: String read FRequestReferer;
 
     /// <summary>
+    ///  原始请求中的URL参数数据(没有经过URLDecode，因为在DecodeRequestHeader中要拼接RequestURL时临时进行了URLDecode)
+    ///  没有经过URLDecode是考虑到参数值中本身存在&字符，导致DecodeURLParam出现不解码异常
+    /// </summary>
+    property RequestURLParamData: string read FRequestURLParamData;
+
+    /// <summary>
     /// 应答完毕，发送会客户端
     /// </summary>
     procedure ResponseEnd;
@@ -389,7 +406,7 @@ type
     FContentType: String;
     FCookieData : String;
     FData: TMemoryStream;
-    FHeader: TDValueNode;
+    FHeader: TDValue;
     FDiocpContext : TDiocpHttpClientContext;
     FHttpCodeStr: String;
     procedure ClearAllCookieObjects;
@@ -417,7 +434,7 @@ type
 
     property Data: TMemoryStream read FData;
 
-    property Header: TDValueNode read FHeader;
+    property Header: TDValue read FHeader;
 
     property HttpCodeStr: String read FHttpCodeStr write FHttpCodeStr;
 
@@ -617,12 +634,14 @@ begin
   FContextLength := 0;
   FContextType := '';
   FPostDataLen := 0;
-  FResponse.Clear;  
+  FResponse.Clear;
+  FReleaseLater := false;
 end;
 
 procedure TDiocpHttpRequest.Close;
 begin
   if FDiocpHttpServer = nil then exit;
+
   FDiocpHttpServer.GiveBackRequest(Self);
 end;
 
@@ -681,7 +700,7 @@ end;
 constructor TDiocpHttpRequest.Create;
 begin
   inherited Create;
-  FHeader := TDValueNode.Create(vntObject);
+  FHeader := TDValue.Create(vntObject);
   
   FRawHeader := TMemoryStream.Create();
   FRawPostData := TMemoryStream.Create();
@@ -1187,6 +1206,12 @@ begin
 
 end;
 
+procedure TDiocpHttpRequest.SetReleaseLater(pvMsg:String);
+begin
+  FReleaseLater := True;
+  FReleaseLaterMsg := pvMsg;
+end;
+
 procedure TDiocpHttpRequest.WriteRawHeaderBuffer(const buffer: Pointer; len:
     Integer);
 begin
@@ -1205,7 +1230,7 @@ constructor TDiocpHttpResponse.Create;
 begin
   inherited Create;
   FData := TMemoryStream.Create();
-  FHeader := TDValueNode.Create(vntObject);
+  FHeader := TDValue.Create(vntObject);
   FCookies := TList.Create();
 end;
 
@@ -1282,7 +1307,7 @@ function TDiocpHttpResponse.EncodeResponseHeader: string;
 var
   lvVersionStr:string;
   i: Integer;
-  lvItem:TDValueNode;
+  lvItem:TDValue;
 begin
   Result := '';
 
@@ -1395,7 +1420,7 @@ begin
        // 直接触发事件
        TDiocpHttpServer(FOwner).DoRequest(pvRequest);
      finally
-       pvRequest.Close;
+       if not pvRequest.FReleaseLater then pvRequest.Close;
      end;
      {$ENDIF}
    {$ENDIF}
@@ -1430,7 +1455,7 @@ begin
        self.UnLockContext('HTTP逻辑处理...', Self);
      end;
   finally
-    lvObj.Close;
+    if not lvObj.FReleaseLater then lvObj.Close;
   end;
 end;
 
@@ -1468,7 +1493,7 @@ begin
        self.UnLockContext('HTTP逻辑处理...', Self);
      end;
   finally
-    lvObj.Close;
+    if not lvObj.FReleaseLater then lvObj.Close;
   end;
 
 end;
@@ -1647,6 +1672,7 @@ begin
     Result := TDiocpHttpRequest.Create;
   end;
   Result.FDiocpHttpServer := Self;
+  Result.Clear;
 end;
 
 function TDiocpHttpServer.GetSession(pvSessionID:string): TDiocpHttpSession;

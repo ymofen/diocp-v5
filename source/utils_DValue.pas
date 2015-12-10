@@ -58,10 +58,10 @@ type
 
 
 
-  PDValueRecord = ^TDValueRecord;
+  PDRawValue = ^TDRawValue;
 
   /// 一个值对象
-  TDValueData = record
+  TDRawInnerValue = record
     case Integer of
       0:
         (AsBoolean: Boolean);
@@ -84,7 +84,7 @@ type
       16:    // Array
         (
           ArrayLength: Cardinal;
-          ArrayItemsEntry: PDValueRecord;
+          ArrayItemsEntry: PDRawValue;
         );
       17:
         (AsCurrency: Currency);
@@ -104,18 +104,18 @@ type
         (AsPointer: Pointer);
       26:
         (AsInterface: PInterface);
-      30:
-        (
-          ValueType: TDValueDataType;
-          Value: PDValueRecord;
-        );
+//      30:
+//        (
+//          ValueType: TDValueDataType;
+//          Value: PDRawValue;
+//        );
   end;
 
-  TDValueRecord = record
-    Value: TDValueData;
+  TDRawValue = record
+    Value: TDRawInnerValue;
     ValueType: TDValueDataType;
   end;
-  TDValues = array of TDValueRecord;
+  TDRawValueArray = array of TDRawValue;
 
 const
   TDValueNodeTypeStr: array[TDValueNodeType] of string = ('vntNull', 'vntArray', 'vntObject', 'vntValue');
@@ -125,11 +125,11 @@ const
 
 type
   TDValueItem = class;
-  TDValueNode = class;
+  TDValue = class;
   TDValueObject = class(TObject)
   private
     FName: String;
-    FRawValue: TDValueRecord;
+    FRawValue: TDRawValue;
     function GetAsBoolean: Boolean;
     function GetAsFloat: Double;
     function GetAsInetger: Int64;
@@ -190,15 +190,15 @@ type
   /// <summary>
   ///   DValue节点
   /// </summary>
-  TDValueNode = class(TObject)
+  TDValue = class(TObject)
   private
     FName: TDValueItem;
     FValue: TDValueItem;
     FNodeType: TDValueNodeType;
-    FParent: TDValueNode;
+    FParent: TDValue;
 
     {$IFDEF HAVE_GENERICS}
-    FChildren: TList<TDValueNode>;
+    FChildren: TList<TDValue>;
     {$ELSE}
     FChildren: TList;
     {$ENDIF}
@@ -212,7 +212,7 @@ type
     procedure CheckCreateChildren;
     procedure CreateName();
     procedure DeleteName();
-    function GetItems(Index: Integer): TDValueNode;
+    function GetItems(pvIndex: Integer): TDValue;
     /// <summary>
     ///   根据名称查找子节点
     /// </summary>
@@ -227,11 +227,13 @@ type
     /// <param name="pvPath"> 要查找的路径 </param>
     /// <param name="vParent"> 如果查找到对象返回找到对象的父节点 </param>
     /// <param name="vIndex"> 如果查找到对象,表示在父节点中的索引值 </param>
-    function InnerFindByPath(pvPath: string; var vParent:TDValueNode; var vIndex:
-        Integer): TDValueNode;
+    function InnerFindByPath(pvPath: string; var vParent:TDValue; var vIndex:
+        Integer): TDValue;
   public
-    constructor Create(pvType: TDValueNodeType);
-    
+    constructor Create(pvType: TDValueNodeType); overload;
+
+    constructor Create; overload;
+
     destructor Destroy; override;
 
     /// <summary>
@@ -239,21 +241,21 @@ type
     /// </summary>
     procedure CheckSetNodeType(pvType:TDValueNodeType);
 
-    function FindByName(pvName:String): TDValueNode;
+    function FindByName(pvName:String): TDValue;
 
-    function FindByPath(pvPath:string): TDValueNode;
+    function FindByPath(pvPath:string): TDValue;
 
-    function ItemByName(pvName:string): TDValueNode;
+    function ItemByName(pvName:string): TDValue;
 
-    function ForceByName(pvName:string): TDValueNode;
+    function ForceByName(pvName:string): TDValue;
 
-    function ForceByPath(pvPath:String): TDValueNode;
+    function ForceByPath(pvPath:String): TDValue;
 
     /// <summary>
     ///   本身作为一个数组添加一个子节点
     ///     如果之前不是数组类型，将会被清除
     /// </summary>
-    function AddArrayChild: TDValueNode;
+    function AddArrayChild: TDValue;
 
     /// <summary>
     ///   根据名称移除掉一个子对象
@@ -273,8 +275,8 @@ type
 
     property Count: Integer read GetCount;
 
-    
-    property Items[Index: Integer]: TDValueNode read GetItems; default;
+
+    property Items[pvIndex: Integer]: TDValue read GetItems; default;
 
     /// <summary>
     ///   键值对象
@@ -284,7 +286,7 @@ type
     /// <summary>
     ///   父节点
     /// </summary>
-    property Parent: TDValueNode read FParent;
+    property Parent: TDValue read FParent;
 
     /// <summary>
     ///   值对象
@@ -294,9 +296,9 @@ type
 
   TDValueItem = class(TObject)
   private
-    FRawValue: TDValueRecord;
-    function GetArrayItem(pvIndex: Integer): TDValueItem;
-    function GetArraySize: Integer;
+    FRawValue: TDRawValue;
+    function GetItems(pvIndex: Integer): TDValueItem;
+    function GetSize: Integer;
     function GetAsBoolean: Boolean;
     function GetAsFloat: Double;
     function GetAsInetger: Int64;
@@ -304,17 +306,33 @@ type
 
     function GetAsString: String;
     function GetDataType: TDValueDataType;
-    procedure SetArraySize(const Value: Integer);
     procedure SetAsBoolean(const Value: Boolean);
     procedure SetAsFloat(const Value: Double);
     procedure SetAsInetger(const Value: Int64);
     procedure SetAsInterface(const Value: IInterface);
 
     procedure SetAsString(const Value: String);
-
   public
+    /// <summary>
+    ///   设置为数组方式同时设置数组大小
+    ///    如果之前不是数组方式，将会被清理
+    ///    如果设置的尺寸比之前大，之前的值将会被保留
+    ///    如果小于之前的尺寸，后面的值将会被清空
+    /// </summary>
+    procedure SetArraySize(const Value: Integer);
+
     destructor Destroy; override;
+
+    /// <summary>
+    ///  比较两个值是否相等
+    /// </summary>
     function Equal(pvItem:TDValueItem): Boolean;
+
+    /// <summary>
+    ///   清空值
+    /// </summary>
+    procedure Clear;
+
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
     property AsInetger: Int64 read GetAsInetger write SetAsInetger;
@@ -325,11 +343,12 @@ type
     procedure SetAsOwnerObject(const Value: TObject);
     procedure SetReferObject(const value:TObject);
 
-    property ArrayItem[pvIndex: Integer]: TDValueItem read GetArrayItem;
-    property ArraySize: Integer read GetArraySize write SetArraySize;
+    /// <summary>
+    ///   根据索引获取对象
+    /// </summary>
+    property Items[pvIndex: Integer]: TDValueItem read GetItems; default;
 
-
-
+    property Size: Integer read GetSize;
 
     property DataType: TDValueDataType read GetDataType;
   end;
@@ -340,46 +359,46 @@ type
 
 
 
-function CompareDValue(pvDValue1: PDValueRecord; pvDValue2:PDValueRecord):
+function CompareDValue(pvDValue1: PDRawValue; pvDValue2:PDRawValue):
     Integer;
 
-function GetDValueSize(ADValue: PDValueRecord): Integer;
-function GetDValueItem(ADValue: PDValueRecord; pvIndex: Integer): PDValueRecord;
+function GetDValueSize(ADValue: PDRawValue): Integer;
+function GetDValueItem(ADValue: PDRawValue; pvIndex: Integer): PDRawValue;
 
 /// <summary>清理DValue内部占用的内存</summary>
-/// <param name="ADValue"> (PDValueRecord) </param>
-procedure ClearDValue(ADValue:PDValueRecord);
-procedure CheckDValueSetType(ADValue:PDValueRecord; AType: TDValueDataType);
+/// <param name="ADValue"> (PDRawValue) </param>
+procedure ClearDValue(ADValue:PDRawValue);
+procedure CheckDValueSetType(ADValue:PDRawValue; AType: TDValueDataType);
 
-procedure CheckDValueSetArrayLength(ADValue: PDValueRecord; ALen: Integer);
+procedure CheckDValueSetArrayLength(ADValue: PDRawValue; ALen: Integer);
 
-procedure DValueSetAsString(ADValue:PDValueRecord; pvString:String);
-function DValueGetAsString(ADValue:PDValueRecord): string;
+procedure DValueSetAsString(ADValue:PDRawValue; pvString:String);
+function DValueGetAsString(ADValue:PDRawValue): string;
 
-procedure DValueSetAsStringW(ADValue:PDValueRecord; pvString:DStringW);
-function DValueGetAsStringW(ADValue:PDValueRecord): DStringW;
+procedure DValueSetAsStringW(ADValue:PDRawValue; pvString:DStringW);
+function DValueGetAsStringW(ADValue:PDRawValue): DStringW;
 
-procedure DValueSetAsReferObject(ADValue:PDValueRecord; pvData:TObject);
-procedure DValueSetAsOwnerObject(ADValue:PDValueRecord; pvObject:TObject);
-function DValueGetAsObject(ADValue:PDValueRecord): TObject;
+procedure DValueSetAsReferObject(ADValue:PDRawValue; pvData:TObject);
+procedure DValueSetAsOwnerObject(ADValue:PDRawValue; pvObject:TObject);
+function DValueGetAsObject(ADValue:PDRawValue): TObject;
 
-procedure DValueSetAsInterface(ADValue: PDValueRecord; const pvValue:
+procedure DValueSetAsInterface(ADValue: PDRawValue; const pvValue:
     IInterface);
-function DValueGetAsInterface(ADValue:PDValueRecord): IInterface;
+function DValueGetAsInterface(ADValue:PDRawValue): IInterface;
 
-procedure DValueSetAsInt64(ADValue:PDValueRecord; pvValue:Int64);
-function DValueGetAsInt64(ADValue: PDValueRecord): Int64;
+procedure DValueSetAsInt64(ADValue:PDRawValue; pvValue:Int64);
+function DValueGetAsInt64(ADValue: PDRawValue): Int64;
 
-procedure DValueSetAsInteger(ADValue:PDValueRecord; pvValue:Integer);
-function DValueGetAsInteger(ADValue: PDValueRecord): Integer;
-
-
-procedure DValueSetAsFloat(ADValue:PDValueRecord; pvValue:Double);
-function DValueGetAsFloat(ADValue: PDValueRecord): Double;
+procedure DValueSetAsInteger(ADValue:PDRawValue; pvValue:Integer);
+function DValueGetAsInteger(ADValue: PDRawValue): Integer;
 
 
-procedure DValueSetAsBoolean(ADValue:PDValueRecord; pvValue:Boolean);
-function DValueGetAsBoolean(ADValue: PDValueRecord): Boolean;
+procedure DValueSetAsFloat(ADValue:PDRawValue; pvValue:Double);
+function DValueGetAsFloat(ADValue: PDRawValue): Double;
+
+
+procedure DValueSetAsBoolean(ADValue:PDRawValue; pvValue:Boolean);
+function DValueGetAsBoolean(ADValue: PDRawValue): Boolean;
 
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW; overload;
 function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW; overload;
@@ -489,7 +508,7 @@ begin
   end;
 end;
 
-function GetDValueSize(ADValue: PDValueRecord): Integer;
+function GetDValueSize(ADValue: PDRawValue): Integer;
 var
   I: Integer;
 begin
@@ -530,15 +549,15 @@ begin
   end;
 end;
 
-function GetDValueItem(ADValue: PDValueRecord; pvIndex: Integer): PDValueRecord;
+function GetDValueItem(ADValue: PDRawValue; pvIndex: Integer): PDRawValue;
 begin
   if ADValue.ValueType = vdtArray then
-    Result := PDValueRecord(IntPtr(ADValue.Value.ArrayItemsEntry) + (SizeOf(TDValueRecord) * pvIndex))
+    Result := PDRawValue(IntPtr(ADValue.Value.ArrayItemsEntry) + (SizeOf(TDRawValue) * pvIndex))
   else
     raise Exception.Create(SValueNotArray);
 end;
 
-procedure ClearDValue(ADValue:PDValueRecord);
+procedure ClearDValue(ADValue:PDRawValue);
   procedure ClearArray;
   var
     I: Cardinal;
@@ -575,7 +594,7 @@ begin
   end;
 end;
 
-procedure CheckDValueSetType(ADValue:PDValueRecord; AType: TDValueDataType);
+procedure CheckDValueSetType(ADValue:PDRawValue; AType: TDValueDataType);
 begin
   if ADValue.ValueType <> AType then
   begin
@@ -598,21 +617,21 @@ begin
   end;
 end;
 
-procedure CheckDValueSetArrayLength(ADValue: PDValueRecord; ALen: Integer);
+procedure CheckDValueSetArrayLength(ADValue: PDRawValue; ALen: Integer);
 begin
   CheckDValueSetType(ADValue, vdtArray);
   if ALen > 0 then
   begin
     if ADValue.Value.ArrayLength = 0 then
     begin
-      GetMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDValueRecord) * ALen);
+      GetMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDRawValue) * ALen);
       ADValue.Value.ArrayLength := ALen;
     end
     else
     begin
       if Cardinal(ALen) > ADValue.Value.ArrayLength then
       begin
-        ReallocMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDValueRecord) * ALen);
+        ReallocMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDRawValue) * ALen);
         ADValue.Value.ArrayLength := ALen;
       end
       else
@@ -627,16 +646,16 @@ begin
   end;
 end;
 
-procedure DValueSetAsStringW(ADValue:PDValueRecord; pvString:DStringW);
+procedure DValueSetAsStringW(ADValue:PDRawValue; pvString:DStringW);
 begin
   CheckDValueSetType(ADValue, vdtStringW);
   ADValue.Value.AsStringW^ := pvString;
 end;
 
-function DValueGetAsStringW(ADValue:PDValueRecord): DStringW;
+function DValueGetAsStringW(ADValue:PDRawValue): DStringW;
 var
   lvHexStr:DStringW;
-  function DTToStr(ADValue: PDValueRecord): DStringW;
+  function DTToStr(ADValue: PDRawValue): DStringW;
   begin
     if Trunc(ADValue.Value.AsFloat) = 0 then
       Result := FormatDateTime({$IF RTLVersion>=22} FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime)
@@ -689,13 +708,13 @@ begin
   end;
 end;
 
-procedure DValueSetAsInt64(ADValue:PDValueRecord; pvValue:Int64);
+procedure DValueSetAsInt64(ADValue:PDRawValue; pvValue:Int64);
 begin
   CheckDValueSetType(ADValue, vdtInt64);
   ADValue.Value.AsInt64 := pvValue;
 end;
 
-function DValueGetAsInteger(ADValue: PDValueRecord): Integer;
+function DValueGetAsInteger(ADValue: PDRawValue): Integer;
 begin
   case ADValue.ValueType of
     vdtInteger:
@@ -720,7 +739,7 @@ begin
   end;
 end;
 
-function DValueGetAsInt64(ADValue: PDValueRecord): Int64;
+function DValueGetAsInt64(ADValue: PDRawValue): Int64;
 begin
   case ADValue.ValueType of
     vdtInt64:
@@ -745,20 +764,20 @@ begin
   end;
 end;
 
-procedure DValueSetAsInteger(ADValue:PDValueRecord; pvValue:Integer);
+procedure DValueSetAsInteger(ADValue:PDRawValue; pvValue:Integer);
 begin
   CheckDValueSetType(ADValue, vdtInteger);
   ADValue.Value.AsInt64 := pvValue;
   
 end;
 
-procedure DValueSetAsFloat(ADValue:PDValueRecord; pvValue:Double);
+procedure DValueSetAsFloat(ADValue:PDRawValue; pvValue:Double);
 begin
   CheckDValueSetType(ADValue, vdtFloat);
   ADValue.Value.AsFloat := pvValue;
 end;
 
-function DValueGetAsFloat(ADValue: PDValueRecord): Double;
+function DValueGetAsFloat(ADValue: PDRawValue): Double;
 begin
   case ADValue.ValueType of
     vdtFloat, vdtDateTime:
@@ -783,13 +802,13 @@ begin
   end;
 end;
 
-procedure DValueSetAsBoolean(ADValue:PDValueRecord; pvValue:Boolean);
+procedure DValueSetAsBoolean(ADValue:PDRawValue; pvValue:Boolean);
 begin
   CheckDValueSetType(ADValue, vdtBoolean);
   ADValue.Value.AsBoolean := pvValue;
 end;
 
-function DValueGetAsBoolean(ADValue: PDValueRecord): Boolean;
+function DValueGetAsBoolean(ADValue: PDRawValue): Boolean;
 begin
   case ADValue.ValueType of
     vdtFloat, vdtDateTime:
@@ -814,7 +833,7 @@ begin
   end;
 end;
 
-function CompareDValue(pvDValue1: PDValueRecord; pvDValue2:PDValueRecord): Integer;
+function CompareDValue(pvDValue1: PDRawValue; pvDValue2:PDRawValue): Integer;
 begin
   if pvDValue1.ValueType in [vdtInteger, vdtInt64] then
   begin
@@ -831,16 +850,16 @@ begin
   end;   
 end;
 
-procedure DValueSetAsString(ADValue:PDValueRecord; pvString:String);
+procedure DValueSetAsString(ADValue:PDRawValue; pvString:String);
 begin
   CheckDValueSetType(ADValue, vdtString);
   ADValue.Value.AsString^ := pvString;
 end;
 
-function DValueGetAsString(ADValue:PDValueRecord): string;
+function DValueGetAsString(ADValue:PDRawValue): string;
 var
   lvHexStr:DStringW;
-  function DTToStr(ADValue: PDValueRecord): DStringW;
+  function DTToStr(ADValue: PDRawValue): DStringW;
   begin
     if Trunc(ADValue.Value.AsFloat) = 0 then
       Result := FormatDateTime({$IF RTLVersion>=22} FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime)
@@ -893,7 +912,7 @@ begin
   end;
 end;
 
-procedure DValueSetAsOwnerObject(ADValue:PDValueRecord; pvObject:TObject);
+procedure DValueSetAsOwnerObject(ADValue:PDRawValue; pvObject:TObject);
 begin
   if pvObject = nil then
   begin       // 清空
@@ -905,7 +924,7 @@ begin
   end;
 end;
 
-function DValueGetAsObject(ADValue:PDValueRecord): TObject;
+function DValueGetAsObject(ADValue:PDRawValue): TObject;
 begin
   case ADValue.ValueType of
     vdtUnset, vdtNull:
@@ -918,7 +937,7 @@ begin
   end;
 end;
 
-procedure DValueSetAsInterface(ADValue: PDValueRecord; const pvValue:
+procedure DValueSetAsInterface(ADValue: PDRawValue; const pvValue:
     IInterface);
 begin
   if pvValue = nil then
@@ -931,7 +950,7 @@ begin
   end;
 end;
 
-function DValueGetAsInterface(ADValue:PDValueRecord): IInterface;
+function DValueGetAsInterface(ADValue:PDRawValue): IInterface;
 begin
 
   case ADValue.ValueType of
@@ -949,7 +968,7 @@ end;
 
 
 
-procedure DValueSetAsReferObject(ADValue:PDValueRecord; pvData:TObject);
+procedure DValueSetAsReferObject(ADValue:PDRawValue; pvData:TObject);
 begin
   if pvData = nil then
   begin       // 清空
@@ -1098,7 +1117,7 @@ begin
   end;
 end;
 
-procedure TDValueNode.ClearChildren;
+procedure TDValue.ClearChildren;
 var
   i: Integer;
 begin
@@ -1112,22 +1131,32 @@ begin
   end;
 end;
 
-constructor TDValueNode.Create(pvType: TDValueNodeType);
+constructor TDValue.Create(pvType: TDValueNodeType);
 begin
   inherited Create;
   FNodeType := vntNull;
   CreateName;
   FValue := TDValueItem.Create;
-  
+
   CheckSetNodeType(pvType);
 end;
 
-procedure TDValueNode.CreateName;
+constructor TDValue.Create;
+begin
+  inherited;
+  FNodeType := vntNull;
+  CreateName;
+  FValue := TDValueItem.Create;
+  CheckSetNodeType(vntObject);
+
+end;
+
+procedure TDValue.CreateName;
 begin
   if not Assigned(FName) then FName := TDValueItem.Create;
 end;
 
-procedure TDValueNode.DeleteName;
+procedure TDValue.DeleteName;
 begin
   if Assigned(FName) then
   begin
@@ -1136,7 +1165,7 @@ begin
   end;    
 end;
 
-destructor TDValueNode.Destroy;
+destructor TDValue.Destroy;
 begin
   if Assigned(FChildren) then
   begin
@@ -1150,27 +1179,27 @@ begin
   inherited;
 end;
 
-function TDValueNode.AddArrayChild: TDValueNode;
+function TDValue.AddArrayChild: TDValue;
 begin
   CheckSetNodeType(vntArray);
-  Result := TDValueNode.Create(vntValue);
+  Result := TDValue.Create(vntValue);
   Result.FParent := Self;
   FChildren.Add(Result);
 end;
 
-procedure TDValueNode.CheckCreateChildren;
+procedure TDValue.CheckCreateChildren;
 begin
   if not Assigned(FChildren) then
   begin
     {$IFDEF HAVE_GENERICS}
-      FChildren := TList<TDValueNode>.Create;
+      FChildren := TList<TDValue>.Create;
     {$ELSE}
       FChildren := TList.Create;
     {$ENDIF} 
   end;
 end;
 
-function TDValueNode.GetCount: Integer;
+function TDValue.GetCount: Integer;
 begin
   if Assigned(FChildren) then
     Result := FChildren.Count
@@ -1180,13 +1209,13 @@ begin
   end;
 end;
 
-function TDValueNode.ItemByName(pvName:string): TDValueNode;
+function TDValue.ItemByName(pvName:string): TDValue;
 begin
   Result := FindByName(pvName);
   if Result = nil then raise TDValueException.CreateFmt(SItemNotFound, [pvName]);
 end;
 
-procedure TDValueNode.CheckSetNodeType(pvType:TDValueNodeType);
+procedure TDValue.CheckSetNodeType(pvType:TDValueNodeType);
 begin
   if pvType <> FNodeType then
   begin
@@ -1208,13 +1237,13 @@ begin
   end;
 end;
 
-procedure TDValueNode.Delete(pvIndex:Integer);
+procedure TDValue.Delete(pvIndex:Integer);
 begin
   TDValueItem(FChildren[pvIndex]).Free;
   FChildren.Delete(pvIndex);
 end;
 
-function TDValueNode.FindByName(pvName:String): TDValueNode;
+function TDValue.FindByName(pvName:String): TDValue;
 var
   i:Integer;
 begin
@@ -1222,33 +1251,33 @@ begin
   if i = -1 then Result := nil else Result := Items[i];
 end;
 
-function TDValueNode.FindByPath(pvPath:string): TDValueNode;
+function TDValue.FindByPath(pvPath:string): TDValue;
 var
-  lvParent:TDValueNode;
+  lvParent:TDValue;
   j:Integer;
 begin
   Result := InnerFindByPath(pvPath, lvParent, j);
 end;
 
-function TDValueNode.ForceByName(pvName:string): TDValueNode;
+function TDValue.ForceByName(pvName:string): TDValue;
 begin
   Result := FindByName(pvName);
   if Result = nil then
   begin
     CheckSetNodeType(vntObject);
-    Result := TDValueNode.Create(vntValue);
+    Result := TDValue.Create(vntValue);
     Result.FName.AsString := pvName;
     Result.FParent := Self;
     FChildren.Add(Result);
   end;
 end;
 
-function TDValueNode.ForceByPath(pvPath:String): TDValueNode;
+function TDValue.ForceByPath(pvPath:String): TDValue;
 var
   lvName:string;
   s:string;
   sPtr:PChar;
-  lvParent:TDValueNode;
+  lvParent:TDValue;
 begin
   Result := nil;
   s := pvPath;
@@ -1277,12 +1306,12 @@ begin
   end;
 end;
 
-function TDValueNode.GetItems(Index: Integer): TDValueNode;
+function TDValue.GetItems(pvIndex: Integer): TDValue;
 begin
-  Result := TDValueNode(FChildren[Index]);
+  Result := TDValue(FChildren[pvIndex]);
 end;
 
-function TDValueNode.IndexOf(pvName: string): Integer;
+function TDValue.IndexOf(pvName: string): Integer;
 var
   i:Integer;
 begin
@@ -1298,13 +1327,13 @@ begin
     end;
 end;
 
-function TDValueNode.InnerFindByPath(pvPath: string; var vParent:TDValueNode;
-    var vIndex: Integer): TDValueNode;
+function TDValue.InnerFindByPath(pvPath: string; var vParent:TDValue;
+    var vIndex: Integer): TDValue;
 var
   lvName:string;
   s:string;
   sPtr:PChar;
-  lvTempObj, lvParent:TDValueNode;
+  lvTempObj, lvParent:TDValue;
   j:Integer;
 begin
   s := pvPath;
@@ -1351,12 +1380,12 @@ begin
   end;
 end;
 
-procedure TDValueNode.RemoveAll;
+procedure TDValue.RemoveAll;
 begin
   ClearChildren();
 end;
 
-function TDValueNode.RemoveByName(pvName:String): Integer;
+function TDValue.RemoveByName(pvName:String): Integer;
 begin
 
   Result := IndexOf(pvName);
@@ -1372,12 +1401,17 @@ begin
   inherited;
 end;
 
+procedure TDValueItem.Clear;
+begin
+  ClearDValue(@FRawValue);
+end;
+
 function TDValueItem.Equal(pvItem:TDValueItem): Boolean;
 begin
   Result := CompareDValue(@FRawValue, @pvItem.FRawValue) = 0;
 end;
 
-function TDValueItem.GetArrayItem(pvIndex: Integer): TDValueItem;
+function TDValueItem.GetItems(pvIndex: Integer): TDValueItem;
 var
   lvObj:TObject;
 begin
@@ -1389,7 +1423,7 @@ begin
   Result := TDValueItem(lvObj);
 end;
 
-function TDValueItem.GetArraySize: Integer;
+function TDValueItem.GetSize: Integer;
 begin
   if FRawValue.ValueType <> vdtArray then Result := 0
   else Result := FRawValue.Value.ArrayLength;
@@ -1437,9 +1471,9 @@ var
   i, l: Integer;
   lvDValueItem:TDValueItem;
 begin
-  lvOldSize := GetArraySize;
+  lvOldSize := GetSize;
   CheckDValueSetArrayLength(@FRawValue, Value);
-  l := GetArraySize;
+  l := GetSize;
   if l > lvOldSize then
     for i := lvOldSize to l - 1 do
     begin
