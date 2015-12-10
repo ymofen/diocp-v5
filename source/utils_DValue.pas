@@ -213,10 +213,16 @@ type
     procedure CreateName();
     procedure DeleteName();
     function GetItems(pvIndex: Integer): TDValue;
+
     /// <summary>
     ///   根据名称查找子节点
     /// </summary>
-    function IndexOf(pvName: string): Integer;
+    function IndexOf(pvName: string): Integer; overload;
+
+    /// <summary>
+    ///   根据名称查找子节点
+    /// </summary>
+    function IndexOf(pvName: Integer): Integer; overload;
 
     /// <summary>
     ///   根据路径查找对象，如果不存在返回nil
@@ -227,8 +233,7 @@ type
     /// <param name="pvPath"> 要查找的路径 </param>
     /// <param name="vParent"> 如果查找到对象返回找到对象的父节点 </param>
     /// <param name="vIndex"> 如果查找到对象,表示在父节点中的索引值 </param>
-    function InnerFindByPath(pvPath: string; var vParent:TDValue; var vIndex:
-        Integer): TDValue;
+    function InnerFindByPath(pvPath: string; var vParent:TDValue; var vIndex: Integer): TDValue;
   public
     constructor Create(pvType: TDValueNodeType); overload;
 
@@ -241,13 +246,17 @@ type
     /// </summary>
     procedure CheckSetNodeType(pvType:TDValueNodeType);
 
-    function FindByName(pvName:String): TDValue;
+    function FindByName(pvName:String): TDValue; overload;
+
+    function FindByName(pvName:Integer): TDValue; overload;
 
     function FindByPath(pvPath:string): TDValue;
 
     function ItemByName(pvName:string): TDValue;
 
-    function ForceByName(pvName:string): TDValue;
+    function ForceByName(pvName:string): TDValue; overload;
+
+    function ForceByName(pvName:Integer): TDValue; overload;
 
     function ForceByPath(pvPath:String): TDValue;
 
@@ -269,10 +278,18 @@ type
     procedure RemoveAll;
 
     /// <summary>
+    ///   清理值
+    /// </summary>
+    procedure Clear;
+
+    /// <summary>
     ///   根据索引删除掉一个子对象
     /// </summary>
     procedure Delete(pvIndex:Integer);
 
+    /// <summary>
+    ///  子项目数量
+    /// </summary>
     property Count: Integer read GetCount;
 
 
@@ -306,6 +323,9 @@ type
 
     function GetAsString: String;
     function GetDataType: TDValueDataType;
+
+    function GetAsObject: TObject;
+
     procedure SetAsBoolean(const Value: Boolean);
     procedure SetAsFloat(const Value: Double);
     procedure SetAsInetger(const Value: Int64);
@@ -333,13 +353,15 @@ type
     /// </summary>
     procedure Clear;
 
+
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
     property AsInetger: Int64 read GetAsInetger write SetAsInetger;
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
+    property AsObject: TObject read GetAsObject;
 
     property AsInterface: IInterface read GetAsInterface write SetAsInterface;
-    function GetAsObject: TObject;
+
     procedure SetAsOwnerObject(const Value: TObject);
     procedure SetReferObject(const value:TObject);
 
@@ -1237,6 +1259,12 @@ begin
   end;
 end;
 
+procedure TDValue.Clear;
+begin
+  ClearChildren;
+  FValue.Clear;
+end;
+
 procedure TDValue.Delete(pvIndex:Integer);
 begin
   TDValueItem(FChildren[pvIndex]).Free;
@@ -1244,6 +1272,14 @@ begin
 end;
 
 function TDValue.FindByName(pvName:String): TDValue;
+var
+  i:Integer;
+begin
+  i := IndexOf(pvName);
+  if i = -1 then Result := nil else Result := Items[i];
+end;
+
+function TDValue.FindByName(pvName: Integer): TDValue;
 var
   i:Integer;
 begin
@@ -1267,6 +1303,19 @@ begin
     CheckSetNodeType(vntObject);
     Result := TDValue.Create(vntValue);
     Result.FName.AsString := pvName;
+    Result.FParent := Self;
+    FChildren.Add(Result);
+  end;
+end;
+
+function TDValue.ForceByName(pvName:Integer): TDValue;
+begin
+  Result := FindByName(pvName);
+  if Result = nil then
+  begin
+    CheckSetNodeType(vntObject);
+    Result := TDValue.Create(vntValue);
+    Result.FName.AsInetger := pvName;
     Result.FParent := Self;
     FChildren.Add(Result);
   end;
@@ -1323,6 +1372,25 @@ begin
       begin
         Result := i;
         Break;
+      end;
+    end;
+end;
+
+function TDValue.IndexOf(pvName: Integer): Integer;
+var
+  i:Integer;
+begin
+  Result := -1;
+  if Assigned(FChildren) then
+    for i := 0 to FChildren.Count - 1 do
+    begin
+      if Items[i].FName.DataType in [vdtInt64, vdtInteger] then
+      begin
+        if Items[i].FName.AsInetger = pvName then
+        begin
+          Result := i;
+          Break;
+        end;
       end;
     end;
 end;
