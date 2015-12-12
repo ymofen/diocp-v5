@@ -431,6 +431,7 @@ resourcestring
   SValueNotArray = '当前值不是数组类型，无法按数组方式访问。';
   SConvertError = '无法将 %s 转换为 %s 类型的值。';
   SUnsupportStreamSource = '无法将 Variant 类型转换为流。';
+  SOutOfBound   = '访问[%d]超出范围(0..%d)';
 
   SItemNotFound = '找不到对应的项目:%s';
   SItemExists   = '项目[%s]已经存在,不能重复添加.';
@@ -574,8 +575,13 @@ end;
 function GetDValueItem(ADValue: PDRawValue; pvIndex: Integer): PDRawValue;
 begin
   if ADValue.ValueType = vdtArray then
+  begin
+    if (pvIndex < 0) or (pvIndex >= ADValue.Value.ArrayLength) then
+    begin
+      raise EArgumentOutOfRangeException.CreateFmt(SOutOfBound, [pvIndex, ADValue.Value.ArrayLength - 1]);
+    end;
     Result := PDRawValue(IntPtr(ADValue.Value.ArrayItemsEntry) + (SizeOf(TDRawValue) * pvIndex))
-  else
+  end else
     raise Exception.Create(SValueNotArray);
 end;
 
@@ -1486,6 +1492,9 @@ begin
   if DataType <> vdtArray then
     raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[DataType],
       DValueTypeName[vdtArray]]);
+
+
+
 
   lvObj := DValueGetAsObject(GetDValueItem(@FRawValue, pvIndex));
   Result := TDValueItem(lvObj);
