@@ -1651,6 +1651,7 @@ begin
   else
     MPool := nil;
 
+
   if MPool <> nil then
   begin
     MemBlock := MPool.GetMemoryBlock;
@@ -1672,10 +1673,18 @@ begin
   else
   begin
     MemBlock := SuperLargeMemoryPool.GetMemoryBlock;
-    MemBlock^.DataLen := SuperMemoryPool.FBlockSize;
     MemBlock^.NextEx := nil;
     MemBlock^.PrevEx := nil;
-    Move(buf^,MemBlock^.Memory^,MemBlock^.DataLen);
+    if SuperLargeMemoryPool.FBlockSize <= Len then
+    begin
+      MemBlock^.DataLen := SuperLargeMemoryPool.FBlockSize;
+      Move(buf^,MemBlock^.Memory^,MemBlock^.DataLen)
+    end
+    else
+    begin
+      MemBlock^.DataLen := Len;
+      Move(buf^,MemBlock^.Memory^,len);
+    end;
     if FHead = nil then
       FHead := MemBlock;
     if FLast = nil then
@@ -1686,10 +1695,10 @@ begin
       MemBlock^.PrevEx := FLast;
       FLast := MemBlock;
     end;
-
     Dec(len,MemBlock^.DataLen);
     Inc(buf,MemBlock^.DataLen);
-    AddBuffer(buf,len);
+    if Len > 0 then
+      AddBuffer(buf,len);
   end;
 end;
 
