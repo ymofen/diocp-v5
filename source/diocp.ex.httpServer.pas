@@ -40,7 +40,7 @@ uses
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp.task{$ENDIF}
   , diocp.tcp.server, utils.queues, utils.hashs, utils_DValue,
-  utils.objectPool, utils.safeLogger;
+  utils.objectPool, utils.safeLogger, Windows;
 
 
 
@@ -76,26 +76,34 @@ type
   /// </summary>
   TDiocpHttpSession = class(TObject)
   private
-    FLastActivity: Integer;
+    FLastActivity: Integer; 
+    procedure SetSessionTimeOut(const Value: Integer);
   protected
+    FSessionTimeOut: Integer;
     procedure DoCleanup; virtual;
   public
     constructor Create; virtual;
     property LastActivity: Integer read FLastActivity;
+    property SessionTimeOut: Integer read FSessionTimeOut write SetSessionTimeOut;
+
+    /// <summary>
+    ///  立即失效
+    /// </summary>
+    procedure Invalidate;
   end;
 
   /// <summary>
   ///   使用DValue存储数据的Session
   /// </summary>
-  TDiocpHttpDValueSessoin = class(TDiocpHttpSession)
+  TDiocpHttpDValueSession = class(TDiocpHttpSession)
   private
-    FDValues: TDValueList;
+    FDValues: TDValue;
   protected
     procedure DoCleanup; override;
   public
     constructor Create; override;
     destructor Destroy; override;
-    property DValues: TDValueList read FDValues;
+    property DValues: TDValue read FDValues;
   end;
 
   /// <summary>
@@ -490,6 +498,7 @@ type
     FOnDiocpHttpRequestPostDone: TOnDiocpHttpRequestEvent;
 
     FLogicWorkerNeedCoInitialize: Boolean;
+    FSessionTimeOut: Integer;
 
     /// <summary>
     /// 响应Http请求， 执行响应事件
@@ -557,7 +566,10 @@ type
     property OnDiocpHttpRequest: TOnDiocpHttpRequestEvent read FOnDiocpHttpRequest
         write FOnDiocpHttpRequest;
 
-    
+    /// <summary>
+    ///   检查Session超时, 剔除超时的Session
+    /// </summary>
+    procedure CheckSessionTimeOut;
 
   published
     /// <summary>
@@ -565,6 +577,10 @@ type
     /// </summary>
     property LogicWorkerNeedCoInitialize: Boolean read FLogicWorkerNeedCoInitialize
         write FLogicWorkerNeedCoInitialize;
+        
+    property SessionTimeOut: Integer read FSessionTimeOut write FSessionTimeOut;
+
+
   end;
 
 
@@ -1627,9 +1643,10 @@ begin
   FSessionObjectPool := TObjectPool.Create(OnCreateSessionObject);
   FSessionList := TDHashTableSafe.Create;
   FSessionList.OnDelete := OnSessionRemove;
+  FSessionTimeOut := 300;  // five miniutes
   KeepAlive := false;
   RegisterContextClass(TDiocpHttpClientContext);
-  RegisterSessionClass(TDiocpHttpDValueSessoin);
+  RegisterSessionClass(TDiocpHttpDValueSession);
 end;
 
 destructor TDiocpHttpServer.Destroy;
@@ -1644,6 +1661,11 @@ begin
   FSessionObjectPool.WaitFor(10000);
   FSessionObjectPool.Free;
   inherited;
+end;
+
+procedure TDiocpHttpServer.CheckSessionTimeOut;
+begin
+  ;
 end;
 
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
@@ -1683,8 +1705,11 @@ begin
     if Result = nil then
     begin
       Result := TDiocpHttpSession(FSessionObjectPool.GetObject);
-      FSessionList.ValueMap[pvSessionID] := Result;      
+      Result.DoCleanup;
+      Result.SessionTimeOut := self.FSessionTimeOut;
+      FSessionList.ValueMap[pvSessionID] := Result;
     end;
+    Result.FLastActivity := GetTickCount;
   finally
     FSessionList.unLock;
   end;
@@ -1750,16 +1775,16 @@ end;
 
 constructor TDiocpHttpSession.Create;
 begin
-
+  FSessionTimeOut := 300;
 end;
 
-constructor TDiocpHttpDValueSessoin.Create;
+constructor TDiocpHttpDValueSession.Create;
 begin
   inherited Create;
-  FDValues := TDValueList.Create();
+  FDValues := TDValue.Create();
 end;
 
-destructor TDiocpHttpDValueSessoin.Destroy;
+destructor TDiocpHttpDValueSession.Destroy;
 begin
   FDValues.Free;
   inherited Destroy;
@@ -1767,7 +1792,7 @@ end;
 
 
 
-procedure TDiocpHttpDValueSessoin.DoCleanup;
+procedure TDiocpHttpDValueSession.DoCleanup;
 begin
   inherited;
   FDValues.Clear;
@@ -1776,6 +1801,16 @@ end;
 procedure TDiocpHttpSession.DoCleanup;
 begin
 
+end;
+
+procedure TDiocpHttpSession.Invalidate;
+begin
+  DoCleanup;
+end;
+
+procedure TDiocpHttpSession.SetSessionTimeOut(const Value: Integer);
+begin
+  FSessionTimeOut := Value;
 end;
 
 end.

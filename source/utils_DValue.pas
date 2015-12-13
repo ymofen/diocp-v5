@@ -50,7 +50,7 @@ type
     vdtString, vdtStringW, vdtStream, vdtInterface, vdtReferObject, vdtOwnerObject, vdtArray);
 
   // 节点类型
-  TDValueNodeType = (vntNull,        // 没有值
+  TDValueObjectType = (vntNull,        // 没有值
                      vntArray,       // 列表-数组
                      vntObject,      // 列表-Key-Value
                      vntValue        // 值
@@ -118,7 +118,7 @@ type
   TDRawValueArray = array of TDRawValue;
 
 const
-  TDValueNodeTypeStr: array[TDValueNodeType] of string = ('vntNull', 'vntArray', 'vntObject', 'vntValue');
+  TDValueObjectTypeStr: array[TDValueObjectType] of string = ('vntNull', 'vntArray', 'vntObject', 'vntValue');
 
   Path_SplitChars : TSysCharSet = ['.', '/' , '\'];
 
@@ -194,7 +194,7 @@ type
   private
     FName: TDValueItem;
     FValue: TDValueItem;
-    FNodeType: TDValueNodeType;
+    FObjectType: TDValueObjectType;
     FParent: TDValue;
 
     {$IFDEF HAVE_GENERICS}
@@ -235,7 +235,7 @@ type
     /// <param name="vIndex"> 如果查找到对象,表示在父节点中的索引值 </param>
     function InnerFindByPath(pvPath: string; var vParent:TDValue; var vIndex: Integer): TDValue;
   public
-    constructor Create(pvType: TDValueNodeType); overload;
+    constructor Create(pvType: TDValueObjectType); overload;
 
     constructor Create; overload;
 
@@ -244,7 +244,7 @@ type
     /// <summary>
     ///   设置节点类型, 类型转换时会丢失数据
     /// </summary>
-    procedure CheckSetNodeType(pvType:TDValueNodeType);
+    procedure CheckSetNodeType(pvType:TDValueObjectType);
 
     function FindByName(pvName:String): TDValue; overload;
 
@@ -265,6 +265,12 @@ type
     ///     如果之前不是数组类型，将会被清除
     /// </summary>
     function AddArrayChild: TDValue;
+
+    /// <summary>
+    ///   本身作为一个vntObject添加一个子节点
+    ///     如果之前不是vntObject类型，将会被清除
+    /// </summary>
+    function Add: TDValue;
 
     /// <summary>
     ///   根据名称移除掉一个子对象
@@ -299,6 +305,11 @@ type
     ///   键值对象
     /// </summary>
     property Name: TDValueItem read FName;
+
+    /// <summary>
+    ///   对象类型
+    /// </summary>
+    property ObjectType: TDValueObjectType read FObjectType;
 
     /// <summary>
     ///   父节点
@@ -578,7 +589,7 @@ begin
   begin
     if (pvIndex < 0) or (pvIndex >= ADValue.Value.ArrayLength) then
     begin
-      raise EArgumentOutOfRangeException.CreateFmt(SOutOfBound, [pvIndex, ADValue.Value.ArrayLength - 1]);
+      raise TDValueException.CreateFmt(SOutOfBound, [pvIndex, ADValue.Value.ArrayLength - 1]);
     end;
     Result := PDRawValue(IntPtr(ADValue.Value.ArrayItemsEntry) + (SizeOf(TDRawValue) * pvIndex))
   end else
@@ -1159,10 +1170,10 @@ begin
   end;
 end;
 
-constructor TDValue.Create(pvType: TDValueNodeType);
+constructor TDValue.Create(pvType: TDValueObjectType);
 begin
   inherited Create;
-  FNodeType := vntNull;
+  FObjectType := vntNull;
   CreateName;
   FValue := TDValueItem.Create;
 
@@ -1172,7 +1183,7 @@ end;
 constructor TDValue.Create;
 begin
   inherited;
-  FNodeType := vntNull;
+  FObjectType := vntNull;
   CreateName;
   FValue := TDValueItem.Create;
   CheckSetNodeType(vntObject);
@@ -1205,6 +1216,14 @@ begin
   if Assigned(FValue) then FValue.Free;
   DeleteName;
   inherited;
+end;
+
+function TDValue.Add: TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(vntValue);
+  Result.FParent := Self;
+  FChildren.Add(Result); 
 end;
 
 function TDValue.AddArrayChild: TDValue;
@@ -1243,11 +1262,11 @@ begin
   if Result = nil then raise TDValueException.CreateFmt(SItemNotFound, [pvName]);
 end;
 
-procedure TDValue.CheckSetNodeType(pvType:TDValueNodeType);
+procedure TDValue.CheckSetNodeType(pvType:TDValueObjectType);
 begin
-  if pvType <> FNodeType then
+  if pvType <> FObjectType then
   begin
-    if not (FNodeType in [vntNull]) then
+    if not (FObjectType in [vntNull]) then
     begin
       ClearChildren;
     end;
@@ -1261,7 +1280,7 @@ begin
       if not Assigned(FValue) then FValue := TDValueItem.Create;
     end;
 
-    FNodeType := pvType;
+    FObjectType := pvType;
   end;
 end;
 
