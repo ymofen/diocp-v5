@@ -262,6 +262,11 @@ type
     /// </summary>
     procedure RemoveSession;
 
+    /// <summary>
+    ///  获取当前会话ID, 如果没有会设置Response的Cookie信息
+    /// </summary>
+    function GetSessionID: String;
+
 
     /// <summary>
     ///   将Post的原始数据解码，放到参数列表中
@@ -1149,6 +1154,12 @@ function TDiocpHttpRequest.GetSession: TDiocpHttpSession;
 begin
   CheckCookieSession;
   Result := TDiocpHttpServer(Connection.Owner).GetSession(FSessionID);
+end;
+
+function TDiocpHttpRequest.GetSessionID: String;
+begin
+  CheckCookieSession;
+  Result := FSessionID;
 end;
 
 /// <summary>

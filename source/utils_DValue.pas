@@ -45,9 +45,16 @@ type
   TBytes = array of Byte;
   {$ifend}
 
+  // 释放动作
+  TObjectFreeAction = (faNone, faFree);
+
+  // 指针释放动作
+  TPtrReleaseAction = (praNone, praObjectFree, praDispose, praFreeMem);
+
+
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
     vdtInteger, vdtInt64, vdtCurrency, vdtGuid, vdtDateTime,
-    vdtString, vdtStringW, vdtStream, vdtInterface, vdtReferObject, vdtOwnerObject, vdtArray);
+    vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtArray);
 
   // 节点类型
   TDValueObjectType = (vntNull,        // 没有值
@@ -101,7 +108,10 @@ type
       24:
         (AsExtend: Extended);
       25:
-        (AsPointer: Pointer);
+        (
+          AsPointer: Pointer;
+          PtrReleaseAction: TPtrReleaseAction;
+        );
       26:
         (AsInterface: PInterface);
 //      30:
@@ -212,6 +222,8 @@ type
     procedure CheckCreateChildren;
     procedure CreateName();
     procedure DeleteName();
+
+
     function GetItems(pvIndex: Integer): TDValue;
 
     /// <summary>
@@ -234,6 +246,17 @@ type
     /// <param name="vParent"> 如果查找到对象返回找到对象的父节点 </param>
     /// <param name="vIndex"> 如果查找到对象,表示在父节点中的索引值 </param>
     function InnerFindByPath(pvPath: string; var vParent:TDValue; var vIndex: Integer): TDValue;
+
+  private
+    function GetAsBoolean: Boolean;
+    procedure SetAsBoolean(const Value: Boolean);
+    function GetAsFloat: Double;
+    function GetAsInteger: Int64;
+    function GetAsString: String;
+    procedure SetAsFloat(const Value: Double);
+    procedure SetAsInteger(const Value: Int64);
+    procedure SetAsString(const Value: String);
+    function GetAsObject: TObject;
   public
     constructor Create(pvType: TDValueObjectType); overload;
 
@@ -276,6 +299,8 @@ type
     ///   根据名称移除掉一个子对象
     /// </summary>
     function RemoveByName(pvName:String): Integer;
+
+    function IndexDataOf(pvData:Pointer): Integer;
 
     /// <summary>
     ///   释放所有的子对象
@@ -320,6 +345,17 @@ type
     ///   值对象
     /// </summary>
     property Value: TDValueItem read FValue;
+
+  public
+    // 对Value的访问封装, 可以直接访问Value.AsXXXX
+    procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
+        faFree);
+    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
+    property AsFloat: Double read GetAsFloat write SetAsFloat;
+    property AsString: String read GetAsString write SetAsString;
+    property AsInteger: Int64 read GetAsInteger write SetAsInteger;
+    property AsObject: TObject read GetAsObject;
+
   end;
 
   TDValueItem = class(TObject)
@@ -329,7 +365,7 @@ type
     function GetSize: Integer;
     function GetAsBoolean: Boolean;
     function GetAsFloat: Double;
-    function GetAsInetger: Int64;
+    function GetAsInteger: Int64;
     function GetAsInterface: IInterface;
 
     function GetAsString: String;
@@ -339,7 +375,7 @@ type
 
     procedure SetAsBoolean(const Value: Boolean);
     procedure SetAsFloat(const Value: Double);
-    procedure SetAsInetger(const Value: Int64);
+    procedure SetAsInteger(const Value: Int64);
     procedure SetAsInterface(const Value: IInterface);
 
     procedure SetAsString(const Value: String);
@@ -367,14 +403,14 @@ type
 
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
-    property AsInetger: Int64 read GetAsInetger write SetAsInetger;
+    property AsInteger: Int64 read GetAsInteger write SetAsInteger;
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsObject: TObject read GetAsObject;
 
     property AsInterface: IInterface read GetAsInterface write SetAsInterface;
 
-    procedure SetAsOwnerObject(const Value: TObject);
-    procedure SetReferObject(const value:TObject);
+    procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
+        faFree);
 
     /// <summary>
     ///   根据索引获取对象
@@ -411,8 +447,8 @@ function DValueGetAsString(ADValue:PDRawValue): string;
 procedure DValueSetAsStringW(ADValue:PDRawValue; pvString:DStringW);
 function DValueGetAsStringW(ADValue:PDRawValue): DStringW;
 
-procedure DValueSetAsReferObject(ADValue:PDRawValue; pvData:TObject);
-procedure DValueSetAsOwnerObject(ADValue:PDRawValue; pvObject:TObject);
+procedure DValueBindPointerData(ADValue:PDRawValue; pvData:Pointer;
+    pvReleaseAction:TPtrReleaseAction);
 function DValueGetAsObject(ADValue:PDRawValue): TObject;
 
 procedure DValueSetAsInterface(ADValue: PDRawValue; const pvValue:
@@ -452,7 +488,7 @@ resourcestring
 const
   DValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'Currency', 'Guid',
-    'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'ReferObject', 'OwnerObject', 'Array');
+    'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'Pointer', 'Array');
 
 
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW;
@@ -609,6 +645,24 @@ procedure ClearDValue(ADValue:PDRawValue);
     end;
     FreeMem(ADValue.Value.ArrayItemsEntry);
   end;
+  procedure ClearPointer();
+  begin
+    case ADValue.Value.PtrReleaseAction of
+      praNone:;
+      praObjectFree:
+        begin
+          TObject(ADValue.Value.AsPointer).Free;
+        end;
+      praDispose:
+        begin
+          Dispose(ADValue.Value.AsPointer);
+        end;
+      praFreeMem:
+        begin
+          FreeMem(ADValue.Value.AsPointer);
+        end;
+    end;
+  end;
 
 begin
   if ADValue.ValueType <> vdtUnset then
@@ -624,8 +678,8 @@ begin
         FreeAndNil(ADValue.Value.AsStream);
       vdtInterface:
         Dispose(ADValue.Value.AsInterface);
-      vdtOwnerObject:
-        TObject(ADValue.Value.AsPointer).Free;
+      vdtPtr:
+        ClearPointer;
       vdtArray:
         ClearArray;
     end;
@@ -951,25 +1005,26 @@ begin
   end;
 end;
 
-procedure DValueSetAsOwnerObject(ADValue:PDRawValue; pvObject:TObject);
-begin
-  if pvObject = nil then
-  begin       // 清空
-    ClearDValue(ADValue);
-  end else
-  begin
-    CheckDValueSetType(ADValue, vdtOwnerObject);
-    ADValue.Value.AsPointer := pvObject;
-  end;
-end;
-
 function DValueGetAsObject(ADValue:PDRawValue): TObject;
 begin
   case ADValue.ValueType of
     vdtUnset, vdtNull:
       Result := nil;
-    vdtOwnerObject, vdtReferObject:
-      Result :=  TObject(ADValue.Value.AsPointer);
+    vdtPtr:
+      case ADValue.Value.PtrReleaseAction of
+        praNone, praObjectFree:  // 引用对象，或者管理生命周期的对象
+          begin
+            Result :=  TObject(ADValue.Value.AsPointer);
+          end;
+        praDispose, praFreeMem:
+          begin
+            raise EConvertError.CreateFmt(SConvertError, ['memory pointer block',
+              'Object']);
+          end;
+      else
+        raise EConvertError.CreateFmt(SConvertError, ['unkown memory pointer block',
+          'Object']);
+      end;  
   else
     raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
       'Object']);
@@ -991,14 +1046,28 @@ end;
 
 function DValueGetAsInterface(ADValue:PDRawValue): IInterface;
 begin
-
   case ADValue.ValueType of
     vdtUnset, vdtNull:
       Result := nil;
     vdtInterface:
       Result :=  ADValue.Value.AsInterface^;
-    vdtOwnerObject, vdtReferObject:
-      TObject(ADValue.Value.AsPointer).GetInterface(IInterface, Result);
+    vdtPtr:
+      begin
+        case ADValue.Value.PtrReleaseAction of
+          praNone, praObjectFree:  // 引用对象，或者管理生命周期的对象
+            begin
+              TObject(ADValue.Value.AsPointer).GetInterface(IInterface, Result);
+            end;
+          praDispose, praFreeMem:
+            begin
+              raise EConvertError.CreateFmt(SConvertError, ['memory pointer block',
+                'Interface']);
+            end;
+        else
+          raise EConvertError.CreateFmt(SConvertError, ['unkown memory pointer block',
+            'Interface']);
+        end;
+      end;  
   else
     raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
       DValueTypeName[vdtInterface]]);
@@ -1007,15 +1076,17 @@ end;
 
 
 
-procedure DValueSetAsReferObject(ADValue:PDRawValue; pvData:TObject);
+procedure DValueBindPointerData(ADValue:PDRawValue; pvData:Pointer;
+    pvReleaseAction:TPtrReleaseAction);
 begin
   if pvData = nil then
   begin       // 清空
     ClearDValue(ADValue);
   end else
   begin
-    CheckDValueSetType(ADValue, vdtReferObject);
+    CheckDValueSetType(ADValue, vdtPtr);
     ADValue.Value.AsPointer := pvData;
+    ADValue.Value.PtrReleaseAction := pvReleaseAction;
   end;
 end;
 
@@ -1234,6 +1305,13 @@ begin
   FChildren.Add(Result);
 end;
 
+procedure TDValue.BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction
+    = faFree);
+begin
+  FValue.BindObject(pvObject, pvFreeAction);
+
+end;
+
 procedure TDValue.CheckCreateChildren;
 begin
   if not Assigned(FChildren) then
@@ -1340,7 +1418,7 @@ begin
   begin
     CheckSetNodeType(vntObject);
     Result := TDValue.Create(vntValue);
-    Result.FName.AsInetger := pvName;
+    Result.FName.AsInteger := pvName;
     Result.FParent := Self;
     FChildren.Add(Result);
   end;
@@ -1380,9 +1458,57 @@ begin
   end;
 end;
 
+function TDValue.GetAsBoolean: Boolean;
+begin
+  Result := FValue.GetAsBoolean;
+end;
+
+function TDValue.GetAsFloat: Double;
+begin
+  Result := FValue.GetAsFloat;
+end;
+
+function TDValue.GetAsInteger: Int64;
+begin
+  Result := FValue.GetAsInteger;
+end;
+
+function TDValue.GetAsObject: TObject;
+begin
+  Result := FValue.GetAsObject;  
+end;
+
+function TDValue.GetAsString: String;
+begin
+  Result := FValue.GetAsString;
+end;
+
 function TDValue.GetItems(pvIndex: Integer): TDValue;
 begin
   Result := TDValue(FChildren[pvIndex]);
+end;
+
+function TDValue.IndexDataOf(pvData:Pointer): Integer;
+var
+  lvCount, j:Integer;
+  lvItem:PDRawValue;
+begin
+  lvCount := Count;
+  Result := -1;
+  for j := 0 to lvCount - 1 do
+  begin
+    lvItem := @GetItems(j).FValue.FRawValue;
+    if lvItem.ValueType = vdtPtr then
+    begin
+      if lvItem.Value.AsPointer = pvData then
+      begin
+        Result := j;
+        Break;
+      end;
+    end;
+  end;
+
+
 end;
 
 function TDValue.IndexOf(pvName: string): Integer;
@@ -1411,7 +1537,7 @@ begin
     begin
       if Items[i].FName.DataType in [vdtInt64, vdtInteger] then
       begin
-        if Items[i].FName.AsInetger = pvName then
+        if Items[i].FName.AsInteger = pvName then
         begin
           Result := i;
           Break;
@@ -1488,10 +1614,39 @@ begin
   end;
 end;
 
+procedure TDValue.SetAsBoolean(const Value: Boolean);
+begin
+  FValue.SetAsBoolean(Value);
+end;
+
+procedure TDValue.SetAsFloat(const Value: Double);
+begin
+  FValue.SetAsFloat(Value);
+end;
+
+procedure TDValue.SetAsInteger(const Value: Int64);
+begin
+  FValue.SetAsInteger(Value);
+end;
+
+procedure TDValue.SetAsString(const Value: String);
+begin
+  FValue.SetAsString(Value);
+end;
+
 destructor TDValueItem.Destroy;
 begin
   ClearDValue(@FRawValue);
   inherited;
+end;
+
+procedure TDValueItem.BindObject(pvObject: TObject; pvFreeAction:
+    TObjectFreeAction = faFree);
+begin
+  case pvFreeAction of
+    faNone: DValueBindPointerData(@FRawValue, pvObject, praNone);
+    faFree: DValueBindPointerData(@FRawValue, pvObject, praObjectFree);
+  end;
 end;
 
 procedure TDValueItem.Clear;
@@ -1535,7 +1690,7 @@ begin
   Result := DValueGetAsFloat(@FRawValue);
 end;
 
-function TDValueItem.GetAsInetger: Int64;
+function TDValueItem.GetAsInteger: Int64;
 begin
   Result := DValueGetAsInt64(@FRawValue);
 end;
@@ -1575,7 +1730,7 @@ begin
     begin
       lvDValueItem := TDValueItem.Create();
       // 设置Item为TDValueItem对象
-      DValueSetAsOwnerObject(GetDValueItem(@FRawValue, i), lvDValueItem);
+      DValueBindPointerData(GetDValueItem(@FRawValue, i), lvDValueItem, praObjectFree);
     end;
 end;
 
@@ -1589,7 +1744,7 @@ begin
   DValueSetAsFloat(@FRawValue, Value);
 end;
 
-procedure TDValueItem.SetAsInetger(const Value: Int64);
+procedure TDValueItem.SetAsInteger(const Value: Int64);
 begin
   DValueSetAsInt64(@FRawValue, Value);
 end;
@@ -1599,19 +1754,9 @@ begin
   DValueSetAsInterface(@FRawValue, Value);
 end;
 
-procedure TDValueItem.SetAsOwnerObject(const Value: TObject);
-begin
-  DValueSetAsOwnerObject(@FRawValue, Value);
-end;
-
 procedure TDValueItem.SetAsString(const Value: String);
 begin
   DValueSetAsString(@FRawValue, Value);
-end;
-
-procedure TDValueItem.SetReferObject(const value:TObject);
-begin
-  DValueSetAsReferObject(@FRawValue, Value);
 end;
 
 end.
