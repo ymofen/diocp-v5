@@ -775,6 +775,7 @@ begin
     MB_Large: BSize := LargeMemoryPool.FBlockSize;
     MB_SPLarge: BSize := SuperLargeMemoryPool.FBlockSize;
     MB_Max: BSize := MaxMemoryPool.FBlockSize;
+    MB_MaxBlock: BSize := MaxBlockMPool.FBlockSize;
     else BSize := BigMemoryPool.FBlockSize;
     end;
     while tmp <> FLast do
@@ -814,6 +815,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     tmpBlock := FHead;
@@ -861,6 +863,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     tmpBlock := FHead;
@@ -896,6 +899,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     if FPosition + Count > FSize then
@@ -984,6 +988,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     if FPosition + Len > FSize then
@@ -1045,6 +1050,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     if FPosition + Len > FSize then
@@ -1141,6 +1147,7 @@ begin
     MB_Large: MPool := LargeMemoryPool;
     MB_SPLarge: MPool := SuperLargeMemoryPool;
     MB_Max: MPool := MaxMemoryPool;
+    MB_MaxBlock: MPool := MaxBlockMPool;
     else MPool := BigMemoryPool;
     end;
     tmp := FHead;
@@ -1169,6 +1176,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     case TSeekOrigin(Origin) of
@@ -1305,6 +1313,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     CurCount := FCapacity div MPool.FBlockSize;
@@ -1430,6 +1439,7 @@ begin
     MB_Large: MPool := LargeMemoryPool;
     MB_SPLarge: MPool := SuperLargeMemoryPool;
     MB_Max: MPool := MaxMemoryPool;
+    MB_MaxBlock: MPool := MaxBlockMPool;
     else MPool := BigMemoryPool;
   end;
   if FCurBlock = nil then
@@ -1524,6 +1534,7 @@ begin
     MB_Large: MPool := LargeMemoryPool;
     MB_SPLarge: MPool := SuperLargeMemoryPool;
     MB_Max: MPool := MaxMemoryPool;
+    MB_MaxBlock: MPool := MaxBlockMPool;
     else MPool := BigMemoryPool;
   end;
   if FCurBlock = nil then
@@ -1610,6 +1621,7 @@ begin
     MB_Large: BlockSize := LargeMemoryPool.FBlockSize;
     MB_SPLarge: BlockSize := SuperLargeMemoryPool.FBlockSize;
     MB_Max: BlockSize := MaxMemoryPool.FBlockSize;
+    MB_MaxBlock: BlockSize := MaxBlockMPool.FBlockSize;
     else BlockSize := BigMemoryPool.FBlockSize;
     end;
 
@@ -1648,6 +1660,8 @@ begin
     MPool := LargeMemoryPool
   else if len <= DWORD(SuperLargeMemoryPool.FBlockSize) then
     MPool := SuperLargeMemoryPool
+  else if len <= MaxBlockMPool.FBlockSize then
+    MPool := MaxBlockMPool
   else
     MPool := nil;
 
@@ -1672,12 +1686,12 @@ begin
   end
   else
   begin
-    MemBlock := SuperLargeMemoryPool.GetMemoryBlock;
+    MemBlock := MaxMemoryPool.GetMemoryBlock;
     MemBlock^.NextEx := nil;
     MemBlock^.PrevEx := nil;
-    if SuperLargeMemoryPool.FBlockSize <= Len then
+    if MaxMemoryPool.FBlockSize <= Len then
     begin
-      MemBlock^.DataLen := SuperLargeMemoryPool.FBlockSize;
+      MemBlock^.DataLen := MaxMemoryPool.FBlockSize;
       Move(buf^,MemBlock^.Memory^,MemBlock^.DataLen)
     end
     else
@@ -1704,7 +1718,6 @@ end;
 
 procedure TBufferLink.AddMemBlockLink(MemBlockLink: PMemoryBlock);
 begin
-  MemBlockLink := SmallMemoryPool.GetMemoryBlock;
   MemBlockLink^.NextEx := nil;
   MemBlockLink^.PrevEx := nil;
   if FHead = nil then
@@ -1734,6 +1747,8 @@ begin
     MB_SpBig: SuperMemoryPool.FreeMemoryBlock(lvFreeBuf);
     MB_Large: LargeMemoryPool.FreeMemoryBlock(lvFreeBuf);
     MB_SPLarge: SuperLargeMemoryPool.FreeMemoryBlock(lvFreeBuf);
+    MB_Max: MaxMemoryPool.FreeMemoryBlock(lvFreeBuf);
+    MB_MaxBlock: MaxBlockMPool.FreeMemoryBlock(lvFreeBuf);
     else BigMemoryPool.FreeMemoryBlock(lvFreeBuf);
     end;
   end;
@@ -1761,6 +1776,8 @@ begin
     MB_SpBig: SuperMemoryPool.FreeMemoryBlock(lvFreeBuf);
     MB_Large: LargeMemoryPool.FreeMemoryBlock(lvFreeBuf);
     MB_SPLarge: SuperLargeMemoryPool.FreeMemoryBlock(lvFreeBuf);
+    MB_Max: MaxMemoryPool.FreeMemoryBlock(lvFreeBuf);
+    MB_MaxBlock: MaxBlockMPool.FreeMemoryBlock(lvFreeBuf);
     else BigMemoryPool.FreeMemoryBlock(lvFreeBuf);
     end;
   end;
@@ -2169,6 +2186,8 @@ begin
       MB_SpBig: MPool := SuperMemoryPool;
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
+      MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     CanReadSize := DataSize;
@@ -2281,6 +2300,8 @@ begin
       MB_SpBig: MPool := SuperMemoryPool;
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
+      MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     case TSeekOrigin(Origin) of
@@ -2523,6 +2544,7 @@ begin
       MB_Large: MPool := LargeMemoryPool;
       MB_SPLarge: MPool := SuperLargeMemoryPool;
       MB_Max: MPool := MaxMemoryPool;
+      MB_MaxBlock: MPool := MaxBlockMPool;
       else MPool := BigMemoryPool;
     end;
     CurCount := FCapacity div MPool.FBlockSize;
@@ -2620,6 +2642,8 @@ begin
     MB_SpBig: MPool := SuperMemoryPool;
     MB_Large: MPool := LargeMemoryPool;
     MB_SPLarge: MPool := SuperLargeMemoryPool;
+    MB_Max: MPool := MaxMemoryPool;
+    MB_MaxBlock: MPool := MaxBlockMPool;
     else MPool := BigMemoryPool;
   end;
 
