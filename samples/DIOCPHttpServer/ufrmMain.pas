@@ -16,8 +16,8 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer
-  ;
+  ComCtrls, diocp.ex.httpServer, System.Actions
+  , IdText, IdGlobal;
 
 type
   TfrmMain = class(TForm)
@@ -174,6 +174,9 @@ var
     pvRequest.Response.WriteString('</div>');
   end;
 
+var
+  lvBytes:TBytes;
+
 begin
   // Context Type                        返回的是UTF-8的编码
   pvRequest.Response.ContentType := 'text/html; charset=utf-8';
@@ -183,12 +186,18 @@ begin
   pvRequest.DecodePostDataParam(nil);
   pvRequest.DecodeURLParam(nil);
   {$ELSE}
-  pvRequest.DecodePostDataParam(false);
+  pvRequest.DecodePostDataParam(False);
   pvRequest.DecodeURLParam(false);
   {$ENDIF}
 
-  //   // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
+//  SetLength(lvBytes, pvRequest.RawPostData.Size);
+//  pvRequest.RawPostData.Position := 0;
+//  pvRequest.RawPostData.Read(lvBytes[0], pvRequest.RawPostData.Size);
+//  s :=  TEncoding.UTF8.GetString(lvBytes);
+//  sfLogger.logMessage(s);
 
+
+  //sfLogger.logMessage(UTF8Decode(pvRequest.GetRequestParam('param')));
 
   // 输出客户端IP信息
   pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,

@@ -52,6 +52,15 @@ type
     destructor Destroy; override;
     procedure Post(pvURL:String);
     procedure Get(pvURL:String);
+
+    /// <summary>
+    ///   关闭Socket，异步操作时，关闭Socket会使正在进行的阻塞操作抛出异常从而中断
+    /// </summary>
+    procedure CloseSocket;
+
+    procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
+        Boolean);
+
     /// <summary>
     ///   请求参数:
     ///    接受数据的编码类型
@@ -466,6 +475,19 @@ begin
     lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));
     lvReadL := lvReadL + Cardinal(lvTempL);
   end;
+end;
+
+procedure TDiocpHttpClient.CloseSocket;
+begin
+  self.FRawSocket.Close;
+end;
+
+procedure TDiocpHttpClient.SetRequestBodyAsString(pvRequestData: string;
+    pvConvert2Utf8: Boolean);
+begin
+  FRequestBody.Clear;
+  WriteStringToStream(FRequestBody, pvRequestData, pvConvert2Utf8);
+
 end;
 
 end.

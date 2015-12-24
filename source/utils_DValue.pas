@@ -347,6 +347,10 @@ type
     property Value: TDValueItem read FValue;
 
   public
+    function GetStrValueByName(pvName:string; pvDefault:string): String;
+
+    function GetIntValueByName(pvName:String; pvDefault:Integer): Integer;
+
     // 对Value的访问封装, 可以直接访问Value.AsXXXX
     procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
         faFree);
@@ -1483,9 +1487,37 @@ begin
   Result := FValue.GetAsString;
 end;
 
+function TDValue.GetIntValueByName(pvName:String; pvDefault:Integer): Integer;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsInteger;
+  end;
+end;
+
 function TDValue.GetItems(pvIndex: Integer): TDValue;
 begin
   Result := TDValue(FChildren[pvIndex]);
+end;
+
+function TDValue.GetStrValueByName(pvName:string; pvDefault:string): String;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsString;
+  end;
 end;
 
 function TDValue.IndexDataOf(pvData:Pointer): Integer;

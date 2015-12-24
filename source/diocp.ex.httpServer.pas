@@ -301,6 +301,10 @@ type
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
+
+    /// <summary>
+    ///   请求头
+    /// </summary>
     property Header: TDValue read FHeader;
 
     property HttpVersion: Word read FHttpVersion;
