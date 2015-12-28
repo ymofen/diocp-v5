@@ -152,3 +152,6 @@ DIOCP-v5 0.0.2
     * httpClient 处理Cookie
     * httpServer 添加HttpDValueSession
     2015-11-14 16:12:01
+    
+30: * 捕获投递AcceptEx异常并记录日志。
+    2015-12-28 20:13:11
