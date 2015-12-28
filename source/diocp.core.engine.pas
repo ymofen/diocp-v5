@@ -56,6 +56,8 @@ type
 
   TThreadStackFunc = function(AThread:TThread):string;
 
+  TDiocpExceptionEvent = procedure(pvRequest:TIocpRequest; E:Exception) of object;
+
 
 
   /// <summary>
@@ -217,6 +219,7 @@ type
     ///   IOCP core handle
     /// </summary>
     FIOCPHandle: NativeUInt;
+    FOnIocpException: TDiocpExceptionEvent;
 
     // <summary>
     //   create IOCP handle
@@ -245,7 +248,7 @@ type
     /// <summary>
     ///   handle io exception
     /// </summary>
-    procedure HandleException(E:Exception);
+    procedure HandleException(pvRequest: TIocpRequest; E: Exception);
 
 
     /// <summary>
@@ -258,6 +261,15 @@ type
     /// </summary>
     function PostRequest(dwCompletionKey: DWORD; lpOverlapped: POverlapped):
         Boolean;
+
+    property OnIocpException: TDiocpExceptionEvent read FOnIocpException write
+        FOnIocpException;
+
+
+
+
+
+
   end;
 
   /// <summary>
@@ -565,9 +577,12 @@ begin
   if FIOCPHandle = 0 then CreateIOCPHandle;
 end;
 
-procedure TIocpCore.HandleException(E:Exception);
+procedure TIocpCore.HandleException(pvRequest: TIocpRequest; E: Exception);
 begin
-  ;
+  if Assigned(FOnIocpException) then
+  begin
+    FOnIocpException(pvRequest, E);
+  end;
 end;
 
 function TIocpCore.PostIOExitRequest: Boolean;
@@ -671,31 +686,44 @@ begin
             Assert(FLastRequest<>NIL);
           end;
           /// reply io request, invoke handleRepsone to do ....
-
-          lvTempRequest.FResponding := true;
-          lvTempRequest.FRespondStartTime := Now();
-          lvTempRequest.FRespondStartTickCount := GetTickCount;
-          lvTempRequest.FRespondEndTime := 0;
-          lvTempRequest.FiocpWorker := Self;
-          lvTempRequest.FErrorCode := lvErrCode;
-          lvTempRequest.FBytesTransferred := lvBytesTransferred;
-          lvTempRequest.FCompletionKey := lpCompletionKey;
-          if Assigned(lvTempRequest.FOnResponse) then
-          begin
-            lvTempRequest.FOnResponse(lvTempRequest);
-          end else
-          begin
-            lvTempRequest.HandleResponse();
+          try
+            lvTempRequest.FResponding := true;
+            lvTempRequest.FRespondStartTime := Now();
+            lvTempRequest.FRespondStartTickCount := GetTickCount;
+            lvTempRequest.FRespondEndTime := 0;
+            lvTempRequest.FiocpWorker := Self;
+            lvTempRequest.FErrorCode := lvErrCode;
+            lvTempRequest.FBytesTransferred := lvBytesTransferred;
+            lvTempRequest.FCompletionKey := lpCompletionKey;
+            if Assigned(lvTempRequest.FOnResponse) then
+            begin
+              lvTempRequest.FOnResponse(lvTempRequest);
+            end else
+            begin
+              lvTempRequest.HandleResponse();
+            end;
+            lvTempRequest.FRespondEndTime := Now();
+            lvTempRequest.FResponding := false;
+          except
+            on E:Exception do
+            begin
+              FIocpCore.HandleException(lvTempRequest, E);
+            end;
           end;
-          lvTempRequest.FRespondEndTime := Now();
-          lvTempRequest.FResponding := false;
         finally
-          if Assigned(lvTempRequest.OnResponseDone) then
-          begin
-            lvTempRequest.FOnResponseDone(lvTempRequest);
-          end else
-          begin
-            lvTempRequest.ResponseDone();
+          try
+            if Assigned(lvTempRequest.OnResponseDone) then
+            begin
+              lvTempRequest.FOnResponseDone(lvTempRequest);
+            end else
+            begin
+              lvTempRequest.ResponseDone();
+            end;
+          except
+            on E:Exception do
+            begin
+              FIocpCore.HandleException(lvTempRequest, E);
+            end;
           end;
         end;
 
@@ -708,7 +736,7 @@ begin
       on E: Exception do
       begin
         try
-          FIocpCore.HandleException(E);
+          FIocpCore.HandleException(nil, E);
         except
         end;
       end;

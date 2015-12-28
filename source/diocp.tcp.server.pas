@@ -895,6 +895,8 @@ type
     procedure DoAcceptExResponse(pvRequest: TIocpAcceptExRequest);
 
     function GetClientCount: Integer;
+
+    procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
   public
 
     /// <summary>
@@ -1961,6 +1963,7 @@ begin
   FSendRequestPool := TBaseQueue.Create;
     
   FIocpEngine := TIocpEngine.Create();
+  FIocpEngine.IocpCore.OnIocpException := self.OnIocpException;
 
   FOnlineContextList := TDHashTable.Create(10949);
 
@@ -2106,6 +2109,7 @@ var
 
   end;
 begin
+  //LogMessage('DoAcceptExResponse_Start', CORE_DEBUG_FILE);
   if pvRequest.FErrorCode = 0 then
   begin
     if DoAfterAcceptEx then
@@ -2168,7 +2172,16 @@ begin
   // 从正在请求的列表中移除
   FIocpAcceptorMgr.RemoveRequestObject(pvRequest);
 
-  if FActive then FIocpAcceptorMgr.CheckPostRequest;
+
+  if FActive then
+  begin
+    FIocpAcceptorMgr.CheckPostRequest;
+    //LogMessage('DoAcceptExResponse_END_Active', CORE_DEBUG_FILE);
+  end else
+  begin
+    ;
+    //LogMessage('DoAcceptExResponse_END_UnActive', CORE_DEBUG_FILE);
+  end;
 end;
 
 procedure TDiocpTcpServer.DoClientContextError(pvClientContext:
@@ -2795,6 +2808,21 @@ begin
   {$ENDIF}
 end;
 
+procedure TDiocpTcpServer.OnIocpException(pvRequest:TIocpRequest; E:Exception);
+begin
+  try
+    if pvRequest <> nil then
+    begin
+      LogMessage('未处理异常:%s, 请求(%s)信息:%s',[E.Message, pvRequest.ClassName, pvRequest.Remark],
+        CORE_LOG_FILE, lgvError);
+    end else
+    begin
+      LogMessage('未处理异常:%s',[E.Message], CORE_LOG_FILE, lgvError);
+    end;
+  except
+  end;
+end;
+
 procedure TDiocpTcpServer.SetWSARecvBufferSize(const Value: cardinal);
 begin
   FWSARecvBufferSize := Value;
@@ -2852,52 +2880,71 @@ end;
 procedure TIocpAcceptorMgr.CheckPostRequest;
 var
   lvRequest:TIocpAcceptExRequest;
-  i:Integer;
+  i, j:Integer;
 begin
   Assert(FOwner <> nil);
   FLocker.lock;
   try
+//    FOwner.LogMessage(
+//      Format('list:%d, FMinRequest:%d, FMaxRequest:%d',
+//      [FList.Count, FMinRequest, FMaxRequest]), CORE_DEBUG_FILE);
+
     if FList.Count > FMinRequest then Exit;
 
-    i := 0;
-    // post request
-    while FList.Count < FMaxRequest do
-    begin
-      lvRequest := GetRequestObject;
-      lvRequest.FClientContext := FOwner.GetClientContext;
-      lvRequest.FAcceptorMgr := self;
-      if lvRequest.PostRequest then
+    try
+      i := 0;
+      j := 0;
+      // post request
+      while FList.Count < FMaxRequest do
       begin
-        FList.Add(lvRequest);
-        if (FOwner.FDataMoniter <> nil) then
+        j := 1;
+        lvRequest := GetRequestObject;
+        j := 2;
+        lvRequest.FClientContext := FOwner.GetClientContext;
+        lvRequest.FAcceptorMgr := self;
+        j := 3;
+
+        if lvRequest.PostRequest then
         begin
-          InterlockedIncrement(FOwner.FDataMoniter.FPostWSAAcceptExCounter);
-        end;
-      end else
-      begin     // post fail
-        Inc(i);
+          j := 4;
+          FList.Add(lvRequest);
+          if (FOwner.FDataMoniter <> nil) then
+          begin
+            InterlockedIncrement(FOwner.FDataMoniter.FPostWSAAcceptExCounter);
+          end;
+          j := 9;
+        end else
+        begin     // post fail
+          j := 100;
+          Inc(i);
 
-        try
-          // 出现异常，直接释放Context
-          lvRequest.FClientContext.RawSocket.Close;
-          lvRequest.FClientContext.FAlive := false;
-          lvRequest.FClientContext.Free;
-          lvRequest.FClientContext := nil;
-        except
-        end;
 
-        // 归还到对象池
-        ReleaseRequestObject(lvRequest);
+          try
+            // 出现异常，直接释放Context
+            lvRequest.FClientContext.RawSocket.Close;
+            lvRequest.FClientContext.FAlive := false;
+            lvRequest.FClientContext.Free;
+            lvRequest.FClientContext := nil;
+          except
+          end;
+          j := 110;
+          // 归还到对象池
+          ReleaseRequestObject(lvRequest);
+          j := 111;
 
-        if i > 100 then
-        begin    // 投递失败次数大于100 记录日志,本结束投递
-           FOwner.logMessage('TIocpAcceptorMgr.CheckPostRequest errCounter:%d', [i], CORE_LOG_FILE);
-           Break;
+          if i > 100 then
+          begin    // 投递失败次数大于100 记录日志,本结束投递
+             FOwner.logMessage('TIocpAcceptorMgr.CheckPostRequest errCounter:%d', [i], CORE_LOG_FILE);
+             Break;
+          end;
+          j := 199;
         end;
-        
       end;
-
-
+    except
+      on E:Exception do
+      begin
+         FOwner.logMessage('TIocpAcceptorMgr.CheckPostRequest(%d) Err:%s', [j, e.Message], CORE_LOG_FILE);
+      end;
     end;
   finally
     FLocker.unLock;
