@@ -55,6 +55,7 @@ type
   private
     FActive: Boolean;
     FHost: String;
+    FOnDisconnected: TNotifyEvent;
     FPort: Integer;
     FRawSocket: TRawSocket;
     FReadTimeOut: Integer;
@@ -103,7 +104,13 @@ type
     property Active: Boolean read FActive write SetActive;
 
     property Host: String read FHost write FHost;
+
+    property OnDisconnected: TNotifyEvent read FOnDisconnected write
+        FOnDisconnected;
+
     property Port: Integer read FPort write FPort;
+
+
     /// <summary>
     ///   unit ms
     /// </summary>
@@ -229,6 +236,9 @@ end;
 procedure TDiocpBlockTcpClient.Disconnect;
 begin
   if not FActive then Exit;
+
+  if Assigned(FOnDisconnected) then FOnDisconnected(Self);
+  
 
   FRawSocket.close;
 
