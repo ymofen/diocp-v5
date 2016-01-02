@@ -150,6 +150,11 @@ type
     /// </summary>
     FHeader : TDValue;
 
+    /// <summary>
+    ///   URL中的参数
+    /// </summary>
+    FURLParams: TDValue;
+
     FDiocpContext: TDiocpHttpClientContext;
 
     /// 头信息
@@ -375,6 +380,7 @@ type
     ///  没有经过URLDecode是考虑到参数值中本身存在&字符，导致DecodeURLParam出现不解码异常
     /// </summary>
     property RequestURLParamData: string read FRequestURLParamData;
+    property URLParams: TDValue read FURLParams;
 
     /// <summary>
     /// 应答完毕，发送会客户端
@@ -385,7 +391,12 @@ type
     /// <summary>
     ///   直接发送Response.Header和Data数据
     /// </summary>
-    procedure SendResponse;
+    procedure SendResponse(pvContentLength: Integer = 0);
+
+    /// <summary>
+    ///   直接发送数据
+    /// </summary>
+    procedure SendResponseBuffer(pvBuffer:PByte; pvLen:Cardinal);
 
 
 
@@ -440,7 +451,7 @@ type
 
     function EncodeHeader: String;
 
-    function EncodeResponseHeader: string;
+    function EncodeResponseHeader(pvContentLength: Integer): string;
 
     /// <summary>
     ///   与客户端建立的连接
@@ -726,6 +737,8 @@ constructor TDiocpHttpRequest.Create;
 begin
   inherited Create;
   FHeader := TDValue.Create(vntObject);
+
+  FURLParams := TDValue.Create(vntObject);
   
   FRawHeader := TMemoryStream.Create();
   FRawPostData := TMemoryStream.Create();
@@ -747,6 +760,8 @@ begin
   FRequestCookieList.Free;
 
   FHeader.Free;
+
+  FURLParams.Free;
 
   inherited Destroy;
 end;
@@ -1113,6 +1128,7 @@ begin
 
     for i := 0 to lvStrings.Count - 1 do
     begin
+
       lvRawData := URLDecode(lvStrings.ValueFromIndex[i]);
       if lvRawData<> '' then
       begin
@@ -1139,6 +1155,8 @@ begin
 
         // 解码参数
         lvStrings.ValueFromIndex[i] := s;
+        
+        FURLParams.ForceByName(lvStrings.Names[i]).AsString := s;
       end;
     end;
     FRequestParamsList.AddStrings(lvStrings);
@@ -1209,12 +1227,12 @@ begin
   end;
 end;
 
-procedure TDiocpHttpRequest.SendResponse;
+procedure TDiocpHttpRequest.SendResponse(pvContentLength: Integer = 0);
 var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
-  lvFixedHeader := FResponse.EncodeResponseHeader;
+  lvFixedHeader := FResponse.EncodeResponseHeader(pvContentLength);
 
   if (lvFixedHeader <> '') then
     lvFixedHeader := FixHeader(lvFixedHeader)
@@ -1235,6 +1253,11 @@ begin
       FResponse.FData.Size);
   end;
 
+end;
+
+procedure TDiocpHttpRequest.SendResponseBuffer(pvBuffer:PByte; pvLen:Cardinal);
+begin
+  FDiocpContext.PostWSASendRequest(pvBuffer, pvLen);
 end;
 
 procedure TDiocpHttpRequest.SetReleaseLater(pvMsg:String);
@@ -1334,7 +1357,8 @@ begin
   FCookies.Clear();
 end;
 
-function TDiocpHttpResponse.EncodeResponseHeader: string;
+function TDiocpHttpResponse.EncodeResponseHeader(pvContentLength: Integer):
+    string;
 var
   lvVersionStr:string;
   i: Integer;
@@ -1353,8 +1377,14 @@ begin
     Result := Result + lvItem.Name.AsString + ':' + lvItem.Value.AsString + HTTPLineBreak;
   end;
 
-  if (FData.Size > 0) then
-    Result := Result + 'Content-Length: ' + IntToStr(FData.Size) + #13#10;
+  if pvContentLength > 0 then
+  begin
+    Result := Result + 'Content-Length: ' + IntToStr(pvContentLength) + #13#10;
+  end else
+  begin
+    if (FData.Size > 0) then
+      Result := Result + 'Content-Length: ' + IntToStr(FData.Size) + #13#10;
+  end;
 
   Result := Result + 'Connection: close'#13#10;
 

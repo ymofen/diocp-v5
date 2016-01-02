@@ -191,7 +191,10 @@ begin
   if FActive then exit;
 
   FRawSocket.createTcpSocket;
-  FRawSocket.setReadTimeOut(FReadTimeOut);
+  if FReadTimeOut > 0 then
+  begin
+    FRawSocket.setReadTimeOut(FReadTimeOut);
+  end;
 
   // 进行域名解析
   lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
