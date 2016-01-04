@@ -23,8 +23,10 @@ interface
 
 uses
   Classes, SysUtils
-  {$IFDEF MSWINDOWS}
+{$IFDEF MSWINDOWS}
     , windows
+{$ELSE}
+    , System.NetEncoding
 {$ENDIF}
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
     , AnsiStrings
@@ -181,7 +183,7 @@ function URLDecode(const ASrc: URLString; pvIsPostData: Boolean = true):URLStrin
 /// </returns>
 /// <param name="S"> 需要编码的数据 </param>
 /// <param name="pvIsPostData"> Post的原始数据中原始的空格经过UrlEncode后变成+号 </param>
-function URLEncode(S: string; pvIsPostData: Boolean = true): URLString;
+function URLEncode(S: URLString; pvIsPostData: Boolean = true): URLString;
 
 
 /// <summary>
@@ -516,11 +518,13 @@ end;
 
 
 
-function URLEncode(S: string; pvIsPostData: Boolean = true): URLString;
+function URLEncode(S: URLString; pvIsPostData: Boolean = true): URLString;
 var
   i: Integer; // loops thru characters in string
   {$IFDEF UNICODE_URL}
   lvRawBytes:TBytes;
+  {$ELSE}
+  lvRawStr:AnsiString;
   {$ENDIF}
 begin
   {$IFDEF UNICODE_URL}
@@ -546,11 +550,12 @@ begin
   end;
   {$ELSE}
   Result := '';
-  for i := 1 to Length(S) do
+  lvRawStr := s;
+  for i := 1 to Length(lvRawStr) do
   begin
-    case S[i] of
+    case lvRawStr[i] of
       'A' .. 'Z', 'a' .. 'z', '0' .. '9', '-', '_', '.':
-        Result := Result + S[i];
+        Result := Result + lvRawStr[i];
       ' ':
         if pvIsPostData then
         begin     // Post数据如果是空格需要编码成 +
@@ -560,7 +565,7 @@ begin
           Result := Result + '%20';
         end
     else
-      Result := Result + '%' + SysUtils.IntToHex(Ord(S[i]), 2);
+      Result := Result + '%' + SysUtils.IntToHex(Ord(lvRawStr[i]), 2);
     end;
   end;
   {$ENDIF}
