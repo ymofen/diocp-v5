@@ -7,7 +7,7 @@
   *     DIOCP-V5 发布
 
   *    Http协议处理单元
-  *    其中大部分思路来自于delphi iocp framework中的iocp.HttpServer
+  *    其中部分思路来自于delphi iocp framework中的iocp.HttpServer
   *
   *   2015-04-08 12:34:33
   *    (感谢 (Xjumping  990669769)/(suoler)反馈bug和提供bug重现)
@@ -208,6 +208,7 @@ type
     FPostDataLen: Integer;
 
     FRequestHeader: TStringList;
+    FRequestRawHeaderString: string;
 
     FResponse: TDiocpHttpResponse;
 
@@ -333,6 +334,8 @@ type
     /// </summary>
     property RequestHeader: TStringList read FRequestHeader;
 
+
+
     /// <summary>
     ///   从头信息解码器出来的Url,包含参数
     /// </summary>
@@ -372,6 +375,8 @@ type
     ///   从Url和Post数据中得到的参数信息: key = value
     /// </summary>
     property RequestParamsList: TStringList read FRequestParamsList;
+
+    property RequestRawHeaderString: string read FRequestRawHeaderString;
 
     property RequestReferer: String read FRequestReferer;
 
@@ -659,6 +664,7 @@ procedure TDiocpHttpRequest.Clear;
 begin
   FRawHeader.Clear;
   FRawPostData.Clear;
+  FURLParams.Clear;
   FRequestURL := '';
   FRequestURI := '';
   FRequestRawURL := '';
@@ -672,6 +678,7 @@ begin
   FPostDataLen := 0;
   FResponse.Clear;
   FReleaseLater := false;
+  FRequestRawHeaderString := '';
 end;
 
 procedure TDiocpHttpRequest.Close;
@@ -859,6 +866,7 @@ begin
   SetLength(lvRawString, FRawHeader.Size);
   FRawHeader.Position := 0;
   FRawHeader.Read(lvRawString[1], FRawHeader.Size);
+  FRequestRawHeaderString := lvRawString;
   FRequestHeader.Text := lvRawString;
 
   // GET /test?v=abc HTTP/1.1
@@ -1244,6 +1252,7 @@ begin
   if lvFixedHeader <> '' then
   begin
     len := Length(lvFixedHeader);
+    sfLogger.logMessage('response===' + sLineBreak + lvFixedHeader);
     FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
   end;
 
@@ -1277,6 +1286,7 @@ begin
   FContentType := '';
   FData.Clear;
   FResponseHeader := '';
+  FHttpCodeStr := '';
   ClearAllCookieObjects;
 end;
 

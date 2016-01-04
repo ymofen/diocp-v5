@@ -856,6 +856,7 @@ type
     FOnSendRequestResponse: TOnSendRequestResponse;
 
     FPort: Integer;
+    FUseContextPool: Boolean;
 
     procedure DoClientContextError(pvClientContext: TIocpClientContext;
         pvErrorCode: Integer);
@@ -1058,6 +1059,8 @@ type
     ///   Ä¬ÈÏÕìÌýµÄ¶Ë¿Ú
     /// </summary>
     property Port: Integer read FPort write FPort;
+
+    property UseContextPool: Boolean read FUseContextPool write FUseContextPool;
 
 
 
@@ -1951,6 +1954,7 @@ end;
 constructor TDiocpTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FUseContextPool := true;
   FContextDNA := 0;
   FLocker := TIocpLocker.Create('diocp.tcp.server');
   FLogger:=TSafeLogger.Create();
@@ -2235,8 +2239,7 @@ end;
 
 function TDiocpTcpServer.GetClientContext: TIocpClientContext;
 begin
-  Result := TIocpClientContext(FContextPool.DeQueue);
-  if Result = nil then
+  if not FUseContextPool then
   begin
     if FClientContextClass <> nil then
     begin
@@ -2252,15 +2255,38 @@ begin
       InterlockedIncrement(FDataMoniter.FContextCreateCounter);
     end;
     Result.FSendRequestLink.SetMaxSize(FMaxSendingQueueSize);
+  end else
+  begin
+    Result := TIocpClientContext(FContextPool.DeQueue);
+    if Result = nil then
+    begin
+      if FClientContextClass <> nil then
+      begin
+        Result := FClientContextClass.Create;
+        OnCreateClientContext(Result);
+      end else
+      begin
+        Result := TIocpClientContext.Create;
+        OnCreateClientContext(Result);
+      end;
+      if (FDataMoniter <> nil) then
+      begin
+        InterlockedIncrement(FDataMoniter.FContextCreateCounter);
+      end;
+      Result.FSendRequestLink.SetMaxSize(FMaxSendingQueueSize);
+    end;
+    if (FDataMoniter <> nil) then
+    begin
+      InterlockedIncrement(FDataMoniter.FContextOutCounter);
+    end;
   end;
+  
   Result.FAlive := True;
   Result.DoCleanUp;
   Result.Owner := Self;
-  if (FDataMoniter <> nil) then
-  begin
-    InterlockedIncrement(FDataMoniter.FContextOutCounter);
-  end;
+
 end;
+
 
 function TDiocpTcpServer.GetWorkerCount: Integer;
 begin
@@ -2298,18 +2324,25 @@ end;
 function TDiocpTcpServer.ReleaseClientContext(pvObject:TIocpClientContext):
     Boolean;
 begin
-  if lock_cmp_exchange(True, False, pvObject.FAlive) = true then
+  if not FUseContextPool then
   begin
-    pvObject.DoCleanUp;
-    FContextPool.EnQueue(pvObject);
-    if (FDataMoniter <> nil) then
-    begin
-      InterlockedIncrement(FDataMoniter.FContextReturnCounter);
-    end;
+    pvObject.Free;
     Result := true;
   end else
   begin
-    Result := false;
+    if lock_cmp_exchange(True, False, pvObject.FAlive) = true then
+    begin
+      pvObject.DoCleanUp;
+      FContextPool.EnQueue(pvObject);
+      if (FDataMoniter <> nil) then
+      begin
+        InterlockedIncrement(FDataMoniter.FContextReturnCounter);
+      end;
+      Result := true;
+    end else
+    begin
+      Result := false;
+    end;
   end;
 end;
 

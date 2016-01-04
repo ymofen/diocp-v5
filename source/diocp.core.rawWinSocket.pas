@@ -166,9 +166,10 @@ begin
   if lvTempSocket <> INVALID_SOCKET then
   begin
     FSocketHandle := INVALID_SOCKET;
-    
-    diocp.winapi.winsock2.shutdown(lvTempSocket, SD_BOTH);
-    
+
+    // To assure that all data is sent and received on a connected socket before it is closed, an application should use shutdown to close connection before calling closesocket.
+    //diocp.winapi.winsock2.shutdown(lvTempSocket, SD_BOTH);
+
     Closesocket(lvTempSocket);
 
     InterlockedIncrement(__DebugWSACloseCounter);
