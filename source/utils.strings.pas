@@ -267,6 +267,16 @@ function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
 /// <param name="pvCharSets"> (TSysCharSet) </param>
 function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
 
+/// <summary>
+///  ×ª»»×Ö·û´®µ½Bytes
+/// </summary>
+function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;
+
+/// <summary>
+///   
+/// </summary>
+function Utf8BytesToString(pvBytes: TBytes; pvOffset: Cardinal): String;
+
 
 implementation
 
@@ -871,6 +881,38 @@ begin
     Result := False;
   end;  
 
+end;
+
+function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := TEncoding.UTF8.GetBytes(pvData, 1, Length(pvData), pvBytes, 0);
+{$ELSE}
+  lvRawStr := UTF8Encode(pvData);
+  Result := Length(lvRawStr);
+  Move(PAnsiChar(lvRawStr)^, pvBytes[0], Result);
+{$ENDIF}
+end;
+
+function Utf8BytesToString(pvBytes: TBytes; pvOffset: Cardinal): String;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+  l:Cardinal;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
+{$ELSE}
+  l := Length(pvBytes) - pvOffset;
+  SetLength(lvRawStr, l);
+  Move(pvBytes[pvOffset], PansiChar(lvRawStr)^, l);
+  Result := UTF8Decode(lvRawStr);
+{$ENDIF}
 end;
 
 

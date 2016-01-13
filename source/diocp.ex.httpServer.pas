@@ -1404,6 +1404,10 @@ begin
     Result := Result + 'Set-Cookie:' + TDiocpHttpCookie(FCookies[i]).ToString() + sLineBreak;
   end;
 
+// header÷–ª·”–
+//  if (FContentType = '') then FContentType := 'text/html';
+//  Result := Result + 'Content-Type: ' + FContentType + #13#10;
+
 //  if FCookieData <> '' then
 //  begin             // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
 //    Result := Result + 'Set-Cookie:' + FCookieData + sLineBreak;

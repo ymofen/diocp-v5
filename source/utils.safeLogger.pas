@@ -56,6 +56,7 @@ type
   private
     FAddThreadINfo: Boolean;
     FAddTimeInfo: Boolean;
+    FAppendLineBreak: Boolean;
     FMaxLines: Integer;
     FStrings: TStrings;
   protected
@@ -64,10 +65,9 @@ type
     constructor Create(AStrings: TStrings);
     property AddThreadINfo: Boolean read FAddThreadINfo write FAddThreadINfo;
     property AddTimeInfo: Boolean read FAddTimeInfo write FAddTimeInfo;
+    property AppendLineBreak: Boolean read FAppendLineBreak write FAppendLineBreak;
+
     property MaxLines: Integer read FMaxLines write FMaxLines;
-
-
-
   end;
 
   TLogFileAppender = class(TBaseAppender)
@@ -713,6 +713,7 @@ begin
   FStrings := AStrings;
   FAddTimeInfo := true;
   FAddThreadINfo := false;
+  FAppendLineBreak := true;
   FMaxLines := 500;
 end;
 
@@ -722,6 +723,7 @@ var
 begin
   inherited;
   Assert(FStrings <> nil);
+  lvMsg := '';
   if FAddTimeInfo then
   begin
     lvMsg := Format('%s[%s]',
@@ -736,12 +738,19 @@ begin
         [GetCurrentProcessID(), pvData.FThreadID]);
   end;
 
+
   if lvMsg <> '' then lvMsg := lvMsg + ':' + pvData.FMsg else lvMsg := pvData.FMsg;
 
+
   if FStrings.Count > FMaxLines then FStrings.Clear;
-  
-  
-  FStrings.Add(lvMsg);
+
+  if Self.AppendLineBreak then
+  begin
+    FStrings.Add(lvMsg);
+  end else
+  begin
+    FStrings.Add(lvMsg);
+  end;
 end;
 
 procedure TLogFileAppender.AppendLog(pvData: TLogDataObject);
