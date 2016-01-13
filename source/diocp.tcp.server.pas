@@ -1313,7 +1313,8 @@ begin
       lvRequest.CancelRequest;
 
       /// Ìß³öÁ¬½Ó
-      RequestDisconnect(Format(strFuncFail, [self.SocketHandle,'CheckNextSendRequest::lvRequest.ExecuteSend', lvRequest.FLastMsg]), lvRequest);
+      RequestDisconnect(Format(strFuncFail,
+        [self.SocketHandle,'CheckNextSendRequest::lvRequest.ExecuteSend', lvRequest.FLastMsg]), lvRequest);
 
       FOwner.ReleaseSendRequest(lvRequest);
     end;
@@ -1530,7 +1531,10 @@ begin
   {$IFDEF SOCKET_REUSE}
   if lvCloseContext then InnerCloseContext;
   {$ELSE}
-  if lvCloseContext then InnerCloseContext else FRawSocket.close;
+  if lvCloseContext then InnerCloseContext else
+  begin
+    FRawSocket.Close;
+  end;
   {$ENDIF}
 end;
 
