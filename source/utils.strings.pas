@@ -270,12 +270,14 @@ function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
 /// <summary>
 ///  ×ª»»×Ö·û´®µ½Bytes
 /// </summary>
-function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;
+function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;overload;
 
 /// <summary>
-///   
+///
 /// </summary>
 function Utf8BytesToString(pvBytes: TBytes; pvOffset: Cardinal): String;
+
+function StringToUtf8Bytes(pvData:string): TBytes; overload;
 
 
 implementation
@@ -912,6 +914,21 @@ begin
   SetLength(lvRawStr, l);
   Move(pvBytes[pvOffset], PansiChar(lvRawStr)^, l);
   Result := UTF8Decode(lvRawStr);
+{$ENDIF}
+end;
+
+function StringToUtf8Bytes(pvData:string): TBytes; overload;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := TEncoding.UTF8.GetBytes(pvData);
+{$ELSE}
+  lvRawStr := UTF8Encode(pvData);
+  SetLength(Result, Length(lvRawStr));
+  Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
 {$ENDIF}
 end;
 
