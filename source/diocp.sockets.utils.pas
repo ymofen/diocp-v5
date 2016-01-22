@@ -89,6 +89,8 @@ function SetKeepAlive(pvSocket: TSocket; pvKeepAliveTime: Integer = 5000):
 
 function CreateTcpOverlappedSocket: THandle;
 
+procedure CheckWinSocketStart;
+
 implementation
 
 const
@@ -125,7 +127,22 @@ const
   {$EXTERNALSYM WSAID_DISCONNECTEX}
   WSAID_DISCONNECTEX: TGuid = (D1:$7fda2e11;D2:$8630;D3:$436f;D4:($a0,$31,$f5,$36,$a6,$ee,$c1,$57));
 
+var
+  __CheckWinSocketStart:Boolean;
 
+
+/// compare target, cmp_val same set target = new_val
+/// return old value
+function lock_cmp_exchange(cmp_val, new_val: Boolean; var target: Boolean): Boolean; overload;
+asm
+{$ifdef win32}
+  lock cmpxchg [ecx], dl
+{$else}
+.noframe
+  mov rax, rcx
+  lock cmpxchg [r8], dl
+{$endif}
+end;
 
 function GetQueuedCompletionStatus; external kernel32 name 'GetQueuedCompletionStatus';
 function CreateIoCompletionPort; external kernel32 name 'CreateIoCompletionPort';
@@ -305,9 +322,17 @@ begin
   end;
 end;
 
+procedure CheckWinSocketStart;
+begin
+  if lock_cmp_exchange(False, True, __CheckWinSocketStart) = False then
+  begin
+    WSAStart;
+    loadExFunctions;
+  end;
+end;
+
 
 initialization
-  WSAStart;
-  loadExFunctions;
+  __CheckWinSocketStart := False;
 
 end.

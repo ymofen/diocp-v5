@@ -1958,6 +1958,7 @@ end;
 constructor TDiocpTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  CheckWinSocketStart;
   FUseContextPool := true;
   FContextDNA := 0;
   FLocker := TIocpLocker.Create('diocp.tcp.server');
@@ -2954,8 +2955,6 @@ begin
         begin     // post fail
           j := 100;
           Inc(i);
-
-
           try
             // 出现异常，直接释放Context
             lvRequest.FClientContext.RawSocket.Close;
