@@ -155,3 +155,10 @@ DIOCP-v5 0.0.2
     
 30: * 捕获投递AcceptEx异常并记录日志。
     2015-12-28 20:13:11
+    
+31: 2016-01-22 21:52:03
+    * 将Socket的初始化工作放在组件创建中
+    * StreamCoderDEMO添加DiocpStreamServer工程
+    (已经确认编码层(TDiocpCoderTcpServer)有隐患, 请尽量使用TDiocpTcpServer, 编码层使用了iocpTaskManager, utils.buffer(TBufferLink), 目前还没有确定是具体位置)
+      
+    
