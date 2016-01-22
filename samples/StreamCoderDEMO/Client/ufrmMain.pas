@@ -128,7 +128,7 @@ begin
   lvStream.Read(s[1], lvStream.Size);
 
   sfLogger.logMessage('recv msg from server:' + sLineBreak + '    ' + s);
-  sfLogger.logMessage('');
+  //sfLogger.logMessage('');
  end;
 
 end.
