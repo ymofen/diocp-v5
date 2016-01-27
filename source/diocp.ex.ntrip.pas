@@ -805,7 +805,7 @@ begin
     if lvContext.LockContext('分发GNSS数据', Self) then
     begin
       try
-        if lvContext.FMountPoint <> self.FMountPoint then  // 不是请求的挂节点
+        if not SameText(lvContext.FMountPoint, self.FMountPoint) then  // 不是请求的挂节点
         begin
           RemoveNtripClient(lvContext);
         end else

@@ -1681,8 +1681,14 @@ begin
   except
     on E:Exception do
     begin
-      Owner.LogMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
-      Owner.OnContextError(Self, 0);
+      if FOwner <> nil then
+      begin       
+        FOwner.LogMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+        FOwner.OnContextError(Self, -1);
+      end else
+      begin
+        sfLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+      end;
     end;
   end;
 end;
@@ -3218,100 +3224,121 @@ var
   lvDNACounter:Integer;
   lvDebugInfo:String;
   lvRefCount:Integer;
+  lvDebugStep:Integer;
 begin
-  lvDNACounter := Self.FCounter;
-
-  {$IFDEF DEBUG_ON}
-  InterlockedDecrement(FOverlapped.RefCount);
-  if FOverlapped.RefCount <> 0 then
-  begin        // 引用计数异常
-    if IsDebugMode then
-    begin
-      Assert(FOverlapped.RefCount <>0);
-    end;
-    {$IFDEF WRITE_LOG}
-    FOwner.logMessage(strRecvResponseErr,
-        [Integer(self.FClientContext), Integer(Self), FOverlapped.RefCount],
-        CORE_LOG_FILE, lgvError);
-    {$ENDIF}
-  end;
-  {$ENDIF}
-
-  Assert(FOwner <> nil);
   try
-    if (FOwner.FDataMoniter <> nil) then
-    begin
-      FOwner.FDataMoniter.incResponseWSARecvCounter;
-      FOwner.FDataMoniter.incRecvdSize(FBytesTransferred);
-    end;
+    lvDebugStep := 1;
+    lvDNACounter := Self.FCounter;
 
-    if not FOwner.Active then
-    begin
+    {$IFDEF DEBUG_ON}
+    InterlockedDecrement(FOverlapped.RefCount);
+    if FOverlapped.RefCount <> 0 then
+    begin        // 引用计数异常
+      if IsDebugMode then
+      begin
+        Assert(FOverlapped.RefCount <>0);
+      end;
       {$IFDEF WRITE_LOG}
-      FOwner.logMessage(
-          Format(strRecvEngineOff, [FClientContext.FSocketHandle])
-        );
+      FOwner.logMessage(strRecvResponseErr,
+          [Integer(self.FClientContext), Integer(Self), FOverlapped.RefCount],
+          CORE_LOG_FILE, lgvError);
       {$ENDIF}
-      // 避免后面重复投递接收请求
-      FClientContext.RequestDisconnect(
-        Format(strRecvEngineOff, [FClientContext.FSocketHandle])
-        , Self);
-    end else if FErrorCode <> 0 then
-    begin
-      if not FClientContext.FRequestDisconnect then
-      begin   // 如果请求关闭，不再输出日志,和触发错误
+    end;
+    {$ENDIF}
+
+    Assert(FOwner <> nil);
+    try
+      lvDebugStep := 2;
+      if (FOwner.FDataMoniter <> nil) then
+      begin
+        FOwner.FDataMoniter.incResponseWSARecvCounter;
+        FOwner.FDataMoniter.incRecvdSize(FBytesTransferred);
+      end;
+
+      if not FOwner.Active then
+      begin
+        lvDebugStep := 10;
         {$IFDEF WRITE_LOG}
         FOwner.logMessage(
-          Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
+            Format(strRecvEngineOff, [FClientContext.FSocketHandle])
           );
         {$ENDIF}
-        FOwner.DoClientContextError(FClientContext, FErrorCode);
+        // 避免后面重复投递接收请求
         FClientContext.RequestDisconnect(
-          Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
-          ,  Self);
+          Format(strRecvEngineOff, [FClientContext.FSocketHandle])
+          , Self);
+        lvDebugStep := 19;
+      end else if FErrorCode <> 0 then
+      begin
+        lvDebugStep := 20;
+        if not FClientContext.FRequestDisconnect then
+        begin   // 如果请求关闭，不再输出日志,和触发错误
+          {$IFDEF WRITE_LOG}
+          FOwner.logMessage(
+            Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
+            );
+          {$ENDIF}
+          FOwner.DoClientContextError(FClientContext, FErrorCode);
+          FClientContext.RequestDisconnect(
+            Format(strRecvError, [FClientContext.FSocketHandle, FErrorCode])
+            ,  Self);
+        end;
+        lvDebugStep := 29;
+      end else if (FBytesTransferred = 0) then
+      begin      // no data recvd, socket is break
+        lvDebugStep := 30;
+        if not FClientContext.FRequestDisconnect then
+        begin
+          FClientContext.RequestDisconnect(
+            Format(strRecvZero,  [FClientContext.FSocketHandle]),  Self);
+        end;
+        lvDebugStep := 35;
+      end else
+      begin
+        lvDebugStep := 40;
+        FClientContext.DoReceiveData;
+        lvDebugStep := 49;
       end;
-    end else if (FBytesTransferred = 0) then
-    begin      // no data recvd, socket is break
+    finally
+      lvDebugInfo := FDebugInfo;
+      lvRefCount := FOverlapped.RefCount;
+    
+      // PostWSARecv before decReferenceCounter
       if not FClientContext.FRequestDisconnect then
       begin
-        FClientContext.RequestDisconnect(
-          Format(strRecvZero,  [FClientContext.FSocketHandle]),  Self);
+        FClientContext.PostWSARecvRequest;
       end;
-    end else
-    begin
-      FClientContext.DoReceiveData;
-    end;
-  finally
-    lvDebugInfo := FDebugInfo;
-    lvRefCount := FOverlapped.RefCount;
-    
-    // PostWSARecv before decReferenceCounter
-    if not FClientContext.FRequestDisconnect then
-    begin
-      FClientContext.PostWSARecvRequest;
-    end;
 
-    // may return to pool
-    FClientContext.decReferenceCounter(
-      Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, refcount:%d',
-        [lvDNACounter, lvDebugInfo, lvRefCount]), Self);
+      // may return to pool
+      FClientContext.decReferenceCounter(
+        Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, refcount:%d',
+          [lvDNACounter, lvDebugInfo, lvRefCount]), Self);
 
-//  for debug context DebugStrings
-//    if FClientContext.FRequestDisconnect then
-//    begin
-//      lvBreak := true;
-//    end else
-//    begin
-//      lvBreak := False
-//    end;
-//    // may return to pool
-//    FClientContext.decReferenceCounter(
-//      Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, refcount:%d',
-//        [lvDNACounter, FDebugInfo, FOverlapped.refCount]), Self);
-//    if lvBreak then
-//    begin
-//      FClientContext.PostWSARecvRequest;
-//    end;
+  //  for debug context DebugStrings
+  //    if FClientContext.FRequestDisconnect then
+  //    begin
+  //      lvBreak := true;
+  //    end else
+  //    begin
+  //      lvBreak := False
+  //    end;
+  //    // may return to pool
+  //    FClientContext.decReferenceCounter(
+  //      Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, refcount:%d',
+  //        [lvDNACounter, FDebugInfo, FOverlapped.refCount]), Self);
+  //    if lvBreak then
+  //    begin
+  //      FClientContext.PostWSARecvRequest;
+  //    end;
+
+    end;
+  except
+    on E:Exception do
+    begin
+      sfLogger.logMessage(
+        Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, step:%d, refcount:%d, emsg:%s',
+          [lvDNACounter, FDebugInfo, lvDebugStep, FOverlapped.refCount, e.Message]));
+    end;
 
   end;
 end;

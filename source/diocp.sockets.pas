@@ -1392,6 +1392,7 @@ end;
 constructor TDiocpCustom.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  CheckWinSocketStart;
   FSafeLogger:=TSafeLogger.Create();
   FSafeLogger.setAppender(TLogFileAppender.Create(True));
 
