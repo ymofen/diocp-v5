@@ -286,7 +286,7 @@ function SearchPointer(pvSource: Pointer; pvSourceLen, pvStartIndex: Integer;
     pvSub: Pointer; pvSubLen: Integer): Pointer;
 var
   I, j: Integer;
-  lvTempP, lvTempPSub, lvTempP2, lvTempPSub2:PByte;
+  lvTempP, lvTempPSub, lvTempP2, lvTempPSub2:PAnsiChar;
 begin
   if (pvSub = nil) then
     Result := nil
@@ -294,10 +294,10 @@ begin
   begin
     Result := nil;
     j := pvStartIndex;
-    lvTempP := PByte(pvSource);
+    lvTempP := PAnsiChar(pvSource);
     Inc(lvTempP, pvStartIndex);
 
-    lvTempPSub := PByte(pvSub);
+    lvTempPSub := PAnsiChar(pvSub);
     while j<pvSourceLen do
     begin
       if lvTempP^ = lvTempPSub^ then
@@ -1765,7 +1765,7 @@ var
   lvBuf, lvFreeBuf: PMemoryBlock;
 begin
   if FRead = nil then exit;
-  lvBuf := FRead.PrevEx;
+    lvBuf := FRead.PrevEx;
   while lvBuf <> nil do
   begin
     lvFreeBuf :=lvBuf;
@@ -1918,41 +1918,112 @@ function TBufferLink.SearchBuffer(subBuf:PAnsiChar; subBufLen:Cardinal):
     Integer;
 var
   lvBufBlock: PMemoryBlock;
-
-  lvPRes:Pointer;
-
-  l, x, lvPosition:Cardinal;
+  LCompLen,HasCompLen:Cardinal;
+  SearchStart,SubPointer,search1,LLast: PAnsiChar;
+  LPosition,BlockSize,LResult,HasRead:Integer;
+  FHasFound: Boolean;
+  BlockIndex: Integer;
 begin
   Result := -1;
-  l := 0;
-
   lvBufBlock := FRead;
-  lvPosition := FReadPosition;
-
   if lvBufBlock = nil then
   begin   // 从头开始
     lvBufBlock := FHead;
-    lvPosition := 0;
   end;
-
+  BlockIndex := 0;
+  HasRead := 0;
   if lvBufBlock <> nil then
   begin
+    FHasFound := False;
+    SubPointer := subBuf;
+    Result := FReadPosition;
+    LPosition := FReadPosition;
+    HasCompLen := 0;
     while lvBufBlock <> nil do
     begin
-      lvPRes := SearchPointer(lvBufBlock.Memory, lvBufBlock.DataLen, lvPosition, subBuf, subBufLen);
+      case lvBufBlock.BlockType of
+      MB_Small: BlockSize := SmallMemoryPool.FBlockSize;
+      MB_Normal: BlockSize := MemoryPool.FBlockSize;
+      MB_SpBig: BlockSize := SuperMemoryPool.FBlockSize;
+      MB_Large: BlockSize := LargeMemoryPool.FBlockSize;
+      MB_SPLarge: BlockSize := SuperLargeMemoryPool.FBlockSize;
+      MB_Max: BlockSize := MaxMemoryPool.FBlockSize;
+      MB_MaxBlock: BlockSize := MaxBlockMPool.FBlockSize;
+      else BlockSize := BigMemoryPool.FBlockSize;
+      end;
+      SearchStart := PAnsiChar(lvBufBlock.Memory);
+      LLast := SearchStart;
+      Inc(LLast,BlockSize);
+      inc(SearchStart,LPosition);
+      while LPosition < BlockSize do
+      begin
+        if SearchStart^ = SubPointer^ then //匹配到，匹配后面的
+        begin
+          LCompLen := 1 + HasCompLen;
+          search1 := SearchStart;
+          if BlockIndex = 0 then
+            LResult := Integer(search1)- Integer(PAnsiChar(lvBufBlock.Memory)) - FReadPosition
+          else LResult := Integer(search1)- Integer(PAnsiChar(lvBufBlock.Memory));
+          Inc(search1);
+          Inc(SubPointer);
+          while LCompLen < subBufLen do
+          begin
+            if Integer(search1) = integer(LLast) then //已经匹配到末尾
+            begin
+              HasCompLen := LCompLen;
+              Break;
+            end
+            else if search1^ = subPointer^ then
+            begin
+              Inc(search1);
+              Inc(SubPointer);
+              Inc(LCompLen);
+              Inc(LResult);
+            end
+            else
+            begin
+              if Integer(search1) <> integer(LLast) then
+              begin
+                SubPointer := subBuf;
+                HasCompLen := 0;
+              end
+              else HasCompLen := LCompLen;
+              Break;
+            end;
+          end;
+          FHasFound := LCompLen = subBufLen;
+          if FHasFound then
+          begin
+            Result := HasRead + LResult - subBufLen + 1;
+            Break;
+          end;
+        end;
+        Inc(LPosition);
+        Inc(SearchStart);
+      end;
+      if FHasFound then
+         Break;
+      if BlockIndex = 0 then
+        HasRead := BlockSize - FReadPosition
+      else Inc(HasRead,BlockSize);
+      Inc(BlockIndex);
+      lvBufBlock := lvBufBlock^.NextEx;
+      LPosition := 0;
+      //
+      {lvPRes := SearchPointer(lvBufBlock.Memory, lvBufBlock.DataLen, lvPosition, subBuf, subBufLen);
       if lvPRes <> nil then
       begin
         x := PAnsiChar(lvPRes) - PAnsiChar(lvBufBlock.Memory) - lvPosition;
         Result := l + x;
         Break;
-      end else
+      end
+      else
       begin
         l := l + lvBufBlock.DataLen - lvPosition;
-
         // 查找下一块
         lvBufBlock := lvBufBlock.NextEx;
         lvPosition := 0;
-      end;
+      end;}
     end;
   end;
 end;
