@@ -33,6 +33,9 @@ uses
 {$IFEND >=XE5}
   ;
 
+const
+  STRING_BLOCK_SIZE = $2000;  // Must be a power of 2 
+
 type
 {$IFDEF MSWINDOWS}  // Windows平台下面可以使用AnsiString
   URLString = AnsiString;
@@ -60,6 +63,37 @@ type
   TArrayStrings = array of string;
   PArrayStrings = ^ TArrayStrings;
 
+  TCharArray = array of Char;
+  
+  TDStringBuilder = class(TObject)
+  private
+    FData: TCharArray;
+    FPosition: Integer;
+    FMaxCapacity: Integer;
+    FCapacity :Integer;
+    procedure CheckNeedSize(pvSize:Integer);
+    function GetLength: Integer;
+  public
+    procedure Clear;
+    function Append(c:Char): TDStringBuilder;  overload;
+    function Append(str:string): TDStringBuilder; overload;
+    function Append(str:string; pvLeftStr:string; pvRightStr:String):
+        TDStringBuilder; overload;
+    function Append(v: Boolean; UseBoolStrs: Boolean = True): TDStringBuilder;
+        overload;
+    function Append(v:Integer): TDStringBuilder; overload;
+    function Append(v:Double): TDStringBuilder; overload;
+    function AppendQuoteStr(str:string): TDStringBuilder;
+    function AppendSingleQuoteStr(str:string): TDStringBuilder;
+    function AppendLine(str:string): TDStringBuilder;
+
+    function ToString: string;
+    property Length: Integer read GetLength;
+
+
+
+  
+  end;
 
 
 /// <summary>
@@ -930,6 +964,94 @@ begin
   SetLength(Result, Length(lvRawStr));
   Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
 {$ENDIF}
+end;
+
+function TDStringBuilder.Append(c:Char): TDStringBuilder;
+begin
+  CheckNeedSize(1);
+  FData[FPosition] := c;
+  Inc(FPosition);
+  Result := Self;
+end;
+
+function TDStringBuilder.Append(str:string): TDStringBuilder;
+var
+  l:Integer;
+begin
+  l := System.Length(str);
+  if l = 0 then Exit;
+  CheckNeedSize(l);
+  Move(PChar(str)^, FData[FPosition], l);
+  Inc(FPosition, l);
+  Result := Self;
+end;
+
+function TDStringBuilder.Append(v: Boolean; UseBoolStrs: Boolean = True):
+    TDStringBuilder;
+begin
+  Result := Append(BoolToStr(v, UseBoolStrs));
+end;
+
+function TDStringBuilder.Append(v:Integer): TDStringBuilder;
+begin
+  Result :=Append(IntToStr(v));
+end;
+
+function TDStringBuilder.Append(v:Double): TDStringBuilder;
+begin
+  Result := Append(FloatToStr(v));
+end;
+
+function TDStringBuilder.Append(str:string; pvLeftStr:string;
+    pvRightStr:String): TDStringBuilder;
+begin
+  Result := Append(pvLeftStr).Append(str).Append(pvRightStr);
+end;
+
+function TDStringBuilder.AppendLine(str:string): TDStringBuilder;
+begin
+  Result := Append(Str).Append(sLineBreak);
+end;
+
+function TDStringBuilder.AppendQuoteStr(str:string): TDStringBuilder;
+begin
+  Result := Append('"').Append(str).Append('"');
+end;
+
+function TDStringBuilder.AppendSingleQuoteStr(str:string): TDStringBuilder;
+begin
+  Result := Append('''').Append(str).Append('''');
+end;
+
+procedure TDStringBuilder.CheckNeedSize(pvSize:Integer);
+var
+  lvCapacity:Integer;
+begin
+  if FPosition + pvSize > FCapacity then
+  begin
+    lvCapacity := (FPosition + pvSize + (STRING_BLOCK_SIZE - 1)) AND (not (STRING_BLOCK_SIZE - 1));
+    FCapacity := lvCapacity;
+    SetLength(FData, FCapacity);     
+  end;
+end;
+
+procedure TDStringBuilder.Clear;
+begin
+  FPosition := 0;
+end;
+
+function TDStringBuilder.GetLength: Integer;
+begin
+  Result := FPosition;
+end;
+
+function TDStringBuilder.ToString: string;
+var
+  l:Integer;
+begin
+  l := Length;
+  SetLength(Result, l);
+  Move(FData[0], PChar(Result)^, l);
 end;
 
 

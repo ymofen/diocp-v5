@@ -1105,6 +1105,17 @@ type
 
 
 
+var
+  __svrLogger:TSafeLogger;
+
+
+/// <summary>
+///   注册服务使用的SafeLogger
+/// </summary>
+procedure RegisterDiocpSvrLogger(pvLogger:TSafeLogger);
+
+
+
 implementation
 
 uses
@@ -1113,6 +1124,7 @@ uses
 
 var
   __startTime:TDateTime;
+  __innerLogger:TSafeLogger;
 
 
 
@@ -1202,6 +1214,19 @@ asm
   mov rax, rcx
   lock cmpxchg [r8], dl
 {$endif}
+end;
+
+procedure RegisterDiocpSvrLogger(pvLogger:TSafeLogger);
+begin
+  if __svrLogger <> pvLogger then
+  begin
+    __svrLogger := pvLogger;
+    if __innerLogger <> nil then
+    begin
+      __innerLogger.Free;
+      __innerLogger := nil;
+    end;
+  end;
 end;
 
 
@@ -1687,7 +1712,7 @@ begin
         FOwner.OnContextError(Self, -1);
       end else
       begin
-        sfLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+        __svrLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
       end;
     end;
   end;
@@ -2069,7 +2094,7 @@ procedure TDiocpTcpServer.LogMessage(pvMsg: string; const args: array of const;
 begin
   if LogCanWrite then
   begin
-    FLogger.logMessage(pvMsg, args, pvMsgType, pvLevel);
+    __svrLogger.logMessage(pvMsg, args, pvMsgType, pvLevel);
   end;
 end;
 
@@ -2078,7 +2103,7 @@ procedure TDiocpTcpServer.LogMessage(pvMsg: string; pvMsgType: string = '';
 begin
   if LogCanWrite then
   begin
-    FLogger.logMessage(pvMsg, pvMsgType, pvLevel);
+    __svrLogger.logMessage(pvMsg, pvMsgType, pvLevel);
   end;
 end;
 
@@ -3335,7 +3360,7 @@ begin
   except
     on E:Exception do
     begin
-      sfLogger.logMessage(
+      __svrLogger.logMessage(
         Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, step:%d, refcount:%d, emsg:%s',
           [lvDNACounter, FDebugInfo, lvDebugStep, FOverlapped.refCount, e.Message]));
     end;
@@ -3941,6 +3966,15 @@ end;
 
 initialization
   __startTime :=  Now();
+  __innerLogger := TSafeLogger.Create();
+  __innerLogger.setAppender(TLogFileAppender.Create(True));
+  __svrLogger := __innerLogger;
+
+finalization
+  if __innerLogger <> nil then
+  begin
+    __innerLogger.Free;
+  end;
 
 
 
