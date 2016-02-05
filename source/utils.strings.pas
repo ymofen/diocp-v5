@@ -978,12 +978,13 @@ function TDStringBuilder.Append(str:string): TDStringBuilder;
 var
   l:Integer;
 begin
+  Result := Self;
   l := System.Length(str);
   if l = 0 then Exit;
   CheckNeedSize(l);
   Move(PChar(str)^, FData[FPosition], l);
   Inc(FPosition, l);
-  Result := Self;
+
 end;
 
 function TDStringBuilder.Append(v: Boolean; UseBoolStrs: Boolean = True):

@@ -69,6 +69,12 @@ begin
     pvStringBuilder.Append('}');
   end else if v.ObjectType = vntArray then
   begin
+    lvName := v.Name.AsString;
+    if Length(lvName) <> 0 then
+    begin
+      pvStringBuilder.AppendQuoteStr(v.Name.AsString);
+      pvStringBuilder.Append(':');
+    end;
     pvStringBuilder.AppendLine('[');
     for i := 0 to v.Count - 1 do
     begin
@@ -84,8 +90,11 @@ begin
     pvStringBuilder.Append(']');
   end else if v.ObjectType = vntValue then
   begin
-    pvStringBuilder.AppendQuoteStr(v.Name.AsString);
-    pvStringBuilder.Append(':');
+    if v.Name.AsString <> '' then
+    begin
+      pvStringBuilder.AppendQuoteStr(v.Name.AsString);
+      pvStringBuilder.Append(':');
+    end;
     if v.Value.DataType in [vdtString, vdtStringW] then
     begin
       pvStringBuilder.AppendQuoteStr(v.AsString);
@@ -338,7 +347,15 @@ begin
         Result := JSONParseValue(ptrData, pvDValue, pvParser);
         Exit;
       end;
-    end; 
+    end else if pvDValue.Parent.ObjectType = vntArray then
+    begin
+      Result := JSONParseValue(ptrData, pvDValue, pvParser);
+      Exit;
+    end else
+    begin  // must be vntArray, vntObject(vdtNull, vdtUnset can convert to object)
+      Result := -1;
+      Exit;
+    end;
   end else
   begin
     pvDValue.CheckSetNodeType(vntNull);
