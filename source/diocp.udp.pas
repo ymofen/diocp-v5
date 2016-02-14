@@ -200,7 +200,9 @@ type
     function GetSession(pvSessionID:String): TDiocpUdpSession;
 
     function GetSendRequest():TDiocpUdpSendRequest;
+    function GetWorkerCount: Integer;
     procedure ReleaseSendRequest(pvRequest:TDiocpUdpSendRequest);
+    procedure SetWorkerCount(const Value: Integer);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -224,6 +226,12 @@ type
     property DefaultListener: TDiocpUdpListener read FDefaultListener;
 
     property OnRecv: TDiocpUdpRecvRequestEvent read FOnRecv write FOnRecv;
+  published
+    /// <summary>
+    ///   iocp工作线程
+    ///    为0时默认为 cpu count * 2 -1
+    /// </summary>
+    property WorkerCount: Integer read GetWorkerCount write SetWorkerCount;
   end;
 
 implementation
@@ -287,6 +295,11 @@ begin
 
 end;
 
+function TDiocpUdp.GetWorkerCount: Integer;
+begin
+  Result := FIocpEngine.WorkerCount;
+end;
+
 procedure TDiocpUdp.LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel:
     TLogLevel = lgvMessage);
 begin
@@ -307,6 +320,11 @@ end;
 procedure TDiocpUdp.ReleaseSendRequest(pvRequest:TDiocpUdpSendRequest);
 begin
   FSendRequestPool.EnQueue(pvRequest);
+end;
+
+procedure TDiocpUdp.SetWorkerCount(const Value: Integer);
+begin
+  FIocpEngine.SetWorkerCount(Value);
 end;
 
 procedure TDiocpUdp.Start;

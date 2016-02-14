@@ -79,7 +79,10 @@ type
     function GetValues(pvHashValue: Cardinal): Pointer;
   private
     function GetValueMap(pvKey:String): Pointer;
+    procedure SetBucketAutoSize(const Value: Boolean);
     procedure SetValueMap(pvKey:String; const Value: Pointer);
+  protected
+    FBucketAutoSize: Boolean;
   public
     constructor Create(pvBucketSize: Cardinal = 1361);
 
@@ -171,6 +174,9 @@ type
 
     property OnCompare: TOnDataCompare read FOnCompare write SetOnCompare;
 
+    /// 是否自动调整桶大小
+    property BucketAutoSize: Boolean read FBucketAutoSize write SetBucketAutoSize;
+
     property ValueMap[pvKey:String]: Pointer read GetValueMap write SetValueMap;
 
     property Values[pvHashValue: Cardinal]: Pointer read GetValues write SetValues; default;
@@ -257,6 +263,7 @@ end;
 constructor TDHashTable.Create(pvBucketSize: Cardinal = 1361);
 begin
   inherited Create;
+  FBucketAutoSize := pvBucketSize = 0;
   SetBucketSize(pvBucketSize);
   FOnCompare := InnerCompare;
 end;
@@ -277,6 +284,9 @@ begin
   FBuckets[lvIndex]:=lvBucket;
 
   Inc(FCount);
+
+  if FBucketAutoSize and ((FCount div Length(FBuckets)) > 3) then
+    SetBucketSize(0);
 end;
 
 function TDHashTable.InnerCompare(pvData1, pvData2:Pointer): Integer;
@@ -599,6 +609,19 @@ end;
 function TDHashTable.GetValues(pvHashValue: Cardinal): Pointer;
 begin
   Result := FindFirstData(pvHashValue);
+end;
+
+procedure TDHashTable.SetBucketAutoSize(const Value: Boolean);
+begin
+  if FBucketAutoSize <> Value then
+  begin
+    FBucketAutoSize := Value;
+    if BucketAutoSize then
+    begin
+      if (FCount div Length(FBuckets)) > 3 then
+        SetBucketSize(0);
+    end;
+  end;
 end;
 
 procedure TDHashTable.SetBucketSize(pvBucketSize:Integer);

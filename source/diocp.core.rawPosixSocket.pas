@@ -121,7 +121,7 @@ type
 
     function Listen(const backlog: Integer = 0): Boolean;
 
-    procedure Close;
+    procedure Close(pvShutdown: Boolean = true);
 
     function IsValidSocketHandle: Boolean;
 
@@ -215,7 +215,7 @@ begin
   Result := Posix.SysSocket.Bind(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in))  = 0;
 end;
 
-procedure TRawSocket.Close;
+procedure TRawSocket.Close(pvShutdown: Boolean = true);
 var
   lvTempSocket: THandle;
 begin

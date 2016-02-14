@@ -107,7 +107,7 @@ begin
     lvStream := TMemoryStream.Create;
     try
       s := edtMsg.Text;
-      lvStream.Write(s[1], Length(s));
+      //lvStream.Write(s[1], Length(s));
 
       // get all client context to List
       FTcpServer.getOnlineContextList(lvList);

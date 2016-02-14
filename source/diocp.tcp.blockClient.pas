@@ -240,7 +240,7 @@ begin
   if Assigned(FOnDisconnected) then FOnDisconnected(Self);
   
 
-  FRawSocket.close;
+  FRawSocket.Close(False);
 
   FActive := false;
 end;

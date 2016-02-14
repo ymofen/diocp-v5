@@ -46,7 +46,7 @@ type
   private
     FSocketHandle: TSocket;
   public
-    procedure Close;
+    procedure Close(pvShutdown: Boolean = true);
     procedure CreateTcpSocket;
 
     /// <summary>
@@ -158,7 +158,7 @@ begin
   Result := Windows.CancelIo(FSocketHandle);
 end;
 
-procedure TRawSocket.Close;
+procedure TRawSocket.Close(pvShutdown: Boolean = true);
 var
   lvTempSocket: TSocket;
 begin
@@ -166,9 +166,13 @@ begin
   if lvTempSocket <> INVALID_SOCKET then
   begin
     FSocketHandle := INVALID_SOCKET;
-
-    // To assure that all data is sent and received on a connected socket before it is closed, an application should use shutdown to close connection before calling closesocket.
-    diocp.winapi.winsock2.shutdown(lvTempSocket, SD_BOTH);
+    
+    if pvShutdown then
+    begin  
+      // To assure that all data is sent and received on a connected socket before it is closed,
+      // an application should use shutdown to close connection before calling closesocket.
+      diocp.winapi.winsock2.shutdown(lvTempSocket, SD_BOTH);
+    end;
 
     Closesocket(lvTempSocket);
 

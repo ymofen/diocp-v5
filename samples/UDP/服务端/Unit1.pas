@@ -54,6 +54,7 @@ begin
     Button1.Caption := '点击开启';
   end else
   begin
+    
     FDiocpUdp.DefaultListener.Port := StrToInt(Edit1.Text);
     FDiocpUdp.Start();
     Button1.Caption := '点击关闭';

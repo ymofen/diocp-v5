@@ -16,8 +16,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer, System.Actions
-  , IdText, IdGlobal;
+  ComCtrls, diocp.ex.httpServer;
 
 type
   TfrmMain = class(TForm)
@@ -76,6 +75,7 @@ begin
   FTcpServer.createDataMonitor;
   FTcpServer.OnDiocpHttpRequest := OnHttpSvrRequest;
   FTcpServer.RegisterSessionClass(TDiocpSimpleMsgPackSession);
+  FTcpServer.WorkerCount := 5;
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
   
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
