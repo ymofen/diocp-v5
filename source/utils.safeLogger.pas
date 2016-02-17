@@ -11,7 +11,12 @@ unit utils.safeLogger;
 interface
 
 uses
-  Classes, utils.queues, SysUtils, SyncObjs{$IFDEF MSWINDOWS}, Windows, Messages {$ENDIF};
+  Classes, utils.queues, SysUtils, SyncObjs
+  {$IFDEF MSWINDOWS}, Windows, Messages
+  {$ELSE}
+  , System.Diagnostics
+  {$ENDIF}
+  ;
 
 type
 
@@ -120,7 +125,9 @@ type
   private
     FDebugInfo: String;
     FDebugData: Pointer;
-    FWorkerAlive:Boolean;
+
+    // 0: dead, 1:alive
+    FWorkerAlive:Integer;
     
     FLogWorker:TLogWorker;
     FDataQueue: TBaseQueue;
@@ -142,24 +149,26 @@ type
     /// <summary>
     ///   check worker thread is alive
     /// </summary>
-    function workersIsAlive(const pvWorker: TLogWorker): Boolean;
+    function WorkersIsAlive(const pvWorker: TLogWorker): Boolean;
 
-    procedure checkForWorker;
+    procedure CheckForWorker;
     procedure stopWorker(pvTimeOut: Cardinal);
   private
-  {$IFDEF MSWINDOWS}
+
     FLogFilter: TLogLevels;
     FStateLocker:TCriticalSection;
     FWorking:Boolean;
-    FMessageHandle: HWND;
     FName: String;
+    {$IFDEF MSWINDOWS}
+    FMessageHandle: HWND;
     procedure DoMainThreadWork(var AMsg: TMessage);
+    {$ENDIF}
     procedure SetWorking(pvWorking:Boolean);
     function isWorking():Boolean;
     procedure DoWork();
-  {$ENDIF}
+
     procedure incWorkerCount;
-    procedure decWorker(pvWorker: TLogWorker);
+    procedure DecWorker(pvWorker: TLogWorker);
   public
     procedure IncErrorCounter;
     procedure IncResponseCounter;
@@ -220,12 +229,45 @@ implementation
 
 var
   __dataObjectPool:TBaseQueue;
+  {$IFDEF MSWINDOWS}
+  {$ELSE}
+  {$ENDIF}
 
 {$IFDEF MSWINDOWS}
 const
   WM_SYNC_METHOD = WM_USER + 1;
   WM_NOTIFY_WORK = WM_USER + 2;
 {$ENDIF}
+
+{$IF RTLVersion<24}
+function AtomicCmpExchange(var Target: Integer; Value: Integer;
+  Comparand: Integer): Integer;
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedCompareExchange(Target, Value, Comparand);
+{$ELSE}
+  Result := TInterlocked.CompareExchange(Target, Value, Comparand);
+{$ENDIF}
+end;
+{$IFEND <XE5}
+
+{$IFDEF MSWINDOWS}
+{$ELSE}
+function GetCurrentProcessId():Integer;
+begin
+  Result := 0;
+end;
+{$ENDIF}
+
+
+function QueryTickCount: Integer;
+begin
+{$IFDEF MSWINDOWS}
+  Result := GetTickCount;
+{$ELSE}
+  Result := TThread.GetTickCount;;
+{$ENDIF}
+end;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 begin
@@ -261,18 +303,7 @@ begin
   end;
 end;
 
-/// compare target, cmp_val same set target = new_val
-/// return old value
-function lock_cmp_exchange(cmp_val, new_val: Boolean; var target: Boolean): Boolean; overload;
-asm
-{$ifdef win32}
-  lock cmpxchg [ecx], dl
-{$else}
-.noframe
-  mov rax, rcx
-  lock cmpxchg [r8], dl
-{$endif}
-end;
+
 
 procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
 var
@@ -299,9 +330,9 @@ begin
   end;
 end;
 
-procedure TSafeLogger.checkForWorker;
+procedure TSafeLogger.CheckForWorker;
 begin
-  if lock_cmp_exchange(False, True, FWorkerAlive) = False then
+  if AtomicCmpExchange(FWorkerAlive, 1, 0) = 0 then
   begin
     if FLogWorker = nil then
     begin
@@ -323,15 +354,16 @@ constructor TSafeLogger.Create;
 begin
   inherited Create;
   FLogFilter := [lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug];
-  FWorkerAlive := False;
+  FWorkerAlive := 0;
   FEnable := true;
   FSyncMainThreadType := rtSync;
 {$IFDEF MSWINDOWS}
   FSyncMainThreadType := rtPostMessage;
-  FWorking := False;
   FMessageHandle := AllocateHWnd(DoMainThreadWork);
-  FStateLocker := TCriticalSection.Create;
 {$ENDIF}
+  FWorking := False;
+  FStateLocker := TCriticalSection.Create;
+
   FDataQueue := TBaseQueue.Create();
   FAppender := nil;
   FOwnsAppender := false;
@@ -388,6 +420,7 @@ begin
   end else
     AMsg.Result := DefWindowProc(FMessageHandle, AMsg.Msg, AMsg.WPARAM, AMsg.LPARAM);
 end;
+{$ENDIF}
 
 procedure TSafeLogger.DoWork;
 var
@@ -429,7 +462,7 @@ begin
     FStateLocker.Leave;
   end;   
 end;
-{$ENDIF}
+
 
 procedure TSafeLogger.ExecuteLogData(const pvData:TLogDataObject);
 begin
@@ -466,16 +499,15 @@ end;
 
 
 
-procedure TSafeLogger.decWorker(pvWorker: TLogWorker);
+procedure TSafeLogger.DecWorker(pvWorker: TLogWorker);
 begin
-
   {$IFDEF MSWINDOWS}
   InterlockedDecrement(FWorkerCounter);
   {$ELSE}
   TInterlocked.Decrement(FWorkerCounter);
   {$ENDIF}
 
-  FWorkerAlive := false;
+  FWorkerAlive := 0;
   FLogWorker := nil;
 end;
 
@@ -485,7 +517,7 @@ var
 begin
   lvDebugINfo := TStringList.Create;
   try
-    lvDebugINfo.Add(Format('enable:%s, workerAlive:%s', [boolToStr(FEnable, True), boolToStr(FWorkerAlive, True)]));
+    lvDebugINfo.Add(Format('enable:%s, workerAlive:%s', [boolToStr(FEnable, True), boolToStr(FWorkerAlive = 1, True)]));
     lvDebugINfo.Add(Format('post/response/error counter:%d / %d / %d',
        [self.FPostCounter,self.FResponseCounter,self.FErrorCounter]));
     Result := lvDebugINfo.Text;
@@ -545,10 +577,10 @@ begin
       end;
     end else
     begin
-      checkForWorker;
+      CheckForWorker;
     end;
   {$ELSE}
-    checkForWorker;
+    CheckForWorker;
   {$ENDIF};
   except
     on E:Exception do
@@ -598,8 +630,8 @@ begin
     FLogWorker.FNotify.SetEvent;
 
     lvWrite := True;
-    l := GetTickCount;
-    while (FWorkerCounter > 0) and workersIsAlive(FLogWorker) do
+    l := QueryTickCount;
+    while (FWorkerCounter > 0) and WorkersIsAlive(FLogWorker) do
     begin
       {$IFDEF MSWINDOWS}
       SwitchToThread;
@@ -609,7 +641,7 @@ begin
 
       if lvWrite then
       begin
-        if tick_diff(l, GetTickCount) > 10000 then
+        if tick_diff(l, QueryTickCount) > 10000 then
         begin
           writeSafeInfo(FName + 'is dead, debugInfo:'  + FDebugInfo);
           lvWrite := false;
@@ -622,11 +654,12 @@ begin
   end;
 end;
 
-function TSafeLogger.workersIsAlive(const pvWorker: TLogWorker): Boolean;
+function TSafeLogger.WorkersIsAlive(const pvWorker: TLogWorker): Boolean;
 var
   lvCode:Cardinal;
 begin
   Result := false;
+  {$IFDEF MSWINDOWS}
   if (pvWorker <> nil) and (GetExitCodeThread(pvWorker.Handle, lvCode)) then
   begin
     if lvCode=STILL_ACTIVE then
@@ -634,6 +667,8 @@ begin
       Result := true;
     end;
   end;
+  {$ELSE}
+  {$ENDIF}
 end;
 
 constructor TLogWorker.Create(ASafeLogger: TSafeLogger);
@@ -902,11 +937,19 @@ initialization
   __dataObjectPool.Name := 'safeLoggerDataPool';
   sfLogger := TSafeLogger.Create();
   sfLogger.setAppender(TLogFileAppender.Create(True));
-
+  {$IFDEF MSWINDOWS}
+  {$ELSE}
+  {$ENDIF}
 
 finalization
   __dataObjectPool.FreeDataObject;
   __dataObjectPool.Free;
   sfLogger.Free;
+
+  {$IFDEF MSWINDOWS}
+  {$ELSE}
+
+  {$ENDIF}
+
 
 end.
