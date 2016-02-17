@@ -9,6 +9,9 @@
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
  *
+ *   2016-02-15 22:39:17
+ *     添加DataReleaseAction属性，Clear自动清理Data数据
+ *
  *)
  
 unit utils.queues;
@@ -23,10 +26,13 @@ uses
 {$ENDIF}
 
 type
+  TDataReleaseAction = (raNone, raObjectFree, raDispose, raFreeMem);
+
   PQueueData = ^TQueueData;
   TQueueData = record
     Data: Pointer;
     Next: PQueueData;
+    ReleaseAction: TDataReleaseAction;
   end;
 
 
@@ -64,7 +70,7 @@ type
     /// <summary>
     ///  入队列
     /// </summary>
-    procedure EnQueue(AData: Pointer);
+    procedure EnQueue(AData: Pointer; pvReleaseAction: TDataReleaseAction = raNone);
 
     /// <summary>
     ///  invoke Only Data Pointer is TObject
@@ -176,6 +182,22 @@ begin
 {$ENDIF}
 end;
 
+procedure __ReleaseQueueData(pvQueueData:PQueueData);
+begin
+  try
+    if pvQueueData = nil then Exit;
+    if pvQueueData.Data = nil then Exit;
+
+    case pvQueueData.ReleaseAction of
+      raObjectFree : TObject(pvQueueData.Data).Free;
+      raFreeMem : FreeMem(pvQueueData.Data);
+      raDispose : Dispose(pvQueueData.Data);
+    end;
+  except
+  end;
+  pvQueueData.Data := nil;
+end;
+
 constructor TBaseQueue.Create;
 begin
   inherited Create;
@@ -242,6 +264,7 @@ begin
     while FHead <> nil do
     begin
       ANext := FHead.Next;
+      __ReleaseQueueData(FHead);
       queueDataPool.Push(FHead);
       FHead := ANext;
     end; 
@@ -306,12 +329,14 @@ begin
   end;
 end;
 
-procedure TBaseQueue.EnQueue(AData: Pointer);
+procedure TBaseQueue.EnQueue(AData: Pointer; pvReleaseAction:
+    TDataReleaseAction = raNone);
 var
   lvTemp:PQueueData;
 begin
   lvTemp := queueDataPool.Pop;
   lvTemp.Data := AData;
+  lvTemp.ReleaseAction := pvReleaseAction;
   InnerAddToTail(lvTemp);
 end;
 

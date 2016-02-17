@@ -446,19 +446,35 @@ end;
 
 procedure TSafeLogger.IncErrorCounter;
 begin
+  {$IFDEF MSWINDOWS}
   InterlockedIncrement(FErrorCounter);
+  {$ELSE}
+  TInterlocked.Increment(FErrorCounter);
+  {$ENDIF}
 end;
 
 procedure TSafeLogger.incWorkerCount;
 begin
+  {$IFDEF MSWINDOWS}
   InterlockedIncrement(FWorkerCounter);
+  {$ELSE}
+  TInterlocked.Increment(FWorkerCounter);
+
+  {$ENDIF}
+
 end;
 
 
 
 procedure TSafeLogger.decWorker(pvWorker: TLogWorker);
 begin
+
+  {$IFDEF MSWINDOWS}
   InterlockedDecrement(FWorkerCounter);
+  {$ELSE}
+  TInterlocked.Decrement(FWorkerCounter);
+  {$ENDIF}
+
   FWorkerAlive := false;
   FLogWorker := nil;
 end;
@@ -480,7 +496,14 @@ end;
 
 procedure TSafeLogger.IncResponseCounter;
 begin
+
+  {$IFDEF MSWINDOWS}
   InterlockedIncrement(FResponseCounter);
+  {$ELSE}
+  TInterlocked.Increment(FResponseCounter);
+
+  {$ENDIF}
+
 end;
 
 { TSafeLogger }
@@ -507,7 +530,12 @@ begin
     lvPData.FMsg := pvMsg;
     lvPData.FMsgType := pvMsgType;
     FDataQueue.EnQueue(lvPData);
+  {$IFDEF MSWINDOWS}
     InterlockedIncrement(FPostCounter);
+  {$ELSE}
+    TInterlocked.Increment(FPostCounter);
+
+  {$ENDIF}
   {$IFDEF MSWINDOWS}
     if (FAppendInMainThread) and (FSyncMainThreadType = rtPostMessage) then
     begin
@@ -829,7 +857,11 @@ begin
   FBasePath :=ExtractFilePath(ParamStr(0)) + 'log';
   FAddThreadINfo := pvAddThreadINfo;
   FAddProcessID := true;
+  {$IFDEF MSWINDOWS}
   FProcessIDStr := IntToStr(GetCurrentProcessId);
+  {$ELSE}
+  FProcessIDStr := '0';
+  {$ENDIF}
 end;
 
 function TLogFileAppender.openLogFile(pvPre: String = ''): Boolean;
