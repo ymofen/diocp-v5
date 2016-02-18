@@ -119,6 +119,9 @@ type
 
 implementation
 
+resourcestring
+  STRING_E_RECV_ZERO = '服务端主动断开关闭';
+
 constructor TDiocpBlockTcpClient.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
@@ -167,7 +170,7 @@ begin
   ///  Posix, fail return 0
   ///  ms_windows, fail return -1
   {$IFDEF POSIX}
-  if (pvSocketResult = -1) or (pvSocketResult = 0) then
+  if (pvSocketResult = -1) then
   begin
      try
        RaiseLastOSError;
@@ -261,6 +264,10 @@ begin
   while lvReadL < len do
   begin
     lvTempL := FRawSocket.RecvBuf(lvPBuf^, len - lvReadL);
+    if lvTempL = 0 then
+    begin
+      raise Exception.Create(STRING_E_RECV_ZERO);
+    end;
 
     CheckSocketResult(lvTempL);
 
@@ -272,6 +279,10 @@ end;
 function TDiocpBlockTcpClient.RecvBuffer(buf: Pointer; len: cardinal): Integer;
 begin
   Result := FRawSocket.RecvBuf(buf^, len);
+  if Result = 0 then
+  begin
+    raise Exception.Create(STRING_E_RECV_ZERO);
+  end;
   CheckSocketResult(Result);
 end;
 
@@ -279,6 +290,10 @@ function TDiocpBlockTcpClient.RecvBufferEnd(buf: Pointer; len: cardinal;
     endBuf: Pointer; endBufLen: Integer): Integer;
 begin
   Result := FRawSocket.RecvBufEnd(buf, len, endBuf, endBufLen);
+  if Result = 0 then
+  begin
+    raise Exception.Create(STRING_E_RECV_ZERO);
+  end;
   CheckSocketResult(Result);
 end;
 

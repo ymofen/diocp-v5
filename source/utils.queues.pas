@@ -70,8 +70,13 @@ type
     /// <summary>
     ///  入队列
     /// </summary>
-    procedure EnQueue(AData: Pointer; pvReleaseAction: TDataReleaseAction = raNone);
+    procedure EnQueue(AData: Pointer; pvReleaseAction: TDataReleaseAction = raNone); overload;
 
+    /// <summary>
+    ///  入队列(队列, android平台需要_ObjAddRef
+    /// </summary>
+    procedure EnQueue(AData: TObject; pvReleaseAction: TDataReleaseAction =
+        raNone); overload;
     /// <summary>
     ///  invoke Only Data Pointer is TObject
     /// </summary>
@@ -336,6 +341,20 @@ var
 begin
   lvTemp := queueDataPool.Pop;
   lvTemp.Data := AData;
+  lvTemp.ReleaseAction := pvReleaseAction;
+  InnerAddToTail(lvTemp);
+end;
+
+procedure TBaseQueue.EnQueue(AData: TObject; pvReleaseAction:
+    TDataReleaseAction = raNone);
+var
+  lvTemp:PQueueData;
+begin
+  lvTemp := queueDataPool.Pop;
+  lvTemp.Data := AData;
+{$IFDEF NEXTGEN}
+  TObject(lvTemp.Data).__ObjAddRef;
+{$ENDIF}
   lvTemp.ReleaseAction := pvReleaseAction;
   InnerAddToTail(lvTemp);
 end;

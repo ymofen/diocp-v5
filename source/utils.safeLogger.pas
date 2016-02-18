@@ -709,7 +709,9 @@ begin
         FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor(), succ';
         while not self.Terminated do
         begin
-          lvPData := FSafeLogger.FDataQueue.DeQueue;
+
+          lvPData := nil;
+          FSafeLogger.FDataQueue.DeQueue(Pointer(lvPData));
           if lvPData = nil then Break;
 
           try
