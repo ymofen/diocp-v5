@@ -12,9 +12,14 @@ interface
 
 uses
   Classes, utils.queues, SysUtils, SyncObjs
-  {$IFDEF MSWINDOWS}, Windows, Messages
+  {$IFDEF MSWINDOWS}
+  , Windows, Messages
   {$ELSE}
-  , System.Diagnostics
+  , System.Diagnostics, IOUtils
+  {$ENDIF}
+
+  {$IFDEF ANDROID}
+  , Androidapi.Log
   {$ENDIF}
   ;
 
@@ -891,14 +896,18 @@ end;
 constructor TLogFileAppender.Create(pvAddThreadINfo: Boolean);
 begin
   inherited Create;
-  FBasePath :=ExtractFilePath(ParamStr(0)) + 'log';
+
   FAddThreadINfo := pvAddThreadINfo;
   FAddProcessID := true;
   {$IFDEF MSWINDOWS}
   FProcessIDStr := IntToStr(GetCurrentProcessId);
+  FBasePath :=ExtractFilePath(ParamStr(0)) + 'log';
   {$ELSE}
   FProcessIDStr := '0';
+  FBasePath := TPath.GetSharedDocumentsPath + TPath.DirectorySeparatorChar;
   {$ENDIF}
+
+
 end;
 
 function TLogFileAppender.openLogFile(pvPre: String = ''): Boolean;
