@@ -96,6 +96,8 @@ type
 
     function Readable(pvTimeOut:Integer): Boolean;
 
+    function ReceiveLength: Integer;
+
     function SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
 
     function CancelIO: Boolean;
@@ -335,6 +337,17 @@ begin
   lvTime_val.tv_sec := pvTimeOut div 1000;
   lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
   Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
+end;
+
+function TRawSocket.ReceiveLength: Integer;
+var
+  r :Integer;
+begin
+  r := ioctlsocket(FSocketHandle, FIONREAD, Cardinal(Result));
+  if r = -1 then
+  begin
+    Result := 0;
+  end;
 end;
 
 

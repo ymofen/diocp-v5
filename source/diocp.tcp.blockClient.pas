@@ -78,6 +78,8 @@ type
     /// </summary>
     function CanRecvBuffer(pvTimeOut:Integer): Boolean;
 
+    function ReceiveLength: Integer;
+
     /// <summary>
     ///  recv buffer
     /// </summary>
@@ -251,6 +253,11 @@ end;
 function TDiocpBlockTcpClient.Peek(buf: Pointer; len: Cardinal): Integer;
 begin
   Result := FRawSocket.PeekBuf(buf^, len);
+end;
+
+function TDiocpBlockTcpClient.ReceiveLength: Integer;
+begin
+  Result := FRawSocket.ReceiveLength;
 end;
 
 procedure TDiocpBlockTcpClient.recv(buf: Pointer; len: cardinal);

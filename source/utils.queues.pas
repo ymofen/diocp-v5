@@ -31,6 +31,7 @@ type
   PQueueData = ^TQueueData;
   TQueueData = record
     Data: Pointer;
+    AsObject:TObject;
     Next: PQueueData;
     ReleaseAction: TDataReleaseAction;
   end;
@@ -67,15 +68,18 @@ type
     function DeQueue: Pointer; overload;
     function DeQueue(var outPointer:Pointer):Boolean;overload;
 
+    function DeQueueObject: TObject;
+
     /// <summary>
     ///  入队列
     /// </summary>
-    procedure EnQueue(AData: Pointer; pvReleaseAction: TDataReleaseAction = raNone); overload;
+    procedure EnQueue(AData: Pointer; pvReleaseAction: TDataReleaseAction =
+        raNone); overload;
 
     /// <summary>
     ///  入队列(队列, android平台需要_ObjAddRef
     /// </summary>
-    procedure EnQueue(AData: TObject; pvReleaseAction: TDataReleaseAction =
+    procedure EnQueueObject(AData: TObject; pvReleaseAction: TDataReleaseAction =
         raNone); overload;
     /// <summary>
     ///  invoke Only Data Pointer is TObject
@@ -190,13 +194,25 @@ end;
 procedure __ReleaseQueueData(pvQueueData:PQueueData);
 begin
   try
-    if pvQueueData = nil then Exit;
-    if pvQueueData.Data = nil then Exit;
 
-    case pvQueueData.ReleaseAction of
-      raObjectFree : TObject(pvQueueData.Data).Free;
-      raFreeMem : FreeMem(pvQueueData.Data);
-      raDispose : Dispose(pvQueueData.Data);
+    if pvQueueData = nil then Exit;
+    if pvQueueData.ReleaseAction = raNone then Exit;
+
+
+    if pvQueueData.AsObject <> nil then
+    begin
+      case pvQueueData.ReleaseAction of
+        raObjectFree : pvQueueData.AsObject.Free;
+      end;
+    end else
+    begin
+      if pvQueueData.Data = nil then Exit;
+
+      case pvQueueData.ReleaseAction of
+        raObjectFree : TObject(pvQueueData.Data).Free;
+        raFreeMem : FreeMem(pvQueueData.Data);
+        raDispose : Dispose(pvQueueData.Data);
+      end;
     end;
   except
   end;
@@ -334,6 +350,20 @@ begin
   end;
 end;
 
+function TBaseQueue.DeQueueObject: TObject;
+var
+  lvTemp:PQueueData;
+begin
+  Result := nil;
+  lvTemp := InnerDeQueue;
+  if lvTemp <> nil then
+  begin
+    Result := lvTemp.AsObject;
+    lvTemp.AsObject := nil;
+    queueDataPool.Push(lvTemp);
+  end;
+end;
+
 procedure TBaseQueue.EnQueue(AData: Pointer; pvReleaseAction:
     TDataReleaseAction = raNone);
 var
@@ -341,20 +371,19 @@ var
 begin
   lvTemp := queueDataPool.Pop;
   lvTemp.Data := AData;
+  lvTemp.AsObject := nil;
   lvTemp.ReleaseAction := pvReleaseAction;
   InnerAddToTail(lvTemp);
 end;
 
-procedure TBaseQueue.EnQueue(AData: TObject; pvReleaseAction:
+procedure TBaseQueue.EnQueueObject(AData: TObject; pvReleaseAction:
     TDataReleaseAction = raNone);
 var
   lvTemp:PQueueData;
 begin
   lvTemp := queueDataPool.Pop;
-  lvTemp.Data := AData;
-{$IFDEF NEXTGEN}
-  TObject(lvTemp.Data).__ObjAddRef;
-{$ENDIF}
+  lvTemp.Data := nil;
+  lvTemp.AsObject := AData;
   lvTemp.ReleaseAction := pvReleaseAction;
   InnerAddToTail(lvTemp);
 end;
@@ -454,7 +483,9 @@ begin
   FLocker.Leave;
 
   if Result = nil then
-    GetMem(Result, SizeOf(TQueueData));
+  begin
+    New(Result);
+  end;
   Result.Data := nil;
   Result.Next := nil;
 end;
@@ -480,7 +511,7 @@ begin
   
   if ADoFree then
   begin
-    FreeMem(pvQueueData);
+    Dispose(pvQueueData);
   end;
 end; 
 
