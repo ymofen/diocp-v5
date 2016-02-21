@@ -695,7 +695,7 @@ begin
         FreeAndNil(ADValue.Value.AsStream);
       vdtInterface:
         Dispose(ADValue.Value.AsInterface);
-      vdtPtr:
+      vdtObject, vdtPtr:
         ClearPointer;
       vdtArray:
         ClearArray;
@@ -1080,18 +1080,25 @@ begin
 end;
 
 function DValueGetAsInterface(ADValue:PDRawValue): IInterface;
+var
+  lvObj:TObject;
 begin
   case ADValue.ValueType of
     vdtUnset, vdtNull:
       Result := nil;
     vdtInterface:
       Result :=  ADValue.Value.AsInterface^;
-    vdtPtr:
+    vdtObject, vdtPtr:
       begin
         case ADValue.Value.PtrReleaseAction of
           praNone, praObjectFree:  // 引用对象，或者管理生命周期的对象
             begin
-              TObject(ADValue.Value.AsPointer).GetInterface(IInterface, Result);
+              lvObj :=TObject(ADValue.Value.AsPointer);
+              {$IFDEF NEXTGEN}
+              // 移动平台下AData的计数需要增加，以避免自动释放
+              lvObj.__ObjAddRef;
+              {$ENDIF}
+              lvObj.GetInterface(IInterface, Result);
             end;
           praDispose, praFreeMem:
             begin
@@ -1362,7 +1369,6 @@ procedure TDValue.BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction
     = faFree);
 begin
   FValue.BindObject(pvObject, pvFreeAction);
-
 end;
 
 procedure TDValue.CheckCreateChildren;

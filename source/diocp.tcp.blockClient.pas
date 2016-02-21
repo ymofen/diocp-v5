@@ -61,7 +61,6 @@ type
     FReadTimeOut: Integer;
     procedure SetActive(const Value: Boolean);
     
-    procedure CheckSocketResult(pvSocketResult:Integer);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -77,6 +76,7 @@ type
     ///  是否可以接收数据,如果返回true， 代表可以执行RecvBuffer接收数据
     /// </summary>
     function CanRecvBuffer(pvTimeOut:Integer): Boolean;
+    procedure CheckSocketResult(pvSocketResult:Integer);
 
     function ReceiveLength: Integer;
 
@@ -165,7 +165,7 @@ begin
   {$ENDIF}
 end;
 
-procedure TDiocpBlockTcpClient.CheckSocketResult(pvSocketResult: Integer);
+procedure TDiocpBlockTcpClient.CheckSocketResult(pvSocketResult:Integer);
 var
   lvErrorCode:Integer;
 begin

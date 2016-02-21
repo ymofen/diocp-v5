@@ -344,10 +344,6 @@ var
   r :Integer;
 begin
   r := ioctlsocket(FSocketHandle, FIONREAD, Cardinal(Result));
-  if r = -1 then
-  begin
-    Result := 0;
-  end;
 end;
 
 
