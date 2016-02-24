@@ -790,7 +790,13 @@ type
 function lock_cmp_exchange(cmp_val, new_val: Boolean; var target: Boolean):
     Boolean;
 
-  
+var
+  __diocp_logger:TSafeLogger;
+
+/// <summary>
+///   注册服务使用的SafeLogger
+/// </summary>
+procedure RegisterDiocpLogger(pvLogger:TSafeLogger);
 
 implementation
 
@@ -809,6 +815,9 @@ resourcestring
   strBindingIocpError = '[%d]绑定到IOCP句柄时出现了异常, 错误代码:%d, (%s)';
 
   strPushFail      = '[%d]压入到待发送队列失败, 队列信息: %d/%d';
+
+var
+  __innerLogger:TSafeLogger;
 
 //{$IFDEF DEBUG_ON}
 //procedure logDebugMessage(pvMsg: string; const args: array of const);
@@ -831,6 +840,19 @@ asm
   mov rax, rcx
   lock cmpxchg [r8], dl
 {$endif}
+end;
+
+procedure RegisterDiocpLogger(pvLogger:TSafeLogger);
+begin
+  if __diocp_logger <> pvLogger then
+  begin
+    __diocp_logger := pvLogger;
+    if __innerLogger <> nil then
+    begin
+      __innerLogger.Free;
+      __innerLogger := nil;
+    end;
+  end;
 end;
 
 
@@ -2742,5 +2764,16 @@ procedure TDiocpCustomContext.SetMaxSendingQueueSize(pvSize:Integer);
 begin
   FSendRequestLink.setMaxSize(pvSize);
 end;
+
+initialization
+  __innerLogger := TSafeLogger.Create();
+  __innerLogger.setAppender(TLogFileAppender.Create(True));
+  __diocp_logger := __innerLogger;
+
+finalization
+  if __innerLogger <> nil then
+  begin
+    __innerLogger.Free;
+  end;
 
 end.
