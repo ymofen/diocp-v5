@@ -19,7 +19,7 @@ unit utils.queues;
 interface
 
 uses
-  SyncObjs;
+  SyncObjs, SysUtils;
 
 {$IFDEF DEBUG}
   {$DEFINE DEBUG_ON}
@@ -231,13 +231,15 @@ end;
 
 destructor TBaseQueue.Destroy;
 begin
+  Clear;
   {$IFDEF DEBUG_ON}
   if IsDebugMode then
-    Assert(FPopCounter = FPushCounter, ('[' + FName + ']PopCounter <> PushCounter'));
-
+    Assert(FPopCounter = FPushCounter,
+      Format('[%s]PopCounter(%d) <> PushCounter(%d)', [FName, FPopCounter, FPushCounter])
+      );
   {$ENDIF}
 
-  Clear;
+
   FLocker.Free;
   inherited Destroy;
 end;
@@ -286,6 +288,9 @@ begin
     begin
       ANext := FHead.Next;
       __ReleaseQueueData(FHead);
+    {$IFDEF DEBUG_ON}
+      Inc(FPopCounter);
+    {$ENDIF}
       queueDataPool.Push(FHead);
       FHead := ANext;
     end; 
@@ -431,7 +436,7 @@ begin
     Inc(FCount);
 
     {$IFDEF DEBUG_ON}
-      Inc(FPushCounter);
+    Inc(FPushCounter);
     {$ENDIF}
 
   finally
@@ -505,10 +510,10 @@ begin
     Inc(FCount);
   end;
   {$IFDEF DEBUG_ON}
-    Inc(FPushCounter);
+  Inc(FPushCounter);
   {$ENDIF}
   FLocker.Leave;
-  
+
   if ADoFree then
   begin
     Dispose(pvQueueData);

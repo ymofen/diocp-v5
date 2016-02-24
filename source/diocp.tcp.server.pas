@@ -1503,7 +1503,7 @@ end;
 function TIocpClientContext.ReleaseSendRequest(
   pvObject: TIocpSendRequest): Boolean;
 begin
-  Result := FOwner.releaseSendRequest(pvObject);
+  Result := FOwner.ReleaseSendRequest(pvObject);
 end;
 
 procedure TIocpClientContext.RequestDisconnect(pvDebugInfo: string = ''; pvObj:
@@ -1514,7 +1514,7 @@ begin
   if not FActive then exit;
 
 {$IFDEF WRITE_LOG}
-  FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID);
+  FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID, lgvDebug);
 {$ENDIF}
 
   FContextLocker.lock('RequestDisconnect');
@@ -2640,7 +2640,8 @@ begin
       lvUseTime := lvContext.CheckWorkingTick;
       if lvUseTime > pvTimeOut then
       begin
-        Result := Result + Format('[%s:%d(%d)]:%s', [lvContext.RemoteAddr, lvContext.RemotePort, lvUseTime, lvContext.DebugInfo]) + sLineBreak;
+        Result := Result + Format('[%s:%d(t:%d)]:%s',
+          [lvContext.RemoteAddr, lvContext.RemotePort, lvUseTime, lvContext.DebugInfo]) + sLineBreak;
       end;
     end;
   finally
