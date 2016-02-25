@@ -224,6 +224,7 @@ type
     property Active: Boolean read FActive;
 
     property DefaultListener: TDiocpUdpListener read FDefaultListener;
+    property IocpEngine: TIocpEngine read FIocpEngine;
 
     property OnRecv: TDiocpUdpRecvRequestEvent read FOnRecv write FOnRecv;
   published

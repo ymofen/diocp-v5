@@ -24,7 +24,9 @@ uses
   , Posix.NetDB
   , Posix.Fcntl
   , Posix.SysSelect
-  , Posix.SysTime;
+  , Posix.SysTime
+  , Posix.StrOpts
+  , Posix.Errno;
 
 
 
@@ -66,7 +68,7 @@ type
     function ConnectTimeOut(const pvAddr: string; pvPort: Integer; pvMs:Cardinal):
         Boolean;
 
-    function RecvdCount: Integer;
+    function ReceiveLength: Integer;
 
 
     procedure SetConnectInfo(const pvAddr: string; pvPort: Integer);
@@ -132,6 +134,11 @@ type
 
 
 implementation
+
+function ioctlsocket(Socket: THandle; Request: Integer; var Data): Integer; inline;
+begin
+  Result := ioctl(Socket, Request, @Data);
+end;
 
 {$IFDEF POSIX}
 function TranslateTInAddrToString(var AInAddr): string;
@@ -536,10 +543,15 @@ begin
   Result := j;
 end;
 
-function TRawSocket.RecvdCount: Integer;
+function TRawSocket.ReceiveLength: Integer;
+var
+  r :Integer;
 begin
-  // Î´Íê³É
-  Result := 0;
+  r := ioctlsocket(FSocketHandle, FIONREAD, Cardinal(Result));
+  if r = -1 then
+  begin
+    Result := 0;
+  end;
 end;
 
 procedure TRawSocket.SetConnectInfo(const pvAddr: string; pvPort: Integer);

@@ -955,9 +955,9 @@ begin
       begin
         lvWorker := TIocpWorker(FWorkerList[i]);
 
-        if lvWorker.checkFlag(WORKER_ISBUSY) then
+        if lvWorker.CheckFlag(WORKER_ISBUSY) then
         begin
-          if GetTickCount - lvWorker.FLastRequest.FRespondStartTickCount > pvTimeOut then
+          if tick_diff(lvWorker.FLastRequest.FRespondStartTickCount, GetTickCount) > pvTimeOut then
           begin
             lvStrings.Add(Format(strDebug_WorkerTitle, [i + 1]));
             lvWorker.WriteStateINfo(lvStrings);

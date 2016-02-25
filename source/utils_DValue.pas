@@ -54,7 +54,7 @@ type
 
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
     vdtInteger, vdtInt64, vdtCurrency, vdtGuid, vdtDateTime,
-    vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtArray);
+    vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtObject, vdtArray);
 
   // 节点类型
   TDValueObjectType = (vntNull,        // 没有值
@@ -112,7 +112,7 @@ type
           AsPointer: Pointer;
           PtrReleaseAction: TPtrReleaseAction;
         );
-      26:
+      27:
         (AsInterface: PInterface);
 //      30:
 //        (
@@ -453,6 +453,8 @@ function DValueGetAsStringW(ADValue:PDRawValue): DStringW;
 
 procedure DValueBindPointerData(ADValue:PDRawValue; pvData:Pointer;
     pvReleaseAction:TPtrReleaseAction);
+procedure DValueBindObjectData(ADValue:PDRawValue; pvData:TObject;
+    pvReleaseAction:TPtrReleaseAction);
 function DValueGetAsObject(ADValue:PDRawValue): TObject;
 
 procedure DValueSetAsInterface(ADValue: PDRawValue; const pvValue:
@@ -476,6 +478,8 @@ function DValueGetAsBoolean(ADValue: PDRawValue): Boolean;
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW; overload;
 function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW; overload;
 
+procedure FreeObject(AObject: TObject);
+
 implementation
 
 resourcestring
@@ -492,8 +496,16 @@ resourcestring
 const
   DValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'Currency', 'Guid',
-    'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'Pointer', 'Array');
+    'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'Pointer', 'Object', 'Array');
 
+procedure FreeObject(AObject: TObject);
+begin
+{$IFDEF AUTOREFCOUNT}
+  AObject.DisposeOf;
+{$ELSE}
+  AObject.Free;
+{$ENDIF}
+end;
 
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW;
 const
@@ -655,7 +667,7 @@ procedure ClearDValue(ADValue:PDRawValue);
       praNone:;
       praObjectFree:
         begin
-          TObject(ADValue.Value.AsPointer).Free;
+          FreeObject(TObject(ADValue.Value.AsPointer));
         end;
       praDispose:
         begin
@@ -666,6 +678,7 @@ procedure ClearDValue(ADValue:PDRawValue);
           FreeMem(ADValue.Value.AsPointer);
         end;
     end;
+    ADValue.Value.AsPointer := nil;
   end;
 
 begin
@@ -682,7 +695,7 @@ begin
         FreeAndNil(ADValue.Value.AsStream);
       vdtInterface:
         Dispose(ADValue.Value.AsInterface);
-      vdtPtr:
+      vdtObject, vdtPtr:
         ClearPointer;
       vdtArray:
         ClearArray;
@@ -1014,11 +1027,29 @@ begin
   case ADValue.ValueType of
     vdtUnset, vdtNull:
       Result := nil;
+    vdtObject:
+      begin
+        Result :=  TObject(ADValue.Value.AsPointer);
+        {$IFDEF NEXTGEN}
+        // 移动平台下AData的计数需要增加，以避免自动释放
+        if Result <> nil then
+        begin
+          Result.__ObjAddRef;
+        end;
+        {$ENDIF}
+      end;
     vdtPtr:
       case ADValue.Value.PtrReleaseAction of
         praNone, praObjectFree:  // 引用对象，或者管理生命周期的对象
           begin
             Result :=  TObject(ADValue.Value.AsPointer);
+            {$IFDEF NEXTGEN}
+            // 移动平台下AData的计数需要增加，以避免自动释放
+            if Result <> nil then
+            begin
+              Result.__ObjAddRef;
+            end;
+            {$ENDIF}
           end;
         praDispose, praFreeMem:
           begin
@@ -1049,18 +1080,25 @@ begin
 end;
 
 function DValueGetAsInterface(ADValue:PDRawValue): IInterface;
+var
+  lvObj:TObject;
 begin
   case ADValue.ValueType of
     vdtUnset, vdtNull:
       Result := nil;
     vdtInterface:
       Result :=  ADValue.Value.AsInterface^;
-    vdtPtr:
+    vdtObject, vdtPtr:
       begin
         case ADValue.Value.PtrReleaseAction of
           praNone, praObjectFree:  // 引用对象，或者管理生命周期的对象
             begin
-              TObject(ADValue.Value.AsPointer).GetInterface(IInterface, Result);
+              lvObj :=TObject(ADValue.Value.AsPointer);
+              {$IFDEF NEXTGEN}
+              // 移动平台下AData的计数需要增加，以避免自动释放
+              lvObj.__ObjAddRef;
+              {$ENDIF}
+              lvObj.GetInterface(IInterface, Result);
             end;
           praDispose, praFreeMem:
             begin
@@ -1090,6 +1128,24 @@ begin
   begin
     CheckDValueSetType(ADValue, vdtPtr);
     ADValue.Value.AsPointer := pvData;
+    ADValue.Value.PtrReleaseAction := pvReleaseAction;
+  end;
+end;
+
+procedure DValueBindObjectData(ADValue:PDRawValue; pvData:TObject;
+    pvReleaseAction:TPtrReleaseAction);
+begin
+  if pvData = nil then
+  begin       // 清空
+    ClearDValue(ADValue);
+  end else
+  begin
+    CheckDValueSetType(ADValue, vdtObject);
+    ADValue.Value.AsPointer := pvData;
+{$IFDEF NEXTGEN}
+    // 移动平台下AData的计数需要增加，以避免自动释放
+    pvData.__ObjAddRef;
+{$ENDIF}
     ADValue.Value.PtrReleaseAction := pvReleaseAction;
   end;
 end;
@@ -1313,7 +1369,6 @@ procedure TDValue.BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction
     = faFree);
 begin
   FValue.BindObject(pvObject, pvFreeAction);
-
 end;
 
 procedure TDValue.CheckCreateChildren;

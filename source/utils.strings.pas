@@ -71,9 +71,11 @@ type
     FPosition: Integer;
     FMaxCapacity: Integer;
     FCapacity :Integer;
+    FLineBreak: String;
     procedure CheckNeedSize(pvSize:Integer);
     function GetLength: Integer;
   public
+    constructor Create;
     procedure Clear;
     function Append(c:Char): TDStringBuilder;  overload;
     function Append(str:string): TDStringBuilder; overload;
@@ -90,9 +92,100 @@ type
     function ToString: string;
     property Length: Integer read GetLength;
 
+    /// <summary>
+    ///   换行符: 默认#13#10
+    /// </summary>
+    property LineBreak: String read FLineBreak write FLineBreak;
 
 
-  
+
+  end;
+
+
+  TDBufferBuilder = class(TObject)
+  private
+    FData: TBytes;
+    FReadPosition: Integer;
+    FWritePosition: Integer;
+    FMaxCapacity: Integer;
+    FCapacity :Integer;
+    FBufferLocked:Boolean;
+    FLineBreak: String;
+    procedure CheckNeedSize(pvSize:Integer);
+    function GetLength: Integer;
+    function GetRemain: Integer;
+  public
+    constructor Create;
+    procedure Clear;
+    function Append(const c: Char): TDBufferBuilder; overload;
+    function Append(str:string): TDBufferBuilder; overload;
+    function Append(str:string; pvLeftStr:string; pvRightStr:String):
+        TDBufferBuilder; overload;
+    function Append(v: Boolean; UseBoolStrs: Boolean = True): TDBufferBuilder;
+        overload;
+    function Append(v:Integer): TDBufferBuilder; overload;
+    function Append(v:Double): TDBufferBuilder; overload;
+    function AppendQuoteStr(str:string): TDBufferBuilder;
+    function AppendSingleQuoteStr(str:string): TDBufferBuilder;
+    function AppendLine(str:string): TDBufferBuilder;
+
+    /// <summary>
+    ///   写入数据
+    /// </summary>
+    function AppendBuffer(pvBuffer:PByte; pvLength:Integer): TDBufferBuilder;
+
+    /// <summary>
+    ///   读取数据
+    /// </summary>
+    function ReadBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
+
+    /// <summary>
+    ///   读取一个字节
+    /// </summary>
+    function ReadByte(var vByte: Byte): Boolean;
+
+    /// <summary>
+    ///   提前获取并且锁定一块Buffer
+    /// </summary>
+    function GetLockBuffer(pvLength:Integer): PByte;
+
+    /// <summary>
+    ///    释放最后一次锁定的Buffer, 并且写入指定长度的数据
+    /// </summary>
+    function ReleaseLockBuffer(pvLength:Integer): TDBufferBuilder;
+
+    /// <summary>
+    ///   整个数据(不移动数据指针)
+    /// </summary>
+    function ToBytes: TBytes;
+
+    /// <summary>
+    ///   数据内存指针
+    /// </summary>
+    function Memory: PByte;
+
+    /// <summary>
+    ///   重新排列可用数据
+    /// </summary>
+    function ReArrange: TDBufferBuilder;
+
+    /// <summary>
+    ///   所有数据长度
+    /// </summary>
+    property Length: Integer read GetLength;
+    /// <summary>
+    ///   换行符: 默认#13#10
+    /// </summary>
+    property LineBreak: String read FLineBreak write FLineBreak;
+
+    /// <summary>
+    ///   剩余数据长度
+    /// </summary>
+    property Remain: Integer read GetRemain;
+
+
+
+
   end;
 
 
@@ -966,6 +1059,12 @@ begin
 {$ENDIF}
 end;
 
+constructor TDStringBuilder.Create;
+begin
+  inherited Create;
+  FLineBreak := Char(13) + Char(10);
+end;
+
 function TDStringBuilder.Append(c:Char): TDStringBuilder;
 begin
   CheckNeedSize(1);
@@ -982,7 +1081,12 @@ begin
   l := System.Length(str);
   if l = 0 then Exit;
   CheckNeedSize(l);
+{$IFDEF UNICODE}
+  Move(PChar(str)^, FData[FPosition], l shl 1);
+{$ELSE}
   Move(PChar(str)^, FData[FPosition], l);
+{$ENDIF}
+
   Inc(FPosition, l);
 
 end;
@@ -1011,7 +1115,7 @@ end;
 
 function TDStringBuilder.AppendLine(str:string): TDStringBuilder;
 begin
-  Result := Append(Str).Append(sLineBreak);
+  Result := Append(Str).Append(FLineBreak);
 end;
 
 function TDStringBuilder.AppendQuoteStr(str:string): TDStringBuilder;
@@ -1052,7 +1156,191 @@ var
 begin
   l := Length;
   SetLength(Result, l);
+{$IFDEF UNICODE}
+  Move(FData[0], PChar(Result)^, l shl 1);
+{$ELSE}
   Move(FData[0], PChar(Result)^, l);
+{$ENDIF}
+end;
+
+constructor TDBufferBuilder.Create;
+begin
+  inherited Create;
+  FLineBreak := #13#10;
+end;
+
+function TDBufferBuilder.Append(const c: Char): TDBufferBuilder;
+begin
+{$IFDEF UNICODE}
+  Result := AppendBuffer(@c, SizeOf(c));
+//  CheckNeedSize(2);
+//  Move(c, FData[FWritePosition], 2);
+//  Inc(FWritePosition, 2);
+//  Result := Self;
+{$ELSE}
+  Result := AppendBuffer(@c, SizeOf(c));
+//  CheckNeedSize(1);
+//  FData[FWritePosition] := c;
+//  Inc(FWritePosition);
+//  Result := Self;
+{$ENDIF}
+
+end;
+
+function TDBufferBuilder.Append(str:string): TDBufferBuilder;
+var
+  l:Integer;
+begin
+  Result := Self;
+  l := System.Length(str);
+  if l = 0 then Exit;
+{$IFDEF UNICODE}
+  l := l shl 1;
+{$ENDIF}
+  Result := AppendBuffer(PByte(Str), l);
+
+//
+//  CheckNeedSize(l);
+//  Move(PChar(str)^, FData[FWritePosition], l);
+//  Inc(FWritePosition, l);
+end;
+
+function TDBufferBuilder.Append(v: Boolean; UseBoolStrs: Boolean = True):
+    TDBufferBuilder;
+begin
+  Result := Append(BoolToStr(v, UseBoolStrs));
+end;
+
+function TDBufferBuilder.Append(v:Integer): TDBufferBuilder;
+begin
+  Result :=Append(IntToStr(v));
+end;
+
+function TDBufferBuilder.Append(v:Double): TDBufferBuilder;
+begin
+  Result := Append(FloatToStr(v));
+end;
+
+function TDBufferBuilder.Append(str:string; pvLeftStr:string;
+    pvRightStr:String): TDBufferBuilder;
+begin
+  Result := Append(pvLeftStr).Append(str).Append(pvRightStr);
+end;
+
+function TDBufferBuilder.AppendBuffer(pvBuffer:PByte; pvLength:Integer):
+    TDBufferBuilder;
+begin
+  if FBufferLocked then
+  begin
+    raise Exception.Create('Buffer Locked');
+  end;
+  CheckNeedSize(pvLength);
+  Move(pvBuffer^, FData[FWritePosition], pvLength);
+  Inc(FWritePosition, pvLength);
+  Result := Self;
+end;
+
+function TDBufferBuilder.AppendLine(str:string): TDBufferBuilder;
+begin
+  Result := Append(Str).Append(FLineBreak);
+end;
+
+function TDBufferBuilder.AppendQuoteStr(str:string): TDBufferBuilder;
+begin
+  Result := Append('"').Append(str).Append('"');
+end;
+
+function TDBufferBuilder.AppendSingleQuoteStr(str:string): TDBufferBuilder;
+begin
+  Result := Append('''').Append(str).Append('''');
+end;
+
+procedure TDBufferBuilder.CheckNeedSize(pvSize:Integer);
+var
+  lvCapacity:Integer;
+begin
+  if FWritePosition + pvSize > FCapacity then
+  begin
+    lvCapacity := (FWritePosition + pvSize + (STRING_BLOCK_SIZE - 1)) AND (not (STRING_BLOCK_SIZE - 1));
+    FCapacity := lvCapacity;
+    SetLength(FData, FCapacity);
+  end;
+end;
+
+procedure TDBufferBuilder.Clear;
+begin
+  FWritePosition := 0;
+  FReadPosition := 0;
+end;
+
+function TDBufferBuilder.ReArrange: TDBufferBuilder;
+var
+  lvOffset:Integer;
+begin
+  lvOffset := FReadPosition;
+  Move(FData[FReadPosition], FData[0], Remain);
+  Result := Self;
+  Dec(FWritePosition, lvOffset);
+  FReadPosition := 0;
+end;
+
+function TDBufferBuilder.GetLength: Integer;
+begin
+  Result := FWritePosition;
+end;
+
+function TDBufferBuilder.GetLockBuffer(pvLength:Integer): PByte;
+begin
+  CheckNeedSize(pvLength);
+  Result := @FData[FWritePosition];
+  FBufferLocked := True;
+end;
+
+function TDBufferBuilder.GetRemain: Integer;
+begin
+  Result := FWritePosition - FReadPosition;
+end;
+
+function TDBufferBuilder.Memory: PByte;
+begin
+  Result := @FData[0];
+end;
+
+function TDBufferBuilder.ReadBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
+var
+  l:Integer;
+begin
+  Result := 0;
+  l := FWritePosition - FReadPosition;
+  if l = 0 then Exit;
+
+  if l > pvLength then l := pvLength;
+  Move(FData[FReadPosition], pvBuffer^, l);
+  Inc(FReadPosition, l);
+  Result := l;
+end;
+
+function TDBufferBuilder.ReadByte(var vByte: Byte): Boolean;
+begin
+  Result := False;
+  if Remain = 0 then Exit;
+
+  vByte :=  FData[FReadPosition];
+  Inc(FReadPosition);
+  Result := True;
+end;
+
+function TDBufferBuilder.ReleaseLockBuffer(pvLength:Integer): TDBufferBuilder;
+begin
+  Inc(FWritePosition, pvLength);
+  Result := Self;
+  FBufferLocked := False;
+end;
+
+function TDBufferBuilder.ToBytes: TBytes;
+begin
+  SetLength(Result, self.Length);
+  Move(FData[0], Result[0], self.Length);
 end;
 
 

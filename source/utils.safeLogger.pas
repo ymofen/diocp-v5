@@ -172,8 +172,9 @@ type
     function isWorking():Boolean;
     procedure DoWork();
 
-    procedure incWorkerCount;
+    procedure IncWorkerCount;
     procedure DecWorker(pvWorker: TLogWorker);
+    procedure ClearLogData;
   public
     procedure IncErrorCounter;
     procedure IncResponseCounter;
@@ -231,6 +232,9 @@ procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
 
 implementation
 
+resourcestring
+  STRING_ERR_POSTLOGERR = '投递日志信息[%s]时出现了异常:%s';
+  STRING_ERR_LOGERR = '记录日志信息时出现了异常:%s';
 
 var
   __dataObjectPool:TBaseQueue;
@@ -254,6 +258,16 @@ begin
   Result := TInterlocked.CompareExchange(Target, Value, Comparand);
 {$ENDIF}
 end;
+
+function AtomicInc(var Target: Integer): Integer;
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedIncrement(Target);
+{$ELSE}
+  Result := TInterlocked.Increment(Target);
+{$ENDIF}
+end;
+
 {$IFEND <XE5}
 
 {$IFDEF MSWINDOWS}
@@ -381,7 +395,8 @@ begin
   
   stopWorker(30000);
 
-  FDataQueue.FreeDataObject;
+  ClearLogData;
+
   FreeAndNil(FDataQueue);
   if FOwnsAppender then
   begin
@@ -396,6 +411,19 @@ begin
   FStateLocker.Free;
 {$ENDIF}
   inherited Destroy;
+end;
+
+procedure TSafeLogger.ClearLogData;
+var
+  lvPData:TLogDataObject;
+begin
+  while True do
+  begin
+    lvPData :=TLogDataObject(FDataQueue.DeQueueObject);
+    if lvPData = nil then Break;
+
+    __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+  end;
 end;
 
 {$IFDEF MSWINDOWS}
@@ -432,8 +460,11 @@ var
   lvPData:TLogDataObject;
 begin
   while self.FEnable do
-  begin 
-    if not FDataQueue.DeQueue(Pointer(lvPData)) then Break;
+  begin
+    lvPData :=TLogDataObject(FDataQueue.DeQueueObject);
+    if lvPData = nil then Break;
+
+    //if not FDataQueue.DeQueue(Pointer(lvPData)) then Break;
     if lvPData <> nil then
     begin
       try
@@ -442,7 +473,7 @@ begin
       except
         IncErrorCounter;
       end;
-      __dataObjectPool.EnQueue(lvPData);
+      __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
     end;
   end;
 end;
@@ -491,15 +522,13 @@ begin
   {$ENDIF}
 end;
 
-procedure TSafeLogger.incWorkerCount;
+procedure TSafeLogger.IncWorkerCount;
 begin
   {$IFDEF MSWINDOWS}
   InterlockedIncrement(FWorkerCounter);
   {$ELSE}
   TInterlocked.Increment(FWorkerCounter);
-
   {$ENDIF}
-
 end;
 
 
@@ -555,7 +584,7 @@ begin
   if not (pvLevel in FLogFilter) then Exit;
 
   try
-    lvPData := __dataObjectPool.DeQueue;
+    lvPData :=TLogDataObject(__dataObjectPool.DeQueueObject);
     if lvPData = nil then lvPData:=TLogDataObject.Create;
   {$IFDEF MSWINDOWS}
     lvPData.FThreadID := GetCurrentThreadId;
@@ -566,7 +595,9 @@ begin
     lvPData.FLogLevel := pvLevel;
     lvPData.FMsg := pvMsg;
     lvPData.FMsgType := pvMsgType;
-    FDataQueue.EnQueue(lvPData);
+    // dataQueue只引用对象
+    FDataQueue.EnQueueObject(lvPData, raNone);
+
   {$IFDEF MSWINDOWS}
     InterlockedIncrement(FPostCounter);
   {$ELSE}
@@ -590,8 +621,8 @@ begin
   except
     on E:Exception do
     begin
-      SafeWriteFileMsg('TSafeLogger.logMessage记录' + pvMsg +'异常:' + e.Message, 'SafeLogger异常_');
-    end;                                                                      
+      SafeWriteFileMsg(Format(STRING_ERR_POSTLOGERR, [pvMsg, e.Message]), 'sfLogger_err_');
+    end;
   end;
 end;
 
@@ -714,20 +745,22 @@ begin
         FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor(), succ';
         while not self.Terminated do
         begin
-
-          lvPData := nil;
-          FSafeLogger.FDataQueue.DeQueue(Pointer(lvPData));
+          lvPData :=TLogDataObject(FSafeLogger.FDataQueue.DeQueueObject);
           if lvPData = nil then Break;
 
           try
             FSafeLogger.FDebugData := lvPData;
             ExecuteLogData(lvPData);
           except
-            FSafeLogger.incErrorCounter;
+            on E:Exception do
+            begin
+              SafeWriteFileMsg(Format(STRING_ERR_LOGERR, [e.Message]), 'sfLogger_err_');
+              FSafeLogger.IncErrorCounter;
+            end;
           end;
           
           /// push back to logData pool
-          __dataObjectPool.EnQueue(lvPData);
+          __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
         end;
       end else if lvWaitResult = wrTimeout then
       begin
@@ -945,7 +978,7 @@ initialization
   __ProcessIDStr := IntToStr(GetCurrentProcessId);
   __GetThreadStackFunc := nil;
   __dataObjectPool := TBaseQueue.Create;
-  __dataObjectPool.Name := 'safeLoggerDataPool';
+  __dataObjectPool.Name := 'safeLogger.LogDataPool';
   sfLogger := TSafeLogger.Create();
   sfLogger.setAppender(TLogFileAppender.Create(True));
   {$IFDEF MSWINDOWS}
@@ -953,9 +986,11 @@ initialization
   {$ENDIF}
 
 finalization
-  __dataObjectPool.FreeDataObject;
-  __dataObjectPool.Free;
   sfLogger.Free;
+
+  //
+  __dataObjectPool.Free;
+
 
   {$IFDEF MSWINDOWS}
   {$ELSE}

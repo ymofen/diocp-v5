@@ -10,10 +10,15 @@ type
   TOnASyncEvent = procedure(pvASyncWorker: TASyncWorker) of object;
   TASyncWorker = class(TThread)
   private
+    FData: Pointer;
+    FDataObj: TObject;
     FOnAsyncEvent: TOnASyncEvent;
+    procedure SetDataObj(const Value: TObject);
   public
     constructor Create(AOnAsyncEvent: TOnASyncEvent);
     procedure Execute; override;
+    property Data: Pointer read FData write FData;
+    property DataObj: TObject read FDataObj write SetDataObj;     
   end;
 
   TASyncInvoker = class(TObject)
@@ -33,7 +38,8 @@ type
     property Terminated: Boolean read FTerminated write FTerminated;
   end;
 
-procedure ASyncInvoke(pvASyncProc:TOnASyncEvent);
+procedure ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
+    pvDataObject: TObject = nil);
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 
@@ -54,9 +60,15 @@ begin
     result := High(Cardinal) - tick_start + tick_end;
 end;
 
-procedure ASyncInvoke(pvASyncProc:TOnASyncEvent);
+procedure ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
+    pvDataObject: TObject = nil);
+var
+  lvWorker:TASyncWorker;
 begin
-  TASyncWorker.Create(pvASyncProc);
+  lvWorker := TASyncWorker.Create(pvASyncProc);
+  lvWorker.Data := pvData;
+  lvWorker.DataObj := pvDataObject;
+  lvWorker.Resume;
 end;
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
@@ -66,7 +78,7 @@ end;
 
 constructor TASyncWorker.Create(AOnAsyncEvent: TOnASyncEvent);
 begin
-  inherited Create(False);
+  inherited Create(True);
   FreeOnTerminate := True;
   FOnAsyncEvent := AOnAsyncEvent;
 end;
@@ -77,6 +89,11 @@ begin
   begin
     FOnAsyncEvent(Self);
   end;
+end;
+
+procedure TASyncWorker.SetDataObj(const Value: TObject);
+begin
+  FDataObj := Value;
 end;
 
 constructor TASyncInvoker.Create;

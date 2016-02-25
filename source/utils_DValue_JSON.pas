@@ -19,7 +19,6 @@ type
   end;
 
 function JSONParser(s: string; pvDValue: TDValue): Integer;
-
 function JSONEncode(v:TDValue): String;
 
 
@@ -33,9 +32,19 @@ function JSONSkipSpaceAndComment(var ptrData: PChar; pvParser: TJsonParser):
     Integer;forward;
 
 function CreateIndentBlock(pvLevel: Integer; pvBlockSize: Integer = 4): String;
+var
+  l:Integer;
+  i: Integer;
 begin
-  SetLength(Result, pvLevel * pvBlockSize);
-  FillChar(PChar(Result)^, pvLevel * pvBlockSize, ' ');
+  l := pvLevel * pvBlockSize;
+  SetLength(Result, l);
+  for i := Low(Result) to High(Result) do
+  begin
+    Result[i] := ' ';
+  end;
+
+  // fillchar有问题 UNICOPDE下面
+  //FillChar(Result[1], l, ' ');
 end;
 
 procedure JSONEncodeEx(v: TDValue; pvStringBuilder: TDStringBuilder; pvLevel:
