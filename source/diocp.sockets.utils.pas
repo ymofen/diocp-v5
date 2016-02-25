@@ -22,12 +22,10 @@ type
      IntPtr = Cardinal;
 {$ifend}
 
-
 // XE2 = 22
 {$if CompilerVersion < 23}
-type
    ULONG_PTR = Cardinal;
-{$ifelse}
+{$else}
    ULONG_PTR = NativeUInt;
 {$ifend}
 

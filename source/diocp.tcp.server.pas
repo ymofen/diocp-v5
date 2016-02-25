@@ -62,6 +62,9 @@ type
   TOnDataReceived = procedure(pvClientContext:TIocpClientContext;
       buf:Pointer; len:cardinal; errCode:Integer) of object;
 
+  TOnBufferEvent = procedure(pvContext: TIocpClientContext; pvBuff: Pointer; len:
+      Cardinal; pvBufferTag, pvErrorCode: Integer) of object;
+
   TOnContextAcceptEvent = procedure(pvSocket: THandle; pvAddr: String; pvPort:
       Integer; var vAllowAccept: Boolean) of object;
 
@@ -273,6 +276,8 @@ type
     procedure UnLock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
   protected
     procedure DoConnected;
+
+    procedure DoDisconnected;
 
     procedure DoCleanUp;virtual;
 
@@ -853,6 +858,7 @@ type
 
     FOnContextError: TOnContextError;
     FOnContextAccept: TOnContextAcceptEvent;
+    FOnSendBufferCompleted: TOnBufferEvent;
     FOnSendRequestResponse: TOnSendRequestResponse;
 
     FPort: Integer;
@@ -898,6 +904,9 @@ type
     function GetClientCount: Integer;
 
     procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
+
+    procedure DoSendBufferCompletedEvent(pvContext: TIocpClientContext; pvBuff:
+        Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
   public
 
     /// <summary>
@@ -1007,6 +1016,8 @@ type
 
 
     property Logger: TSafeLogger read FLogger;
+
+
   published
 
     /// <summary>
@@ -1054,6 +1065,12 @@ type
     /// </summary>
     property DefaultListenAddress: String read FDefaultListenAddress write
         FDefaultListenAddress;
+
+    /// <summary>
+    ///   发送的Buffer已经完成
+    /// </summary>
+    property OnSendBufferCompleted: TOnBufferEvent read FOnSendBufferCompleted
+        write FOnSendBufferCompleted;
 
     /// <summary>
     ///   默认侦听的端口
@@ -1266,7 +1283,7 @@ begin
         begin
           FOwner.FOnContextDisconnected(Self);
         end;
-        OnDisconnected;
+        DoDisconnected;
       end;
     except
     end;
@@ -1361,7 +1378,7 @@ begin
       end;
 
       lvRequest.CancelRequest;
-      FOwner.releaseSendRequest(lvRequest);
+      FOwner.ReleaseSendRequest(lvRequest);
     end else
     begin
       Break;
@@ -1691,6 +1708,11 @@ end;
 procedure TIocpClientContext.DoDisconnect;
 begin
   RequestDisconnect;
+end;
+
+procedure TIocpClientContext.DoDisconnected;
+begin
+  OnDisconnected;
 end;
 
 procedure TIocpClientContext.DoReceiveData;
@@ -2405,7 +2427,16 @@ begin
     begin
       InterlockedIncrement(FDataMoniter.FSendRequestReturnCounter);
     end;
+
+    if pvObject.FBuf <> nil then
+    begin
+      /// Buff处理完成, 响应事件
+      DoSendBufferCompletedEvent(pvObject.FClientContext, pvObject.FBuf, pvObject.FLen, pvObject.Tag, pvObject.ErrorCode);
+    end;
+
+    // 清理Buffer
     pvObject.DoCleanUp;
+    
     FSendRequestPool.EnQueue(pvObject);
     Result := true;
   end else
@@ -2615,6 +2646,23 @@ begin
   begin
     FDataMoniter := TIocpDataMonitor.Create;
   end;
+end;
+
+procedure TDiocpTcpServer.DoSendBufferCompletedEvent(pvContext:
+    TIocpClientContext; pvBuff: Pointer; len: Cardinal; pvBufferTag,
+    pvErrorCode: Integer);
+begin
+  if Assigned(FOnSendBufferCompleted) then
+  begin
+    try
+      FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvErrorCode);
+    except
+      on e:Exception do
+      begin
+        LogMessage('DoSendBufferCompletedEvent error:' + e.Message, '', lgvError);
+      end;
+    end;
+  end;  
 end;
 
 function TDiocpTcpServer.GetClientCount: Integer;
@@ -3566,6 +3614,8 @@ begin
       FClientContext.DoSendRequestCompleted(Self);
 
       FClientContext.PostNextSendRequest;
+
+
     end;
   finally
 //    if FClientContext = nil then
@@ -3573,7 +3623,7 @@ begin
 //      Assert(False);
 //      FReponseState := lvResponseState;
 //    end;
-    lvContext.decReferenceCounter('TIocpSendRequest.WSASendRequest.Response', Self);
+    lvContext.DecReferenceCounter('TIocpSendRequest.WSASendRequest.Response', Self);
   end;
 end;
 
@@ -3672,6 +3722,7 @@ begin
     end;
   end else
   begin
+    
     FOwner.releaseSendRequest(Self);
   end;
 end;

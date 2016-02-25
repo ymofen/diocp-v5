@@ -9,7 +9,7 @@ unit utils_BufferPool;
 interface
 
 uses
-  SyncObjs
+  SyncObjs, SysUtils
   {$IFDEF MSWINDOWS}
   , Windows
   {$ELSE}
@@ -44,7 +44,7 @@ type
 
 
 
-  TBufferBlock = packed record
+  TBufferBlock = record
     flag: Word;
     refcounter :Integer;
     next: PBufferBlock;
@@ -137,10 +137,15 @@ begin
   begin
     // + 2保护边界(可以检测内存越界写入)
     GetMem(Result, BLOCK_SIZE + ABuffPool.FBlockSize + protect_size);
+    {$IFDEF DEBUG}
     FillChar(Result^, BLOCK_SIZE + ABuffPool.FBlockSize + protect_size, 0);
+    {$ELSE}
+    FillChar(Result^, BLOCK_SIZE, 0);
+    {$ENDIF}
     lvBuffer := PBufferBlock(Result);
     lvBuffer.owner := ABuffPool;
     lvBuffer.flag := block_flag;
+
     AtomicInc(ABuffPool.FSize);
   end else
   begin
@@ -220,7 +225,8 @@ procedure FreeBufferPool(buffPool:PBufferPool);
 var
   lvBlock, lvNext:PBufferBlock;
 begin
-  Assert(buffPool.FGet = buffPool.FPut, 'DBuffer Leak');
+  Assert(buffPool.FGet = buffPool.FPut,
+    Format('DBuffer Leak, get:%d, put:%d', [buffPool.FGet, buffPool.FPut]));
 
   lvBlock := buffPool.FHead;
   while lvBlock <> nil do
