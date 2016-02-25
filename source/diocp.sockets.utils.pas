@@ -56,13 +56,14 @@ const
 
 
 
+// copy from dx10
 
 function CreateIoCompletionPort(FileHandle, ExistingCompletionPort: THandle;
-  CompletionKey:ULONG_PTR; NumberOfConcurrentThreads: DWORD): THandle; stdcall;
+  CompletionKey: ULONG_PTR; NumberOfConcurrentThreads: DWORD): THandle; stdcall;
 {$EXTERNALSYM CreateIoCompletionPort}
 
 function GetQueuedCompletionStatus(CompletionPort: THandle;
-  var lpNumberOfBytesTransferred, lpCompletionKey: ULONG_PTR;
+  var lpNumberOfBytesTransferred: DWORD; var lpCompletionKey: ULONG_PTR;
   var lpOverlapped: POverlapped; dwMilliseconds: DWORD): BOOL; stdcall;
 {$EXTERNALSYM GetQueuedCompletionStatus}
 

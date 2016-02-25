@@ -623,7 +623,7 @@ end;
 
 procedure TIocpWorker.Execute;
 var
-  lvBytesTransferred:ULONG_PTR;
+  lvBytesTransferred:DWORD;
   lvResultStatus:BOOL;
   lvErrCode:Integer;
   lpOverlapped:POVERLAPPEDEx;
