@@ -22,10 +22,13 @@ type
      IntPtr = Cardinal;
 {$ifend}
 
-// before delphi 2007
-{$if CompilerVersion < 18}
+
+// XE2 = 22
+{$if CompilerVersion < 23}
 type
-     ULONG_PTR = Cardinal;
+   ULONG_PTR = Cardinal;
+{$ifelse}
+   ULONG_PTR = NativeUInt;
 {$ifend}
 
 type
