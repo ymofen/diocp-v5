@@ -15,9 +15,9 @@ interface
 uses
   Windows, SysUtils, diocp.winapi.winsock2;
 
+type
 // 25:XE5
 {$IF CompilerVersion<=25}
-type
      NativeUInt = Cardinal;
      IntPtr = Cardinal;
 {$ifend}
