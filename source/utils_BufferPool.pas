@@ -82,7 +82,7 @@ begin
 {$ENDIF}
 end;
 
-function AtomicInc(var Target: Integer): Integer;
+function AtomicIncrement(var Target: Integer): Integer;
 begin
 {$IFDEF MSWINDOWS}
   Result := InterlockedIncrement(Target);
@@ -91,7 +91,7 @@ begin
 {$ENDIF}
 end;
 
-function AtomicDec(var Target: Integer): Integer;
+function AtomicDecrement(var Target: Integer): Integer;
 begin
 {$IFDEF MSWINDOWS}
   Result := InterlockedDecrement(Target);
@@ -146,14 +146,15 @@ begin
     lvBuffer.owner := ABuffPool;
     lvBuffer.flag := block_flag;
 
-    AtomicInc(ABuffPool.FSize);
+
+    AtomicIncrement(ABuffPool.FSize);
   end else
   begin
     Result := PByte(lvBuffer);
   end;     
 
   Inc(Result, BLOCK_SIZE);
-  AtomicInc(ABuffPool.FGet);
+  AtomicIncrement(ABuffPool.FGet);
 end;
 
 procedure FreeBuffer(pvBufBlock:PBufferBlock);
@@ -168,7 +169,7 @@ begin
   pvBufBlock.next := lvBuffer;
   lvOwner.FHead := pvBufBlock;
   lvOwner.FLocker.Leave;
-  AtomicInc(lvOwner.FPut);
+  AtomicIncrement(lvOwner.FPut);
 end;
 
 
@@ -182,8 +183,8 @@ begin
   Dec(lvBuffer, BLOCK_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
-  Result := AtomicInc(lvBlock.refcounter);
-  AtomicInc(lvBlock.owner.FAddRef);
+  Result := AtomicIncrement(lvBlock.refcounter);
+  AtomicIncrement(lvBlock.owner.FAddRef);
 end;
 
 function ReleaseRef(pvBuffer:PByte): Integer;
@@ -195,8 +196,8 @@ begin
   Dec(lvBuffer, BLOCK_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
-  Result := AtomicDec(lvBlock.refcounter);
-  AtomicInc(lvBlock.owner.FReleaseRef);
+  Result := AtomicDecrement(lvBlock.refcounter);
+  AtomicIncrement(lvBlock.owner.FReleaseRef);
   if Result = 0 then
   begin
     FreeBuffer(lvBlock);
