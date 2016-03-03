@@ -52,6 +52,8 @@ type
     FLocker:TCriticalSection;
     {$ENDIF}
 
+    FName:String;
+
   end;
 
 
@@ -90,6 +92,12 @@ procedure SpinLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_IN
 procedure SpinLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
 procedure SpinUnLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
 procedure SpinUnLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
+
+
+{$if CompilerVersion < 18} //before delphi 2007
+function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint; Comperand: Longint): Longint stdcall; external kernel32 name 'InterlockedCompareExchange';
+{$EXTERNALSYM InterlockedCompareExchange}
+{$ifend}
 
 implementation
 
@@ -312,7 +320,7 @@ var
   lvBlock, lvNext:PBufferBlock;
 begin
   Assert(buffPool.FGet = buffPool.FPut,
-    Format('DBuffer Leak, get:%d, put:%d', [buffPool.FGet, buffPool.FPut]));
+    Format('DBuffer-%s Leak, get:%d, put:%d', [buffPool.FName, buffPool.FGet, buffPool.FPut]));
 
   lvBlock := buffPool.FHead;
   while lvBlock <> nil do

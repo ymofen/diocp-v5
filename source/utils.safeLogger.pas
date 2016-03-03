@@ -23,6 +23,7 @@ uses
   {$ENDIF}
   ;
 
+
 type
 
   TLogLevel=(lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug);
@@ -229,6 +230,11 @@ var
   __GetThreadStackFunc: TThreadStackFunc;
 
 procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
+
+{$if CompilerVersion < 18} //before delphi 2007
+function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint; Comperand: Longint): Longint stdcall; external kernel32 name 'InterlockedCompareExchange';
+{$EXTERNALSYM InterlockedCompareExchange}
+{$ifend}
 
 implementation
 

@@ -79,6 +79,7 @@ object frmMain: TfrmMain
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
+    ExplicitTop = -6
     object btnDisconectAll: TButton
       Left = 216
       Top = 5
@@ -150,6 +151,15 @@ object frmMain: TfrmMain
       State = cbChecked
       TabOrder = 7
       OnClick = chkLogDetailsClick
+    end
+    object btnPoolInfo: TButton
+      Left = 671
+      Top = 33
+      Width = 106
+      Height = 25
+      Caption = #20869#23384#27744#20449#24687
+      TabOrder = 8
+      OnClick = btnPoolInfoClick
     end
   end
   object actlstMain: TActionList

@@ -158,6 +158,7 @@ type
     procedure SetBucketSize(pvBucketSize:Integer);
 
     procedure FreeAllDataAsObject();
+    procedure DisposeAllDataAsPointer;
 
     /// <summary>
     ///   将所有数据写入到List中
@@ -461,6 +462,26 @@ begin
   end;
 end;
 
+procedure TDHashTable.DisposeAllDataAsPointer;
+var
+  I:Integer;
+  lvBucket: PDHashData;
+begin
+  for I := 0 to High(FBuckets) do
+  begin
+    lvBucket := FBuckets[I];
+    while lvBucket<>nil do
+    begin
+      if lvBucket.Data <> nil then
+      begin
+        Dispose(lvBucket.Data);
+        lvBucket.Data :=nil;
+      end;
+      lvBucket:=lvBucket.Next;
+    end;
+  end;
+end;
+
 function TDHashTable.GetBuckets(AIndex: Cardinal): PDHashData;
 begin
   if (AIndex>=FBucketSize) then
@@ -543,6 +564,8 @@ begin
     end;
   end;   
 end;
+
+
 
 function TDHashTable.Exists(pvHashValue: TDHashValueType): Boolean;
 var

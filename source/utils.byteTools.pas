@@ -20,6 +20,10 @@ type
   IntPtr=Integer;
   {$IFEND IntPtr}
 
+  {$if CompilerVersion < 18} //before delphi 2007
+  TBytes = array of Byte;
+  {$ifend}
+
   TByteTools = class(TObject)
   public
      class function varToByteString(const v; len: Cardinal; Split: string = ' '):

@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp.tcp.server, ExtCtrls,
-  ComCtrls, utils.safeLogger;
+  ComCtrls, utils.safeLogger, utils_BufferPool;
 
 type
   TfrmMain = class(TForm)
@@ -33,12 +33,14 @@ type
     mmoPushData: TMemo;
     btnPushToAll: TButton;
     actPushToAll: TAction;
+    btnPoolInfo: TButton;
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
+    procedure btnPoolInfoClick(Sender: TObject);
     procedure btnPostWSACloseClick(Sender: TObject);
     procedure btnReOpenTestClick(Sender: TObject);
     procedure chkLogDetailsClick(Sender: TObject);
@@ -48,9 +50,14 @@ type
   private
     iCounter:Integer;
     FTcpServer: TDiocpTcpServer;
+    FPool:PBufferPool;
     procedure RefreshState;
     procedure OnRecvBuffer(pvClientContext:TIocpClientContext; buf:Pointer;
         len:cardinal; errCode:Integer);
+
+    procedure OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff: Pointer;
+        len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+
     procedure OnAccept(pvSocket: THandle; pvAddr: String; pvPort: Integer; var
         vAllowAccept: Boolean);
   public
@@ -81,11 +88,14 @@ begin
   FTcpServer.OnDataReceived := self.OnRecvBuffer;
   FTcpServer.OnContextAccept := OnAccept;
   FTcpServer.createDataMonitor;
+  FTcpServer.OnSendBufferCompleted := OnSendBufferCompleted;
+  FPool := NewBufferPool(FTcpServer.WSARecvBufferSize);
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
 end;
 
 destructor TfrmMain.Destroy;
 begin
+  FreeBufferPool(FPool);
   inherited Destroy;
 end;
 
@@ -164,6 +174,19 @@ begin
   ShowMessage(FTcpServer.IocpEngine.getWorkerStateInfo(0));
 end;
 
+procedure TfrmMain.btnPoolInfoClick(Sender: TObject);
+var
+  s:string;
+  r:Integer;
+begin
+  if FPool = nil then Exit;
+  s :=Format('get:%d, put:%d, addRef:%d, releaseRef:%d, size:%d',
+    [FPool.FGet, FPool.FPut, FPool.FAddRef, FPool.FReleaseRef, FPool.FSize]);
+  r := CheckBufferBounds(FPool);
+  s := s + sLineBreak + Format('池中共有:%d个内存块, 可能[%d]个内存块写入越界的情况', [FPool.FSize, r]);
+  ShowMessage(s);
+end;
+
 procedure TfrmMain.btnPostWSACloseClick(Sender: TObject);
 var
   lvList:TList;
@@ -212,6 +235,7 @@ procedure TfrmMain.OnRecvBuffer(pvClientContext:TIocpClientContext;
 var
   j, i:Integer;
   s:AnsiString;
+  lvBuff:PByte;
 begin
   if errCode = 0 then
   begin
@@ -219,12 +243,23 @@ begin
 //    SetLength(s, len);
 //    Move(buf^, s[1], len);
 //    sfLogger.logMessage(s);
-    pvClientContext.PostWSASendRequest(buf, len);
+    lvBuff := GetBuffer(FPool);
+
+    //
+    AddRef(lvBuff);
+
+    pvClientContext.PostWSASendRequest(lvBuff, len, dtNone);
 
   end else
   begin
     pvClientContext.RequestDisconnect;
   end;
+end;
+
+procedure TfrmMain.OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff:
+    Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+begin
+  ReleaseRef(pvBuff);
 end;
 
 procedure TfrmMain.tmrInfoTimer(Sender: TObject);
