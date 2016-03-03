@@ -60,6 +60,11 @@ type
   IntPtr=Integer;
   {$IFEND}
 
+  {$if CompilerVersion < 18} //before delphi 2007
+  TBytes = array of Byte;
+  {$ifend}
+
+
   TArrayStrings = array of string;
   PArrayStrings = ^ TArrayStrings;
 
@@ -139,6 +144,8 @@ type
     /// </summary>
     function ReadBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
 
+    function PeekBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
+
     /// <summary>
     ///   读取一个字节
     /// </summary>
@@ -173,6 +180,7 @@ type
     ///   所有数据长度
     /// </summary>
     property Length: Integer read GetLength;
+
     /// <summary>
     ///   换行符: 默认#13#10
     /// </summary>
@@ -404,7 +412,11 @@ function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;overload;
 /// </summary>
 function Utf8BytesToString(pvBytes: TBytes; pvOffset: Cardinal): String;
 
+function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
+
 function StringToUtf8Bytes(pvData:string): TBytes; overload;
+
+
 
 
 implementation
@@ -1059,6 +1071,29 @@ begin
 {$ENDIF}
 end;
 
+function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+  l:Cardinal;
+{$ELSE}
+var
+  lvBytes:TBytes;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  SetLength(lvBytes, pvLen);
+  Move(pvBuff^, lvBytes[0], pvLen);
+  Result := TEncoding.UTF8.GetString(lvBytes);
+  //Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
+{$ELSE}
+  l := pvLen;
+  SetLength(lvRawStr, l);
+  Move(pvBuff^, PansiChar(lvRawStr)^, l);
+  Result := UTF8Decode(lvRawStr);
+{$ENDIF}
+end;
+
 constructor TDStringBuilder.Create;
 begin
   inherited Create;
@@ -1304,6 +1339,19 @@ end;
 function TDBufferBuilder.Memory: PByte;
 begin
   Result := @FData[0];
+end;
+
+function TDBufferBuilder.PeekBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
+var
+  l:Integer;
+begin
+  Result := 0;
+  l := FWritePosition - FReadPosition;
+  if l = 0 then Exit;
+
+  if l > pvLength then l := pvLength;
+  Move(FData[FReadPosition], pvBuffer^, l);
+  Result := l;
 end;
 
 function TDBufferBuilder.ReadBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;

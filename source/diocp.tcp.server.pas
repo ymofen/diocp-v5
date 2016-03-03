@@ -2585,6 +2585,7 @@ begin
       // °ó¶¨ÕìÌý¶Ë¿Ú
       if not FListenSocket.Bind(FDefaultListenAddress, FPort) then
       begin
+        FListenSocket.Close(False);
         RaiseLastOSError;
       end;
 

@@ -73,13 +73,14 @@ type
     ///   0: 代表连接被优雅的关闭
     ///   > 0：收到的数据长度
     ///  -1: 接收错误
+    ///  -2: 接收超时
     /// </returns>
     /// <param name="buf"> (PAnsiChar) </param>
     /// <param name="len"> (Integer) </param>
     /// <param name="endBuf"> (PAnsiChar) </param>
     /// <param name="endBufLen"> (Integer) </param>
     function RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar; endBufLen:
-        Integer): Integer;
+        Integer; pvTimeOut: Cardinal = 30000): Integer;
 
 
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
@@ -123,6 +124,8 @@ type
     property SocketHandle: TSocket read FSocketHandle;
   end;
 
+function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+
 var
   __DebugWSACreateCounter:Integer;
 
@@ -134,6 +137,14 @@ implementation
 
 var
   __WSAStartupDone:Boolean;
+
+function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+begin
+  if tick_end >= tick_start then
+    result := tick_end - tick_start
+  else
+    result := High(Cardinal) - tick_start + tick_end;
+end;
 
 function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;
 var
@@ -327,16 +338,29 @@ begin
 end;
 
 function TRawSocket.Readable(pvTimeOut:Integer): Boolean;
+//var
+//  lvFDSet:TFDSet;
+//  lvTime_val: TTimeval;
 var
-  lvFDSet:TFDSet;
-  lvTime_val: TTimeval;
+  lvTick:Cardinal;
 begin
-  FD_ZERO(lvFDSet);
-  _FD_SET(FSocketHandle, lvFDSet);
+  lvTick := GetTickCount;
+  while (GetTickCount - lvTick) < pvTimeOut do
+  begin
+    Result := ReceiveLength > 0;
+    if Result then
+    begin
+      Break;
+    end;
+    Sleep(100);
+  end;
 
-  lvTime_val.tv_sec := pvTimeOut div 1000;
-  lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
-  Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
+//  FD_ZERO(lvFDSet);
+//  _FD_SET(FSocketHandle, lvFDSet);
+//
+//  lvTime_val.tv_sec := pvTimeOut div 1000;
+//  lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
+//  Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
 end;
 
 function TRawSocket.ReceiveLength: Integer;
@@ -354,43 +378,55 @@ begin
 end;
 
 function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;
-    endBufLen: Integer): Integer;
+    endBufLen: Integer; pvTimeOut: Cardinal = 30000): Integer;
 var
   lvRet, j:Integer;
   lvTempEndBuf:PAnsiChar;
   lvMatchCounter:Integer;
+  lvTick:Cardinal;
 begin
   lvTempEndBuf := endBuf;
   lvMatchCounter := 0;
   j:=0;
-  while j < len do
+  lvTick := GetTickCount;
+  while (j < len) do
   begin
-    lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
-    if lvRet = -1 then
+    if (tick_diff(lvTick, GetTickCount) > pvTimeOut) then
     begin
-      Result := lvRet;
-      exit;
-    end;
-    if lvRet = 0 then
-    begin  // 被关闭
-      Result := 0;
-      exit;
-    end;
-    inc(j);
-    if buf^ = lvTempEndBuf^ then
+      Result := -2;
+      Exit;
+    end else  if ReceiveLength > 0 then
     begin
-      Inc(lvMatchCounter);
-      Inc(lvTempEndBuf);
-      if lvMatchCounter = endBufLen then
-      begin    // 读取成功
-        Break;
+      lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
+      if lvRet = -1 then
+      begin
+        Result := lvRet;
+        exit;
       end;
+      if lvRet = 0 then
+      begin  // 被关闭
+        Result := 0;
+        exit;
+      end;
+      inc(j);
+      if buf^ = lvTempEndBuf^ then
+      begin
+        Inc(lvMatchCounter);
+        Inc(lvTempEndBuf);
+        if lvMatchCounter = endBufLen then
+        begin    // 读取成功
+          Break;
+        end;
+      end else
+      begin
+        lvTempEndBuf := endBuf;
+        lvMatchCounter := 0;
+      end;
+      inc(buf);
     end else
     begin
-      lvTempEndBuf := endBuf;
-      lvMatchCounter := 0;
+      Sleep(10);
     end;
-    inc(buf);
   end;
   Result := j;
 end;

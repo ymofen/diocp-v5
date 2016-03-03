@@ -8,6 +8,8 @@ unit utils_BufferPool;
 
 interface
 
+{$DEFINE USE_SPINLOCK}
+
 uses
   SyncObjs, SysUtils
   {$IFDEF MSWINDOWS}
@@ -15,6 +17,10 @@ uses
   {$ELSE}
 
   {$ENDIF};
+
+{$IF defined(FPC) or (RTLVersion>=18))}
+  {$DEFINE HAVE_INLINE}
+{$IFEND HAVE_INLINE}
 
 const
   block_flag :Word = $1DFB;
@@ -38,7 +44,13 @@ type
     FSize:Integer;
     FAddRef:Integer;
     FReleaseRef:Integer;
+
+    {$IFDEF USE_SPINLOCK}
+    FSpinLock:Integer;
+    FLockWaitCounter: Integer;
+    {$ELSE}
     FLocker:TCriticalSection;
+    {$ENDIF}
 
   end;
 
@@ -67,13 +79,64 @@ function ReleaseRef(pvBuffer:PByte): Integer;
 /// </summary>
 function CheckBufferBounds(ABuffPool:PBufferPool): Integer;
 
+{$IF RTLVersion<24}
+function AtomicCmpExchange(var Target: Integer; Value: Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+{$IFEND <XE5}
+
+procedure SpinLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+procedure SpinLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+procedure SpinUnLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
+procedure SpinUnLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
+
 implementation
+
+procedure SpinLock(var Target:Integer; var WaitCounter:Integer);
+begin
+  while AtomicCmpExchange(Target, 1, 0) <> 0 do
+  begin
+    AtomicIncrement(WaitCounter);
+//    {$IFDEF MSWINDOWS}
+//      SwitchToThread;
+//    {$ELSE}
+//      TThread.Yield;
+//    {$ENDIF}
+    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+  end;
+end;
+
+procedure SpinLock(var Target:Integer);
+begin
+  while AtomicCmpExchange(Target, 1, 0) <> 0 do
+  begin
+    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+  end;
+end;
+
+procedure SpinUnLock(var Target:Integer; var WaitCounter:Integer);
+begin
+  while AtomicCmpExchange(Target, 0, 1) <> 1 do
+  begin
+    AtomicIncrement(WaitCounter);
+    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+  end;
+end;
+
+procedure SpinUnLock(var Target:Integer); 
+begin
+  while AtomicCmpExchange(Target, 0, 1) <> 1 do
+  begin
+    Sleep(1);
+  end;
+end;
 
 
 
 {$IF RTLVersion<24}
 function AtomicCmpExchange(var Target: Integer; Value: Integer;
-  Comparand: Integer): Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
   Result := InterlockedCompareExchange(Target, Value, Comparand);
@@ -82,7 +145,7 @@ begin
 {$ENDIF}
 end;
 
-function AtomicIncrement(var Target: Integer): Integer;
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
   Result := InterlockedIncrement(Target);
@@ -91,7 +154,7 @@ begin
 {$ENDIF}
 end;
 
-function AtomicDecrement(var Target: Integer): Integer;
+function AtomicDecrement(var Target: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
   Result := InterlockedDecrement(Target);
@@ -128,10 +191,19 @@ function GetBuffer(ABuffPool:PBufferPool): PByte;
 var
   lvBuffer:PBufferBlock;
 begin
+  {$IFDEF USE_SPINLOCK}
+  SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
+  {$ELSE}
   ABuffPool.FLocker.Enter;
+  {$ENDIF}
   lvBuffer := PBufferBlock(ABuffPool.FHead);
   if lvBuffer <> nil then ABuffPool.FHead := lvBuffer.next;
+  {$IFDEF USE_SPINLOCK}
+  SpinUnLock(ABuffPool.FSpinLock);
+  {$ELSE}
   ABuffPool.FLocker.Leave;
+  {$ENDIF}
+
 
   if lvBuffer = nil then
   begin
@@ -163,12 +235,19 @@ var
   lvOwner:PBufferPool;
 begin
   lvOwner := pvBufBlock.owner;
-
+  {$IFDEF USE_SPINLOCK}
+  SpinLock(lvOwner.FSpinLock, lvOwner.FLockWaitCounter);
+  {$ELSE}
   lvOwner.FLocker.Enter;
+  {$ENDIF}
   lvBuffer := lvOwner.FHead;
   pvBufBlock.next := lvBuffer;
   lvOwner.FHead := pvBufBlock;
+  {$IFDEF USE_SPINLOCK}
+  SpinUnLock(lvOwner.FSpinLock);
+  {$ELSE}
   lvOwner.FLocker.Leave;
+  {$ENDIF}
   AtomicIncrement(lvOwner.FPut);
 end;
 
@@ -213,7 +292,13 @@ begin
   New(Result);
   Result.FBlockSize := pvBlockSize;
   Result.FHead := nil;
+  {$IFDEF USE_SPINLOCK}
+  Result.FSpinLock := 0;
+  Result.FLockWaitCounter := 0;
+  {$ELSE}
   Result.FLocker := TCriticalSection.Create;
+  {$ENDIF}
+
   Result.FGet := 0;
   Result.FSize := 0;
   Result.FPut := 0;
@@ -236,7 +321,12 @@ begin
     FreeMem(lvBlock);
     lvBlock := lvNext;
   end;
+  {$IFDEF USE_SPINLOCK}
+  ;
+  {$ELSE}
   buffPool.FLocker.Free;
+  {$ENDIF}
+
   Dispose(buffPool);
 end;
 
@@ -250,7 +340,11 @@ begin
     Result := -1;
     Exit;
   end;
+  {$IFDEF USE_SPINLOCK}
+  SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
+  {$ELSE}
   ABuffPool.FLocker.Enter;
+  {$ENDIF}
   lvBlock := ABuffPool.FHead;
   while lvBlock <> nil do
   begin
@@ -258,7 +352,11 @@ begin
 
     lvBlock := lvBlock.next;
   end;
+  {$IFDEF USE_SPINLOCK}
+  SpinUnLock(ABuffPool.FSpinLock);
+  {$ELSE}
   ABuffPool.FLocker.Leave;
+  {$ENDIF}
 end;
 
 
