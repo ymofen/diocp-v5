@@ -5,33 +5,41 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp.tcp.client,
-  utils.safeLogger, ComCtrls, diocp.sockets;
+  utils.safeLogger, ComCtrls, diocp.sockets, ExtCtrls;
 
 type
   TfrmMain = class(TForm)
-    btnConnect: TButton;
-    edtHost: TEdit;
-    edtPort: TEdit;
-    btnSendObject: TButton;
     PageControl1: TPageControl;
     TabSheet1: TTabSheet;
     tsMonitor: TTabSheet;
     mmoRecvMessage: TMemo;
     tsOperator: TTabSheet;
     mmoData: TMemo;
+    btnFill1K: TButton;
+    btnSendObject: TButton;
+    pnlTop: TPanel;
+    btnConnect: TButton;
+    edtHost: TEdit;
+    edtPort: TEdit;
     btnClose: TButton;
     btnCreate: TButton;
     edtCount: TEdit;
     chkSendData: TCheckBox;
-    btnFill1K: TButton;
+    chkRecvEcho: TCheckBox;
+    chkRecvOnLog: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnCreateClick(Sender: TObject);
     procedure btnFill1KClick(Sender: TObject);
+    procedure btnSendObjectClick(Sender: TObject);
+    procedure chkRecvEchoClick(Sender: TObject);
+    procedure chkRecvOnLogClick(Sender: TObject);
     procedure chkSendDataClick(Sender: TObject);
   private
     FSendDataOnConnected:Boolean;
+    FSendDataOnRecv:Boolean;
+    FRecvOnLog:Boolean;
     { Private declarations }
     FIocpClientSocket: TDiocpTcpClient;
 
@@ -61,6 +69,8 @@ uses
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited;
+  FSendDataOnRecv := chkRecvEcho.Checked;
+  FRecvOnLog := chkRecvOnLog.Checked;
   sfLogger.setAppender(TStringsAppender.Create(mmoRecvMessage.Lines));
   sfLogger.AppendInMainThread := true;
 
@@ -93,9 +103,9 @@ begin
   for i := 0 to FIocpClientSocket.Count-1 do
   begin
     FIocpClientSocket.Items[i].AutoReConnect := false;
-    FIocpClientSocket.Items[i].Close;
-
+    FIocpClientSocket.Items[i].Close; 
   end;
+  FIocpClientSocket.ClearContexts;
 end;
 
 procedure TfrmMain.btnConnectClick(Sender: TObject);
@@ -146,6 +156,29 @@ begin
   mmoData.Lines.Text :=  s;
 end;
 
+procedure TfrmMain.btnSendObjectClick(Sender: TObject);
+var
+  s:AnsiString;
+  i: Integer;
+begin  
+  s := mmoData.Lines.Text;
+
+  for i := 0 to FIocpClientSocket.Count - 1 do
+  begin
+    FIocpClientSocket.Items[i].PostWSASendRequest(PAnsiChar(s), Length(s));
+  end;
+end;
+
+procedure TfrmMain.chkRecvEchoClick(Sender: TObject);
+begin
+  FSendDataOnRecv := chkRecvEcho.Checked;
+end;
+
+procedure TfrmMain.chkRecvOnLogClick(Sender: TObject);
+begin
+  FRecvOnLog := chkRecvOnLog.Checked;
+end;
+
 procedure TfrmMain.chkSendDataClick(Sender: TObject);
 begin
   FSendDataOnConnected := chkSendData.Checked;
@@ -173,8 +206,15 @@ begin
   end;
   if pvErrorCode = 0 then
   begin
-    Sleep(0);
-    pvContext.PostWSASendRequest(buf, len);
+    if FSendDataOnRecv then
+    begin
+      Sleep(0);
+      pvContext.PostWSASendRequest(buf, len);
+    end;
+    if FRecvOnLog then
+    begin
+      sfLogger.logMessage(PAnsiChar(buf));
+    end;
   end else
   begin
     sfLogger.logMessage('recv err:%d', [pvErrorCode]);
