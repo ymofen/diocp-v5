@@ -33,3 +33,18 @@ A: 在编码层(TDiocpCoderTcpServer), 逻辑处理事件(OnContextAction), 是�
 
 Q: 同一个连接的OnContextAction会同时被多个线程触发吗？
 A：编码层的OnContextAction是排队处理的，底层接收到数据后交由注册的解码器进行解码, 解码成功后，放到任务队列，然后依次触发OnContextAction,所以同一个连接的OnContextAction同时只会有一个线程调用。
+
+Q: Diocp的断开日志
+A: Diocp在DEBUG模式下面会记录详细的日志。会记录每个连接断开的原因。如下
+   1> xxxx:[2824]投递发送数据请求时出现了错误。错误代码:10054
+     说明: 这种日志在发送数据的时候系统返回了错误代码，可以根据错误代码(如10054),查询到相应的错误信息。
+     MSDN上面SOCKET错误代码说明: https://msdn.microsoft.com/en-us/library/ms740668.aspx
+   2> xxxx: [720]响应接收请求时出现了错误。错误代码:64!
+     说明：这种日志在响应接收请求时系统返回的错误，根据错误代码查询响应的信息。
+   3> xxxx: [704]接收到0字节的数据,该连接将断开!
+     说明: 服务端接收到长度为0字节的数据，认为对方关闭了连接。服务端相应的会释放连接触发OnDiscconected函数。
+   4> xxxx :[812]执行[CheckNextSendRequest::lvRequest.ExecuteSend]失败: 处理投递发送请求数据包时,发现异步关闭请求(Request.Tag = -1)。进行关闭处理!
+     说明: 这种日志一般在服务端投递了异步关闭请求(PostWSAClose)时，会出现该日志。
+   上面列举的日志都是正常的，DIOCP只是记录详细情况，一遍出现问题时能有据可查，请勿惊慌。
+   * 中括号[]中的数字是连接对应的SocketHandle，是连接的套接字句柄。
+   

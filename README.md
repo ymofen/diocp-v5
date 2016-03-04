@@ -1,10 +1,87 @@
-diocp3
+diocp5
 ======
 
-delphi iocp model, iocp-engine, iocp-socket, iocp-task
+设置环境变量
+DIOCP5_HOME=E:\workspace\diocp-v5
+
+搜索路径
+$(DIOCP5_HOME)\Source
 
 
-2014-11-02 00:38:49
-  3.5.02: release
+目录说明:
+  samples                        下面是各种DEMO
+  source                         目录下面是源代码
+  
+可以先从下面的DEMO中了解diocp的工作原理
+  samples\ECHO
+  samples\simple 
 
 
+=======================================================
+关于文档帮助
+
+DIOCP QQ 群: 320641073  
+DIOCP官方社区: www.diocp.org
+=======================================================
+
+关于捐助：
+
+	DIOCP5遵循BSD协议，你可以任意的用于商业项目和自由的项目中而不用通知我，
+	如果你觉得DIOCP5对你有帮助而你刚好又想对DIOCP5进行捐助,请联系作者，或者直接进行捐助：
+
+	捐助的支付宝：
+	账号：ymofen@diocp.org
+	户名: 杨茂丰
+
+  
+FAQ.txt
+1.diocp-v5使用在哪里可以得到帮助
+  
+  http://www.diocp.org/?page_id=159
+  
+  可以浏览官方社区的一些基础说明,该文档会陆续进行整理。
+  
+
+
+2.diocp-v5怎么样编译DEMO  
+  <<关于DEMO的编译>>
+  http://www.diocp.org/?p=16
+  
+2.1 
+Q:在编译DiocpV5DEMO是编译不通过
+A:你编译DEMO的时候，把diocpv5\source加入到路径就好
+  不要把所有Source下的文件添加到工程,因为有一些文件是给android/ios平台用的当然不能在windows下面编译,
+  例如:diocp.core.rawPosixSocket.pas
+
+  
+  
+3.服务端避免不了和多线程打交道，请先好好熟悉多线程的基础知识和注意实现。下面有多线程的一些文章，请认真看看。
+  http://blog.qdac.cc/?p=890
+
+
+Q:服务端在线信息显示为何与实际有差异?
+Q:服务端许多死链接都显示在线?
+A:DIOCP默认关闭了心跳。所以会造成很多死链接，仍然显示在线，详细原因点击查看该文章：http://www.diocp.org/?p=189
+ (【DIOCP3-说明书】关于服务端的KeepAlive属性(心跳))
+
+ 
+Q: 在Diocp中我需要另外开线程去处理逻辑吗？
+A: 在编码层(TDiocpCoderTcpServer), 逻辑处理事件(OnContextAction), 是由DiocpTask/Qworker(编译开关(QDAC_QWorker)可以进行切换)驱动的，和底层的通信线程是不相干扰。所以在编码层不需要使用另外的线程池，来处理逻辑。
+
+Q: 同一个连接的OnContextAction会同时被多个线程触发吗？
+A：编码层的OnContextAction是排队处理的，底层接收到数据后交由注册的解码器进行解码, 解码成功后，放到任务队列，然后依次触发OnContextAction,所以同一个连接的OnContextAction同时只会有一个线程调用。
+
+Q: Diocp的断开日志
+A: Diocp在DEBUG模式下面会记录详细的日志。会记录每个连接断开的原因。如下
+   1> xxxx:[2824]投递发送数据请求时出现了错误。错误代码:10054
+     说明: 这种日志在发送数据的时候系统返回了错误代码，可以根据错误代码(如10054),查询到相应的错误信息。
+     MSDN上面SOCKET错误代码说明: https://msdn.microsoft.com/en-us/library/ms740668.aspx
+   2> xxxx: [720]响应接收请求时出现了错误。错误代码:64!
+     说明：这种日志在响应接收请求时系统返回的错误，根据错误代码查询响应的信息。
+   3> xxxx: [704]接收到0字节的数据,该连接将断开!
+     说明: 服务端接收到长度为0字节的数据，认为对方关闭了连接。服务端相应的会释放连接触发OnDiscconected函数。
+   4> xxxx :[812]执行[CheckNextSendRequest::lvRequest.ExecuteSend]失败: 处理投递发送请求数据包时,发现异步关闭请求(Request.Tag = -1)。进行关闭处理!
+     说明: 这种日志一般在服务端投递了异步关闭请求(PostWSAClose)时，会出现该日志。
+   上面列举的日志都是正常的，DIOCP只是记录详细情况，一遍出现问题时能有据可查，请勿惊慌。
+   * 中括号[]中的数字是连接对应的SocketHandle，是连接的套接字句柄。
+   

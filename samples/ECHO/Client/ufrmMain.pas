@@ -105,6 +105,7 @@ begin
     FIocpClientSocket.Items[i].AutoReConnect := false;
     FIocpClientSocket.Items[i].Close; 
   end;
+  FIocpClientSocket.WaitForContext(30000);
   FIocpClientSocket.ClearContexts;
 end;
 

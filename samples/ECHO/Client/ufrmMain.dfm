@@ -24,8 +24,6 @@ object frmMain: TfrmMain
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #26085#24535
-      ExplicitWidth = 787
-      ExplicitHeight = 264
       object mmoRecvMessage: TMemo
         Left = 0
         Top = 0
@@ -35,19 +33,21 @@ object frmMain: TfrmMain
         Lines.Strings = (
           'iocp tcp client demo')
         TabOrder = 0
-        ExplicitWidth = 787
-        ExplicitHeight = 264
       end
     end
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
       ExplicitWidth = 787
       ExplicitHeight = 264
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
       ExplicitWidth = 787
       ExplicitHeight = 264
       object mmoData: TMemo
@@ -86,7 +86,6 @@ object frmMain: TfrmMain
     Height = 79
     Align = alTop
     TabOrder = 1
-    ExplicitTop = -6
     object btnConnect: TButton
       Left = 278
       Top = 8
