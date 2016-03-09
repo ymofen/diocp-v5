@@ -395,7 +395,7 @@ begin
   l := StrToIntDef(lvTempStr, 0);
   if l > 0 then
   begin
-    FResponseBody.SetSize(l);
+    FResponseBody.Size := l;
     CheckRecv(FResponseBody.Memory, l);    
   end;
 

@@ -255,10 +255,23 @@ function StartWith(P:PChar; pvStart:PChar; pvIgnoreCase: Boolean = true):
 /// </summary>
 /// <returns>
 ///   返回截取到的字符串
+///   没有匹配到会返回空字符串
 /// </returns>
 /// <param name="p"> 源(字符串)开始的位置, 匹配成功会出现在pvSpliter的首次出现位置, 否则不会进行移动</param>
 /// <param name="pvChars"> (TSysCharSet) </param>
-function LeftUntil(var p:PChar; pvChars: TSysCharSet): string;
+function LeftUntil(var p:PChar; pvChars: TSysCharSet): string; overload;
+
+/// <summary>
+///   从左边开始截取字符
+/// </summary>
+/// <param name="vLeftStr">截取到的字符串</param>
+/// <returns>
+///    0: 截取成功(p停留在pvChars中首次出现的位置)
+///   -1: 匹配失败(p不会移动)
+/// </returns>
+/// <param name="p"> 源(字符串)开始的位置, 匹配成功会出现在pvChars的首次出现位置, 否则不会进行移动</param>
+function LeftUntil(var p: PChar; pvChars: TSysCharSet; var vLeftStr: string):
+    Integer; overload;
 
 
 /// <summary>
@@ -416,8 +429,8 @@ function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
 function StringToUtf8Bytes(pvData:string): TBytes; overload;
 
-
-
+function StringToBytes(pvData:String; pvBytes:TBytes): Integer;
+function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
 
 implementation
 
@@ -1071,6 +1084,34 @@ begin
 {$ENDIF}
 end;
 
+function StringToBytes(pvData:String; pvBytes:TBytes): Integer;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := TEncoding.Default.GetBytes(pvData, 1, Length(pvData), pvBytes, 0);
+{$ELSE}
+  lvRawStr := pvData;
+  Move(PAnsiChar(lvRawStr)^, pvBytes[0], Length(lvRawStr));
+{$ENDIF}
+end;
+
+function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := TEncoding.Default.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
+{$ELSE}
+  lvRawStr := StrPas(@pvBytes[pvOffset]);
+  Result := lvRawStr;
+{$ENDIF}
+end;
+
 function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 {$IFNDEF UNICODE}
 var
@@ -1092,6 +1133,44 @@ begin
   Move(pvBuff^, PansiChar(lvRawStr)^, l);
   Result := UTF8Decode(lvRawStr);
 {$ENDIF}
+end;
+
+function LeftUntil(var p: PChar; pvChars: TSysCharSet; var vLeftStr: string):
+    Integer;
+var
+  lvPTemp: PChar;
+  l:Integer;
+  lvMatched: Byte;
+begin
+  lvMatched := 0;
+  lvPTemp := p;
+  while lvPTemp^ <> #0 do
+  begin
+    if CharInSet(lvPTemp^, pvChars) then
+    begin            // 匹配到
+      lvMatched := 1;
+      Break;
+    end else
+      Inc(lvPTemp);
+  end;
+  if lvMatched = 0 then
+  begin   // 没有匹配到
+    Result := -1;
+  end else
+  begin   // 匹配到
+    l := lvPTemp-P;
+    SetLength(vLeftStr, l);
+    if SizeOf(Char) = 1 then
+    begin
+      Move(P^, PChar(vLeftStr)^, l);
+    end else
+    begin
+      l := l shl 1;
+      Move(P^, PChar(vLeftStr)^, l);
+    end;
+    P := lvPTemp;  // 跳转到新位置
+    Result := 0;
+  end;
 end;
 
 constructor TDStringBuilder.Create;
