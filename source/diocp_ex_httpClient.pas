@@ -27,6 +27,8 @@ type
 
   TDiocpHttpClient = class(TComponent)
   private
+    FStringBuilder:TDStringBuilder;
+    FCustomeHeader: TStrings;
     FURL: TURL;
     FRawSocket: TRawSocket;
     FRequestAccept: String;
@@ -61,6 +63,7 @@ type
     procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
         Boolean);
 
+    property CustomeHeader: TStrings read FCustomeHeader;
     /// <summary>
     ///   请求参数:
     ///    接受数据的编码类型
@@ -95,6 +98,8 @@ type
     ///     Content-Type:text/html; charset=utf-8
     /// </summary>
     property ResponseContentType: String read FResponseContentType;
+
+
 
   end;
 
@@ -198,9 +203,12 @@ end;
 constructor TDiocpHttpClient.Create(AOwner: TComponent);
 begin
   inherited;
+  FStringBuilder := TDStringBuilder.Create;
   FRawSocket := TRawSocket.Create;
   FRequestBody := TMemoryStream.Create;
   FRequestHeader := TStringList.Create;
+  FCustomeHeader := TStringList.Create;
+  FCustomeHeader.NameValueSeparator := ':';
 
   FResponseBody := TMemoryStream.Create;
   FResponseHeader := TStringList.Create;
@@ -220,8 +228,10 @@ begin
   FResponseHeader.Free;
   FResponseBody.Free;
   FRequestHeader.Free;
+  FCustomeHeader.Free;
   FRequestBody.Free;
   FURL.Free;
+  FStringBuilder.Free;
   inherited;
 end;
 
@@ -303,8 +313,15 @@ begin
     RaiseLastOSError;
   end;
 
+  FStringBuilder.Clear;
+  FStringBuilder.Append(FRequestHeader.Text);
+  if FCustomeHeader.Count > 0 then
+  begin
+    FStringBuilder.Append(FCustomeHeader.Text);
+  end;
+  FStringBuilder.Append(FStringBuilder.LineBreak);
 {$IFDEF UNICODE}
-  lvRawHeader := TEncoding.Default.GetBytes(FRequestHeader.Text);
+  lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
   len := Length(lvRawHeader);
   r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
   CheckSocketResult(r);
@@ -313,7 +330,7 @@ begin
     raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
   end;
 {$ELSE}
-  lvRawHeader := FRequestHeader.Text;
+  lvRawHeader := FStringBuilder.ToString();
   len := Length(lvRawHeader);
   r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
   CheckSocketResult(r);
@@ -322,6 +339,26 @@ begin
     raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
   end;
 {$ENDIF}
+//
+//{$IFDEF UNICODE}
+//  lvRawHeader := TEncoding.Default.GetBytes(FRequestHeader.Text);
+//  len := Length(lvRawHeader);
+//  r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
+//  CheckSocketResult(r);
+//  if r <> len then
+//  begin
+//    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+//  end;
+//{$ELSE}
+//  lvRawHeader := FRequestHeader.Text;
+//  len := Length(lvRawHeader);
+//  r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
+//  CheckSocketResult(r);
+//  if r <> len then
+//  begin
+//    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+//  end;
+//{$ENDIF}
 
   InnerExecuteRecvResponse();
 end;
@@ -411,7 +448,7 @@ begin
   end;
   FRequestHeader.Add(Format('Content-Type: %s', [FRequestContentType]));
 
-  FRequestHeader.Add('');                 // 添加一个回车符
+  //FRequestHeader.Add('');                 // 添加一个回车符
 
   FRawSocket.CreateTcpSocket;
 
@@ -423,8 +460,15 @@ begin
     RaiseLastOSError;
   end;
 
+  FStringBuilder.Clear;
+  FStringBuilder.Append(FRequestHeader.Text);
+  if FCustomeHeader.Count > 0 then
+  begin
+    FStringBuilder.Append(FCustomeHeader.Text);
+  end;
+  FStringBuilder.Append(FStringBuilder.LineBreak);
 {$IFDEF UNICODE}
-  lvRawHeader := TEncoding.Default.GetBytes(FRequestHeader.Text);
+  lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
   len := Length(lvRawHeader);
   r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
   CheckSocketResult(r);
@@ -433,7 +477,7 @@ begin
     raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
   end;
 {$ELSE}
-  lvRawHeader := FRequestHeader.Text;
+  lvRawHeader := FStringBuilder.ToString();
   len := Length(lvRawHeader);
   r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
   CheckSocketResult(r);

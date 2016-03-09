@@ -35,13 +35,23 @@ function CreateIndentBlock(pvLevel: Integer; pvBlockSize: Integer = 4): String;
 var
   l:Integer;
   i: Integer;
+  lvPtr:PChar;
 begin
   l := pvLevel * pvBlockSize;
   SetLength(Result, l);
-  for i := Low(Result) to High(Result) do
+  
+  i := 0;
+  lvPtr := PChar(Result);
+  while i < l do
   begin
-    Result[i] := ' ';
+    lvPtr^ := ' ';
+    inc(lvPtr);
+    inc(i);
   end;
+//  for i := Low(Result) to High(Result) do
+//  begin
+//    Result[i] := ' ';
+//  end;
 
   // fillchar有问题 UNICOPDE下面
   //FillChar(Result[1], l, ' ');
