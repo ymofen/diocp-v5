@@ -434,6 +434,16 @@ function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
 
 function SpanPointer(const pvStart, pvEnd: PByte): Integer;
 
+function IsHexChar(c: Char): Boolean;
+
+function HexValue(c: Char): Integer;
+
+function HexChar(V: Byte): Char;
+
+function PickString(p: PChar; pvOffset, pvCount: Integer): String;
+
+
+
 implementation
 
 
@@ -457,6 +467,30 @@ begin
   Result := C in CharSet;
 end;
 {$ifend}
+
+function IsHexChar(c: Char): Boolean;
+begin
+  Result := ((c >= '0') and (c <= '9')) or ((c >= 'a') and (c <= 'f')) or
+    ((c >= 'A') and (c <= 'F'));
+end;
+
+function HexValue(c: Char): Integer;
+begin
+  if (c >= '0') and (c <= '9') then
+    Result := Ord(c) - Ord('0')
+  else if (c >= 'a') and (c <= 'f') then
+    Result := 10 + Ord(c) - Ord('a')
+  else
+    Result := 10 + Ord(c) - Ord('A');
+end;
+
+function HexChar(V: Byte): Char;
+begin
+  if V < 10 then
+    Result := Char(V + Ord('0'))
+  else
+    Result := Char(V - 10 + Ord('A'));
+end;
 
 
 function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
@@ -1178,6 +1212,17 @@ begin
     P := lvPTemp;  // 跳转到新位置
     Result := 0;
   end;
+end;
+
+function PickString(p: PChar; pvOffset, pvCount: Integer): String;
+begin
+  SetLength(Result, pvCount);
+  Inc(p, pvOffset);
+{$IFDEF UNICODE}
+  Move(PChar(Result)^, P^, pvCount shl 1);
+{$ELSE}
+  Move(PChar(Result)^, P^, pvCount);
+{$ENDIF}
 end;
 
 constructor TDStringBuilder.Create;

@@ -56,6 +56,8 @@ type
     vdtInteger, vdtInt64, vdtCurrency, vdtGuid, vdtDateTime,
     vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtObject, vdtArray);
 
+  TDValueDataTypes = set of TDValueDataType;
+
   // 节点类型
   TDValueObjectType = (vntNull,        // 没有值
                      vntArray,       // 列表-数组
@@ -805,6 +807,12 @@ begin
       Result := GuidToString(ADValue.Value.AsGuid^);
     vdtDateTime:
       Result := DTToStr(ADValue);
+    vdtObject:
+      Result := Format('@@object[$%p]', [ADValue.Value.AsPointer]);
+    vdtPtr:
+      Result := Format('@@Ptr[$%p]', [ADValue.Value.AsPointer]);
+    vdtInterface:
+      Result := Format('@@Interface[$%p]', [ADValue.Value.AsInterface]);
     vdtStream:
       begin
         SetLength(lvHexStr, TMemoryStream(ADValue.Value.AsStream).Size * 2);
@@ -1017,6 +1025,12 @@ begin
 
         Result := lvHexStr;
       end;
+    vdtObject:
+      Result := Format('@@object[$%p]', [ADValue.Value.AsPointer]);
+    vdtPtr:
+      Result := Format('@@Ptr[$%p]', [ADValue.Value.AsPointer]);
+    vdtInterface:
+      Result := Format('@@Interface[$%p]', [ADValue.Value.AsInterface]);
     vdtArray:
       Result := '@@Array';
   end;
@@ -1731,8 +1745,8 @@ procedure TDValueItem.BindObject(pvObject: TObject; pvFreeAction:
     TObjectFreeAction = faFree);
 begin
   case pvFreeAction of
-    faNone: DValueBindPointerData(@FRawValue, pvObject, praNone);
-    faFree: DValueBindPointerData(@FRawValue, pvObject, praObjectFree);
+    faNone: DValueBindObjectData(@FRawValue, pvObject, praNone);
+    faFree: DValueBindObjectData(@FRawValue, pvObject, praObjectFree);
   end;
 end;
 
