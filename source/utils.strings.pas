@@ -432,6 +432,8 @@ function StringToUtf8Bytes(pvData:string): TBytes; overload;
 function StringToBytes(pvData:String; pvBytes:TBytes): Integer;
 function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
 
+function SpanPointer(const pvStart, pvEnd: PByte): Integer;
+
 implementation
 
 
@@ -1133,6 +1135,11 @@ begin
   Move(pvBuff^, PansiChar(lvRawStr)^, l);
   Result := UTF8Decode(lvRawStr);
 {$ENDIF}
+end;
+
+function SpanPointer(const pvStart, pvEnd: PByte): Integer;
+begin
+  Result := Integer(pvEnd) - Integer(pvStart);
 end;
 
 function LeftUntil(var p: PChar; pvChars: TSysCharSet; var vLeftStr: string):
