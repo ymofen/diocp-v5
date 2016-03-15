@@ -41,6 +41,7 @@ type
     FResponseBody: TMemoryStream;
     FResponseContentType: String;
     FResponseHeader: TStringList;
+    FTimeOut: Integer;
     /// <summary>
     ///  CheckRecv buffer
     /// </summary>
@@ -99,6 +100,10 @@ type
     /// </summary>
     property ResponseContentType: String read FResponseContentType;
 
+    property TimeOut: Integer read FTimeOut write FTimeOut;
+
+
+
 
 
   end;
@@ -113,6 +118,10 @@ function ReadStringFromStream(pvStream: TStream; pvIsUtf8Raw:Boolean): String;
 implementation
 
 { TDiocpHttpClient }
+
+resourcestring
+  STRING_E_RECV_ZERO = '服务端主动断开关闭';
+  STRING_E_TIMEOUT   = '服务端响应超时';
 
 {$IFDEF POSIX}
 
@@ -213,6 +222,8 @@ begin
   FResponseBody := TMemoryStream.Create;
   FResponseHeader := TStringList.Create;
 
+  FTimeOut := 30000;
+
   FURL := TURL.Create;
 
 {$if CompilerVersion >= 18.5}
@@ -239,6 +250,11 @@ procedure TDiocpHttpClient.CheckSocketResult(pvSocketResult: Integer);
 var
   lvErrorCode:Integer;
 begin
+  if pvSocketResult = -2 then
+  begin
+    self.Close;
+    raise Exception.Create(STRING_E_TIMEOUT);
+  end;
   {$IFDEF POSIX}
   if (pvSocketResult = -1) or (pvSocketResult = 0) then
   begin
@@ -374,11 +390,12 @@ begin
   SetLength(lvRawHeader, 2048);
   FillChar(lvRawHeader[0], 2048, 0);
   //FRawSocket.SetReadTimeOut(3000);
-  r := FRawSocket.RecvBufEnd(@lvRawHeader[0], 2048, @HTTP_HEADER_END[0], 4);
+  r := FRawSocket.RecvBufEnd(@lvRawHeader[0], 2048, @HTTP_HEADER_END[0], 4, FTimeOut);
   if r = 0 then
   begin
     // 对方被关闭
     Close;
+    raise Exception.Create('与服务器断开连接！');
   end;
   // 检测是否有错误
   CheckSocketResult(r);
@@ -396,7 +413,7 @@ begin
   if l > 0 then
   begin
     FResponseBody.Size := l;
-    CheckRecv(FResponseBody.Memory, l);    
+    CheckRecv(FResponseBody.Memory, l);
   end;
 
   lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
@@ -513,7 +530,11 @@ begin
   while lvReadL < len do
   begin
     lvTempL := FRawSocket.RecvBuf(lvPBuf^, len - lvReadL);
-
+    if lvTempL = 0 then
+    begin
+      self.Close;
+      raise Exception.Create('与服务器断开连接！');
+    end;
     CheckSocketResult(lvTempL);
 
     lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));

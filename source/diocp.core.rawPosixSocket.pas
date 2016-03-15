@@ -20,6 +20,7 @@ interface
 
 uses
   SysUtils
+  , Classes
   , Posix.Base, Posix.SysSocket, Posix.arpainet, Posix.NetinetIn, Posix.UniStd
   , Posix.NetDB
   , Posix.Fcntl
@@ -57,7 +58,7 @@ type
     function RecvBuf(var data; const len: Cardinal): Integer;
     function PeekBuf(var data; const len: Cardinal): Integer;
     function RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte; endBufLen:
-        Integer): Integer;
+        Integer; pvTimeOut: Cardinal = 30000): Integer;
 
 
     function SendBuf(const data; const len: Cardinal): Integer;
@@ -501,16 +502,18 @@ begin
 end;
 
 function TRawSocket.RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte;
-    endBufLen: Integer): Integer;
+    endBufLen: Integer; pvTimeOut: Cardinal = 30000): Integer;
 var
   lvRecvByte:byte;
   lvRet, j:Integer;
   lvTempEndBuf:PByte;
   lvMatchCounter:Integer;
+  lvTick:Cardinal;
 begin
   lvTempEndBuf := endBuf;
   lvMatchCounter := 0;
   j:=0;
+  lvTick := TThread.GetTickCount;
   while j < len do
   begin
     lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节

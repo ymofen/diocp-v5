@@ -503,6 +503,16 @@ type
     FSendRequestOutCounter: Integer;
     FSendRequestReturnCounter: Integer;
 
+    // 记录开始时间点
+    FLastSpeedTick : Cardinal;
+
+    // 记录开始时间点_数据
+    FLastSpeed_WSASendResponse: Int64;
+    FLastSpeed_WSARecvResponse: Int64;
+
+    FSpeed_WSASendResponse: Int64;
+    FSpeed_WSARecvResponse: Int64;
+
     procedure incSentSize(pvSize:Cardinal);
     procedure incPostWSASendSize(pvSize:Cardinal);
     procedure incRecvdSize(pvSize:Cardinal);
@@ -521,6 +531,15 @@ type
     destructor Destroy; override;
 
     procedure clear;
+    /// <summary>
+    ///   统计数据，计算时间信息
+    /// </summary>
+    procedure SpeedCalcuEnd;
+    /// <summary>
+    ///  开始统计速度
+    ///  记录当前信息
+    /// </summary>
+    procedure SpeedCalcuStart;
 
     property PushSendQueueCounter: Integer read FPushSendQueueCounter;
     property PostSendObjectCounter: Integer read FPostSendObjectCounter;
@@ -542,6 +561,8 @@ type
     property SendRequestOutCounter: Integer read FSendRequestOutCounter;
     property SendRequestReturnCounter: Integer read FSendRequestReturnCounter;
     property SentSize: Int64 read FSentSize;
+    property Speed_WSARecvResponse: Int64 read FSpeed_WSARecvResponse;
+    property Speed_WSASendResponse: Int64 read FSpeed_WSASendResponse;
   end;
 
   TContextDoublyLinked = class(TObject)
@@ -2479,6 +2500,33 @@ begin
   finally
     FLocker.Leave;
   end;
+end;
+
+procedure TIocpDataMonitor.SpeedCalcuEnd;
+var
+  lvTick:Cardinal;
+  lvSec:Double;
+begin
+  if FLastSpeedTick = 0 then exit;
+
+  lvTick := tick_diff(FLastSpeedTick, GetTickCount);
+  if lvTick = 0 then Exit;
+
+  lvSec := (lvTick / 1000.000);
+  if lvSec = 0 then Exit;
+
+  FSpeed_WSASendResponse := Trunc((FResponseWSASendCounter - FLastSpeed_WSASendResponse) / lvSec);
+
+
+  FSpeed_WSARecvResponse := Trunc((self.FResponseWSARecvCounter - FLastSpeed_WSARecvResponse) / lvSec);
+
+end;
+
+procedure TIocpDataMonitor.SpeedCalcuStart;
+begin
+  FLastSpeedTick := GetTickCount;
+  FLastSpeed_WSASendResponse := FResponseWSASendCounter;
+  FLastSpeed_WSARecvResponse := FResponseWSARecvCounter;
 end;
 
 procedure TContextDoublyLinked.add(pvContext: TDiocpCustomContext);

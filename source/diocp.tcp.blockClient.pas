@@ -123,6 +123,7 @@ implementation
 
 resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
+  STRING_E_TIMEOUT   = '服务端响应超时';
 
 constructor TDiocpBlockTcpClient.Create(AOwner: TComponent);
 begin
@@ -169,6 +170,11 @@ procedure TDiocpBlockTcpClient.CheckSocketResult(pvSocketResult:Integer);
 var
   lvErrorCode:Integer;
 begin
+  if pvSocketResult = -2 then
+  begin
+    self.Disconnect;
+    raise Exception.Create(STRING_E_TIMEOUT);
+  end;
   ///  Posix, fail return 0
   ///  ms_windows, fail return -1
   {$IFDEF POSIX}
