@@ -9,9 +9,14 @@ unit utils_dvalue_json;
 interface
 
 uses
-  utils_DValue, utils.strings;
+  utils_dvalue, utils.strings;
 
 type
+  TByteChar = record
+  case integer of
+    0: (a, b: Byte);
+    1: (c: WideChar);
+  end;
   TJsonParser = class(TObject)
   private
     FLastStrValue: String;
@@ -29,6 +34,8 @@ implementation
 
 uses
   SysUtils;
+
+
 
 resourcestring
   SCharNeeded = '当前位置应该是 "%s" ，而不是 "%s"。';
@@ -58,10 +65,10 @@ begin
   end;
 end;
 
-procedure JSONEscape(ABuilder: TDStringBuilder; const S: string; ADoEscape:
+procedure JSONEscape(ABuilder: TDStringBuilder; const S: DStringW; ADoEscape:
     Boolean);
 var
-  ps: PChar;
+  ps: PDCharW;
 const
   CharNum1: String = '1';
   CharNum0: String = '0';
@@ -75,7 +82,7 @@ const
   CharCode: String = '\u00';
   CharEscape: String = '\u';
 begin
-  ps := PChar(S);
+  ps := PDCharW(S);
   while ps^ <> #0 do
   begin
     case ps^ of
@@ -95,7 +102,10 @@ begin
         ABuilder.Append(CharQuoter);
     else
       begin
-        if ps^ < #$1F then
+        if (not ADoEscape) then
+        begin
+          ABuilder.Append(ps^);
+        end else if ps^ < #$1F then
         begin
           ABuilder.Append(CharCode);
           if ps^ > #$F then
@@ -103,8 +113,7 @@ begin
           else
             ABuilder.Append(CharNum0);
           ABuilder.Append(HexChar(Ord(ps^) and $0F));
-        end
-        else if (ps^ <= #$7E) or (not ADoEscape) then // 英文字符区
+        end else if (ps^ <= #$7E) then // 英文字符区
           ABuilder.Append(ps^)
         else
           ABuilder.Append(CharEscape).Append(HexChar((PWord(ps)^ shr 12) and $0F))
@@ -352,7 +361,6 @@ begin
         if IsHexChar(ptrData[1]) and IsHexChar(ptrData[2]) and IsHexChar(ptrData[3]) and
           IsHexChar(ptrData[4]) then
         begin
-
           s := WideChar((HexValue(ptrData[1]) shl 12) or (HexValue(ptrData[2]) shl 8)
             or (HexValue(ptrData[3]) shl 4) or HexValue(ptrData[4]));
           pvBuilder.Append(s);

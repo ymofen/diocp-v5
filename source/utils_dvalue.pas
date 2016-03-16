@@ -25,15 +25,24 @@ uses classes, sysutils, variants,
 type
 
   TDValueException = class(Exception);
-  
-{$IFDEF UNICODE}
+
+{$if (sizeof(Char) = 1)}
+  {$IFDEF FPC}
   DStringW = UnicodeString;
-{$ELSE}
+  {$ELSE}
   DStringW = WideString;
-{$ENDIF UNICODE}
+  {$ENDIF}
   DCharW = WideChar;
   PDCharW = PWideChar;
   PDStringW = ^DStringW;
+{$else}
+  DCharW = Char;
+  PDCharW = PChar;
+  DStringW = string;
+  PDStringW = ^DStringW;
+{$ifend}
+
+
   PInterface = ^IInterface;
 
   // XE5
@@ -295,7 +304,9 @@ type
     ///   本身作为一个vntObject添加一个子节点
     ///     如果之前不是vntObject类型，将会被清除
     /// </summary>
-    function Add: TDValue;
+    function Add: TDValue; overload;
+
+    function Add(pvName:String): TDValue; overload;
 
     /// <summary>
     ///   根据名称移除掉一个子对象
@@ -1368,7 +1379,16 @@ begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(vntValue);
   Result.FParent := Self;
-  FChildren.Add(Result); 
+  FChildren.Add(Result);
+end;
+
+function TDValue.Add(pvName:String): TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(vntValue);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
+  FChildren.Add(Result);
 end;
 
 function TDValue.AddArrayChild: TDValue;
