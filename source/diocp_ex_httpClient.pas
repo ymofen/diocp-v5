@@ -320,63 +320,66 @@ begin
   FRequestHeader.Add('');                 // 添加一个回车符
 
   FRawSocket.CreateTcpSocket;
+  try
+    // 进行域名解析
+    lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
 
-  // 进行域名解析
-  lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
+    if not FRawSocket.Connect(lvIpAddr,StrToIntDef(FURL.Port, 80)) then
+    begin
+      RaiseLastOSError;
+    end;
 
-  if not FRawSocket.Connect(lvIpAddr,StrToIntDef(FURL.Port, 80)) then
-  begin
-    RaiseLastOSError;
-  end;
+    FStringBuilder.Clear;
+    FStringBuilder.Append(FRequestHeader.Text);
+    if FCustomeHeader.Count > 0 then
+    begin
+      FStringBuilder.Append(FCustomeHeader.Text);
+    end;
+    FStringBuilder.Append(FStringBuilder.LineBreak);
+  {$IFDEF UNICODE}
+    lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
+    len := Length(lvRawHeader);
+    r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
+    CheckSocketResult(r);
+    if r <> len then
+    begin
+      raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+    end;
+  {$ELSE}
+    lvRawHeader := FStringBuilder.ToString();
+    len := Length(lvRawHeader);
+    r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
+    CheckSocketResult(r);
+    if r <> len then
+    begin
+      raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+    end;
+  {$ENDIF}
+  //
+  //{$IFDEF UNICODE}
+  //  lvRawHeader := TEncoding.Default.GetBytes(FRequestHeader.Text);
+  //  len := Length(lvRawHeader);
+  //  r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
+  //  CheckSocketResult(r);
+  //  if r <> len then
+  //  begin
+  //    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+  //  end;
+  //{$ELSE}
+  //  lvRawHeader := FRequestHeader.Text;
+  //  len := Length(lvRawHeader);
+  //  r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
+  //  CheckSocketResult(r);
+  //  if r <> len then
+  //  begin
+  //    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+  //  end;
+  //{$ENDIF}
 
-  FStringBuilder.Clear;
-  FStringBuilder.Append(FRequestHeader.Text);
-  if FCustomeHeader.Count > 0 then
-  begin
-    FStringBuilder.Append(FCustomeHeader.Text);
+    InnerExecuteRecvResponse();
+  finally
+    FRawSocket.Close(False);
   end;
-  FStringBuilder.Append(FStringBuilder.LineBreak);
-{$IFDEF UNICODE}
-  lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
-  len := Length(lvRawHeader);
-  r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
-  CheckSocketResult(r);
-  if r <> len then
-  begin
-    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-  end;
-{$ELSE}
-  lvRawHeader := FStringBuilder.ToString();
-  len := Length(lvRawHeader);
-  r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
-  CheckSocketResult(r);
-  if r <> len then
-  begin
-    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-  end;
-{$ENDIF}
-//
-//{$IFDEF UNICODE}
-//  lvRawHeader := TEncoding.Default.GetBytes(FRequestHeader.Text);
-//  len := Length(lvRawHeader);
-//  r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
-//  CheckSocketResult(r);
-//  if r <> len then
-//  begin
-//    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-//  end;
-//{$ELSE}
-//  lvRawHeader := FRequestHeader.Text;
-//  len := Length(lvRawHeader);
-//  r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
-//  CheckSocketResult(r);
-//  if r <> len then
-//  begin
-//    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-//  end;
-//{$ENDIF}
-
-  InnerExecuteRecvResponse();
 end;
 
 procedure TDiocpHttpClient.InnerExecuteRecvResponse;
@@ -425,8 +428,6 @@ begin
 
 
   
-
-  
   
   
 
@@ -468,55 +469,58 @@ begin
   //FRequestHeader.Add('');                 // 添加一个回车符
 
   FRawSocket.CreateTcpSocket;
-
-  // 进行域名解析
-  lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
+  try
+    // 进行域名解析
+    lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
   
-  if not FRawSocket.Connect(lvIpAddr,StrToIntDef(FURL.Port, 80)) then
-  begin
-    RaiseLastOSError;
-  end;
+    if not FRawSocket.Connect(lvIpAddr,StrToIntDef(FURL.Port, 80)) then
+    begin
+      RaiseLastOSError;
+    end;
 
-  FStringBuilder.Clear;
-  FStringBuilder.Append(FRequestHeader.Text);
-  if FCustomeHeader.Count > 0 then
-  begin
-    FStringBuilder.Append(FCustomeHeader.Text);
-  end;
-  FStringBuilder.Append(FStringBuilder.LineBreak);
-{$IFDEF UNICODE}
-  lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
-  len := Length(lvRawHeader);
-  r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
-  CheckSocketResult(r);
-  if r <> len then
-  begin
-    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-  end;
-{$ELSE}
-  lvRawHeader := FStringBuilder.ToString();
-  len := Length(lvRawHeader);
-  r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
-  CheckSocketResult(r);
-  if r <> len then
-  begin
-    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-  end;
-{$ENDIF}
-
-  // 发送请求数据体
-  if FRequestBody.Size > 0 then
-  begin
-    len := FRequestBody.Size;
-    r := FRawSocket.SendBuf(FRequestBody.Memory^, len);
+    FStringBuilder.Clear;
+    FStringBuilder.Append(FRequestHeader.Text);
+    if FCustomeHeader.Count > 0 then
+    begin
+      FStringBuilder.Append(FCustomeHeader.Text);
+    end;
+    FStringBuilder.Append(FStringBuilder.LineBreak);
+  {$IFDEF UNICODE}
+    lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
+    len := Length(lvRawHeader);
+    r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
     CheckSocketResult(r);
     if r <> len then
     begin
       raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
     end;
-  end;
+  {$ELSE}
+    lvRawHeader := FStringBuilder.ToString();
+    len := Length(lvRawHeader);
+    r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
+    CheckSocketResult(r);
+    if r <> len then
+    begin
+      raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+    end;
+  {$ENDIF}
 
-  InnerExecuteRecvResponse();
+    // 发送请求数据体
+    if FRequestBody.Size > 0 then
+    begin
+      len := FRequestBody.Size;
+      r := FRawSocket.SendBuf(FRequestBody.Memory^, len);
+      CheckSocketResult(r);
+      if r <> len then
+      begin
+        raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
+      end;
+    end;
+
+    InnerExecuteRecvResponse();
+  finally
+    FRawSocket.Close(False);
+  end;
 end;
 
 procedure TDiocpHttpClient.CheckRecv(buf: Pointer; len: cardinal);

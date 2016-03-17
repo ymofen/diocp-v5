@@ -49,6 +49,8 @@ type
     procedure Close(pvShutdown: Boolean = true);
     procedure CreateTcpSocket;
 
+    destructor Destroy; override;
+
     /// <summary>
     ///   create socket handle for overlapped
     /// </summary>
@@ -301,6 +303,12 @@ begin
     RaiseLastOSError;
   end;
   InterlockedIncrement(__DebugWSACreateCounter);
+end;
+
+destructor TRawSocket.Destroy;
+begin
+  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_SOCKET)), 'socket handle not closed!');
+  inherited;
 end;
 
 function TRawSocket.GetIpAddrByName(const host:string): String;

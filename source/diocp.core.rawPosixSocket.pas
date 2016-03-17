@@ -56,6 +56,8 @@ type
     procedure CreateTcpSocket;
     procedure CreateUdpSocket;
 
+    destructor Destroy; override;
+
     /// <summary>
     ///   -2:  ³¬Ê±
     /// </summary>
@@ -221,6 +223,12 @@ begin
 end;
 
 {$ENDIF}
+
+destructor TRawSocket.Destroy;
+begin
+  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_SOCKET)), 'socket handle not closed!');
+  inherited;
+end;
 
 { TRawSocket }
 
