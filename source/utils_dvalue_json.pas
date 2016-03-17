@@ -9,7 +9,7 @@ unit utils_dvalue_json;
 interface
 
 uses
-  utils_dvalue, utils.strings;
+  utils_dvalue, utils.strings, classes;
 
 type
   TByteChar = record
@@ -27,6 +27,8 @@ function JSONParser(s: string; pvDValue: TDValue): Integer;
 function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
     true; pvExceptValueTypes: TDValueDataTypes = [vdtInterface, vdtObject,
     vdtPtr]): String;
+
+function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
 
 
     
@@ -646,6 +648,15 @@ begin
   finally
     lvSB.Free;
   end;
+end;
+
+
+function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
+var
+  s:String;
+begin
+  s := LoadStringFromUtf8NoBOMFile(pvFile);
+  Result := JSONParser(s, pvDValue);
 end;
 
 end.

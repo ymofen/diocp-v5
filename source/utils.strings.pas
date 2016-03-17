@@ -442,6 +442,11 @@ function HexChar(V: Byte): Char;
 
 function PickString(p: PChar; pvOffset, pvCount: Integer): String;
 
+/// <summary>
+///  从Utf8无BOM格式的文件中加载字符串
+/// </summary>
+function LoadStringFromUtf8NoBOMFile(pvFile:string): String;
+
 
 
 implementation
@@ -1520,6 +1525,40 @@ function TDBufferBuilder.ToBytes: TBytes;
 begin
   SetLength(Result, self.Length);
   Move(FData[0], Result[0], self.Length);
+end;
+
+
+function LoadStringFromUtf8NoBOMFile(pvFile:string): String;
+var
+  lvStream: TMemoryStream;
+{$IFDEF UNICODE}
+  lvBytes:TBytes;
+{$ELSE}
+  lvStr: AnsiString;
+{$ENDIF}
+begin
+  if FileExists(pvFile) then
+  begin
+    lvStream := TMemoryStream.Create;
+    try
+      lvStream.LoadFromFile(pvFile);
+      lvStream.Position := 0;
+      {$IFDEF UNICODE}
+      SetLength(lvBytes, lvStream.Size);
+      lvStream.ReadBuffer(lvBytes[0], lvStream.Size);
+      Result := TEncoding.UTF8.GetString(lvBytes);
+      {$ELSE}
+      SetLength(lvStr, lvStream.Size);
+      lvStream.ReadBuffer(PAnsiChar(lvStr)^, lvStream.Size);
+      Result := UTF8Decode(lvStr);
+      {$ENDIF}
+    finally
+      lvStream.Free;
+    end;
+  end else
+  begin
+    Result := '';
+  end;
 end;
 
 
