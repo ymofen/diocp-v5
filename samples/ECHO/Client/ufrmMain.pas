@@ -27,6 +27,8 @@ type
     chkSendData: TCheckBox;
     chkRecvEcho: TCheckBox;
     chkRecvOnLog: TCheckBox;
+    btnClear: TButton;
+    procedure btnClearClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
@@ -94,6 +96,11 @@ begin
   FIocpClientSocket.Close;
   FIocpClientSocket.Free;
   inherited Destroy;
+end;
+
+procedure TfrmMain.btnClearClick(Sender: TObject);
+begin
+  mmoRecvMessage.Clear;
 end;
 
 procedure TfrmMain.btnCloseClick(Sender: TObject);
@@ -191,7 +198,7 @@ var
 begin
   if FSendDataOnConnected then
   begin
-    s := Trim(mmoData.Lines.Text);
+    s := mmoData.Lines.Text;
 
     pvContext.PostWSASendRequest(PAnsiChar(s), Length(s));
   end;
@@ -200,6 +207,8 @@ end;
 
 procedure TfrmMain.OnRecvdBuffer(pvContext: TDiocpCustomContext; buf: Pointer;
     len: cardinal; pvErrorCode: Integer);
+var
+  lvStr:AnsiString;
 begin
   if len = 0 then
   begin
@@ -214,7 +223,9 @@ begin
     end;
     if FRecvOnLog then
     begin
-      sfLogger.logMessage(PAnsiChar(buf));
+      SetLength(lvStr, len);
+      Move(buf^, PAnsiChar(lvStr)^, len);
+      sfLogger.logMessage(lvStr);
     end;
   end else
   begin

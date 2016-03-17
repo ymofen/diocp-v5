@@ -2,8 +2,8 @@ object frmMain: TfrmMain
   Left = 0
   Top = 0
   Caption = 'diocpv5 echo client'
-  ClientHeight = 356
-  ClientWidth = 811
+  ClientHeight = 430
+  ClientWidth = 844
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,18 +17,22 @@ object frmMain: TfrmMain
   object PageControl1: TPageControl
     Left = 0
     Top = 79
-    Width = 811
-    Height = 277
-    ActivePage = TabSheet1
+    Width = 844
+    Height = 351
+    ActivePage = tsOperator
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #26085#24535
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoRecvMessage: TMemo
         Left = 0
         Top = 0
-        Width = 803
-        Height = 249
+        Width = 836
+        Height = 323
         Align = alClient
         Lines.Strings = (
           'iocp tcp client demo')
@@ -40,16 +44,12 @@ object frmMain: TfrmMain
       ImageIndex = 1
       ExplicitLeft = 0
       ExplicitTop = 0
-      ExplicitWidth = 787
-      ExplicitHeight = 264
+      ExplicitWidth = 0
+      ExplicitHeight = 0
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 787
-      ExplicitHeight = 264
       object mmoData: TMemo
         Left = 3
         Top = 3
@@ -82,7 +82,7 @@ object frmMain: TfrmMain
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 811
+    Width = 844
     Height = 79
     Align = alTop
     TabOrder = 1
@@ -165,6 +165,15 @@ object frmMain: TfrmMain
       Caption = #25910#21040#25968#25454#35760#24405#26085#24535
       TabOrder = 8
       OnClick = chkRecvOnLogClick
+    end
+    object btnClear: TButton
+      Left = 8
+      Top = 48
+      Width = 75
+      Height = 25
+      Caption = #28165#31354#26085#24535
+      TabOrder = 9
+      OnClick = btnClearClick
     end
   end
 end
