@@ -291,7 +291,7 @@ end;
 
 function TDiocpBlockTcpClient.RecvBuffer(buf: Pointer; len: cardinal): Integer;
 begin
-  Result := FRawSocket.RecvBuf(buf^, len);
+  Result := FRawSocket.RecvBuf(buf^, len, FReadTimeOut);
   if Result = 0 then
   begin
     raise Exception.Create(STRING_E_RECV_ZERO);
@@ -302,7 +302,7 @@ end;
 function TDiocpBlockTcpClient.RecvBufferEnd(buf: Pointer; len: cardinal;
     endBuf: Pointer; endBufLen: Integer): Integer;
 begin
-  Result := FRawSocket.RecvBufEnd(buf, len, endBuf, endBufLen);
+  Result := FRawSocket.RecvBufEnd(buf, len, endBuf, endBufLen, FReadTimeOut);
   if Result = 0 then
   begin
     raise Exception.Create(STRING_E_RECV_ZERO);

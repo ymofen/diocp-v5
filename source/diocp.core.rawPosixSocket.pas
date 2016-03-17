@@ -532,6 +532,9 @@ begin
     begin
       Result := recv(FSocketHandle, data, len, 0);
       Exit;
+    end else
+    begin
+      Sleep(10);
     end;
   end;
 end;
