@@ -184,7 +184,7 @@ var
 function checkInitializeTaskManager(pvWorkerCount: Integer = 0;
     pvMaxWorkerCount: Word = 0): Boolean;
 
-procedure checkFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
+procedure CheckFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
 
 implementation
 
@@ -197,7 +197,7 @@ resourcestring
   strSignalAlreadyRegisted = '信号(%d)已经注册';
   strSignalUnRegister = '信号(%d)取消注册';
 
-procedure checkFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
+procedure CheckFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
 begin
   if pvData = nil then exit;
   if pvDataFreeType = ftNone then exit;
@@ -553,7 +553,7 @@ begin
   lvTaskWork := nil;
   if not FEnable then
   begin
-    checkFreeData(pvTaskData, pvDataFreeType);
+    CheckFreeData(pvTaskData, pvDataFreeType);
     exit;
   end;
 
@@ -563,7 +563,7 @@ begin
     lvSignalData := TSignalTaskData(FSignalTasks.FindFirstData(pvSignalID));
     if lvSignalData = nil then
     begin
-      checkFreeData(pvTaskData, pvDataFreeType);
+      CheckFreeData(pvTaskData, pvDataFreeType);
       raise Exception.CreateFmt(strSignalUnRegister, [pvSignalID]);
     end;
 
@@ -591,7 +591,7 @@ begin
     // if occur exception, push to requestPool.
     if lvRequest <> nil then requestPool.EnQueue(lvRequest);
 
-    checkFreeData(pvTaskData, pvDataFreeType);
+    CheckFreeData(pvTaskData, pvDataFreeType);
     raise;
   end;
 end;
@@ -609,12 +609,12 @@ end;
 constructor TIocpTaskRequest.Create;
 begin
   inherited Create;
-  FMessageEvent := TEvent.Create(nil, true, False, '');
+  //FMessageEvent := TEvent.Create(nil, true, False, '');
 end;
 
 destructor TIocpTaskRequest.Destroy;
 begin
-  FreeAndNil(FMessageEvent);
+  //FreeAndNil(FMessageEvent);
   inherited Destroy;
 end;
 
@@ -625,7 +625,7 @@ begin
   self.Remark := '';
   FOnTaskWork := nil;
   FRunInMainThreadType := rtSync;
-  FMessageEvent.ResetEvent;
+  if FMessageEvent <> nil then FMessageEvent.ResetEvent;
   FOwner := nil;
   FFreeType := ftNone;
 end;
@@ -662,6 +662,8 @@ begin
             end;
           rtPostMessage:
             begin
+              if FMessageEvent = nil then FMessageEvent := TEvent.Create(nil, true, False, '');
+
               FMessageEvent.ResetEvent;
               if PostMessage(FOwner.FMessageHandle, WM_REQUEST_TASK, WPARAM(Self), LPARAM(FMessageEvent)) then
               begin
@@ -684,7 +686,7 @@ begin
     end;
     FEndTime := GetTickCount;
   finally
-    checkFreeData(FTaskData, FFreeType);
+    CheckFreeData(FTaskData, FFreeType);
     requestPool.EnQueue(Self);
   end;
 end;
