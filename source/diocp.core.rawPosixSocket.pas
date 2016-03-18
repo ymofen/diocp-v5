@@ -226,7 +226,7 @@ end;
 
 destructor TRawSocket.Destroy;
 begin
-  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_SOCKET)), 'socket handle not closed!');
+  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_HANDLE_VALUE)), 'socket handle not closed!');
   inherited;
 end;
 

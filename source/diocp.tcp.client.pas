@@ -134,6 +134,7 @@ type
     ///   添加一个连对象
     /// </summary>
     function Add: TIocpRemoteContext;
+    function GetStateInfo: String;
 
     /// <summary>
     ///   总的连接对象数量
@@ -406,6 +407,101 @@ begin
   Result := TIocpRemoteContext(FList[pvIndex]);
 {$ENDIF}
 
+end;
+
+function TDiocpTcpClient.GetStateInfo: String;
+var
+  lvStrings:TStrings;
+begin
+  Result := '';
+  if DataMoniter = nil then Exit;
+
+  lvStrings := TStringList.Create;
+  try
+    if Active then
+    begin
+      lvStrings.Add(strState_Active);
+    end else
+    begin
+      lvStrings.Add(strState_Off);
+    end;
+
+
+    lvStrings.Add(Format(strRecv_PostInfo,
+         [
+           DataMoniter.PostWSARecvCounter,
+           DataMoniter.ResponseWSARecvCounter,
+           DataMoniter.PostWSARecvCounter -
+           DataMoniter.ResponseWSARecvCounter,
+           DataMoniter.Speed_WSARecvResponse
+         ]
+        ));
+
+
+    lvStrings.Add(Format(strRecv_SizeInfo, [TransByteSize(DataMoniter.RecvSize)]));
+
+
+    lvStrings.Add(Format(strSend_Info,
+       [
+         DataMoniter.PostWSASendCounter,
+         DataMoniter.ResponseWSASendCounter,
+         DataMoniter.PostWSASendCounter -
+         DataMoniter.ResponseWSASendCounter,
+         DataMoniter.Speed_WSASendResponse
+       ]
+      ));
+
+    lvStrings.Add(Format(strSendRequest_Info,
+       [
+         DataMoniter.SendRequestCreateCounter,
+         DataMoniter.SendRequestOutCounter,
+         DataMoniter.SendRequestReturnCounter
+       ]
+      ));
+
+    lvStrings.Add(Format(strSendQueue_Info,
+       [
+         DataMoniter.PushSendQueueCounter,
+         DataMoniter.PostSendObjectCounter,
+         DataMoniter.ResponseSendObjectCounter,
+         DataMoniter.SendRequestAbortCounter
+       ]
+      ));
+
+    lvStrings.Add(Format(strSend_SizeInfo, [TransByteSize(DataMoniter.SentSize)]));
+
+//    lvStrings.Add(Format(strAcceptEx_Info,
+//       [
+//         DataMoniter.PostWSAAcceptExCounter,
+//         DataMoniter.ResponseWSAAcceptExCounter
+//       ]
+//      ));
+
+//    lvStrings.Add(Format(strSocketHandle_Info,
+//       [
+//         DataMoniter.HandleCreateCounter,
+//         DataMoniter.HandleDestroyCounter
+//       ]
+//      ));
+
+//    lvStrings.Add(Format(strContext_Info,
+//       [
+//         DataMoniter.ContextCreateCounter,
+//         DataMoniter.ContextOutCounter,
+//         DataMoniter.ContextReturnCounter
+//       ]
+//      ));
+
+    lvStrings.Add(Format(strOnline_Info, [OnlineContextCount, 0]));
+  
+    lvStrings.Add(Format(strWorkers_Info, [WorkerCount]));
+
+    lvStrings.Add(Format(strRunTime_Info, [GetRunTimeINfo]));
+
+    Result := lvStrings.Text;
+  finally
+    lvStrings.Free;
+  end;
 end;
 
 procedure TDiocpTcpClient.OnReconnectRequestResponse(pvObject: TObject);

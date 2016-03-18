@@ -447,6 +447,8 @@ function PickString(p: PChar; pvOffset, pvCount: Integer): String;
 /// </summary>
 function LoadStringFromUtf8NoBOMFile(pvFile:string): String;
 
+procedure WriteStringToUtf8NoBOMFile(pvFile, pvData: String);
+
 
 
 implementation
@@ -1559,6 +1561,31 @@ begin
   begin
     Result := '';
   end;
+end;
+
+procedure WriteStringToUtf8NoBOMFile(pvFile, pvData: String);
+var
+  lvStream: TMemoryStream;
+{$IFDEF UNICODE}
+  lvBytes:TBytes;
+{$ELSE}
+  lvStr: AnsiString;
+{$ENDIF}
+begin
+  lvStream := TMemoryStream.Create;
+  try
+    {$IFDEF UNICODE}
+    lvBytes := TEncoding.UTF8.GetBytes(pvData);
+    lvStream.WriteBuffer(lvBytes[0], Length(lvBytes));
+    {$ELSE}
+    lvStr := UTF8Encode(pvData);
+    lvStream.WriteBuffer(PAnsiChar(lvStr)^, Length(lvStr));
+    {$ENDIF}
+    lvStream.SaveToFile(pvFile);
+  finally
+    lvStream.Free;
+  end;  
+
 end;
 
 

@@ -29,6 +29,7 @@ function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
     vdtPtr]): String;
 
 function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
+procedure JSONWriteToUtf8NoBOMFile(pvFile:string; pvDValue:TDValue);
 
 
     
@@ -128,6 +129,43 @@ begin
   end;
 end;
 
+procedure JSONEscapeWithoutDoEscape(ABuilder: TDStringBuilder; const S: String);
+var
+  ps: PChar;
+const
+  CharNum1: String = '1';
+  CharNum0: String = '0';
+  Char7: String = '\b';
+  Char9: String = '\t';
+  Char10: String = '\n';
+  Char12: String = '\f';
+  Char13: String = '\r';
+  CharQuoter: String = '\"';
+  CharBackslash: String = '\\';
+  CharCode: String = '\u00';
+  CharEscape: String = '\u';
+begin
+  ps := PChar(S);
+  while ps^ <> #0 do
+  begin
+    case ps^ of
+      #7:
+        ABuilder.Append(Char7);
+      #12:
+        ABuilder.Append(Char12);
+      '\':
+        ABuilder.Append(CharBackslash);
+      '"':
+        ABuilder.Append(CharQuoter);
+    else
+      begin
+        ABuilder.Append(ps^);
+      end;
+    end;
+    Inc(ps);
+  end;
+end;
+
 function JSONEncodeEx(v: TDValue; pvBuilder: TDStringBuilder; pvLevel: Integer;
     ADoEscape, ADoFormat: Boolean; pvExceptValueTypes: TDValueDataTypes):
     Integer;
@@ -193,7 +231,7 @@ begin
       r := JSONEncodeEx(v.Items[i], pvBuilder, pvLevel + 1, ADoEscape, ADoFormat, pvExceptValueTypes);
       if r = -1 then
       begin
-
+        ;
       end else
       begin
         if i < v.Count -1 then
@@ -219,7 +257,13 @@ begin
       if v.Value.DataType in [vdtString, vdtStringW, vdtPtr, vdtObject, vdtGuid] then
       begin
         pvBuilder.Append('"');
-        JSONEscape(pvBuilder, v.AsString, ADoEscape);
+        if ADoEscape then
+        begin       
+          JSONEscape(pvBuilder, v.AsString, ADoEscape);
+        end else
+        begin
+          JSONEscapeWithoutDoEscape(pvBuilder, v.AsString);
+        end;        
         pvBuilder.Append('"');
       end else
       begin
@@ -657,6 +701,14 @@ var
 begin
   s := LoadStringFromUtf8NoBOMFile(pvFile);
   Result := JSONParser(s, pvDValue);
+end;
+
+procedure JSONWriteToUtf8NoBOMFile(pvFile:string; pvDValue:TDValue);
+var
+  s:String;
+begin
+  s := JSONEncode(pvDValue, False, True);
+  WriteStringToUtf8NoBOMFile(pvFile, s);
 end;
 
 end.

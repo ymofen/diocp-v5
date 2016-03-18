@@ -821,6 +821,9 @@ procedure RegisterDiocpLogger(pvLogger:TSafeLogger);
 
 implementation
 
+uses
+  diocp.res;
+
 resourcestring
   strRecvZero      = '[%d]接收到0字节的数据,该连接将断开!';
   strRecvError     = '[%d]响应接收请求时出现了错误。错误代码:%d!';
@@ -836,6 +839,8 @@ resourcestring
   strBindingIocpError = '[%d]绑定到IOCP句柄时出现了异常, 错误代码:%d, (%s)';
 
   strPushFail      = '[%d]压入到待发送队列失败, 队列信息: %d/%d';
+
+  strOnRecvBufferException = '[%d]响应OnRecvBuffer时出现了异常:%s。';
 
 var
   __innerLogger:TSafeLogger;
@@ -1157,11 +1162,28 @@ end;
 
 procedure TDiocpCustomContext.DoReceiveData;
 begin
-  OnRecvBuffer(FRecvRequest.FRecvBuffer.buf,
-    FRecvRequest.FBytesTransferred,
-    FRecvRequest.ErrorCode);
-  if FOwner <> nil then
-    FOwner.DoReceiveData(Self, FRecvRequest);
+  try
+    FLastActivity := GetTickCount;
+
+    OnRecvBuffer(FRecvRequest.FRecvBuffer.buf,
+      FRecvRequest.FBytesTransferred,
+      FRecvRequest.ErrorCode);
+    if FOwner <> nil then
+      FOwner.DoReceiveData(Self, FRecvRequest);
+  except
+    on E:Exception do
+    begin
+      if FOwner <> nil then
+      begin
+        FOwner.LogMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+        FOwner.OnContextError(Self, -1);
+      end else
+      begin
+        __svrLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+      end;
+    end;
+  end;
+
 end;
 
 procedure TDiocpCustomContext.DoSendRequestCompleted(pvRequest:
@@ -1502,6 +1524,8 @@ end;
 procedure TDiocpCustom.DoReceiveData(pvIocpContext: TDiocpCustomContext;
     pvRequest: TIocpRecvRequest);
 begin
+
+
   if Assigned(FOnReceivedBuffer) then
     FOnReceivedBuffer(pvIocpContext,
       pvRequest.FRecvBuffer.buf, pvRequest.FBytesTransferred,
