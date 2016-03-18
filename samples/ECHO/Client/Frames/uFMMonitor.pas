@@ -45,6 +45,10 @@ implementation
 
 {$R *.dfm}
 
+resourcestring
+  strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
+  strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
+
 class function TFMMonitor.createAsChild(pvParent: TWinControl; pvDiocpCustom:
     TDiocpCustom): TFMMonitor;
 begin
@@ -91,13 +95,30 @@ begin
     lblsvrState.Caption := 'stop';
   end;
 
+  // 统计速度信息
+  FIocpSocket.DataMoniter.SpeedCalcuEnd();
 
-  lblPostRecvINfo.Caption :=   Format('post:%d, response:%d',
+  // 开始记录
+  FIocpSocket.DataMoniter.SpeedCalcuStart();
+
+
+//  lblPostRecvINfo.Caption :=   Format('post:%d, response:%d',
+//     [
+//       FIocpSocket.DataMoniter.PostWSARecvCounter,
+//       FIocpSocket.DataMoniter.ResponseWSARecvCounter
+//     ]
+//    );
+
+  lblPostRecvINfo.Caption :=   Format(strRecv_PostInfo,
      [
        FIocpSocket.DataMoniter.PostWSARecvCounter,
-       FIocpSocket.DataMoniter.ResponseWSARecvCounter
+       FIocpSocket.DataMoniter.ResponseWSARecvCounter,
+       FIocpSocket.DataMoniter.PostWSARecvCounter -
+       FIocpSocket.DataMoniter.ResponseWSARecvCounter,
+       FIocpSocket.DataMoniter.Speed_WSARecvResponse
      ]
     );
+
 
   lblRecvdSize.Caption := TRunTimeINfoTools.transByteSize(FIocpSocket.DataMoniter.RecvSize);
 
@@ -110,12 +131,22 @@ begin
 //     ]
 //    );
 
-  lblSend.Caption := Format('post:%d, response:%u',
+//  lblSend.Caption := Format('post:%d, response:%u',
+//     [
+//       FIocpSocket.DataMoniter.PostWSASendCounter,
+//       FIocpSocket.DataMoniter.ResponseWSASendCounter
+//     ]
+//    );
+
+  lblSend.Caption := Format(strSend_Info,
      [
        FIocpSocket.DataMoniter.PostWSASendCounter,
-       FIocpSocket.DataMoniter.ResponseWSASendCounter
+       FIocpSocket.DataMoniter.ResponseWSASendCounter,
+       FIocpSocket.DataMoniter.PostWSASendCounter - FIocpSocket.DataMoniter.ResponseWSASendCounter,
+       FIocpSocket.DataMoniter.Speed_WSASendResponse
      ]
     );
+    
     
   lblSendQueue.Caption := Format('push/pop/complted:%d, %d, %d',
      [

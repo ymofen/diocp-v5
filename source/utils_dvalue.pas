@@ -6,7 +6,7 @@
  * 1. android下面DValuelist使用 TList会有出现异常, 使用TList<TDValueObject>正常
  *    2015-11-15 16:08:04(感谢CP46反馈)
 *)
-unit utils_DValue;
+unit utils_dvalue;
 
 {$IF CompilerVersion>25}  // XE4(VER250)
   {$DEFINE HAVE_GENERICS}
@@ -25,15 +25,24 @@ uses classes, sysutils, variants,
 type
 
   TDValueException = class(Exception);
-  
-{$IFDEF UNICODE}
+
+{$if (sizeof(Char) = 1)}
+  {$IFDEF FPC}
   DStringW = UnicodeString;
-{$ELSE}
+  {$ELSE}
   DStringW = WideString;
-{$ENDIF UNICODE}
+  {$ENDIF}
   DCharW = WideChar;
   PDCharW = PWideChar;
   PDStringW = ^DStringW;
+{$else}
+  DCharW = Char;
+  PDCharW = PChar;
+  DStringW = string;
+  PDStringW = ^DStringW;
+{$ifend}
+
+
   PInterface = ^IInterface;
 
   // XE5
@@ -55,6 +64,8 @@ type
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
     vdtInteger, vdtInt64, vdtCurrency, vdtGuid, vdtDateTime,
     vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtObject, vdtArray);
+
+  TDValueDataTypes = set of TDValueDataType;
 
   // 节点类型
   TDValueObjectType = (vntNull,        // 没有值
@@ -293,7 +304,9 @@ type
     ///   本身作为一个vntObject添加一个子节点
     ///     如果之前不是vntObject类型，将会被清除
     /// </summary>
-    function Add: TDValue;
+    function Add: TDValue; overload;
+
+    function Add(pvName:String): TDValue; overload;
 
     /// <summary>
     ///   根据名称移除掉一个子对象
@@ -805,6 +818,12 @@ begin
       Result := GuidToString(ADValue.Value.AsGuid^);
     vdtDateTime:
       Result := DTToStr(ADValue);
+    vdtObject:
+      Result := Format('@@object[$%p]', [ADValue.Value.AsPointer]);
+    vdtPtr:
+      Result := Format('@@Ptr[$%p]', [ADValue.Value.AsPointer]);
+    vdtInterface:
+      Result := Format('@@Interface[$%p]', [ADValue.Value.AsInterface]);
     vdtStream:
       begin
         SetLength(lvHexStr, TMemoryStream(ADValue.Value.AsStream).Size * 2);
@@ -1017,6 +1036,12 @@ begin
 
         Result := lvHexStr;
       end;
+    vdtObject:
+      Result := Format('@@object[$%p]', [ADValue.Value.AsPointer]);
+    vdtPtr:
+      Result := Format('@@Ptr[$%p]', [ADValue.Value.AsPointer]);
+    vdtInterface:
+      Result := Format('@@Interface[$%p]', [ADValue.Value.AsInterface]);
     vdtArray:
       Result := '@@Array';
   end;
@@ -1354,7 +1379,16 @@ begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(vntValue);
   Result.FParent := Self;
-  FChildren.Add(Result); 
+  FChildren.Add(Result);
+end;
+
+function TDValue.Add(pvName:String): TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(vntValue);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
+  FChildren.Add(Result);
 end;
 
 function TDValue.AddArrayChild: TDValue;
@@ -1731,8 +1765,8 @@ procedure TDValueItem.BindObject(pvObject: TObject; pvFreeAction:
     TObjectFreeAction = faFree);
 begin
   case pvFreeAction of
-    faNone: DValueBindPointerData(@FRawValue, pvObject, praNone);
-    faFree: DValueBindPointerData(@FRawValue, pvObject, praObjectFree);
+    faNone: DValueBindObjectData(@FRawValue, pvObject, praNone);
+    faFree: DValueBindObjectData(@FRawValue, pvObject, praObjectFree);
   end;
 end;
 

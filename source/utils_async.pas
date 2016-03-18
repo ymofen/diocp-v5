@@ -3,7 +3,13 @@ unit utils_async;
 interface
 
 uses
-  Classes, SyncObjs;
+  Classes, SyncObjs
+  {$IFDEF MSWINDOWS}
+  , Windows
+  {$ELSE}
+
+  {$ENDIF}
+  ;
 
 type
   TASyncWorker = class;
@@ -45,6 +51,8 @@ function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
+function GetTickCount: Cardinal;
+
 implementation
 
 /// <summary>
@@ -74,6 +82,15 @@ end;
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 begin
   Result := TEvent.Create(nil, True, pvInitState, '');
+end;
+
+function GetTickCount: Cardinal;
+begin
+  {$IFDEF MSWINDOWS}
+  Result := Windows.GetTickCount;
+  {$ELSE}
+  Result := TThread.GetTickCount;
+  {$ENDIF}
 end;
 
 constructor TASyncWorker.Create(AOnAsyncEvent: TOnASyncEvent);

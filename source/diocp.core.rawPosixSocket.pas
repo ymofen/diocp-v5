@@ -20,6 +20,7 @@ interface
 
 uses
   SysUtils
+  , Classes
   , Posix.Base, Posix.SysSocket, Posix.arpainet, Posix.NetinetIn, Posix.UniStd
   , Posix.NetDB
   , Posix.Fcntl
@@ -54,10 +55,22 @@ type
     function Bind(const pvAddr: string; pvPort: Integer): Boolean;
     procedure CreateTcpSocket;
     procedure CreateUdpSocket;
-    function RecvBuf(var data; const len: Cardinal): Integer;
+
+    destructor Destroy; override;
+
+    /// <summary>
+    ///   -2:  超时
+    /// </summary>
+    function RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal = 30000):
+        Integer;
+
     function PeekBuf(var data; const len: Cardinal): Integer;
+
+    /// <summary>
+    ///   -2:  超时
+    /// </summary>
     function RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte; endBufLen:
-        Integer): Integer;
+        Integer; pvTimeOut: Cardinal = 30000): Integer;
 
 
     function SendBuf(const data; const len: Cardinal): Integer;
@@ -135,6 +148,14 @@ type
 
 implementation
 
+function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+begin
+  if tick_end >= tick_start then
+    result := tick_end - tick_start
+  else
+    result := High(Cardinal) - tick_start + tick_end;
+end;
+
 function ioctlsocket(Socket: THandle; Request: Integer; var Data): Integer; inline;
 begin
   Result := ioctl(Socket, Request, @Data);
@@ -202,6 +223,12 @@ begin
 end;
 
 {$ENDIF}
+
+destructor TRawSocket.Destroy;
+begin
+  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_SOCKET)), 'socket handle not closed!');
+  inherited;
+end;
 
 { TRawSocket }
 
@@ -364,10 +391,7 @@ begin
 {$ENDIF}
 end;
 
-function TRawSocket.RecvBuf(var data; const len: Cardinal): Integer;
-begin
-  Result := recv(FSocketHandle, data, len, 0);
-end;
+
 
 function TRawSocket.SendBuf(const data; const len: Cardinal): Integer;
 begin
@@ -500,45 +524,81 @@ begin
   Result := recv(FSocketHandle, data, len, MSG_PEEK);
 end;
 
+function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal
+    = 30000): Integer;
+var
+  lvTick : Cardinal;
+begin
+  lvTick := TThread.GetTickCount;
+  while True do
+  begin
+    if (tick_diff(lvTick, TThread.GetTickCount) > pvTimeOut) then
+    begin
+      Result := -2;
+      Exit;
+    end else  if ReceiveLength > 0 then
+    begin
+      Result := recv(FSocketHandle, data, len, 0);
+      Exit;
+    end else
+    begin
+      Sleep(10);
+    end;
+  end;
+end;
+
 function TRawSocket.RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte;
-    endBufLen: Integer): Integer;
+    endBufLen: Integer; pvTimeOut: Cardinal = 30000): Integer;
 var
   lvRecvByte:byte;
   lvRet, j:Integer;
   lvTempEndBuf:PByte;
   lvMatchCounter:Integer;
+  lvTick:Cardinal;
 begin
   lvTempEndBuf := endBuf;
   lvMatchCounter := 0;
   j:=0;
+  lvTick := TThread.GetTickCount;
   while j < len do
   begin
-    lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
-    if lvRet = -1 then
+    if (tick_diff(lvTick, TThread.GetTickCount) > pvTimeOut) then
     begin
-      Result := lvRet;
-      exit;
-    end;
-    if lvRet = 0 then
-    begin  // 被关闭
-      Result := 0;
-      exit;
-    end;
-    inc(j);
-    if Byte(buf^) = Byte(lvTempEndBuf^) then
+      Result := -2;
+      Exit;
+    end else  if ReceiveLength > 0 then
     begin
-      Inc(lvMatchCounter);
-      Inc(lvTempEndBuf);
-      if lvMatchCounter = endBufLen then
-      begin    // 读取成功
-        Break;
+      lvRet := recv(FSocketHandle, buf^, 1, 0);
+      //lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
+      if lvRet = -1 then
+      begin
+        Result := lvRet;
+        exit;
       end;
+      if lvRet = 0 then
+      begin  // 被关闭
+        Result := 0;
+        exit;
+      end;
+      inc(j);
+      if Byte(buf^) = Byte(lvTempEndBuf^) then
+      begin
+        Inc(lvMatchCounter);
+        Inc(lvTempEndBuf);
+        if lvMatchCounter = endBufLen then
+        begin    // 读取成功
+          Break;
+        end;
+      end else
+      begin
+        lvTempEndBuf := endBuf;
+        lvMatchCounter := 0;
+      end;
+      inc(buf);
     end else
     begin
-      lvTempEndBuf := endBuf;
-      lvMatchCounter := 0;
+      Sleep(10);
     end;
-    inc(buf);
   end;
   Result := j;
 end;

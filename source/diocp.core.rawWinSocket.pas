@@ -49,6 +49,8 @@ type
     procedure Close(pvShutdown: Boolean = true);
     procedure CreateTcpSocket;
 
+    destructor Destroy; override;
+
     /// <summary>
     ///   create socket handle for overlapped
     /// </summary>
@@ -62,7 +64,11 @@ type
 
     function GetIpAddrByName(const host:string): String;
 
-    function RecvBuf(var data; const len: Integer): Integer;
+    /// <summary>
+    ///   -2:  超时
+    /// </summary>
+    function RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal = 30000):
+        Integer;
     function SendBuf(const data; const len: Integer): Integer;
     function PeekBuf(var data; const len: Integer): Integer;
 
@@ -299,6 +305,12 @@ begin
   InterlockedIncrement(__DebugWSACreateCounter);
 end;
 
+destructor TRawSocket.Destroy;
+begin
+  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_SOCKET)), 'socket handle not closed!');
+  inherited;
+end;
+
 function TRawSocket.GetIpAddrByName(const host:string): String;
 var
   lvhostInfo:PHostEnt;
@@ -372,9 +384,27 @@ end;
 
 
 
-function TRawSocket.RecvBuf(var data; const len: Integer): Integer;
+function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal
+    = 30000): Integer;
+var
+  lvTick : Cardinal;
 begin
-  Result := diocp.winapi.winsock2.recv(FSocketHandle, data, len, 0);
+  lvTick := GetTickCount;
+  while True do
+  begin
+    if (tick_diff(lvTick, GetTickCount) > pvTimeOut) then
+    begin
+      Result := -2;
+      Exit;
+    end else  if ReceiveLength > 0 then
+    begin
+      Result := recv(FSocketHandle, data, len, 0);
+      Exit;
+    end else
+    begin
+      Sleep(10);
+    end;
+  end;
 end;
 
 function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;
@@ -397,6 +427,7 @@ begin
       Exit;
     end else  if ReceiveLength > 0 then
     begin
+      lvRet := recv(FSocketHandle, buf^, 1, 0);
       lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
       if lvRet = -1 then
       begin
