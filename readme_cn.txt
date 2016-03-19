@@ -4,6 +4,9 @@ DIOCP5_HOME=E:\workspace\diocp-v5
 搜索路径
 $(DIOCP5_HOME)\Source
 
+备注：
+  代码中不要声明CompilerVersion,代码中使用了CompilerVersion来判断编译器版本
+
 
 目录说明:
   samples                        下面是各种DEMO

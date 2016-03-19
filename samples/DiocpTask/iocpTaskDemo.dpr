@@ -1,8 +1,8 @@
 program iocpTaskDemo;
 
 uses
-  FastMM4,
-  FastMM4Messages,
+//  FastMM4,
+//  FastMM4Messages,
   Forms,
   ufrmMain in 'ufrmMain.pas' {frmMain};
 

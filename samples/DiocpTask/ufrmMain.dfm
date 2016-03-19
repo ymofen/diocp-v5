@@ -13,6 +13,13 @@ object frmMain: TfrmMain
   OldCreateOrder = False
   PixelsPerInch = 96
   TextHeight = 13
+  object lblSpeed: TLabel
+    Left = 8
+    Top = 70
+    Width = 40
+    Height = 13
+    Caption = 'lblSpeed'
+  end
   object btnPostTask: TButton
     Left = 8
     Top = 8
@@ -75,5 +82,20 @@ object frmMain: TfrmMain
     Caption = #21462#28040#27880#20876#19968#20010#20449#21495
     TabOrder = 6
     OnClick = btnUnRegisterClick
+  end
+  object btnQueueSpeed: TButton
+    Left = 177
+    Top = 39
+    Width = 144
+    Height = 25
+    Caption = #38431#21015#36895#24230
+    TabOrder = 7
+    OnClick = btnQueueSpeedClick
+  end
+  object tmrSpeed: TTimer
+    Enabled = False
+    OnTimer = tmrSpeedTimer
+    Left = 24
+    Top = 96
   end
 end
