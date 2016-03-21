@@ -70,8 +70,9 @@ type
     ///   -2:  超时
     /// </summary>
     function RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte; endBufLen:
-        Integer; pvTimeOut: Cardinal = 30000): Integer;
-
+        Integer; pvTimeOut: Cardinal): Integer; overload;
+    function RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte; endBufLen:
+        Integer): Integer; overload;
 
     function SendBuf(const data; const len: Cardinal): Integer;
     function SendBufTo(const data; const len: Integer): Integer;
@@ -491,7 +492,7 @@ begin
 end;
 
 function TRawSocket.RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte;
-    endBufLen: Integer; pvTimeOut: Cardinal = 30000): Integer;
+    endBufLen: Integer; pvTimeOut: Cardinal): Integer;
 var
   lvRecvByte:byte;
   lvRet, j:Integer;
@@ -560,6 +561,49 @@ end;
 function TRawSocket.RecvBuf(var data; const len: Cardinal): Integer;
 begin
   Result := recv(FSocketHandle, data, len, 0);
+end;
+
+function TRawSocket.RecvBufEnd(buf: PByte; len: Integer; endBuf: PByte;
+    endBufLen: Integer): Integer;
+var
+  lvRecvByte:byte;
+  lvRet, j:Integer;
+  lvTempEndBuf:PByte;
+  lvMatchCounter:Integer;
+begin
+  lvTempEndBuf := endBuf;
+  lvMatchCounter := 0;
+  j:=0;
+  while j < len do
+  begin
+    lvRet := recv(FSocketHandle, buf^, 1, 0);
+    if lvRet = -1 then
+    begin
+      Result := lvRet;
+      exit;
+    end;
+    if lvRet = 0 then
+    begin  // 被关闭
+      Result := 0;
+      exit;
+    end;
+    inc(j);
+    if Byte(buf^) = Byte(lvTempEndBuf^) then
+    begin
+      Inc(lvMatchCounter);
+      Inc(lvTempEndBuf);
+      if lvMatchCounter = endBufLen then
+      begin    // 读取成功
+        Break;
+      end;
+    end else
+    begin
+      lvTempEndBuf := endBuf;
+      lvMatchCounter := 0;
+    end;
+    inc(buf);
+  end;
+  Result := j;
 end;
 
 procedure TRawSocket.SetConnectInfo(const pvAddr: string; pvPort: Integer);

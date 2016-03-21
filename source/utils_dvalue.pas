@@ -746,7 +746,7 @@ begin
   if ALen > 0 then
   begin
     if ADValue.Value.ArrayLength = 0 then
-    begin
+    begin        // 原有长度为空
       GetMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDRawValue) * ALen);
       ADValue.Value.ArrayLength := ALen;
     end

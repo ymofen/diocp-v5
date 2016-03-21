@@ -87,8 +87,9 @@ type
     /// <param name="endBuf"> (PAnsiChar) </param>
     /// <param name="endBufLen"> (Integer) </param>
     function RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar; endBufLen:
-        Integer; pvTimeOut: Cardinal = 30000): Integer;
-
+        Integer; pvTimeOut: Cardinal): Integer; overload;
+    function RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar; endBufLen:
+        Integer): Integer; overload;
 
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
 
@@ -413,7 +414,7 @@ begin
 end;
 
 function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;
-    endBufLen: Integer; pvTimeOut: Cardinal = 30000): Integer;
+    endBufLen: Integer; pvTimeOut: Cardinal): Integer;
 var
   lvRet, j:Integer;
   lvTempEndBuf:PAnsiChar;
@@ -463,6 +464,48 @@ begin
     begin
       Sleep(10);
     end;
+  end;
+  Result := j;
+end;
+
+function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;
+    endBufLen: Integer): Integer;
+var
+  lvRet, j:Integer;
+  lvTempEndBuf:PAnsiChar;
+  lvMatchCounter:Integer;
+begin
+  lvTempEndBuf := endBuf;
+  lvMatchCounter := 0;
+  j:=0;
+  while j < len do
+  begin
+    lvRet := recv(FSocketHandle, buf^, 1, 0);   // 阻塞读取一个字节
+    if lvRet = -1 then
+    begin
+      Result := lvRet;
+      exit;
+    end;
+    if lvRet = 0 then
+    begin  // 被关闭
+      Result := 0;
+      exit;
+    end;
+    inc(j);
+    if buf^ = lvTempEndBuf^ then
+    begin
+      Inc(lvMatchCounter);
+      Inc(lvTempEndBuf);
+      if lvMatchCounter = endBufLen then
+      begin    // 读取成功
+        Break;
+      end;
+    end else
+    begin
+      lvTempEndBuf := endBuf;
+      lvMatchCounter := 0;
+    end;
+    inc(buf);
   end;
   Result := j;
 end;
