@@ -3,7 +3,7 @@ unit utils_redis;
 interface
 
 uses
-  utils_DValue, SysUtils, diocp.core.rawWinSocket, Classes, utils_rawPackage,
+  utils_DValue, SysUtils, diocp.core.rawWinSocket, diocp.winapi.winsock2, Classes, utils_rawPackage,
   utils_async, utils.strings;
 
 const
@@ -84,7 +84,11 @@ type
     function SendCMD(pvRedisCMD: TRedisCommand): Integer;
     function RecvCMD(pvRedisCMD: TRedisCommand): Integer;
 
+    function ReceiveLength: Integer;
+
     procedure ExecuteCMD(pvRedisCMD:TRedisCommand);
+
+    procedure CheckRecvResult(pvSocketResult: Integer);
     property Active: Boolean read FActive;
     property Host: String read FHost write FHost;
     property Port: Integer read FPort write FPort;
@@ -94,6 +98,10 @@ type
 function utils_redis_tester: string;
 
 implementation
+
+resourcestring
+  STRING_E_RECV_ZERO = '服务端主动断开关闭';
+  STRING_E_TIMEOUT   = '服务端响应超时';
 
 
 function utils_redis_tester: string;
@@ -181,13 +189,11 @@ end;
 
 function TRedisCommand.ExtractSubscribeMessage: String;
 begin
+  Result := '';
   if LowerCase(FCommand) = 'message' then
   begin
     if FData.Count > 1 then     
       Result := FData[1].AsString;
-  end else
-  begin
-    Result := '';
   end;
 end;
 
@@ -416,6 +422,40 @@ begin
   inherited Destroy;
 end;
 
+procedure TRedisClient.CheckRecvResult(pvSocketResult: Integer);
+var
+  lvErrorCode:Integer;
+begin
+  if pvSocketResult = -2 then
+  begin
+    self.Close;
+    raise Exception.Create(STRING_E_TIMEOUT);
+  end;
+  {$IFDEF POSIX}
+  if (pvSocketResult = -1) or (pvSocketResult = 0) then
+  begin
+     try
+       RaiseLastOSError;
+     except
+       FRawSocket.Close;
+       raise;
+     end;
+   end;
+  {$ELSE}
+  if (pvSocketResult = SOCKET_ERROR) then
+  begin
+    lvErrorCode := GetLastError;
+    FRawSocket.Close;     // 出现异常后断开连接
+
+    {$if CompilerVersion < 23}
+    RaiseLastOSErrorException(lvErrorCode);
+    {$ELSE}
+    RaiseLastOSError(lvErrorCode);
+    {$ifend}
+  end;
+  {$ENDIF}
+end;
+
 procedure TRedisClient.Connect;
 begin
   FRawSocket.CreateTcpSocket;
@@ -439,11 +479,12 @@ begin
   SendCMD(pvRedisCMD);
   pvRedisCMD.Clear;
   r := RecvCMD(pvRedisCMD);
-  if r = -1 then
-  begin
-    Close;
-    RaiseLastOSError;
-  end;
+  CheckRecvResult(r);
+end;
+
+function TRedisClient.ReceiveLength: Integer;
+begin
+  Result := FRawSocket.ReceiveLength;
 end;
 
 function TRedisClient.RecvCMD(pvRedisCMD: TRedisCommand): Integer;

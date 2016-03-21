@@ -1731,7 +1731,8 @@ begin
       if FOwner <> nil then
       begin       
         FOwner.LogMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
-        FOwner.OnContextError(Self, -1);
+
+        FOwner.DoClientContextError(Self, -1);
       end else
       begin
         __svrLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);

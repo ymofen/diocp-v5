@@ -302,6 +302,10 @@ end;
 
 procedure TIocpRemoteContext.PostConnectRequest;
 begin
+  if FHost = '' then
+  begin
+    raise Exception.Create('请指定要建立连接的IP和端口信息！');
+  end;
   if lock_cmp_exchange(False, True, FIsConnecting) = False then
   begin
     if RawSocket.SocketHandle = INVALID_SOCKET then

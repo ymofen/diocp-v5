@@ -61,9 +61,9 @@ type
     /// <summary>
     ///   -2:  ≥¨ ±
     /// </summary>
-    function RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal = 30000):
-        Integer;
-
+    function RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal): Integer;
+        overload;
+    function RecvBuf(var data; const len: Cardinal): Integer; overload;
     function PeekBuf(var data; const len: Cardinal): Integer;
 
     /// <summary>
@@ -139,7 +139,6 @@ type
     procedure Close(pvShutdown: Boolean = true);
 
     function IsValidSocketHandle: Boolean;
-
 
   public
     property SocketHandle: THandle read FSocketHandle;
@@ -335,20 +334,12 @@ begin
       lvFlags := lvFlags AND (NOT O_NONBLOCK);  // ◊Ë»˚ƒ£ Ω
       fcntl(FSocketHandle, F_SETFL, lvFlags);
     end;
-  end;
-
-
-
+  end; 
 end;
 
-{$IFDEF MSWINDOWS}
-{$ENDIF}
 
 procedure TRawSocket.CreateTcpSocket;
 begin
-{$IFDEF MSWINDOWS}
-  __CheckWSAStartup;
-{$ENDIF}
   FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if FSocketHandle = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
@@ -356,24 +347,14 @@ end;
 
 procedure TRawSocket.CreateUdpSocket;
 begin
-{$IFDEF MSWINDOWS}
-  __CheckWSAStartup;
-{$ENDIF}
   FSocketHandle := socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 end;
 
 function TRawSocket.Readable(pvTimeOut:Integer): Boolean;
-{$IFDEF POSIX}
 var
   lvFDSet:fd_set;
   lvTime_val: timeval;
-{$ELSE}
-var
-  lvFDSet:TFDSet;
-  lvTime_val: TTimeval;
-{$ENDIF}
 begin
-{$IFDEF POSIX}
   // Œ¥≤‚ ‘
   FD_ZERO(lvFDSet);
   _FD_SET(FSocketHandle, lvFDSet);
@@ -381,14 +362,6 @@ begin
   lvTime_val.tv_sec := pvTimeOut div 1000;
   lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
   Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
-{$ELSE}
-  FD_ZERO(lvFDSet);
-  FD_SET(FSocketHandle, lvFDSet);
-
-  lvTime_val.tv_sec := pvTimeOut div 1000;
-  lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
-  Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
-{$ENDIF}
 end;
 
 
@@ -433,51 +406,22 @@ begin
 end;
 
 function TRawSocket.Writeable(pvTimeOut:Integer): Integer;
-{$IFDEF POSIX}
 var
   lvFDSet:fd_set;
   lvTime_val: timeval;
-{$ELSE}
-var
-  lvFDSet:TFDSet;
-  lvTime_val: TTimeval;
-{$ENDIF}
 begin
-{$IFDEF POSIX}
   // Œ¥≤‚ ‘
   FD_ZERO(lvFDSet);
   _FD_SET(FSocketHandle, lvFDSet);
 
   lvTime_val.tv_sec := pvTimeOut;
   lvTime_val.tv_usec := 0;
-  Result := select(0, nil, @lvFDSet, nil, @lvTime_val);
-{$ELSE}
-  FD_ZERO(lvFDSet);
-  FD_SET(FSocketHandle, lvFDSet);
-
-  lvTime_val.tv_sec := pvTimeOut;
-  lvTime_val.tv_usec := 0;
-  Result := select(0, nil, @lvFDSet, nil, @lvTime_val);
-{$ENDIF}
-
+  Result := select(0, nil, @lvFDSet, nil, @lvTime_val); 
 end;
 
 function TRawSocket.GetIpAddrByName(const pvHost: string): string;
-{$IFDEF POSIX}
-{$ELSE}
-var
-  lvhostInfo: PHostEnt;
-{$ENDIF}
 begin
-{$IFDEF POSIX}
   Result := ResolvingHostName(pvHost);
-{$ELSE}
-  lvhostInfo := gethostbyname(PAnsiChar(AnsiString(pvHost)));
-  if lvhostInfo = nil then
-    RaiseLastOSError;
-
-  Result := inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^);
-{$ENDIF}
 end;
 
 function TRawSocket.GetPeerInfo(var vIp: longword; var vPort: Integer):
@@ -490,8 +434,7 @@ var
 {$ENDIF}
 begin
 {$IFDEF POSIX}
-{$ELSE}
-  
+{$ELSE}  
   Size := SizeOf(SockAddrIn);
   result := getpeername(FSocketHandle, TSockAddr(SockAddrIn), Size);
   vIp := SockAddrIn.sin_addr.S_addr;
@@ -524,8 +467,8 @@ begin
   Result := recv(FSocketHandle, data, len, MSG_PEEK);
 end;
 
-function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal
-    = 30000): Integer;
+function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut:
+    Cardinal): Integer;
 var
   lvTick : Cardinal;
 begin
@@ -614,30 +557,21 @@ begin
   end;
 end;
 
+function TRawSocket.RecvBuf(var data; const len: Cardinal): Integer;
+begin
+  Result := recv(FSocketHandle, data, len, 0);
+end;
+
 procedure TRawSocket.SetConnectInfo(const pvAddr: string; pvPort: Integer);
-{$IFDEF POSIX}
-{$ELSE}
-{$ENDIF}
 begin
   FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
   FSockaddr.sin_family := AF_INET;
   FSockaddr.sin_port := htons(pvPort);
-{$IFDEF POSIX}
   FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
-{$ELSE}
-  FSockaddr.sin_addr.s_addr :=inet_addr(PAnsichar(AnsiString(pvAddr)));
-{$ENDIF}
-
 end;
 
 function TRawSocket.SetNonBlock(pvBlock:Boolean): Integer;
-{$IFDEF POSIX}
-{$ELSE}
-var
-  lvFlag : Integer;
-{$ENDIF}
 begin
-{$IFDEF POSIX}
   // not test
   if pvBlock then
   begin
@@ -646,11 +580,6 @@ begin
   begin
     Result := fcntl(FSocketHandle, F_SETFL, O_NONBLOCK);
   end;
-{$ELSE}
-  if pvBlock then lvFlag := 0 else lvFlag := 1;
-  Result := ioctlsocket(SocketHandle, FIONBIO, lvFlag);
-{$ENDIF}
-
 end;
 
 procedure TRawSocket.SetSocketHandle(pvSocketHandle:THandle);
@@ -658,14 +587,6 @@ begin
   FSocketHandle := pvSocketHandle;
 end;
 
-
-
-
-
-
 initialization
-{$IFDEF MSWINDOWS}
-   __CheckWSAStartup();
-{$ENDIF}
 
 end.

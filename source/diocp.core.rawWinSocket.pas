@@ -67,8 +67,9 @@ type
     /// <summary>
     ///   -2:  ³¬Ê±
     /// </summary>
-    function RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal = 30000):
-        Integer;
+    function RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal): Integer;
+        overload;
+    function RecvBuf(var data; const len: Cardinal): Integer; overload;
     function SendBuf(const data; const len: Integer): Integer;
     function PeekBuf(var data; const len: Integer): Integer;
 
@@ -380,12 +381,11 @@ var
   r :Integer;
 begin
   r := ioctlsocket(FSocketHandle, FIONREAD, Cardinal(Result));
-end;
+end;            
 
 
-
-function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut: Cardinal
-    = 30000): Integer;
+function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut:
+    Cardinal): Integer;
 var
   lvTick : Cardinal;
 begin
@@ -405,6 +405,11 @@ begin
       Sleep(10);
     end;
   end;
+end;
+
+function TRawSocket.RecvBuf(var data; const len: Cardinal): Integer;
+begin
+  Result := recv(FSocketHandle, data, len, 0);
 end;
 
 function TRawSocket.RecvBufEnd(buf: PAnsiChar; len: Integer; endBuf: PAnsiChar;

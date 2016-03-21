@@ -276,7 +276,12 @@ begin
   lvPBuf := buf;
   while lvReadL < len do
   begin
-    lvTempL := FRawSocket.RecvBuf(lvPBuf^, len - lvReadL);
+    if FReadTimeOut = 0 then    
+      lvTempL := FRawSocket.RecvBuf(lvPBuf^, len - lvReadL)
+    else
+      lvTempL := FRawSocket.RecvBuf(lvPBuf^, len - lvReadL, FReadTimeOut);
+
+
     if lvTempL = 0 then
     begin
       raise Exception.Create(STRING_E_RECV_ZERO);
@@ -290,8 +295,11 @@ begin
 end;
 
 function TDiocpBlockTcpClient.RecvBuffer(buf: Pointer; len: cardinal): Integer;
-begin
-  Result := FRawSocket.RecvBuf(buf^, len, FReadTimeOut);
+begin 
+  if FReadTimeOut = 0 then
+    Result := FRawSocket.RecvBuf(buf^, len)
+  else
+    Result := FRawSocket.RecvBuf(buf^, len, FReadTimeOut);
   if Result = 0 then
   begin
     raise Exception.Create(STRING_E_RECV_ZERO);
