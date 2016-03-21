@@ -1844,15 +1844,19 @@ var
   lvDValueItem:TDValueItem;
 begin
   lvOldSize := GetSize;
-  CheckDValueSetArrayLength(@FRawValue, Value);
-  l := GetSize;
-  if l > lvOldSize then
-    for i := lvOldSize to l - 1 do
-    begin
-      lvDValueItem := TDValueItem.Create();
-      // 设置Item为TDValueItem对象
-      DValueBindPointerData(GetDValueItem(@FRawValue, i), lvDValueItem, praObjectFree);
-    end;
+  if lvOldSize <> Value then   // 原有尺寸与新尺寸大小不同
+  begin
+    // 设置新的尺寸大小，如果缩小会处理原有节点的数据清理
+    CheckDValueSetArrayLength(@FRawValue, Value);
+    l := GetSize;
+    if l > lvOldSize then
+      for i := lvOldSize to l - 1 do
+      begin
+        lvDValueItem := TDValueItem.Create();
+        // 设置Item为TDValueItem对象
+        DValueBindPointerData(GetDValueItem(@FRawValue, i), lvDValueItem, praObjectFree);
+      end;
+  end;
 end;
 
 procedure TDValueItem.SetAsBoolean(const Value: Boolean);
