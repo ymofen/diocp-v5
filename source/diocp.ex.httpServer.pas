@@ -216,6 +216,7 @@ type
     ///   不再使用了，归还回对象池
     /// </summary>
     procedure Close;
+
     /// <summary>
     /// 是否有效的Http 请求方法
     /// </summary>

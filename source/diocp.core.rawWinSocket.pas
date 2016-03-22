@@ -434,7 +434,6 @@ begin
     end else  if ReceiveLength > 0 then
     begin
       lvRet := recv(FSocketHandle, buf^, 1, 0);
-      lvRet := RecvBuf(buf^, 1);   // 阻塞读取一个字节
       if lvRet = -1 then
       begin
         Result := lvRet;

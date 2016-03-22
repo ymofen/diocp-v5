@@ -506,6 +506,9 @@ type
     // 记录开始时间点
     FLastSpeedTick : Cardinal;
 
+    // 最高在线数量
+    FMaxOnlineCount:Integer;
+
     // 记录开始时间点_数据
     FLastSpeed_WSASendResponse: Int64;
     FLastSpeed_WSARecvResponse: Int64;
@@ -529,6 +532,10 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+    /// <summary>
+    ///   计算最高在线数量
+    /// </summary>
+    procedure CalcuMaxOnlineCount(pvOnlineCount:Integer);
 
     procedure clear;
     /// <summary>
@@ -541,6 +548,7 @@ type
     /// </summary>
     procedure SpeedCalcuStart;
 
+    property MaxOnlineCount: Integer read FMaxOnlineCount;
     property PushSendQueueCounter: Integer read FPushSendQueueCounter;
     property PostSendObjectCounter: Integer read FPostSendObjectCounter;
     property ResponseSendObjectCounter: Integer read FResponseSendObjectCounter;
@@ -1509,6 +1517,10 @@ begin
   FLocker.lock('AddToOnlineList');
   try
     FOnlineContextList.Add(pvObject.FSocketHandle, pvObject);
+    if DataMoniter <> nil then
+    begin
+      DataMoniter.CalcuMaxOnlineCount(FOnlineContextList.Count);
+    end;
   finally
     FLocker.unLock;
   end; 
@@ -2453,12 +2465,18 @@ constructor TIocpDataMonitor.Create;
 begin
   inherited Create;
   FLocker := TCriticalSection.Create();
+  FMaxOnlineCount := 0;
 end;
 
 destructor TIocpDataMonitor.Destroy;
 begin
   FLocker.Free;
   inherited Destroy;
+end;
+
+procedure TIocpDataMonitor.CalcuMaxOnlineCount(pvOnlineCount: Integer);
+begin
+  if pvOnlineCount > FMaxOnlineCount then FMaxOnlineCount := pvOnlineCount;
 end;
 
 procedure TIocpDataMonitor.incPushSendQueueCounter;

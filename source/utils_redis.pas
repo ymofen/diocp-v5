@@ -4,7 +4,7 @@ interface
 
 uses
   utils_DValue, SysUtils, diocp.core.rawWinSocket, diocp.winapi.winsock2, Classes, utils_rawPackage,
-  utils_async, utils.strings;
+  utils_async, utils.strings, SysConst;
 
 const
   MAX_LEN = 10240;
@@ -102,6 +102,25 @@ implementation
 resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
   STRING_E_TIMEOUT   = '服务端响应超时';
+
+{$IFDEF POSIX}
+
+{$ELSE}
+// <2007版本的Windows平台使用
+//   SOSError = 'System Error.  Code: %d.'+sLineBreak+'%s';
+procedure RaiseLastOSErrorException(LastError: Integer);
+var       // 高版本的 SOSError带3个参数
+  Error: EOSError;
+begin
+  if LastError <> 0 then
+    Error := EOSError.CreateResFmt(@SOSError, [LastError,
+      SysErrorMessage(LastError)])
+  else
+    Error := EOSError.CreateRes(@SUnkOSError);
+  Error.ErrorCode := LastError;
+  raise Error;
+end;
+{$ENDIF}
 
 
 function utils_redis_tester: string;

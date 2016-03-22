@@ -222,7 +222,7 @@ begin
   FResponseBody := TMemoryStream.Create;
   FResponseHeader := TStringList.Create;
 
-  FTimeOut := 30000;
+  FTimeOut := 300000;
 
   FURL := TURL.Create;
 

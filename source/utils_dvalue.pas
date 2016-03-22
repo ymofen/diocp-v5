@@ -361,8 +361,17 @@ type
 
   public
     function GetStrValueByName(pvName:string; pvDefault:string): String;
+    function GetIntValueByName(pvName: String; pvDefault: Int64): Int64;
 
-    function GetIntValueByName(pvName:String; pvDefault:Integer): Integer;
+    function GetValueByName(pvName: String; pvDefault: Int64): Int64;overload;
+    function GetValueByName(pvName:string; pvDefault:string): String;overload;
+    function GetValueByName(pvName:String; pvDefault:Boolean): Boolean; overload;
+    function GetValueByName(pvName:String; pvDefault:Double): Double; overload;
+
+    function GetValueByPath(pvPath:string; pvDefault:string): string; overload;
+    function GetValueByPath(pvPath: string; pvDefault: Int64): Int64; overload;
+    function GetValueByPath(pvPath:string; pvDefault:Boolean): Boolean; overload;
+    function GetValueByPath(pvPath:string; pvDefault:Double): Double; overload;
 
     // 对Value的访问封装, 可以直接访问Value.AsXXXX
     procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
@@ -1576,7 +1585,21 @@ begin
   Result := FValue.GetAsString;
 end;
 
-function TDValue.GetIntValueByName(pvName:String; pvDefault:Integer): Integer;
+function TDValue.GetValueByName(pvName:String; pvDefault:Boolean): Boolean;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsBoolean;
+  end;
+end;
+
+function TDValue.GetIntValueByName(pvName: String; pvDefault: Int64): Int64;
 var
   lvItem:TDValue;
 begin
@@ -1600,6 +1623,109 @@ var
   lvItem:TDValue;
 begin
   lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsString;
+  end;
+end;
+
+function TDValue.GetValueByName(pvName:String; pvDefault:Double): Double;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsFloat;
+  end;
+end;
+
+function TDValue.GetValueByPath(pvPath: string; pvDefault: Int64): Int64;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByPath(pvPath);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsInteger;
+  end;
+
+end;
+
+function TDValue.GetValueByPath(pvPath: string; pvDefault: Boolean): Boolean;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByPath(pvPath);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsBoolean;
+  end;
+
+end;
+
+function TDValue.GetValueByName(pvName: String; pvDefault: Int64): Int64;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsInteger;
+  end;
+end;
+
+function TDValue.GetValueByName(pvName, pvDefault: string): String;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsString;
+  end;
+
+
+end;
+
+function TDValue.GetValueByPath(pvPath: string; pvDefault: Double): Double;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByPath(pvPath);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsFloat;
+  end;
+
+end;
+
+function TDValue.GetValueByPath(pvPath:string; pvDefault:string): string;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByPath(pvPath);
   if lvItem = nil then
   begin
     Result := pvDefault;

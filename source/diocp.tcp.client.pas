@@ -474,33 +474,11 @@ begin
 
     lvStrings.Add(Format(strSend_SizeInfo, [TransByteSize(DataMoniter.SentSize)]));
 
-//    lvStrings.Add(Format(strAcceptEx_Info,
-//       [
-//         DataMoniter.PostWSAAcceptExCounter,
-//         DataMoniter.ResponseWSAAcceptExCounter
-//       ]
-//      ));
+    lvStrings.Add(Format(strOnline_Info,   [OnlineContextCount, DataMoniter.MaxOnlineCount]));
 
-//    lvStrings.Add(Format(strSocketHandle_Info,
-//       [
-//         DataMoniter.HandleCreateCounter,
-//         DataMoniter.HandleDestroyCounter
-//       ]
-//      ));
+    lvStrings.Add(Format(strWorkers_Info,  [WorkerCount]));
 
-//    lvStrings.Add(Format(strContext_Info,
-//       [
-//         DataMoniter.ContextCreateCounter,
-//         DataMoniter.ContextOutCounter,
-//         DataMoniter.ContextReturnCounter
-//       ]
-//      ));
-
-    lvStrings.Add(Format(strOnline_Info, [OnlineContextCount, 0]));
-  
-    lvStrings.Add(Format(strWorkers_Info, [WorkerCount]));
-
-    lvStrings.Add(Format(strRunTime_Info, [GetRunTimeINfo]));
+    lvStrings.Add(Format(strRunTime_Info,  [GetRunTimeINfo]));
 
     Result := lvStrings.Text;
   finally
