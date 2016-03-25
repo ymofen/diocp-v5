@@ -532,6 +532,7 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+    
     /// <summary>
     ///   计算最高在线数量
     /// </summary>

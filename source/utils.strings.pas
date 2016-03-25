@@ -37,6 +37,13 @@ const
   STRING_BLOCK_SIZE = $2000;  // Must be a power of 2 
 
 type
+{$IFDEF MSWINDOWS}
+  RAWString = AnsiString;
+{$ELSE}
+  RAWString = String;
+{$ENDIF}
+
+
 {$IFDEF MSWINDOWS}  // Windows平台下面可以使用AnsiString
   URLString = AnsiString;
   URLChar = AnsiChar;
@@ -122,6 +129,7 @@ type
   public
     constructor Create;
     procedure Clear;
+    function Append(const aByte:Byte): TDBufferBuilder; overload;
     function Append(const c: Char): TDBufferBuilder; overload;
     function Append(str:string): TDBufferBuilder; overload;
     function Append(str:string; pvLeftStr:string; pvRightStr:String):
@@ -130,6 +138,10 @@ type
         overload;
     function Append(v:Integer): TDBufferBuilder; overload;
     function Append(v:Double): TDBufferBuilder; overload;
+    function AppendUtf8(str:String): TDBufferBuilder;
+    function AppendRawStr(pvRawStr:RAWString): TDBufferBuilder;
+    function AppendBreakLineBytes: TDBufferBuilder;
+    function Append(str: string; pvConvertToUtf8Bytes: Boolean): TDBufferBuilder; overload;
     function AppendQuoteStr(str:string): TDBufferBuilder;
     function AppendSingleQuoteStr(str:string): TDBufferBuilder;
     function AppendLine(str:string): TDBufferBuilder;
@@ -165,6 +177,8 @@ type
     ///   整个数据(不移动数据指针)
     /// </summary>
     function ToBytes: TBytes;
+
+    function ToRAWString: RAWString;
 
     /// <summary>
     ///   数据内存指针
@@ -431,6 +445,7 @@ function StringToUtf8Bytes(pvData:string): TBytes; overload;
 
 function StringToBytes(pvData:String; pvBytes:TBytes): Integer;
 function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
+function ByteBufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
 function SpanPointer(const pvStart, pvEnd: PByte): Integer;
 
@@ -1371,11 +1386,6 @@ begin
   l := l shl 1;
 {$ENDIF}
   Result := AppendBuffer(PByte(Str), l);
-
-//
-//  CheckNeedSize(l);
-//  Move(PChar(str)^, FData[FWritePosition], l);
-//  Inc(FWritePosition, l);
 end;
 
 function TDBufferBuilder.Append(v: Boolean; UseBoolStrs: Boolean = True):
@@ -1398,6 +1408,43 @@ function TDBufferBuilder.Append(str:string; pvLeftStr:string;
     pvRightStr:String): TDBufferBuilder;
 begin
   Result := Append(pvLeftStr).Append(str).Append(pvRightStr);
+end;
+
+function TDBufferBuilder.Append(const aByte:Byte): TDBufferBuilder;
+begin
+  Result := AppendBuffer(@aByte, 1);
+end;
+
+function TDBufferBuilder.Append(str: string; pvConvertToUtf8Bytes: Boolean):
+    TDBufferBuilder;
+var
+  l:Integer;
+  lvBytes:TBytes;
+begin
+  if pvConvertToUtf8Bytes then
+  begin
+    Result := Self;
+
+    lvBytes := StringToUtf8Bytes(str);
+    AppendBuffer(PByte(@lvBytes[0]), System.Length(lvBytes));
+  end else
+  begin
+    Result := Append(str);
+  end;
+
+end;
+
+function TDBufferBuilder.AppendBreakLineBytes: TDBufferBuilder;
+begin
+  if FBufferLocked then
+  begin
+    raise Exception.Create('Buffer Locked');
+  end;
+  CheckNeedSize(2);
+  FData[FWritePosition] := 13;
+  FData[FWritePosition +1 ] := 10;
+  Inc(FWritePosition, 2);
+  Result := Self;
 end;
 
 function TDBufferBuilder.AppendBuffer(pvBuffer:PByte; pvLength:Integer):
@@ -1423,9 +1470,34 @@ begin
   Result := Append('"').Append(str).Append('"');
 end;
 
+
+
+
+
+function TDBufferBuilder.AppendRawStr(pvRawStr:RAWString): TDBufferBuilder;
+begin
+{$IFDEF MSWINDOWS}
+  Result := AppendBuffer(PByte(pvRawStr), System.Length(pvRawStr));
+{$ELSE}
+  Result := AppendUtf8(pvRawStr);
+{$ENDIF}
+end;
+
+
+
 function TDBufferBuilder.AppendSingleQuoteStr(str:string): TDBufferBuilder;
 begin
   Result := Append('''').Append(str).Append('''');
+end;
+
+function TDBufferBuilder.AppendUtf8(str:String): TDBufferBuilder;
+var
+  l:Integer;
+  lvBytes:TBytes;
+begin 
+  Result := Self;
+  lvBytes := StringToUtf8Bytes(str);
+  AppendBuffer(PByte(@lvBytes[0]), System.Length(lvBytes));
 end;
 
 procedure TDBufferBuilder.CheckNeedSize(pvSize:Integer);
@@ -1444,6 +1516,9 @@ procedure TDBufferBuilder.Clear;
 begin
   FWritePosition := 0;
   FReadPosition := 0;
+  {$IFDEF DEBUG}
+  ZeroMemory(@FData[0], FCapacity);
+  {$ENDIF}
 end;
 
 function TDBufferBuilder.ReArrange: TDBufferBuilder;
@@ -1529,6 +1604,20 @@ begin
   Move(FData[0], Result[0], self.Length);
 end;
 
+function TDBufferBuilder.ToRAWString: RAWString;
+begin
+{$IFDEF MSWINDOWS}
+  CheckNeedSize(1);
+  FData[FWritePosition] := 0;
+  Result := StrPas(@FData[0]);
+{$ELSE}
+  CheckNeedSize(2);
+  FData[FWritePosition] := 0;
+  FData[FWritePosition + 1] := 0; 
+  Result := TEncoding.UTF8.GetString(pvBytes, 0, self.Length);
+{$ENDIF}
+end;
+
 
 function LoadStringFromUtf8NoBOMFile(pvFile:string): String;
 var
@@ -1586,6 +1675,28 @@ begin
     lvStream.Free;
   end;  
 
+end;
+
+function ByteBufferToString(pvBuff:PByte; pvLen:Cardinal): string;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+  l:Cardinal;
+{$ELSE}
+var
+  lvBytes:TBytes;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  SetLength(lvBytes, pvLen);
+  Move(pvBuff^, lvBytes[0], pvLen);
+  Result := TEncoding.Default.GetString(lvBytes);
+{$ELSE}
+  l := pvLen;
+  SetLength(lvRawStr, l);
+  Move(pvBuff^, PansiChar(lvRawStr)^, l);
+  Result := lvRawStr;
+{$ENDIF}
 end;
 
 

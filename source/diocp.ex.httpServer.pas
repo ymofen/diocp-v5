@@ -39,8 +39,9 @@ uses
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp.task{$ENDIF}
-  , diocp.tcp.server, utils.queues, utils.hashs, utils_DValue,
-  utils.objectPool, utils.safeLogger, Windows;
+  , diocp.tcp.server, utils.queues, utils.hashs, utils_dvalue
+  , diocp_ex_http_common
+  , utils.objectPool, utils.safeLogger, Windows;
 
 
 
@@ -55,6 +56,8 @@ type
   TDiocpHttpServer = class;
   TDiocpHttpRequest = class;
   TDiocpHttpSession = class;
+
+  TDiocpHttpCookie = diocp_ex_http_common.TDHttpCookie;
 
   TDiocpHttpSessionClass = class of TDiocpHttpSession;
 
@@ -106,27 +109,6 @@ type
     property DValues: TDValue read FDValues;
   end;
 
-  /// <summary>
-  ///   设置客户端时进行的Cookie设置类
-  /// </summary>
-  TDiocpHttpCookie = class(TObject)
-  private
-    FExpires: TDateTime;
-    FName: String;
-    FPath: String;
-    FValue: String;
-  public
-    /// <summary>
-    ///   编码成一个String
-    /// </summary>
-    function ToString: String;
-
-    property Expires: TDateTime read FExpires write FExpires;
-    property Name: String read FName write FName;
-    property Path: String read FPath write FPath;
-    property Value: String read FValue write FValue;
-  end;
-
 
   TDiocpHttpRequest = class(TObject)
   private
@@ -134,6 +116,8 @@ type
     FReleaseLaterMsg:String;
     
     FSessionID : String;
+
+    FInnerRequest:THttpRequest;
 
     /// <summary>
     ///   投递之前记录DNA，用于做异步任务时，是否取消当前任务
@@ -172,8 +156,6 @@ type
     FRequestURLParamData: string;
 
     FRequestURL: String;          // URI + 参数
-    FRequestURI: String;          // URI 不带参数
-
 
     FRequestParamsList: TStringList; // TODO:存放http参数的StringList
 
@@ -182,7 +164,6 @@ type
     FRequestCookies: string;
     
     FContextType: string;
-    FContextLength: Int64;
     FKeepAlive: Boolean;
     FRequestAccept: String;
     FRequestReferer: String;
@@ -218,24 +199,6 @@ type
     procedure Close;
 
     /// <summary>
-    /// 是否有效的Http 请求方法
-    /// </summary>
-    /// <returns>
-    /// 0: 数据不足够进行解码
-    /// 1: 有效的数据头
-    /// 2: 无效的请求数据头
-    /// </returns>
-    function DecodeHttpRequestMethod: Integer;
-
-    /// <summary>
-    /// 解码Http请求参数信息
-    /// </summary>
-    /// <returns>
-    /// 1: 有效的Http参数数据
-    /// </returns>
-    function DecodeHttpRequestHeader: Integer;
-    
-    /// <summary>
     /// 接收到的Buffer,写入数据
     /// </summary>
     procedure WriteRawHeaderBuffer(const buffer: Pointer; len: Integer);
@@ -245,6 +208,9 @@ type
     ///   不创建Session对象
     /// </summary>
     procedure CheckCookieSession;
+    function GetContextLength: Int64;
+    function GetRequestCookieList: TStrings;
+    function GetRequestURI: String;
   protected
   public
     constructor Create;
@@ -301,7 +267,7 @@ type
 
     property ContextType: String read FContextType;
 
-    property ContextLength: Int64 read FContextLength;
+    property ContextLength: Int64 read GetContextLength;
 
 
     /// <summary>
@@ -327,7 +293,7 @@ type
     property RequestAccept: String read FRequestAccept;
     property RequestAcceptEncoding: string read FRequestAcceptEncoding;
     property RequestAcceptLanguage: string read FRequestAcceptLanguage;
-    property RequestCookieList: TStrings read FRequestCookieList;
+    property RequestCookieList: TStrings read GetRequestCookieList;
     property RequestCookies: string read FRequestCookies;
 
     /// <summary>
@@ -350,7 +316,7 @@ type
     /// <summary>
     ///   不带URL参数
     /// </summary>
-    property RequestURI: String read FRequestURI;
+    property RequestURI: String read GetRequestURI;
 
     /// <summary>
     ///  从头信息中读取的请求服务器请求方式
@@ -435,15 +401,15 @@ type
 
   TDiocpHttpResponse = class(TObject)
   private
-    FResponseHeader: string;
-    FCookies: TList;
-    FContentType: String;
     FCookieData : String;
-    FData: TMemoryStream;
-    FHeader: TDValue;
     FDiocpContext : TDiocpHttpClientContext;
+    
+    FInnerResponse:THttpResponse;
     FHttpCodeStr: String;
     procedure ClearAllCookieObjects;
+    function GetContentType: String;
+    function GetHeader: TDValue;
+    procedure SetContentType(const Value: String);
   public
     procedure Clear;
     constructor Create;
@@ -464,15 +430,27 @@ type
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
 
-    property ContentType: String read FContentType write FContentType;
+    property ContentType: String read GetContentType write SetContentType;
 
-    property Data: TMemoryStream read FData;
-
-    property Header: TDValue read FHeader;
+    property Header: TDValue read GetHeader;
 
     property HttpCodeStr: String read FHttpCodeStr write FHttpCodeStr;
 
     procedure RedirectURL(pvURL:String);
+
+    procedure GZipContent;
+
+    procedure ZLibCompressContent;
+
+    procedure SetChunkedStart;
+
+    procedure SetChunkedEnd;
+
+    procedure ChunkedFlush;
+
+    procedure SetChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
+
+    procedure SetChunkedUtf8(pvStr:string);
   end;
 
   /// <summary>
@@ -667,19 +645,18 @@ begin
   FRawPostData.Clear;
   FURLParams.Clear;
   FRequestURL := '';
-  FRequestURI := '';
   FRequestRawURL := '';
   FRequestVersionStr := '';
   FRequestMethod := '';
   FRequestCookies := '';
   FRequestParamsList.Clear;
   FRequestCookieList.Clear;
-  FContextLength := 0;
   FContextType := '';
   FPostDataLen := 0;
   FResponse.Clear;
   FReleaseLater := false;
   FRequestRawHeaderString := '';
+  FInnerRequest.DoCleanUp;
 end;
 
 procedure TDiocpHttpRequest.Close;
@@ -699,15 +676,7 @@ var
   i:Integer;
   lvCookie:TDiocpHttpCookie;
 begin
-  for i := 0 to FResponse.FCookies.Count - 1 do
-  begin
-    lvCookie := FResponse.FCookies[i];
-    if lvCookie.Name = pvCookieName then
-    begin
-      Result := lvCookie.Value;
-      Exit;
-    end;
-  end;
+  lvCookie := FResponse.FInnerResponse.GetCookie(pvCookieName);
 
   Result := StringsValueOfName(FRequestCookieList, pvCookieName, ['='], true);
 end;
@@ -744,6 +713,8 @@ end;
 constructor TDiocpHttpRequest.Create;
 begin
   inherited Create;
+  FInnerRequest := THttpRequest.Create;
+  
   FHeader := TDValue.Create(vntObject);
 
   FURLParams := TDValue.Create(vntObject);
@@ -771,6 +742,8 @@ begin
 
   FURLParams.Free;
 
+  FInnerRequest.Free;
+
   inherited Destroy;
 end;
 
@@ -782,262 +755,6 @@ begin
   begin
     FSessionID := SESSIONID + '_' + DeleteChars(CreateClassID, ['-', '{', '}']);
     Response.AddCookie(SESSIONID, FSessionID);
-  end;
-end;
-
-function TDiocpHttpRequest.DecodeHttpRequestMethod: Integer;
-var
-  lvBuf: PAnsiChar;
-begin
-  Result := 0;
-  if FRawHeader.Size <= 7 then
-    Exit;
-
-  lvBuf := FRawHeader.Memory;
-
-  if FRequestMethod <> '' then
-  begin
-    Result := 1; // 已经解码
-    Exit;
-  end;
-
-  // 请求方法（所有方法全为大写）有多种，各个方法的解释如下：
-  // GET     请求获取Request-URI所标识的资源
-  // POST    在Request-URI所标识的资源后附加新的数据
-  // HEAD    请求获取由Request-URI所标识的资源的响应消息报头
-  // PUT     请求服务器存储一个资源，并用Request-URI作为其标识
-  // DELETE  请求服务器删除Request-URI所标识的资源
-  // TRACE   请求服务器回送收到的请求信息，主要用于测试或诊断
-  // CONNECT 保留将来使用
-  // OPTIONS 请求查询服务器的性能，或者查询与资源相关的选项和需求
-  // 应用举例：
-  // GET方法：在浏览器的地址栏中输入网址的方式访问网页时，浏览器采用GET方法向服务器获取资源，eg:GET /form.html HTTP/1.1 (CRLF)
-  //
-  // POST方法要求被请求服务器接受附在请求后面的数据，常用于提交表单。
-
-  Result := 1;
-  // HTTP 1.1 支持8种请求
-  if (StrLIComp(lvBuf, 'GET', 3) = 0) then
-  begin
-    FRequestMethod := 'GET';
-  end
-  else if (StrLIComp(lvBuf, 'POST', 4) = 0) then
-  begin
-    FRequestMethod := 'POST';
-  end
-  else if (StrLIComp(lvBuf, 'PUT', 3) = 0) then
-  begin
-    FRequestMethod := 'PUT';
-  end
-  else if (StrLIComp(lvBuf, 'HEAD', 3) = 0) then
-  begin
-    FRequestMethod := 'HEAD';
-  end
-  else if (StrLIComp(lvBuf, 'OPTIONS', 7) = 0) then
-  begin
-    FRequestMethod := 'OPTIONS';
-  end
-  else if (StrLIComp(lvBuf, 'DELETE', 6) = 0) then
-  begin
-    FRequestMethod := 'DELETE';
-  end
-  else if (StrLIComp(lvBuf, 'TRACE', 5) = 0) then
-  begin
-    FRequestMethod := 'TRACE';
-  end
-  else if (StrLIComp(lvBuf, 'CONNECT', 7) = 0) then
-  begin
-    FRequestMethod := 'CONNECT';
-  end
-  else
-  begin
-    Result := 2;
-  end;
-end;
-
-function TDiocpHttpRequest.DecodeHttpRequestHeader: Integer;
-var
-  lvRawString: AnsiString;
-  lvMethod, lvRawTemp: AnsiString;
-  lvRequestCmdLine, lvTempStr, lvRemainStr: String;
-  I, J: Integer;
-  p : PChar;
-begin
-  Result := 1;
-  SetLength(lvRawString, FRawHeader.Size);
-  FRawHeader.Position := 0;
-  FRawHeader.Read(lvRawString[1], FRawHeader.Size);
-  FRequestRawHeaderString := lvRawString;
-  FRequestHeader.Text := lvRawString;
-
-  // GET /test?v=abc HTTP/1.1
-  lvRequestCmdLine := FRequestHeader[0];
-  P := PChar(lvRequestCmdLine);
-  FRequestHeader.Delete(0);
-
-  I := 1;
-  while (I <= Length(lvRequestCmdLine)) and (lvRequestCmdLine[I] <> ' ') do
-    Inc(I);
-  // 请求方法(GET, POST, PUT, HEAD...)
-  lvMethod := UpperCase(Copy(lvRequestCmdLine, 1, I - 1));
-  Inc(I);
-  while (I <= Length(lvRequestCmdLine)) and (lvRequestCmdLine[I] = ' ') do
-    Inc(I);
-  J := I;
-  while (I <= Length(lvRequestCmdLine)) and (lvRequestCmdLine[I] <> ' ') do
-    Inc(I);
-
-  // 请求参数及路径
-  lvTempStr := Copy(lvRequestCmdLine, J, I - J);
-  FRequestRawURL := lvTempStr;
-  FRequestURLParamData := '';
-
-  // 解析参数
-  J := Pos('?', lvTempStr);
-
-  if (J <= 0) then
-  begin
-    lvRawTemp := '';
-    FRequestURL := URLDecode(lvTempStr);
-    FRequestURL := UTF8Decode(FRequestURL);  // Url经过了Utf8编码
-    FRequestURI := FRequestURL;   //无参数和url一致
-  end
-  else
-  begin
-    // IE原始URL  : /中国.asp?topicid=a汉字a
-    // 后台接收到 : /%E4%B8%AD%E5%9B%BD.asp?topicid=a汉字a
-
-    // FireFox/360极速浏览器原始URL : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
-    // 后台接收到 : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
-
-
-    // URI需要进行URLDecode和Utf8解码
-    FRequestURI := Copy(lvTempStr, 1, J - 1);
-    FRequestURI := URLDecode(FRequestURI, False);
-    FRequestURI := UTF8Decode(FRequestURI);
-
-    // URL中的参数需要进行URLDecode，IE提交过来的为前台的系统默认编码
-    lvRawTemp := Copy(lvTempStr, J + 1, MaxInt);
-    FRequestURLParamData := lvRawTemp;
-    lvRawTemp := URLDecode(lvRawTemp, False);      // 其他浏览器需要进行URLDecode(IE不需要)
-
-    // 拼接
-    FRequestURL := FRequestURI + lvRawTemp;
-  end;
-
-  Inc(I);
-  while (I <= Length(lvRequestCmdLine)) and (lvRequestCmdLine[I] = ' ') do
-    Inc(I);
-  J := I;
-  while (I <= Length(lvRequestCmdLine)) and (lvRequestCmdLine[I] <> ' ') do
-    Inc(I);
-
-  // 请求的HTTP版本
-  FRequestVersionStr := Trim(UpperCase(Copy(lvRequestCmdLine, J, I - J)));
-
-  if (FRequestVersionStr = '') then
-    FRequestVersionStr := 'HTTP/1.0';
-  if (lvTempStr = 'HTTP/1.0') then
-  begin
-    FHttpVersion := 10;
-    FKeepAlive := false; // 默认为false
-  end
-  else
-  begin
-    FHttpVersion := 11;
-    FKeepAlive := true; // 默认为true
-  end;
-
-  FContextLength := 0;
-
-
-  // eg：POST /reg.jsp HTTP/ (CRLF)
-  // Accept:image/gif,image/x-xbit,... (CRLF)
-  // ...
-  // HOST:www.guet.edu.cn (CRLF)
-  // Content-Length:22 (CRLF)
-  // Connection:Keep-Alive (CRLF)
-  // Cache-Control:no-cache (CRLF)
-  // (CRLF)         //该CRLF表示消息报头已经结束，在此之前为消息报头
-  // user=jeffrey&pwd=1234  //此行以下为提交的数据
-  //
-  // HEAD方法与GET方法几乎是一样的，对于HEAD请求的回应部分来说，它的HTTP头部中包含的信息与通过GET请求所得到的信息是相同的。利用这个方法，不必传输整个资源内容，就可以得到Request-URI所标识的资源的信息。该方法常用于测试超链接的有效性，是否可以访问，以及最近是否更新。
-  // 2、请求报头后述
-  // 3、请求正文(略)
-
-  FHeader.RemoveAll;
-  for I := 0 to FRequestHeader.Count - 1 do
-  begin
-    lvRequestCmdLine := FRequestHeader[I];
-    P := PChar(lvRequestCmdLine);
-
-    // 获取右边的字符
-    lvTempStr := LeftUntil(P, [':']);
-    SkipChars(P, [':', ' ']);
-
-    // 获取剩余的字符
-    lvRemainStr := P;
-
-    if (lvRequestCmdLine = '') then
-      Continue;
-
-    FHeader.ForceByName(lvTempStr).Value.AsString := lvRemainStr;
-
-    if SameText(lvTempStr, 'Content-Type') then
-    begin
-      FContextType := lvRemainStr;
-    end else if SameText(lvTempStr, 'Content-Length') then
-    begin
-      FContextLength := StrToInt64Def(lvRemainStr, -1);
-    end else if SameText(lvTempStr, 'Accept') then
-    begin
-      FRequestAccept := lvRemainStr;
-    end else if SameText(lvTempStr, 'Referer') then
-    begin
-      FRequestReferer := lvRemainStr;
-    end else if SameText(lvTempStr, 'Accept-Language') then
-    begin
-      FRequestAcceptLanguage := lvRemainStr;
-    end else if SameText(lvTempStr, 'Accept-Encoding') then
-    begin
-      FRequestAcceptEncoding := lvRemainStr;
-    end else if SameText(lvTempStr, 'User-Agent')then
-    begin
-      FRequestUserAgent := lvRemainStr;
-    end else if SameText(lvTempStr, 'Authorization') then
-    begin
-      FRequestAuth := lvRemainStr;
-    end else if SameText(lvTempStr, 'Cookie') then
-    begin
-      // Cookie:__gads=ID=6ff3a79a032e04d0:T=1425100914:S=ALNI_MZWDCQuaEqZV3ZYri0E4GU8osX7rw; pgv_pvi=5995954176; lzstat_uv=25556556142595371638|754770@2240623; Hm_lvt_674430fbddd66a488580ec86aba288f7=1433747304,1435200001; Hm_lvt_95eb98507622b340bc1da73ed59cfe34=1435906572; AJSTAT_ok_times=2; __utma=226521935.635858515.1425100841.1436162631.1437634125.12; __utmz=226521935.1437634125.12.12.utmcsr=baidu|utmccn=(organic)|utmcmd=organic; _gat=1; _ga=GA1.2.635858515.1425100841; .CNBlogsCookie=B70AF05C246EE95507A6B4E1206C55C394843B6EB1376064B7CE2199A3441791D09AB86E934DF47E48B2E409BC57F7F4C43950430B29D3B23CAC82C7E58212D912F3ECB144B6971C4D9A7EB4E609A900A50016DA
-      FRequestCookies := lvRemainStr;
-      SplitStrings(FRequestCookies, FRequestCookieList, [';']);
-    end else if SameText(lvTempStr, 'Host') then
-    begin
-      lvTempStr := lvRemainStr;
-      J := Pos(':', lvTempStr);
-      if J > 0 then
-      begin
-        FRequestHostName := Copy(lvTempStr, 1, J - 1);
-        FRequestHostPort := Copy(lvTempStr, J + 1, 100);
-      end
-      else
-      begin
-        FRequestHostName := lvTempStr;
-        FRequestHostPort := IntToStr((FDiocpContext).Owner.Port);
-      end;
-    end
-    else if SameText(lvTempStr, 'Connection') then
-    begin
-      // HTTP/1.0 默认KeepAlive=False，只有显示指定了Connection: keep-alive才认为KeepAlive=True
-      // HTTP/1.1 默认KeepAlive=True，只有显示指定了Connection: close才认为KeepAlive=False
-      if FHttpVersion = 10 then
-        FKeepAlive := SameText(lvRemainStr, 'keep-alive')
-      else if SameText(lvRemainStr, 'close') then
-        FKeepAlive := false;
-    end
-    else if SameText(lvTempStr, 'X-Forwarded-For') then
-      FXForwardedFor := lvRemainStr;
   end;
 end;
 
@@ -1175,6 +892,23 @@ begin
 
 end;
 
+function TDiocpHttpRequest.GetContextLength: Int64;
+begin
+  Result := FInnerRequest.ContentLength;
+end;
+
+function TDiocpHttpRequest.GetRequestCookieList: TStrings;
+begin
+  //if FReq then
+  
+  Result := FRequestCookieList;
+end;
+
+function TDiocpHttpRequest.GetRequestURI: String;
+begin
+  Result := FInnerRequest.RequestURI;
+end;
+
 procedure TDiocpHttpRequest.RemoveSession;
 begin
   CheckCookieSession;
@@ -1209,6 +943,7 @@ var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
+ 
   lvFixedHeader := FResponse.EncodeHeader;
 
   if (lvFixedHeader <> '') then
@@ -1224,10 +959,10 @@ begin
     FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
   end;
 
-  if FResponse.FData.Size > 0 then
+  if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
   begin
-    FDiocpContext.PostWSASendRequest(FResponse.FData.Memory,
-      FResponse.FData.Size);
+    FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.ContentBuffer.Memory,
+      FResponse.FInnerResponse.ContentBuffer.Length);
   end;
 
   if not FKeepAlive then
@@ -1257,10 +992,10 @@ begin
     FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
   end;
 
-  if FResponse.FData.Size > 0 then
+  if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
   begin
-    FDiocpContext.PostWSASendRequest(FResponse.FData.Memory,
-      FResponse.FData.Size);
+    FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.ContentBuffer.Memory,
+      FResponse.FInnerResponse.ContentBuffer.Length);
   end;
 
 end;
@@ -1282,139 +1017,74 @@ begin
   FRawHeader.WriteBuffer(buffer^, len);
 end;
 
+procedure TDiocpHttpResponse.ChunkedFlush;
+begin
+  FDiocpContext.PostWSASendRequest(FInnerResponse.ContentBuffer.Memory, FInnerResponse.ContentBuffer.Length);
+  FInnerResponse.ContentBuffer.Clear;
+end;
+
 procedure TDiocpHttpResponse.Clear;
 begin
-  FContentType := '';
-  FData.Clear;
-  FResponseHeader := '';
   FHttpCodeStr := '';
-  ClearAllCookieObjects;
+  FInnerResponse.DoCleanUp;
 end;
 
 constructor TDiocpHttpResponse.Create;
 begin
   inherited Create;
-  FData := TMemoryStream.Create();
-  FHeader := TDValue.Create(vntObject);
-  FCookies := TList.Create();
+  FInnerResponse := THttpResponse.Create;
 end;
 
 destructor TDiocpHttpResponse.Destroy;
 begin
   Clear;
-  FreeAndNil(FData);
-  FHeader.Free;
-  FCookies.Free;
+  FInnerResponse.Free;
   inherited Destroy;
 end;
 
 function TDiocpHttpResponse.AddCookie: TDiocpHttpCookie;
 begin
-  Result := TDiocpHttpCookie.Create;
-  Result.Path := '/';
-  FCookies.Add(Result);
+  Result := FInnerResponse.AddCookie;
 end;
 
 function TDiocpHttpResponse.AddCookie(pvName:String; pvValue:string):
     TDiocpHttpCookie;
 begin
-  Result := AddCookie;
-  Result.Name := pvName;
-  Result.Value := pvValue;
+  Result := FInnerResponse.AddCookie(pvName, pvValue);
 end;
 
 function TDiocpHttpResponse.EncodeHeader: String;
-var
-  lvVersionStr:string;
-  i: Integer;
 begin
-  Result := '';
-
-  lvVersionStr := 'HTTP/1.1';
-
-  if (FHttpCodeStr = '') then FHttpCodeStr := '200 OK';
-  Result := Result + lvVersionStr + ' ' + FHttpCodeStr + #13#10;
-
-  if (FContentType = '') then FContentType := 'text/html';
-  Result := Result + 'Content-Type: ' + FContentType + #13#10;
-
-  if (FData.Size > 0) then
-    Result := Result + 'Content-Length: ' + IntToStr(FData.Size) + #13#10;
-
-  Result := Result + 'Connection: close'#13#10;
-
-
-  for i := 0 to FCookies.Count - 1 do
-  begin
-    Result := Result + 'Set-Cookie:' + TDiocpHttpCookie(FCookies[i]).ToString() + sLineBreak;
-  end;
-
-//  if FCookieData <> '' then
-//  begin             // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
-//    Result := Result + 'Set-Cookie:' + FCookieData + sLineBreak;
-//  end;
-
-  Result := Result + 'Server: DIOCP-V5/1.1'#13#10;
+ 
+  FInnerResponse.EncodeHeader(FInnerResponse.ContentBuffer.Length);
+  Result := FInnerResponse.HeaderBuilder.ToRAWString;
 end;
 
 procedure TDiocpHttpResponse.ClearAllCookieObjects;
-var
-  i: Integer;
 begin
-  for i := 0 to FCookies.Count-1 do
-  begin
-    TObject(FCookies[i]).Free;
-  end;
-  FCookies.Clear();
+  FInnerResponse.ClearCookies;
 end;
 
 function TDiocpHttpResponse.EncodeResponseHeader(pvContentLength: Integer):
     string;
-var
-  lvVersionStr:string;
-  i: Integer;
-  lvItem:TDValue;
 begin
-  Result := '';
+  FInnerResponse.EncodeHeader(pvContentLength);
+  Result := FInnerResponse.HeaderBuilder.ToRAWString;
+end;
 
-  lvVersionStr := 'HTTP/1.1';
+function TDiocpHttpResponse.GetContentType: String;
+begin
+  Result := FInnerResponse.ContentType;
+end;
 
-  if (FHttpCodeStr = '') then FHttpCodeStr := '200 OK';
-  Result := Result + lvVersionStr + ' ' + FHttpCodeStr + #13#10;
+function TDiocpHttpResponse.GetHeader: TDValue;
+begin
+  Result := FInnerResponse.Headers;
+end;
 
-  for i := 0 to FHeader.Count - 1 do
-  begin
-    lvItem := FHeader.Items[i];
-    Result := Result + lvItem.Name.AsString + ':' + lvItem.Value.AsString + HTTPLineBreak;
-  end;
-
-  if pvContentLength > 0 then
-  begin
-    Result := Result + 'Content-Length: ' + IntToStr(pvContentLength) + #13#10;
-  end else
-  begin
-    if (FData.Size > 0) then
-      Result := Result + 'Content-Length: ' + IntToStr(FData.Size) + #13#10;
-  end;
-
-  Result := Result + 'Connection: close'#13#10;
-
-
-  for i := 0 to FCookies.Count - 1 do
-  begin
-    Result := Result + 'Set-Cookie:' + TDiocpHttpCookie(FCookies[i]).ToString() + sLineBreak;
-  end;
-
-// header中会有
-//  if (FContentType = '') then FContentType := 'text/html';
-//  Result := Result + 'Content-Type: ' + FContentType + #13#10;
-
-//  if FCookieData <> '' then
-//  begin             // Set-Cookie: JSESSIONID=4918D6ED22B81B587E7AF7517CE24E25.server1; Path=/cluster
-//    Result := Result + 'Set-Cookie:' + FCookieData + sLineBreak;
-//  end;
-
-  Result := Result + 'Server: DIOCP-V5/1.1'#13#10;
+procedure TDiocpHttpResponse.GZipContent;
+begin
+  FInnerResponse.GZipContent;
 end;
 
 procedure TDiocpHttpResponse.RedirectURL(pvURL: String);
@@ -1439,9 +1109,37 @@ begin
 
 end;
 
+procedure TDiocpHttpResponse.SetChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
+begin
+  FInnerResponse.ChunkedBuffer(pvBuffer, pvLen);
+end;
+
+procedure TDiocpHttpResponse.SetChunkedEnd;
+begin
+  FInnerResponse.ChunkedBufferEnd;
+end;
+
+procedure TDiocpHttpResponse.SetChunkedStart;
+begin
+  FInnerResponse.ChunkedBufferStart;
+end;
+
+procedure TDiocpHttpResponse.SetChunkedUtf8(pvStr:string);
+var
+  lvBytes:TBytes;
+begin
+  lvBytes := StringToUtf8Bytes(pvStr);
+  FInnerResponse.ChunkedBuffer(@lvBytes[0], length(lvBytes));
+end;
+
+procedure TDiocpHttpResponse.SetContentType(const Value: String);
+begin
+  FInnerResponse.ContentType := Value;
+end;
+
 procedure TDiocpHttpResponse.WriteBuf(pvBuf: Pointer; len: Cardinal);
 begin
-  FData.Write(pvBuf^, len);
+  FInnerResponse.ContentBuffer.AppendBuffer(PByte(pvBuf), len);
 end;
 
 procedure TDiocpHttpResponse.WriteString(pvString: string; pvUtf8Convert:
@@ -1451,12 +1149,17 @@ var
 begin
   if pvUtf8Convert then
   begin     // 进行Utf8转换
-    lvRawString := UTF8Encode(pvString);
+    FInnerResponse.ContentBuffer.AppendUtf8(pvString);
   end else
   begin
-    lvRawString := AnsiString(pvString);
+    lvRawString := pvString;
+    FInnerResponse.ContentBuffer.AppendBuffer(PByte(lvRawString), Length(lvRawString));
   end;
-  FData.WriteBuffer(PAnsiChar(lvRawString)^, Length(lvRawString));
+end;
+
+procedure TDiocpHttpResponse.ZLibCompressContent;
+begin
+  FInnerResponse.ZCompressContent
 end;
 
 constructor TDiocpHttpClientContext.Create;
@@ -1580,20 +1283,18 @@ end;
 procedure TDiocpHttpClientContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
   ErrCode: Word);
 var
-  lvTmpBuf: PAnsiChar;
-  CR, LF: Integer;
+  lvTmpBuf: PByte;
   lvRemain: Cardinal;
+  r:Integer;
   lvTempRequest: TDiocpHttpRequest;
 begin
   inherited;
-  lvTmpBuf := buf;
-  CR := 0;
-  LF := 0;
+  lvTmpBuf := PByte(buf);
   lvRemain := len;
   while (lvRemain > 0) do
   begin
-    if FHttpState = hsCompleted then
-    begin // 完成后重置，重新处理下一个包
+    if FCurrentRequest = nil then
+    begin
       FCurrentRequest := TDiocpHttpServer(Owner).GetRequest;
       FCurrentRequest.FDiocpContext := self;
       FCurrentRequest.Response.FDiocpContext := self;
@@ -1601,94 +1302,56 @@ begin
 
       // 记录当前contextDNA，异步任务时组做检测
       FCurrentRequest.FContextDNA := self.ContextDNA;
-
-      FHttpState := hsRequest;
+    end;
+    
+    r := FCurrentRequest.FInnerRequest.InputBuffer(lvTmpBuf^);
+    if r = -1 then
+    begin
+      self.RequestDisconnect('无效的Http请求', self);
+      Exit;
     end;
 
-    if (FHttpState = hsRequest) then
+    if r = -2 then
     begin
-      case lvTmpBuf^ of
-        #13:
-          Inc(CR);
-        #10:
-          Inc(LF);
-      else
-        CR := 0;
-        LF := 0;
-      end;
+      self.RequestDisconnect('HTTP请求头数据过大', self);
+      Exit;
+    end;
 
-      // 写入请求数据
-      FCurrentRequest.WriteRawHeaderBuffer(lvTmpBuf, 1);
-
-      if FCurrentRequest.DecodeHttpRequestMethod = 2 then
-      begin // 无效的Http请求
-        // 还回对象池
-        self.RequestDisconnect('无效的Http请求', self);
-        Exit;
-      end;
-
-      // 请求数据已接收完毕(#13#10#13#10是HTTP请求结束的标志)
-      if (CR = 2) and (LF = 2) then
+    if r = 0 then
+    begin
+      ; //需要更多的数据解码
+    end else
+    if r = 1 then
+    begin
+      if SameText(FCurrentRequest.FInnerRequest.Method, 'POST') or
+          SameText(FCurrentRequest.FInnerRequest.Method, 'PUT') then
       begin
-        if FCurrentRequest.DecodeHttpRequestHeader = 0 then
+        if FCurrentRequest.FInnerRequest.ContentLength = 0 then
         begin
-          self.RequestDisconnect('无效的Http协议数据', self);
+          self.RequestDisconnect('无效的POST/PUT请求数据', self);
           Exit;
         end;
-
-        if SameText(FCurrentRequest.FRequestMethod, 'POST') or
-          SameText(FCurrentRequest.FRequestMethod, 'PUT') then
-        begin
-          // 无效的Post请求直接断开
-          if (FCurrentRequest.FContextLength <= 0) then
-          begin
-            self.RequestDisconnect('无效的POST/PUT请求数据', self);
-            Exit;
-          end;
-          // 改变Http状态, 进入接受数据状态
-          FHttpState := hsRecvingPost;
-        end
-        else
-        begin
-          FHttpState := hsCompleted;
-
-          lvTempRequest := FCurrentRequest;
-
-          // 避免断开后还回对象池，造成重复还回
-          FCurrentRequest := nil;
-
-          // 触发事件
-          DoRequest(lvTempRequest);
-
-          FCurrentRequest := nil;
-          Break;
-        end;
-      end;
-    end
-    else if (FHttpState = hsRecvingPost) then
-    begin
-      FCurrentRequest.FRawPostData.Write(lvTmpBuf^, 1);
-      Inc(FCurrentRequest.FPostDataLen);
-
-      if FCurrentRequest.FPostDataLen >= FCurrentRequest.FContextLength then
+      end else
       begin
-        FHttpState := hsCompleted;
-
-        // 触发事件
-        TDiocpHttpServer(FOwner).DoRequestPostDataDone(FCurrentRequest);
-
         lvTempRequest := FCurrentRequest;
 
         // 避免断开后还回对象池，造成重复还回
         FCurrentRequest := nil;
 
-        //
-        lvTempRequest.FRawPostData.Position := 0;
-
-        // 触发事件
         DoRequest(lvTempRequest);
       end;
-    end;
+    end else
+    if r = 2 then
+    begin
+      lvTempRequest := FCurrentRequest;
+
+      // 避免断开后还回对象池，造成重复还回
+      FCurrentRequest := nil;
+
+      // 触发事件
+      DoRequest(lvTempRequest);
+    end;   
+
     Dec(lvRemain);
     Inc(lvTmpBuf);
   end;
@@ -1826,11 +1489,6 @@ begin
   finally
     FSessionList.unLock;
   end;  
-end;
-
-function TDiocpHttpCookie.ToString: String;
-begin
-  Result := Format('%s=%s; Path=%s;', [self.FName, self.FValue, Self.FPath]);
 end;
 
 constructor TDiocpHttpSession.Create;
