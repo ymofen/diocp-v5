@@ -443,7 +443,10 @@ function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
 function StringToUtf8Bytes(pvData:string): TBytes; overload;
 
-function StringToBytes(pvData:String; pvBytes:TBytes): Integer;
+function StringToBytes(pvData:String; pvBytes:TBytes): Integer; overload;
+
+function StringToBytes(pvData:string): TBytes; overload;
+
 function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
 function ByteBufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
@@ -1609,7 +1612,11 @@ begin
 {$IFDEF MSWINDOWS}
   CheckNeedSize(1);
   FData[FWritePosition] := 0;
-  Result := StrPas(@FData[0]);
+  {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
+  Result := AnsiStrings.StrPas(PAnsiChar(@FData[0]));
+  {$ELSE}
+  Result := StrPas(PAnsiChar(@FData[0]));
+  {$IFEND >=XE5}
 {$ELSE}
   CheckNeedSize(2);
   FData[FWritePosition] := 0;
@@ -1696,6 +1703,21 @@ begin
   SetLength(lvRawStr, l);
   Move(pvBuff^, PansiChar(lvRawStr)^, l);
   Result := lvRawStr;
+{$ENDIF}
+end;
+
+function StringToBytes(pvData:string): TBytes;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := TEncoding.Default.GetBytes(pvData);
+{$ELSE}
+  lvRawStr := pvData;
+  SetLength(Result, Length(lvRawStr));
+  Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
 {$ENDIF}
 end;
 

@@ -63,18 +63,46 @@ type
     refcounter :Integer;
     next: PBufferBlock;
     owner: PBufferPool;
+    data: Pointer;
+    data_free_type:Byte; // 0,
   end;
 
 const
   BLOCK_SIZE = SizeOf(TBufferBlock);
 
+  FREE_TYPE_NONE = 0;
+  FREE_TYPE_FREEMEM = 1;
+  FREE_TYPE_DISPOSE = 2;
+  FREE_TYPE_OBJECTFREE = 3;
+
+
 function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
 procedure FreeBufferPool(buffPool:PBufferPool);
 
-function GetBuffer(ABuffPool:PBufferPool): PByte;
+function GetBuffer(ABuffPool:PBufferPool): PByte;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
-function AddRef(pvBuffer:PByte): Integer;
-function ReleaseRef(pvBuffer:PByte): Integer;
+function AddRef(pvBuffer:PByte): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
+/// <summary>
+///   减少对内存块的引用
+///   为0时，释放data数据
+/// </summary>
+function ReleaseRef(pvBuffer:PByte): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+function ReleaseRef(pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
+    Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+
+
+/// <summary>
+///   附加一个数据
+/// </summary>
+procedure AttachData(pvBuffer, pvData: Pointer; pvFreeType: Byte);
+
+/// <summary>
+///   获取附加的数据
+///   0:成功
+///   1:没有
+/// </summary>
+function GetAttachData(pvBuffer: Pointer; var X: Pointer): Integer;
 
 /// <summary>
 ///  检测池中内存块越界情况
@@ -94,12 +122,30 @@ procedure SpinUnLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_
 procedure SpinUnLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
 
 
+
+
 {$if CompilerVersion < 18} //before delphi 2007
 function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint; Comperand: Longint): Longint stdcall; external kernel32 name 'InterlockedCompareExchange';
 {$EXTERNALSYM InterlockedCompareExchange}
 {$ifend}
 
 implementation
+
+procedure ReleaseAttachData(pvBlock:PBufferBlock); {$IFDEF HAVE_INLINE} inline;{$ENDIF} 
+begin
+  if pvBlock.data <> nil then
+  begin
+    case pvBlock.data_free_type of
+      0: ;
+      1: FreeMem(pvBlock.data);
+      2: Dispose(pvBlock.data);
+      3: TObject(pvBlock.data).Free;
+    else
+      Assert(False, Format('BufferBlock[%s] unkown data free type:%d', [pvBlock.owner.FName, pvBlock.data_free_type]));
+    end;
+    pvBlock.data := nil;
+  end;   
+end;
 
 procedure SpinLock(var Target:Integer; var WaitCounter:Integer);
 begin
@@ -204,6 +250,7 @@ begin
   {$ELSE}
   ABuffPool.FLocker.Enter;
   {$ENDIF}
+  // 获取一个节点
   lvBuffer := PBufferBlock(ABuffPool.FHead);
   if lvBuffer <> nil then ABuffPool.FHead := lvBuffer.next;
   {$IFDEF USE_SPINLOCK}
@@ -237,7 +284,10 @@ begin
   AtomicIncrement(ABuffPool.FGet);
 end;
 
-procedure FreeBuffer(pvBufBlock:PBufferBlock);
+/// <summary>
+///  释放内存块到Owner的列表中
+/// </summary>
+procedure FreeBuffer(pvBufBlock:PBufferBlock); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 var
   lvBuffer:PBufferBlock;
   lvOwner:PBufferPool;
@@ -264,7 +314,7 @@ end;
 function AddRef(pvBuffer:PByte): Integer;
 var
   lvBuffer:PByte;
-  lvBlock:PBufferBlock; 
+  lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_SIZE);
@@ -275,24 +325,8 @@ begin
 end;
 
 function ReleaseRef(pvBuffer:PByte): Integer;
-var
-  lvBuffer:PByte;
-  lvBlock:PBufferBlock; 
 begin
-  lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_SIZE);
-  lvBlock := PBufferBlock(lvBuffer);
-  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
-  Result := AtomicDecrement(lvBlock.refcounter);
-  AtomicIncrement(lvBlock.owner.FReleaseRef);
-  if Result = 0 then
-  begin
-    FreeBuffer(lvBlock);
-  end else
-  begin
-    Assert(Result > 0, 'DBuffer error release');
-  end;
-
+  ReleaseRef(pvBuffer, True);
 end;
 
 function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
@@ -326,6 +360,7 @@ begin
   while lvBlock <> nil do
   begin
     lvNext := lvBlock.next;
+    ReleaseAttachData(lvBlock);
     FreeMem(lvBlock);
     lvBlock := lvNext;
   end;
@@ -365,6 +400,66 @@ begin
   {$ELSE}
   ABuffPool.FLocker.Leave;
   {$ENDIF}
+end;
+
+
+
+procedure AttachData(pvBuffer, pvData: Pointer; pvFreeType: Byte);
+var
+  lvBuffer:PByte;
+  lvBlock:PBufferBlock;
+begin
+  lvBuffer := pvBuffer;
+  Dec(lvBuffer, BLOCK_SIZE);
+  lvBlock := PBufferBlock(lvBuffer);
+  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+
+  ReleaseAttachData(lvBlock);
+  
+  lvBlock.data := pvData;
+  lvBlock.data_free_type := pvFreeType;
+end;
+
+function GetAttachData(pvBuffer: Pointer; var X: Pointer): Integer;
+var
+  lvBuffer:PByte;
+  lvBlock:PBufferBlock;
+begin
+  lvBuffer := pvBuffer;
+  Dec(lvBuffer, BLOCK_SIZE);
+  lvBlock := PBufferBlock(lvBuffer);
+  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+
+  if lvBlock.data <> nil then
+  begin
+    X := lvBlock.data;
+    Result := 0;
+  end else
+  begin
+    Result := -1;
+  end;
+end;
+
+function ReleaseRef(pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
+    Integer; overload;
+var
+  lvBuffer:PByte;
+  lvBlock:PBufferBlock; 
+begin
+  lvBuffer := pvBuffer;
+  Dec(lvBuffer, BLOCK_SIZE);
+  lvBlock := PBufferBlock(lvBuffer);
+  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+  Result := AtomicDecrement(lvBlock.refcounter);
+  AtomicIncrement(lvBlock.owner.FReleaseRef);
+  if Result = 0 then
+  begin
+    if pvReleaseAttachDataAtEnd then ReleaseAttachData(lvBlock);
+    FreeBuffer(lvBlock);
+  end else
+  begin
+    Assert(Result > 0, 'DBuffer error release');
+  end;
 end;
 
 

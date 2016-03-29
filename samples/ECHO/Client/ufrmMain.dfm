@@ -11,6 +11,7 @@ object frmMain: TfrmMain
   Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
+  OnClose = FormClose
   OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
@@ -19,15 +20,11 @@ object frmMain: TfrmMain
     Top = 79
     Width = 844
     Height = 351
-    ActivePage = tsOperator
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #26085#24535
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoRecvMessage: TMemo
         Left = 0
         Top = 0
@@ -42,10 +39,6 @@ object frmMain: TfrmMain
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316

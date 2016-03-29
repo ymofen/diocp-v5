@@ -4,8 +4,15 @@ interface
 
 {$DEFINE USE_ZLIBExGZ}
 
+{$if CompilerVersion>= 21}
+{$DEFINE USE_NetEncoding}
+{$ENDIF}
 uses
   utils.strings, SysUtils, utils_dvalue
+{$IFDEF USE_NetEncoding}
+    , System.NetEncoding
+{$ENDIF}
+
 {$IFDEF USE_ZLIBExGZ}
   , ZLibExGZ, ZLibEx
 {$ENDIF}
@@ -111,6 +118,7 @@ type
     FCookies: TDValue;
     FHeaders: TDValue;
     FResponseCode: Word;
+    FResponseCodeStr: String;
     procedure InnerBuildHeader(pvBuilder: TDBufferBuilder); virtual;
   public
     procedure DoCleanUp;
@@ -123,6 +131,8 @@ type
     property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
     property Headers: TDValue read FHeaders;
     property ResponseCode: Word read FResponseCode write FResponseCode;
+    property ResponseCodeStr: String read FResponseCodeStr write FResponseCodeStr;
+
     /// <summary>
     ///  读取传入的Cookie值
     /// </summary>
@@ -176,6 +186,21 @@ procedure ZDecompressBufferBuilder(pvBuilder:TDBufferBuilder);
 procedure GZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
 procedure GZDecompressBufferBuilder(pvBuilder:TDBufferBuilder);
 {$ENDIF}
+
+/// <summary>
+///   [utf8/ansi]->url
+/// </summary>
+function URLEncode(pvStr: string; pvConvertUtf8: Boolean = true): string;
+
+/// <summary>
+///   raw buffer -> url
+/// </summary>
+function BufferURLEncode(pvBuff: PByte; pvLen: Integer): string;
+
+/// <summary>
+///   urldecode -> utf8
+/// </summary>
+function URLDecode(pvStr: RAWString; pvConvertUtf8: Boolean = true): String;
 
 
 
@@ -245,6 +270,7 @@ var
   lvOutBuf: Pointer;
   lvOutBytes: Integer;
 {$ENDIF}
+  lvRefBuf: PByte;
 var
   l: Integer;
 begin
@@ -264,8 +290,13 @@ begin
     {$ELSE}
     ZLib.CompressBuf(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
     {$ifend}
+
+    // 截取前面2位标识符和后四位（2007测试通过OK, deflate压缩方式)
+    lvRefBuf := PByte(lvOutBuf);
+    inc(lvRefBuf, 2);
+
     pvBuilder.Clear;
-    pvBuilder.AppendBuffer(lvOutBuf, lvOutBytes);
+    pvBuilder.AppendBuffer(lvRefBuf, lvOutBytes -2 -4);
   finally
     FreeMem(lvOutBuf, lvOutBytes);
   end;
@@ -357,8 +388,84 @@ begin
     lvOutStream.Free;
   end; 
 end;
-
 {$ENDIF}
+
+function BufferURLEncode(pvBuff: PByte; pvLen: Integer): string;
+// The NoConversion set contains characters as specificed in RFC 1738 and
+// should not be modified unless the standard changes.
+const
+  NoConversion = [Ord('A')..Ord('Z'), Ord('a')..Ord('z'), Ord('*'), Ord('@'),
+                  Ord('.'), Ord('_'), Ord('-'), Ord('0')..Ord('9'), Ord('$'),
+                  Ord('!'), Ord(''''), Ord('('), Ord(')')];
+
+  procedure AppendByte(B: Byte; var Buffer: PChar);
+  const
+    Hex = '0123456789ABCDEF';
+  begin
+    Buffer[0] := '%';
+    Buffer[1] := Hex[B shr 4 + Low(string)];
+    Buffer[2] := Hex[B and $F + Low(string)];
+    Inc(Buffer, 3);
+  end;
+
+var
+  Rp: PChar;
+  lvBuff:PByte;
+  MultibyteChar: TBytes;
+  I, ByteCount, j: Integer;
+begin
+  // Characters that require more than 1 byte are translated as "percent-encoded byte"
+  // which will be encoded with 3 chars per byte -> %XX
+  // Example: U+00D1 ($F1 in CodePage 1252)
+  //   UTF-8 representation: $C3 $91 (2 bytes)
+  //   URL encode representation: %C3%91
+  //
+  // 3 characters to represent each byte
+  SetLength(Result, pvLen * 3);
+  lvBuff := PByte(pvBuff);
+  Rp := PChar(Result);
+  j := 0;
+  while j < pvLen do
+  begin
+    if lvBuff^ in NoConversion then
+    begin
+      Rp^ := Char(lvBuff^);
+      Inc(Rp)
+    end
+//    else if pvBuff^ = Ord(' ') then
+//    begin
+//      Rp^ := '+';
+//      Inc(Rp)
+//    end
+    else
+    begin
+       AppendByte(lvBuff^, Rp)
+    end;
+    Inc(lvBuff);
+    Inc(j);
+  end;
+  SetLength(Result, Rp - PChar(Result));
+end;
+
+function URLEncode(pvStr: string; pvConvertUtf8: Boolean = true): string;
+var
+  lvBytes:TBytes;
+begin
+  if pvConvertUtf8 then
+  begin
+    lvBytes := StringToUtf8Bytes(pvStr);
+  end else
+  begin
+    lvBytes := StringToBytes(pvStr);
+  end;
+
+  Result := BufferURLEncode(@lvBytes[0], Length(lvBytes));
+end;
+
+function URLDecode(pvStr: RAWString; pvConvertUtf8: Boolean = true): String;
+begin
+  Result := ;
+end;
 
 constructor THttpRequest.Create;
 begin
@@ -602,7 +709,7 @@ begin
 
     if (FSectionFlag = 0) and (FEndMatchIndex = 4) then
     begin   // 包头
-      FRawHeader := Utf8BufferToString(FBufferBuilder.Memory, FDataLength);
+      FRawHeader := ByteBufferToString(FBufferBuilder.Memory, FDataLength);
       if DecodeHeader = -1 then
       begin
         FSectionFlag := 0;
@@ -684,6 +791,7 @@ begin
   FContentBuffer.Clear;
   FResponseCode := 0;
   FContentType := '';
+  FResponseCodeStr := '';
 end;
 
 procedure THttpResponse.EncodeHeader(pvContentLength: Integer);
@@ -720,8 +828,14 @@ var
 begin
   lvCode := FResponseCode;
   if lvCode = 0 then lvCode := 200;
-  
-  pvBuilder.AppendRawStr('HTTP/1.1 ').AppendRawStr(GetResponseCodeText(lvCode)).AppendBreakLineBytes;
+
+  if FResponseCodeStr <> ''  then
+  begin
+    pvBuilder.AppendRawStr('HTTP/1.1 ').AppendRawStr(FResponseCodeStr).AppendBreakLineBytes;
+  end else
+  begin
+    pvBuilder.AppendRawStr('HTTP/1.1 ').AppendRawStr(GetResponseCodeText(lvCode)).AppendBreakLineBytes;
+  end;
   pvBuilder.AppendRawStr('Server: DIOCP-V5/1.1').AppendBreakLineBytes;
   pvBuilder.AppendRawStr('Content-Type:').AppendRawStr(FContentType).AppendBreakLineBytes;
 

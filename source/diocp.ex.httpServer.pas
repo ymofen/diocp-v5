@@ -161,8 +161,7 @@ type
 
     // 存放客户端请求的Cookie信息
     FRequestCookieList: TStrings;
-    FRequestCookies: string;
-    
+
     FContextType: string;
     FKeepAlive: Boolean;
     FRequestAccept: String;
@@ -210,6 +209,7 @@ type
     procedure CheckCookieSession;
     function GetContextLength: Int64;
     function GetRequestCookieList: TStrings;
+    function GetRequestCookies: string;
     function GetRequestURI: String;
   protected
   public
@@ -294,7 +294,7 @@ type
     property RequestAcceptEncoding: string read FRequestAcceptEncoding;
     property RequestAcceptLanguage: string read FRequestAcceptLanguage;
     property RequestCookieList: TStrings read GetRequestCookieList;
-    property RequestCookies: string read FRequestCookies;
+    property RequestCookies: string read GetRequestCookies;
 
     /// <summary>
     ///   请求的头信息
@@ -405,11 +405,12 @@ type
     FDiocpContext : TDiocpHttpClientContext;
     
     FInnerResponse:THttpResponse;
-    FHttpCodeStr: String;
     procedure ClearAllCookieObjects;
     function GetContentType: String;
     function GetHeader: TDValue;
+    function GetHttpCodeStr: String;
     procedure SetContentType(const Value: String);
+    procedure SetHttpCodeStr(const Value: String);
   public
     procedure Clear;
     constructor Create;
@@ -434,7 +435,7 @@ type
 
     property Header: TDValue read GetHeader;
 
-    property HttpCodeStr: String read FHttpCodeStr write FHttpCodeStr;
+    property HttpCodeStr: String read GetHttpCodeStr write SetHttpCodeStr;
 
     procedure RedirectURL(pvURL:String);
 
@@ -648,7 +649,6 @@ begin
   FRequestRawURL := '';
   FRequestVersionStr := '';
   FRequestMethod := '';
-  FRequestCookies := '';
   FRequestParamsList.Clear;
   FRequestCookieList.Clear;
   FContextType := '';
@@ -678,7 +678,7 @@ var
 begin
   lvCookie := FResponse.FInnerResponse.GetCookie(pvCookieName);
 
-  Result := StringsValueOfName(FRequestCookieList, pvCookieName, ['='], true);
+  Result := StringsValueOfName(RequestCookieList, pvCookieName, ['='], true);
 end;
 
 function TDiocpHttpRequest.GetRequestParam(ParamsKey: string): string;
@@ -898,10 +898,22 @@ begin
 end;
 
 function TDiocpHttpRequest.GetRequestCookieList: TStrings;
+var
+  lvCookies:String;
 begin
-  //if FReq then
-  
+  if FRequestCookieList.Count = 0 then
+  begin
+    // Cookie:__gads=ID=6ff3a79a032e04d0:T=1425100914:S=ALNI_MZWDCQuaEqZV3ZYri0E4GU8osX7rw; pgv_pvi=5995954176; lzstat_uv=25556556142595371638|754770@2240623; Hm_lvt_674430fbddd66a488580ec86aba288f7=1433747304,1435200001; Hm_lvt_95eb98507622b340bc1da73ed59cfe34=1435906572; AJSTAT_ok_times=2; __utma=226521935.635858515.1425100841.1436162631.1437634125.12; __utmz=226521935.1437634125.12.12.utmcsr=baidu|utmccn=(organic)|utmcmd=organic; _gat=1; _ga=GA1.2.635858515.1425100841; .CNBlogsCookie=B70AF05C246EE95507A6B4E1206C55C394843B6EB1376064B7CE2199A3441791D09AB86E934DF47E48B2E409BC57F7F4C43950430B29D3B23CAC82C7E58212D912F3ECB144B6971C4D9A7EB4E609A900A50016DA
+    lvCookies := GetRequestCookies;
+    SplitStrings(lvCookies, FRequestCookieList, [';']);
+  end;
   Result := FRequestCookieList;
+end;
+
+function TDiocpHttpRequest.GetRequestCookies: string;
+begin
+
+  Result := FInnerRequest.RawCookie;
 end;
 
 function TDiocpHttpRequest.GetRequestURI: String;
@@ -1025,7 +1037,6 @@ end;
 
 procedure TDiocpHttpResponse.Clear;
 begin
-  FHttpCodeStr := '';
   FInnerResponse.DoCleanUp;
 end;
 
@@ -1054,8 +1065,7 @@ begin
 end;
 
 function TDiocpHttpResponse.EncodeHeader: String;
-begin
- 
+begin    
   FInnerResponse.EncodeHeader(FInnerResponse.ContentBuffer.Length);
   Result := FInnerResponse.HeaderBuilder.ToRAWString;
 end;
@@ -1082,6 +1092,11 @@ begin
   Result := FInnerResponse.Headers;
 end;
 
+function TDiocpHttpResponse.GetHttpCodeStr: String;
+begin
+  Result := FInnerResponse.ResponseCodeStr;
+end;
+
 procedure TDiocpHttpResponse.GZipContent;
 begin
   FInnerResponse.GZipContent;
@@ -1092,21 +1107,15 @@ var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
-  lvFixedHeader := MakeHeader('302 Temporarily Moved', 'HTTP/1.0', false, '',
-    '', 0);
+  //lvFixedHeader := MakeHeader('302 Temporarily Moved', 'HTTP/1.0', false, '', '', 0);
+  lvFixedHeader := MakeHeader('307 Temporary Redirect', 'HTTP/1.0', false, '', '', 0);
 
   lvFixedHeader := lvFixedHeader + 'Location: ' + pvURL + HTTPLineBreak;
 
   lvFixedHeader := FixHeader(lvFixedHeader);
 
-  // FResponseSize必须准确指定发送的数据包大小
-  // 用于在发送完之后(Owner.TriggerClientSentData)断开客户端连接
-  if lvFixedHeader <> '' then
-  begin
-    len := Length(lvFixedHeader);
-    FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
-  end;
-
+  len := Length(lvFixedHeader);
+  FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
 end;
 
 procedure TDiocpHttpResponse.SetChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
@@ -1135,6 +1144,11 @@ end;
 procedure TDiocpHttpResponse.SetContentType(const Value: String);
 begin
   FInnerResponse.ContentType := Value;
+end;
+
+procedure TDiocpHttpResponse.SetHttpCodeStr(const Value: String);
+begin
+  FInnerResponse.ResponseCodeStr := Value;
 end;
 
 procedure TDiocpHttpResponse.WriteBuf(pvBuf: Pointer; len: Cardinal);
@@ -1392,12 +1406,27 @@ begin
 end;
 
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
+var
+  lvMsg:String;
 begin
-  pvRequest.CheckCookieSession;
+  try
+    pvRequest.CheckCookieSession;
 
-  if Assigned(FOnDiocpHttpRequest) then
-  begin
-    FOnDiocpHttpRequest(pvRequest);
+    if Assigned(FOnDiocpHttpRequest) then
+    begin
+      FOnDiocpHttpRequest(pvRequest);
+    end;
+  except
+    on E:Exception do
+    begin
+      pvRequest.Response.FInnerResponse.ResponseCode := 500;
+      pvRequest.Response.Clear;
+      pvRequest.Response.ContentType := 'text/html; charset=utf-8';
+      lvMsg := e.Message;
+      lvMsg := StringReplace(lvMsg, sLineBreak, '<BR>', [rfReplaceAll]);
+      pvRequest.Response.WriteString(lvMsg);
+    end;
+
   end;
 end;
 

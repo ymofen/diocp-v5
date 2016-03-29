@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 41
     Width = 661
     Height = 346
-    ActivePage = TabSheet1
+    ActivePage = tsURLCode
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -38,10 +38,6 @@ object frmMain: TfrmMain
     object TabSheet2: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -54,10 +50,6 @@ object frmMain: TfrmMain
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btn1: TButton
         Left = 176
         Top = 88
@@ -66,6 +58,43 @@ object frmMain: TfrmMain
         Caption = 'btn1'
         TabOrder = 0
         OnClick = btn1Click
+      end
+    end
+    object tsURLCode: TTabSheet
+      Caption = 'tsURLCode'
+      ImageIndex = 3
+      object mmoURLInput: TMemo
+        Left = 3
+        Top = 3
+        Width = 358
+        Height = 94
+        Lines.Strings = (
+          'mmoURLInput')
+        TabOrder = 0
+      end
+      object mmoURLOutput: TMemo
+        Left = 5
+        Top = 160
+        Width = 356
+        Height = 113
+        TabOrder = 1
+      end
+      object btnURLDecode: TButton
+        Left = 3
+        Top = 103
+        Width = 102
+        Height = 25
+        Caption = 'btnURLDecode'
+        TabOrder = 2
+      end
+      object btnURLEncode: TButton
+        Left = 138
+        Top = 103
+        Width = 94
+        Height = 25
+        Caption = 'URLEncode'
+        TabOrder = 3
+        OnClick = btnURLEncodeClick
       end
     end
   end
@@ -136,7 +165,7 @@ object frmMain: TfrmMain
     Enabled = False
     Interval = 30000
     OnTimer = tmrHeartTimer
-    Left = 328
-    Top = 200
+    Left = 528
+    Top = 144
   end
 end

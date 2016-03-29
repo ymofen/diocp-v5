@@ -16,7 +16,8 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer;
+  ComCtrls, diocp.ex.httpServer, diocp_ex_http_common, utils.byteTools,
+  System.Actions;
 
 type
   TfrmMain = class(TForm)
@@ -37,12 +38,18 @@ type
     tmrHeart: TTimer;
     tsTester: TTabSheet;
     btn1: TButton;
+    tsURLCode: TTabSheet;
+    mmoURLInput: TMemo;
+    mmoURLOutput: TMemo;
+    btnURLDecode: TButton;
+    btnURLEncode: TButton;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
+    procedure btnURLEncodeClick(Sender: TObject);
     procedure tmrHeartTimer(Sender: TObject);
   private
     iCounter:Integer;
@@ -178,6 +185,43 @@ var
   lvBytes:TBytes;
 
 begin
+
+  if pvRequest.RequestURI = '/CHUNKED' then
+  begin
+    // Context Type                        返回的是UTF-8的编码
+    pvRequest.Response.ContentType := 'text/html; charset=utf-8';
+    pvRequest.Response.SetChunkedStart;
+    pvRequest.Response.SetChunkedUtf8('Chunked编码测试1<BR>');
+    pvRequest.Response.SetChunkedUtf8('================================<BR>');
+    pvRequest.Response.ChunkedFlush;
+    
+    pvRequest.Response.SetChunkedUtf8('Chunked编码测试2<BR>');
+    pvRequest.Response.SetChunkedUtf8('================================<BR>');
+    pvRequest.Response.SetChunkedEnd;
+    pvRequest.Response.ChunkedFlush;
+    pvRequest.CloseContext;
+
+    Exit;
+  end;
+
+//  if pvRequest.RequestURI = '/favicon.ico' then
+//  begin
+//    // Context Type                        返回的是UTF-8的编码
+//    pvRequest.Response.ContentType := 'application/oct stream;
+//    pvRequest.Response.SetChunkedStart;
+//    pvRequest.Response.SetChunkedUtf8('Chunked编码测试1<BR>');
+//    pvRequest.Response.SetChunkedUtf8('================================<BR>');
+//    pvRequest.Response.ChunkedFlush;
+//
+//    pvRequest.Response.SetChunkedUtf8('Chunked编码测试2<BR>');
+//    pvRequest.Response.SetChunkedUtf8('================================<BR>');
+//    pvRequest.Response.SetChunkedEnd;
+//    pvRequest.Response.ChunkedFlush;
+//    pvRequest.CloseContext;
+//
+//    Exit;
+//  end;
+
   // Context Type                        返回的是UTF-8的编码
   pvRequest.Response.ContentType := 'text/html; charset=utf-8';
 
@@ -189,6 +233,8 @@ begin
   pvRequest.DecodePostDataParam(False);
   pvRequest.DecodeURLParam(false);
   {$ENDIF}
+
+
 
 //  SetLength(lvBytes, pvRequest.RawPostData.Size);
 //  pvRequest.RawPostData.Position := 0;
@@ -265,6 +311,17 @@ begin
     WriteNormalPage();
   end;
 
+
+  if Pos('deflate',pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
+  begin
+    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'deflate';
+    pvRequest.Response.ZLibCompressContent;
+  end else if Pos('gzip', pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
+  begin
+    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'gzip';
+    pvRequest.Response.GZipContent;
+  end;
+
   // 应答完毕，发送会客户端
   pvRequest.ResponseEnd;
 
@@ -304,14 +361,32 @@ end;
 
 procedure TfrmMain.btn1Click(Sender: TObject);
 var
-  lvStrings:TStrings;
-  s :string;
+  lvBuilder:TDBufferBuilder;
 begin
-  lvStrings := TStringList.Create();
-  s := '__gads=ID=6ff3a79a032e04d0:T=1425100914:S=ALNI_MZWDCQuaEqZV3ZYri0E4GU8osX7rw; pgv_pvi=5995954176;lzstat_uv=25556556142595371638|754770@2240623;';
-  SplitStrings(s, lvStrings, [';']);
-  ShowMessage(StringsValueOfName(lvStrings, 'lzstat_uv', ['='], true));
-  lvStrings.Free;
+  lvBuilder := TDBufferBuilder.Create;
+  lvBuilder.Clear;
+  lvBuilder.AppendUtf8('0000');
+  GZCompressBufferBuilder(lvBuilder);
+  sfLogger.logMessage(TByteTools.varToHexString(lvBuilder.Memory^, lvBuilder.Length));
+
+  lvBuilder.Clear;
+  lvBuilder.AppendUtf8('0000');
+  ZCompressBufferBuilder(lvBuilder);
+  sfLogger.logMessage(TByteTools.varToHexString(lvBuilder.Memory^, lvBuilder.Length));
+
+  lvBuilder.Clear;
+  lvBuilder.AppendUtf8('111');
+  GZCompressBufferBuilder(lvBuilder);
+  sfLogger.logMessage(TByteTools.varToHexString(lvBuilder.Memory^, lvBuilder.Length));
+
+  lvBuilder.Clear;
+  lvBuilder.AppendUtf8('111');
+  ZCompressBufferBuilder(lvBuilder);
+  sfLogger.logMessage(TByteTools.varToHexString(lvBuilder.Memory^, lvBuilder.Length));
+
+  //GZDecompressBufferBuilder(lvBuilder);
+  //ShowMessage(lvBuilder.ToRAWString);
+  lvBuilder.Free;
 
 end;
 
@@ -342,6 +417,11 @@ procedure TfrmMain.btnGetWorkerStateClick(Sender: TObject);
 begin
   //ShowMessage(FTcpServer.IocpEngine.getWorkerStateInfo(0));
 
+end;
+
+procedure TfrmMain.btnURLEncodeClick(Sender: TObject);
+begin
+  mmoURLOutput.Lines.Text := diocp_ex_http_common.URLEncode(mmoURLInput.Lines.Text);
 end;
 
 procedure TfrmMain.tmrHeartTimer(Sender: TObject);

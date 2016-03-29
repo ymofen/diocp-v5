@@ -38,6 +38,7 @@ type
     procedure chkRecvEchoClick(Sender: TObject);
     procedure chkRecvOnLogClick(Sender: TObject);
     procedure chkSendDataClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
   private
     FSendDataOnConnected:Boolean;
     FSendDataOnRecv:Boolean;
@@ -49,6 +50,10 @@ type
 
     procedure OnRecvdBuffer(pvContext: TDiocpCustomContext; buf: Pointer; len:
         cardinal; pvErrorCode: Integer);
+
+    procedure WriteHistory;
+
+    procedure ReadHistory;
 
   public
     { Public declarations }
@@ -63,7 +68,7 @@ var
 implementation
 
 uses
-  uFMMonitor;
+  uFMMonitor, utils_dvalue, utils_DValue_JSON;
 {$R *.dfm}
 
 { TfrmMain }
@@ -82,8 +87,7 @@ begin
   FIocpClientSocket.OnReceivedBuffer := OnRecvdBuffer;
   TFMMonitor.createAsChild(tsMonitor, FIocpClientSocket);
 
-
-
+  ReadHistory;
 end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
@@ -192,6 +196,11 @@ begin
   FSendDataOnConnected := chkSendData.Checked;
 end;
 
+procedure TfrmMain.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  WriteHistory;
+end;
+
 procedure TfrmMain.OnContextConnected(pvContext: TDiocpCustomContext);
 var
   s:AnsiString;
@@ -231,6 +240,37 @@ begin
   begin
     sfLogger.logMessage('recv err:%d', [pvErrorCode]);
   end;
+end;
+
+procedure TfrmMain.ReadHistory;
+var
+  lvDValue:TDValue;
+begin
+  lvDValue := TDValue.Create();
+  JSONParseFromUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
+  edtHost.Text := lvDValue.ForceByName('host').AsString;
+  edtPort.Text := lvDValue.ForceByName('port').AsString;
+  mmoData.Lines.Text := lvDValue.ForceByName('sendText').AsString;
+  chkRecvEcho.Checked := lvDValue.ForceByName('chk_recvecho').AsBoolean;
+  chkRecvOnLog.Checked := lvDValue.ForceByName('chk_recvonlog').AsBoolean;
+  chkSendData.Checked := lvDValue.ForceByName('chk_send_onconnected').AsBoolean;
+
+  lvDValue.Free;  
+end;
+
+procedure TfrmMain.WriteHistory;
+var
+  lvDValue:TDValue;
+begin
+  lvDValue := TDValue.Create();
+  lvDValue.ForceByName('host').AsString := edtHost.Text;
+  lvDValue.ForceByName('port').AsString := edtPort.Text;
+  lvDValue.ForceByName('sendText').AsString := mmoData.Lines.Text;
+  lvDValue.ForceByName('chk_recvecho').AsBoolean := chkRecvEcho.Checked;
+  lvDValue.ForceByName('chk_recvonlog').AsBoolean := chkRecvOnLog.Checked;
+  lvDValue.ForceByName('chk_send_onconnected').AsBoolean := chkSendData.Checked;
+  JSONWriteToUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
+  lvDValue.Free;
 end;
 
 end.
