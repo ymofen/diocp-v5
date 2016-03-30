@@ -1531,7 +1531,7 @@ begin
   if not FActive then exit;
 
 {$IFDEF WRITE_LOG}
-  FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID, lgvDebug);
+  FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvDebugInfo]), strRequestDisconnectFileID, lgvDebug);
 {$ENDIF}
 
   FContextLocker.lock('RequestDisconnect');
@@ -2892,7 +2892,7 @@ begin
           begin
             if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
             begin
-              // 请求关闭
+              // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
               lvContext.PostWSACloseRequest();
             end;
           end;
@@ -2916,7 +2916,7 @@ begin
       begin
         if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
         begin
-          // 请求关闭
+          // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
           lvContext.PostWSACloseRequest();
         end;
       end;
