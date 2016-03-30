@@ -6,7 +6,7 @@ interface
 
 {$if CompilerVersion>= 21}
 {$DEFINE USE_NetEncoding}
-{$ENDIF}
+{$ifend}
 uses
   utils.strings, SysUtils, utils_dvalue
 {$IFDEF USE_NetEncoding}
@@ -150,7 +150,7 @@ type
     /// </summary>
     procedure GZipContent;
 
-    procedure ZCompressContent;
+    procedure DeflateCompressContent;
   end;
 
   /// <summary>
@@ -174,11 +174,14 @@ type
     property Value: String read FValue write FValue;
   end;
 
+  EHTTPException = class(Exception)
+  end;
+
 
 
 function GetResponseCodeText(pvCode: Word): RAWString;
 
-procedure ZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
+procedure DeflateCompressBufferBuilder(pvBuilder:TDBufferBuilder);
 
 procedure ZDecompressBufferBuilder(pvBuilder:TDBufferBuilder);
 
@@ -198,13 +201,26 @@ function URLEncode(pvStr: string; pvConvertUtf8: Boolean = true): string;
 function BufferURLEncode(pvBuff: PByte; pvLen: Integer): string;
 
 /// <summary>
+///   urlencodestr -> raw buffer
+/// </summary>
+function BufferURLDecode(pvInputStr: string; pvOutBuffer: PByte;
+    pvOutBufferLen: Integer): Integer;
+
+/// <summary>
 ///   urldecode -> utf8
 /// </summary>
-function URLDecode(pvStr: RAWString; pvConvertUtf8: Boolean = true): String;
+function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true): String;
 
 
 
 implementation
+
+resourcestring
+  { System.NetEncoding }
+  sErrorDecodingURLText = 'Error decoding URL style (%%XX) encoded string at position %d';
+  sInvalidURLEncodedChar = 'Invalid URL encoded character (%s) at position %d';
+  sErrorDecodingURL_InvalidateChar = 'URL中含有非法字符%s';
+  sErrorDecodingURL_BufferIsNotEnough = '传入的Buffer长度不够';
 
 function GetResponseCodeText(pvCode: Word): RAWString;
 begin
@@ -260,7 +276,7 @@ begin
   end;
 end;
 
-procedure ZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
+procedure DeflateCompressBufferBuilder(pvBuilder:TDBufferBuilder);
 {$IFDEF POSIX}
 var
   lvBytes, lvOutBytes:TBytes;
@@ -401,10 +417,15 @@ const
   procedure AppendByte(B: Byte; var Buffer: PChar);
   const
     Hex = '0123456789ABCDEF';
+  {$if CompilerVersion>= 21}
+    LOW_INDEX = Low(string);
+  {$else}
+    LOW_INDEX = 1;
+  {$ifend}
   begin
     Buffer[0] := '%';
-    Buffer[1] := Hex[B shr 4 + Low(string)];
-    Buffer[2] := Hex[B and $F + Low(string)];
+    Buffer[1] := Hex[B shr 4 + LOW_INDEX];
+    Buffer[2] := Hex[B and $F + LOW_INDEX];
     Inc(Buffer, 3);
   end;
 
@@ -462,9 +483,98 @@ begin
   Result := BufferURLEncode(@lvBytes[0], Length(lvBytes));
 end;
 
-function URLDecode(pvStr: RAWString; pvConvertUtf8: Boolean = true): String;
+function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true): String;
+var
+  lvBytes:TBytes;
+  l:Integer;
 begin
-  Result := ;
+  SetLength(lvBytes, Length(pvInputStr));
+  l := BufferURLDecode(pvInputStr, @lvBytes[0], Length(lvBytes));
+  SetLength(lvBytes, l);
+  if pvConvertUtf8 then
+  begin
+    Result := Utf8BytesToString(lvBytes, 0);
+  end else
+  begin
+    Result := BytesToString(lvBytes, 0);
+  end;
+end;
+
+function BufferURLDecode(pvInputStr: string; pvOutBuffer: PByte;
+    pvOutBufferLen: Integer): Integer;
+
+  function DecodeHexChar(const C: Char): Byte;
+  begin
+    case C of
+       '0'..'9': Result := Ord(C) - Ord('0');
+       'A'..'F': Result := Ord(C) - Ord('A') + 10;
+       'a'..'f': Result := Ord(C) - Ord('a') + 10;
+    else
+      raise EConvertError.Create('');
+    end;
+  end;
+
+  function DecodeHexPair(const C1, C2: Char): Byte; inline;
+  begin
+    Result := DecodeHexChar(C1) shl 4 + DecodeHexChar(C2)
+  end;
+
+var
+  Sp, Cp: PChar;
+  I: Integer;
+  lvPtr:PByte;
+begin
+  lvPtr := pvOutBuffer;
+  I := 0;
+  Sp := PChar(pvInputStr);
+  Cp := Sp;
+  try
+    while Sp^ <> #0 do
+    begin
+      if (I >= pvOutBufferLen) then
+      begin
+        raise EHTTPException.Create(sErrorDecodingURL_BufferIsNotEnough);
+      end;
+      case Sp^ of
+        '+':
+          lvPtr^ := Byte(' ');
+        '%':
+          begin
+            Inc(Sp);
+            // Look for an escaped % (%%)
+            if (Sp)^ = '%' then
+              lvPtr^ := Byte('%')
+            else
+            begin
+              // Get an encoded byte, may is a single byte (%<hex>)
+              // or part of multi byte (%<hex>%<hex>...) character
+              Cp := Sp;
+              Inc(Sp);
+              if ((Cp^ = #0) or (Sp^ = #0)) then
+                raise EHTTPException.CreateFmt(sErrorDecodingURLText, [Cp - PChar(pvInputStr)]);
+              lvPtr^ := DecodeHexPair(Cp^, Sp^)
+            end;
+          end;
+      else
+        // Accept single
+        if Ord(Sp^) < 128 then
+          lvPtr^ := Byte(Sp^)
+        else
+        begin
+          // multi byte characters (不接受)   s
+          raise EHTTPException.CreateFmt(sErrorDecodingURL_InvalidateChar, [lvPtr^]);
+          //I := I + TEncoding.UTF8.GetBytes([Sp^], 0, 1, Bytes, I) - 1
+        end;
+      end;
+      Inc(I);
+      Inc(lvPtr);
+      Inc(Sp);
+    end;
+  except
+    on E: EConvertError do
+      raise EConvertError.CreateFmt(sInvalidURLEncodedChar, [Char('%') + Cp^ + Sp^, Cp - PChar(pvInputStr)])
+  end;
+  Result := I;
 end;
 
 constructor THttpRequest.Create;
@@ -881,9 +991,9 @@ begin
 
 end;
 
-procedure THttpResponse.ZCompressContent;
+procedure THttpResponse.DeflateCompressContent;
 begin
-  ZCompressBufferBuilder(FContentBuffer);
+  DeflateCompressBufferBuilder(FContentBuffer);
 end;
 
 end.

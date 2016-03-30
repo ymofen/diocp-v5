@@ -29,7 +29,7 @@ type
     btnDisconectAll: TButton;
     pgcMain: TPageControl;
     TabSheet1: TTabSheet;
-    TabSheet2: TTabSheet;
+    tsLog: TTabSheet;
     mmoLog: TMemo;
     pnlMonitor: TPanel;
     btnGetWorkerState: TButton;
@@ -37,18 +37,19 @@ type
     pnlTop: TPanel;
     tmrHeart: TTimer;
     tsTester: TTabSheet;
-    btn1: TButton;
     tsURLCode: TTabSheet;
     mmoURLInput: TMemo;
     mmoURLOutput: TMemo;
     btnURLDecode: TButton;
     btnURLEncode: TButton;
+    btnCompress: TButton;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
-    procedure btn1Click(Sender: TObject);
+    procedure btnCompressClick(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
+    procedure btnURLDecodeClick(Sender: TObject);
     procedure btnURLEncodeClick(Sender: TObject);
     procedure tmrHeartTimer(Sender: TObject);
   private
@@ -315,7 +316,7 @@ begin
   if Pos('deflate',pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
   begin
     pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'deflate';
-    pvRequest.Response.ZLibCompressContent;
+    pvRequest.Response.DeflateCompressContent;
   end else if Pos('gzip', pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
   begin
     pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'gzip';
@@ -359,7 +360,7 @@ begin
   refreshState;
 end;
 
-procedure TfrmMain.btn1Click(Sender: TObject);
+procedure TfrmMain.btnCompressClick(Sender: TObject);
 var
   lvBuilder:TDBufferBuilder;
 begin
@@ -371,7 +372,7 @@ begin
 
   lvBuilder.Clear;
   lvBuilder.AppendUtf8('0000');
-  ZCompressBufferBuilder(lvBuilder);
+  DeflateCompressBufferBuilder(lvBuilder);
   sfLogger.logMessage(TByteTools.varToHexString(lvBuilder.Memory^, lvBuilder.Length));
 
   lvBuilder.Clear;
@@ -381,12 +382,14 @@ begin
 
   lvBuilder.Clear;
   lvBuilder.AppendUtf8('111');
-  ZCompressBufferBuilder(lvBuilder);
+  DeflateCompressBufferBuilder(lvBuilder);
   sfLogger.logMessage(TByteTools.varToHexString(lvBuilder.Memory^, lvBuilder.Length));
 
   //GZDecompressBufferBuilder(lvBuilder);
   //ShowMessage(lvBuilder.ToRAWString);
   lvBuilder.Free;
+
+  pgcMain.ActivePage := tsLog;
 
 end;
 
@@ -419,8 +422,14 @@ begin
 
 end;
 
+procedure TfrmMain.btnURLDecodeClick(Sender: TObject);
+begin
+  mmoURLOutput.Lines.Text := diocp_ex_http_common.URLDecode(mmoURLInput.Lines.Text);
+end;
+
 procedure TfrmMain.btnURLEncodeClick(Sender: TObject);
 begin
+ // showMessage(Format('%d', [Low(String)]));
   mmoURLOutput.Lines.Text := diocp_ex_http_common.URLEncode(mmoURLInput.Lines.Text);
 end;
 

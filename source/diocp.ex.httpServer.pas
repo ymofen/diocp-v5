@@ -441,7 +441,7 @@ type
 
     procedure GZipContent;
 
-    procedure ZLibCompressContent;
+    procedure DeflateCompressContent;
 
     procedure SetChunkedStart;
 
@@ -1171,9 +1171,9 @@ begin
   end;
 end;
 
-procedure TDiocpHttpResponse.ZLibCompressContent;
+procedure TDiocpHttpResponse.DeflateCompressContent;
 begin
-  FInnerResponse.ZCompressContent
+  FInnerResponse.DeflateCompressContent
 end;
 
 constructor TDiocpHttpClientContext.Create;

@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 41
     Width = 661
     Height = 346
-    ActivePage = tsURLCode
+    ActivePage = tsTester
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -35,7 +35,7 @@ object frmMain: TfrmMain
         TabOrder = 0
       end
     end
-    object TabSheet2: TTabSheet
+    object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
       object mmoLog: TMemo
@@ -50,14 +50,14 @@ object frmMain: TfrmMain
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      object btn1: TButton
-        Left = 176
-        Top = 88
+      object btnCompress: TButton
+        Left = 3
+        Top = 3
         Width = 75
-        Height = 25
-        Caption = 'btn1'
+        Height = 33
+        Caption = 'btnCompress'
         TabOrder = 0
-        OnClick = btn1Click
+        OnClick = btnCompressClick
       end
     end
     object tsURLCode: TTabSheet
@@ -86,6 +86,7 @@ object frmMain: TfrmMain
         Height = 25
         Caption = 'btnURLDecode'
         TabOrder = 2
+        OnClick = btnURLDecodeClick
       end
       object btnURLEncode: TButton
         Left = 138
