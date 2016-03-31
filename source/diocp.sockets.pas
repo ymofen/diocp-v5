@@ -73,8 +73,6 @@ type
     FLastErrorCode:Integer;
     FDebugINfo: string;
 
-
-
     procedure SetDebugINfo(const Value: string);
 
   private
@@ -226,7 +224,7 @@ type
 
     procedure lock();
 
-    procedure unLock();
+    procedure UnLock;
 
     procedure PostNextSendRequest; virtual;
   public
@@ -726,7 +724,7 @@ type
   public
     /// <summary>
     ///   原子操作添加引用计数(一定要有对应的DecRefCounter);
-    ///   会阻止关闭
+    ///   目的: 阻止释放连接
     /// </summary>
     function IncRefCounter: Integer;
 
@@ -786,6 +784,12 @@ type
 
     property IocpEngine: TIocpEngine read FIocpEngine;
 
+    /// <summary>
+    ///   超时检测, 如果超过Timeout指定的时间还没有任何数据交换数据记录，
+    ///     就进行关闭连接
+    ///   使用循环检测，如果你有好的方案，欢迎提交您的宝贵意见
+    /// </summary>
+    procedure KickOut(pvTimeOut:Cardinal = 60000);
     procedure LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel: TLogLevel
         = lgvMessage); overload;
         
@@ -936,7 +940,7 @@ begin
       exit;
     end;
   finally
-    FContextLocker.unLock;
+    FContextLocker.UnLock;
   end;
 
   if lvRequest <> nil then
@@ -1046,7 +1050,7 @@ begin
   if FReferenceCounter = 0 then
     if FRequestDisconnect then lvCloseContext := true;
     
-  FContextLocker.unLock; 
+  FContextLocker.UnLock; 
 
   if lvCloseContext then
   begin
@@ -1076,8 +1080,8 @@ begin
   if FReferenceCounter = 0 then
     lvCloseContext := true;
     
-  FContextLocker.unLock; 
-  
+  FContextLocker.UnLock; 
+
   if lvCloseContext then InnerCloseContext; 
 end;
 
@@ -1149,7 +1153,7 @@ begin
       end;
     end;
   finally
-    FContextLocker.unLock;
+    FContextLocker.UnLock;
   end;
   
 //
@@ -1182,7 +1186,7 @@ begin
 //      PostWSARecvRequest;
 //    end;
 //  finally
-//    FContextLocker.unLock;
+//    FContextLocker.UnLock;
 //  end;
 
 end;
@@ -1254,7 +1258,7 @@ begin
 
     Result := true;
   end;
-  FContextLocker.unLock;
+  FContextLocker.UnLock;
 end;
 
 procedure TDiocpCustomContext.InnerCloseContext;
@@ -1336,7 +1340,7 @@ begin
   try
     if not CheckNextSendRequest then FSending := false;
   finally
-    self.unLock;
+    self.UnLock;
   end;
 end;
 
@@ -1366,7 +1370,7 @@ begin
           end;
         end;
       finally
-        FContextLocker.unLock;
+        FContextLocker.UnLock;
       end;
 
       if not Result then
@@ -1451,8 +1455,8 @@ begin
     lvCloseContext := true;
   end;
   
-  FContextLocker.unLock; 
-  
+  FContextLocker.UnLock; 
+
   if lvCloseContext then InnerCloseContext else FRawSocket.close; 
 end;
 
@@ -1476,9 +1480,9 @@ begin
   end;
 end;
 
-procedure TDiocpCustomContext.unLock;
+procedure TDiocpCustomContext.UnLock;
 begin
-  FContextLocker.unLock;
+  FContextLocker.UnLock;
 end;
 
 procedure TDiocpCustomContext.unLockContext(pvDebugInfo: string; pvObj: TObject);
@@ -1787,6 +1791,61 @@ end;
 function TDiocpCustom.IncRefCounter: Integer;
 begin
   Result := InterlockedIncrement(FRefCounter);
+end;
+
+procedure TDiocpCustom.KickOut(pvTimeOut:Cardinal = 60000);
+var
+  lvNowTickCount:Cardinal;
+  I, j:Integer;
+  lvKickOutList: array of TDiocpCustomContext;
+  lvContext:TDiocpCustomContext;
+var
+  lvBucket, lvNextBucket: PDHashData;
+begin
+  lvNowTickCount := GetTickCount;
+  self.IncRefCounter;
+  try
+    FLocker.lock('KickOut');
+    try
+      j := 0;
+      SetLength(lvKickOutList, FOnlineContextList.Count);
+      for I := 0 to FOnlineContextList.BucketSize - 1 do
+      begin
+        lvBucket := FOnlineContextList.Buckets[I];
+        while lvBucket<>nil do
+        begin
+          lvNextBucket := lvBucket.Next;
+          if lvBucket.Data <> nil then
+          begin
+            lvContext := TDiocpCustomContext(lvBucket.Data);
+            if lvContext.FLastActivity <> 0 then
+            begin
+              if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
+              begin
+                // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
+                //lvContext.PostWSACloseRequest();
+                lvKickOutList[j] := lvContext;
+                Inc(j);
+              end;
+            end;
+          end;
+          lvBucket:= lvNextBucket;
+        end;
+      end;
+    finally
+      FLocker.unLock;
+    end;
+
+    for i := 0 to j - 1 do
+    begin
+      lvKickOutList[i].RequestDisconnect('超时检测主动断开');   
+    end;
+
+
+  finally
+    self.DecRefCounter;
+  end;
+
 end;
 
 procedure TDiocpCustom.LogMessage(pvMsg: string; pvMsgType: string = '';
@@ -2814,14 +2873,14 @@ procedure TDiocpCustomContext.AddRefernece;
 begin
   FContextLocker.lock('AddRefernece');
   Inc(FReferenceCounter);
-  FContextLocker.unLock;
+  FContextLocker.UnLock;
 end;
 
 procedure TDiocpCustomContext.DecRefernece;
 begin
   FContextLocker.lock('DecRefernece');
   Dec(FReferenceCounter);
-  FContextLocker.unLock;
+  FContextLocker.UnLock;
 end;
 
 
@@ -2843,7 +2902,7 @@ begin
       end;
     end;
   finally
-    FContextLocker.unLock;
+    FContextLocker.UnLock;
   end;
 
   {$IFDEF DEBUG_ON}
