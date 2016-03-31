@@ -11,8 +11,6 @@ object frmMain: TfrmMain
   Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
-  OnClose = FormClose
-  OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
   object PageControl1: TPageControl
@@ -168,5 +166,38 @@ object frmMain: TfrmMain
       TabOrder = 9
       OnClick = btnClearClick
     end
+    object chkHex: TCheckBox
+      Left = 471
+      Top = 60
+      Width = 97
+      Height = 17
+      Caption = '16'#36827#21046#21457#36865
+      TabOrder = 10
+      OnClick = chkHexClick
+    end
+    object chkCheckHeart: TCheckBox
+      Left = 600
+      Top = 56
+      Width = 169
+      Height = 17
+      Caption = #24515#36339#26816#27979#20851#38381#27515#38142#25509
+      TabOrder = 11
+      OnClick = chkCheckHeartClick
+    end
+    object btnSaveHistory: TButton
+      Left = 104
+      Top = 48
+      Width = 75
+      Height = 25
+      Caption = #20445#23384#37197#32622
+      TabOrder = 12
+      OnClick = btnSaveHistoryClick
+    end
+  end
+  object tmrCheckHeart: TTimer
+    Interval = 10000
+    OnTimer = tmrCheckHeartTimer
+    Left = 416
+    Top = 224
   end
 end

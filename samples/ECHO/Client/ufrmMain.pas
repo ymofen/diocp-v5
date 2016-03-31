@@ -28,23 +28,32 @@ type
     chkRecvEcho: TCheckBox;
     chkRecvOnLog: TCheckBox;
     btnClear: TButton;
+    chkHex: TCheckBox;
+    chkCheckHeart: TCheckBox;
+    btnSaveHistory: TButton;
+    tmrCheckHeart: TTimer;
     procedure btnClearClick(Sender: TObject);
-    procedure FormCreate(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnCreateClick(Sender: TObject);
     procedure btnFill1KClick(Sender: TObject);
+    procedure btnSaveHistoryClick(Sender: TObject);
     procedure btnSendObjectClick(Sender: TObject);
+    procedure chkCheckHeartClick(Sender: TObject);
+    procedure chkHexClick(Sender: TObject);
     procedure chkRecvEchoClick(Sender: TObject);
     procedure chkRecvOnLogClick(Sender: TObject);
     procedure chkSendDataClick(Sender: TObject);
-    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure tmrCheckHeartTimer(Sender: TObject);
   private
     FSendDataOnConnected:Boolean;
     FSendDataOnRecv:Boolean;
     FRecvOnLog:Boolean;
+    FConvertHex:Boolean;
     { Private declarations }
     FIocpClientSocket: TDiocpTcpClient;
+
+    procedure DoSend(pvConentxt: TDiocpCustomContext; s: AnsiString);
 
     procedure OnContextConnected(pvContext: TDiocpCustomContext);
 
@@ -68,7 +77,7 @@ var
 implementation
 
 uses
-  uFMMonitor, utils_dvalue, utils_DValue_JSON;
+  uFMMonitor, utils_dvalue, utils_DValue_JSON, utils.byteTools;
 {$R *.dfm}
 
 { TfrmMain }
@@ -78,6 +87,7 @@ begin
   inherited;
   FSendDataOnRecv := chkRecvEcho.Checked;
   FRecvOnLog := chkRecvOnLog.Checked;
+  FConvertHex := chkHex.Checked;
   sfLogger.setAppender(TStringsAppender.Create(mmoRecvMessage.Lines));
   sfLogger.AppendInMainThread := true;
 
@@ -88,11 +98,7 @@ begin
   TFMMonitor.createAsChild(tsMonitor, FIocpClientSocket);
 
   ReadHistory;
-end;
 
-procedure TfrmMain.FormCreate(Sender: TObject);
-begin
-  FSendDataOnConnected := true;
 end;
 
 destructor TfrmMain.Destroy;
@@ -168,16 +174,54 @@ begin
   mmoData.Lines.Text :=  s;
 end;
 
+procedure TfrmMain.btnSaveHistoryClick(Sender: TObject);
+begin
+  WriteHistory;
+end;
+
 procedure TfrmMain.btnSendObjectClick(Sender: TObject);
 var
+  i, l: Integer;
+  lvBytes:TBytes;
   s:AnsiString;
-  i: Integer;
-begin  
+begin
   s := mmoData.Lines.Text;
-
   for i := 0 to FIocpClientSocket.Count - 1 do
   begin
-    FIocpClientSocket.Items[i].PostWSASendRequest(PAnsiChar(s), Length(s));
+    DoSend(FIocpClientSocket.Items[i], s);
+  end;
+end;
+
+procedure TfrmMain.chkCheckHeartClick(Sender: TObject);
+begin
+  ;
+end;
+
+procedure TfrmMain.chkHexClick(Sender: TObject);
+var
+  s:AnsiString;
+  l:Integer;
+  lvBytes:TBytes;
+begin
+  FConvertHex := chkHex.Checked;
+  if chkHex.Tag = 1 then Exit;
+
+  s := mmoData.Lines.Text;
+
+
+  if FConvertHex then
+  begin
+    mmoData.Lines.Text := TByteTools.varToHexString(PAnsiChar(s)^, Length(s));
+  end else
+  begin
+    s := StringReplace(s, ' ', '', [rfReplaceAll]);
+    s := StringReplace(s, #10, '', [rfReplaceAll]);
+    s := StringReplace(s, #13, '', [rfReplaceAll]);
+    l := Length(s);
+    SetLength(lvBytes, l);
+    FillChar(lvBytes[0], l, 0);
+    l := TByteTools.HexToBin(s, @lvBytes[0]);
+    mmoData.Lines.Text := StrPas(@lvBytes[0]);
   end;
 end;
 
@@ -196,20 +240,41 @@ begin
   FSendDataOnConnected := chkSendData.Checked;
 end;
 
-procedure TfrmMain.FormClose(Sender: TObject; var Action: TCloseAction);
+procedure TfrmMain.DoSend(pvConentxt: TDiocpCustomContext; s: AnsiString);
+var
+  i, l: Integer;
+  lvBytes:TBytes;
 begin
-  WriteHistory;
+  //s := mmoData.Lines.Text;
+  if FConvertHex then
+  begin
+    s := StringReplace(s, ' ', '', [rfReplaceAll]);
+    s := StringReplace(s, #10, '', [rfReplaceAll]);
+    s := StringReplace(s, #13, '', [rfReplaceAll]);
+    l := Length(s);
+    SetLength(lvBytes, l);
+    FillChar(lvBytes[0], l, 0);
+    l := TByteTools.HexToBin(s, @lvBytes[0]);
+  end;
+
+  if FConvertHex then
+  begin
+    pvConentxt.PostWSASendRequest(@lvBytes[0], l);
+  end else
+  begin
+    pvConentxt.PostWSASendRequest(PAnsiChar(s), Length(s));
+  end;
+
 end;
 
 procedure TfrmMain.OnContextConnected(pvContext: TDiocpCustomContext);
 var
   s:AnsiString;
 begin
+  s := mmoData.Lines.Text;
   if FSendDataOnConnected then
   begin
-    s := mmoData.Lines.Text;
-
-    pvContext.PostWSASendRequest(PAnsiChar(s), Length(s));
+    DoSend(pvContext, s);
   end;
 
 end;
@@ -255,7 +320,24 @@ begin
   chkRecvOnLog.Checked := lvDValue.ForceByName('chk_recvonlog').AsBoolean;
   chkSendData.Checked := lvDValue.ForceByName('chk_send_onconnected').AsBoolean;
 
-  lvDValue.Free;  
+  chkHex.Tag := 1;
+  chkHex.Checked := lvDValue.ForceByName('chk_send_hex').AsBoolean;
+  chkHex.Tag := 0;
+
+  chkCheckHeart.Checked := lvDValue.ForceByName('chk_checkheart').AsBoolean;
+
+  lvDValue.Free;
+
+  FSendDataOnConnected := chkSendData.Checked;
+  FRecvOnLog := chkRecvOnLog.Checked;
+  FSendDataOnRecv := chkRecvEcho.Checked;
+  FConvertHex := chkHex.Checked;
+end;
+
+procedure TfrmMain.tmrCheckHeartTimer(Sender: TObject);
+begin
+  if chkCheckHeart.Checked then
+    self.FIocpClientSocket.KickOut(30000);
 end;
 
 procedure TfrmMain.WriteHistory;
@@ -269,6 +351,8 @@ begin
   lvDValue.ForceByName('chk_recvecho').AsBoolean := chkRecvEcho.Checked;
   lvDValue.ForceByName('chk_recvonlog').AsBoolean := chkRecvOnLog.Checked;
   lvDValue.ForceByName('chk_send_onconnected').AsBoolean := chkSendData.Checked;
+  lvDValue.ForceByName('chk_send_hex').AsBoolean := chkHex.Checked;
+  lvDValue.ForceByName('chk_checkheart').AsBoolean := chkCheckHeart.Checked;
   JSONWriteToUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
   lvDValue.Free;
 end;
