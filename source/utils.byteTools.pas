@@ -32,6 +32,7 @@ type
      class function varToHexString(const v; len: Cardinal; Split: string = ' '):
          String;
 
+
      /// <summary>
      ///  16进制转 二进制
      /// </summary>

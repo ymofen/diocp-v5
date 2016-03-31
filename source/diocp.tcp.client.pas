@@ -32,7 +32,7 @@ type
 
     FHost: String;
     FPort: Integer;
-    procedure PostConnectRequest;
+    function PostConnectRequest: Boolean;
     procedure ReCreateSocket;
     function CanAutoReConnect:Boolean;
   protected
@@ -272,26 +272,30 @@ end;
 
 procedure TIocpRemoteContext.OnConnecteExResponse(pvObject: TObject);
 begin
-  FIsConnecting := false;
-  if TIocpConnectExRequest(pvObject).ErrorCode = 0 then
-  begin
-    DoConnected;
-  end else
-  begin
-    {$IFDEF DEBUG_ON}
-    Owner.logMessage(strConnectError,  [TIocpConnectExRequest(pvObject).ErrorCode]);
-    {$ENDIF}
-
-    DoError(TIocpConnectExRequest(pvObject).ErrorCode);
-
-    if (CanAutoReConnect) then
+  try
+    FIsConnecting := false;
+    if TIocpConnectExRequest(pvObject).ErrorCode = 0 then
     begin
-      Sleep(100);
-      PostConnectRequest;
+      DoConnected;
     end else
     begin
-      SetSocketState(ssDisconnected);
+      {$IFDEF DEBUG_ON}
+      Owner.logMessage(strConnectError,  [TIocpConnectExRequest(pvObject).ErrorCode]);
+      {$ENDIF}
+
+      DoError(TIocpConnectExRequest(pvObject).ErrorCode);
+
+      if (CanAutoReConnect) then
+      begin
+        Sleep(100);
+        PostConnectRequest;
+      end else
+      begin
+        SetSocketState(ssDisconnected);
+      end;
     end;
+  finally
+    if Owner <> nil then Owner.DecRefCounter;
   end;
 end;
 
@@ -300,28 +304,43 @@ begin
   inherited;
 end;
 
-procedure TIocpRemoteContext.PostConnectRequest;
+function TIocpRemoteContext.PostConnectRequest: Boolean;
 begin
+  Result := False;
   if FHost = '' then
   begin
     raise Exception.Create('请指定要建立连接的IP和端口信息！');
   end;
-  if lock_cmp_exchange(False, True, FIsConnecting) = False then
-  begin
-    if RawSocket.SocketHandle = INVALID_SOCKET then
+
+  if Owner <> nil then Owner.IncRefCounter;
+  try
+    if lock_cmp_exchange(False, True, FIsConnecting) = False then
     begin
-      ReCreateSocket;
+      if RawSocket.SocketHandle = INVALID_SOCKET then
+      begin
+        ReCreateSocket;
+      end;
+
+
+      if not FConnectExRequest.PostRequest(FHost, FPort) then
+      begin
+        FIsConnecting := false;
+
+        Sleep(1000);
+
+        if CanAutoReConnect then Result := PostConnectRequest;
+      end else
+      begin
+        Result := True;
+      end;
     end;
-
-    if not FConnectExRequest.PostRequest(FHost, FPort) then
+  finally
+    if not Result then
     begin
-      FIsConnecting := false;
-
-      Sleep(1000);
-
-      if CanAutoReConnect then PostConnectRequest;
+       if Owner <> nil then Owner.DecRefCounter;
     end;
   end;
+
 end;
 
 procedure TIocpRemoteContext.ReCreateSocket;
@@ -491,20 +510,27 @@ var
   lvContext:TIocpRemoteContext;
   lvRequest:TIocpASyncRequest;
 begin
-  // 退出
-  if not Self.Active then Exit;
+  try
+    // 退出
+    if not Self.Active then Exit;
     
-  lvRequest := TIocpASyncRequest(pvObject);
-  lvContext := TIocpRemoteContext(lvRequest.Data);
+    lvRequest := TIocpASyncRequest(pvObject);
+    lvContext := TIocpRemoteContext(lvRequest.Data);
 
-  if tick_diff(lvContext.FLastDisconnectTime, GetTickCount) >= RECONNECT_INTERVAL  then
-  begin
-    // 投递真正的连接请求
-    lvContext.PostConnectRequest();
-  end else
-  begin
-    // 再次投递连接请求
-    PostReconnectRequestEvent(lvContext);
+    // 退出重连请求
+    if not lvContext.CanAutoReConnect then Exit;     
+
+    if tick_diff(lvContext.FLastDisconnectTime, GetTickCount) >= RECONNECT_INTERVAL  then
+    begin
+      // 投递真正的连接请求
+      lvContext.PostConnectRequest();
+    end else
+    begin
+      // 再次投递连接请求
+      PostReconnectRequestEvent(lvContext);
+    end;
+  finally
+    self.DecRefCounter;
   end;
 end;
 
@@ -518,12 +544,16 @@ procedure TDiocpTcpClient.PostReconnectRequestEvent(pvContext:
 var
   lvRequest:TIocpASyncRequest;
 begin
+  /// 锁定不能进行关闭
+  Self.IncRefCounter;
+
   lvRequest := TIocpASyncRequest(FReconnectRequestPool.GetObject);
   lvRequest.DoCleanUp;
   lvRequest.OnResponseDone := OnReconnectRequestResponseDone;
   lvRequest.OnResponse := OnReconnectRequestResponse;
   lvRequest.Data := pvContext;
   IocpEngine.PostRequest(lvRequest);
+
 end;
 
 constructor TDiocpExRemoteContext.Create;

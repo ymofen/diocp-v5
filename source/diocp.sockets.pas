@@ -72,6 +72,9 @@ type
     FContextLocker: TIocpLocker;
     FLastErrorCode:Integer;
     FDebugINfo: string;
+
+
+
     procedure SetDebugINfo(const Value: string);
 
   private
@@ -79,17 +82,9 @@ type
     FDebugStrings:TStrings;
 
     /// <summary>
-    ///    dec RequestCounter then check counter and Request flag for Disonnect
-    /// </summary>
-    function decReferenceCounter(pvDebugInfo: string; pvObj: TObject): Integer;
-    
-    /// <summary>
     ///   dec RequestCounter and requestDisconnect then check counter flag for Disonnect
     /// </summary>
-    procedure decReferenceCounterAndRequestDisconnect(pvDebugInfo: string; pvObj:
-        TObject);
-
-    function incReferenceCounter(pvDebugInfo: string; pvObj: TObject): Boolean;
+    procedure DecReferenceCounterAndRequestDisconnect(pvDebugInfo: string; pvObj:TObject);
 
   private
     FAlive:Boolean;
@@ -182,6 +177,22 @@ type
     procedure DoError(pvErrorCode:Integer);
 
   protected
+    /// <summary>
+    ///    dec RequestCounter then check counter and Request flag for Disonnect
+    /// </summary>
+    function DecReferenceCounter(pvDebugInfo: string; pvObj: TObject): Integer;
+    function IncReferenceCounter(pvDebugInfo: string; pvObj: TObject): Boolean;
+
+    /// <summary>
+    ///   只进行增加, connectEx的时候用
+    /// </summary>
+    procedure AddRefernece;
+
+    /// <summary>
+    ///   只进行减少, connectEx的时候用
+    /// </summary>
+    procedure DecRefernece;
+
     procedure DoCleanUp;virtual;
 
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); virtual;
@@ -201,6 +212,7 @@ type
     ///   call in response event
     /// </summary>
     procedure DoDisconnect;
+
 
     procedure InnerCloseContext;
     /// <summary>
@@ -600,6 +612,12 @@ type
   TDiocpCustom = class(TComponent)
   private
     FSafeLogger:TSafeLogger;
+
+
+    /// <summary>
+    ///   引用计数
+    /// </summary>
+    FRefCounter:Integer;
     
   {$IFDEF DEBUG_ON}
     FDebug_SendRequestCounter:Integer;
@@ -706,6 +724,17 @@ type
     procedure RemoveFromOnOnlineList(pvObject: TDiocpCustomContext); virtual;
 
   public
+    /// <summary>
+    ///   原子操作添加引用计数(一定要有对应的DecRefCounter);
+    ///   会阻止关闭
+    /// </summary>
+    function IncRefCounter: Integer;
+
+    /// <summary>
+    ///   减少引用
+    /// </summary>
+    function DecRefCounter:Integer;
+
     constructor Create(AOwner: TComponent); override;
 
     destructor Destroy; override;
@@ -997,13 +1026,13 @@ begin
   inherited Destroy;
 end;
 
-function TDiocpCustomContext.decReferenceCounter(pvDebugInfo: string; pvObj:
+function TDiocpCustomContext.DecReferenceCounter(pvDebugInfo: string; pvObj:
     TObject): Integer;
 var
   lvCloseContext:Boolean;
 begin
   lvCloseContext := false;
-  FContextLocker.lock('decReferenceCounter');
+  FContextLocker.lock('DecReferenceCounter');
   Dec(FReferenceCounter);
   Result := FReferenceCounter;
   FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
@@ -1025,8 +1054,8 @@ begin
   end;
 end;
 
-procedure TDiocpCustomContext.decReferenceCounterAndRequestDisconnect(pvDebugInfo:
-    string; pvObj: TObject);
+procedure TDiocpCustomContext.DecReferenceCounterAndRequestDisconnect(
+    pvDebugInfo: string; pvObj: TObject);
 var
   lvCloseContext:Boolean;
 begin
@@ -1035,7 +1064,7 @@ begin
   FOwner.logMessage('(%d)断开请求信息*:%s', [SocketHandle, pvDebugInfo],
       'RequestDisconnect');
 {$ENDIF}
-  FContextLocker.lock('decReferenceCounter');
+  FContextLocker.lock('DecReferenceCounter');
   FRequestDisconnect := true;
   Dec(FReferenceCounter);
   FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
@@ -1208,10 +1237,11 @@ begin
   Result.FContext := self;
 end;
 
-function TDiocpCustomContext.incReferenceCounter(pvDebugInfo: string; pvObj:
+function TDiocpCustomContext.IncReferenceCounter(pvDebugInfo: string; pvObj:
     TObject): Boolean;
 begin
-  FContextLocker.lock('incReferenceCounter');
+  Assert(Self<> nil);
+  FContextLocker.lock('IncReferenceCounter');
   if (not Active) or FRequestDisconnect then
   begin
     Result := false;
@@ -1277,7 +1307,7 @@ end;
 function TDiocpCustomContext.LockContext(pvDebugInfo: string; pvObj: TObject):
     Boolean;
 begin
-  Result := incReferenceCounter(pvDebugInfo, pvObj);
+  Result := IncReferenceCounter(pvDebugInfo, pvObj);
 end;
 
 procedure TDiocpCustomContext.OnConnected;
@@ -1314,7 +1344,7 @@ function TDiocpCustomContext.PostSendRequestDelete(
     pvSendRequest:TIocpSendRequest): Boolean;
 begin
   Result := false;
-  if incReferenceCounter('TIocpClientContext.PostSendRequestDelete', pvSendRequest) then
+  if IncReferenceCounter('TIocpClientContext.PostSendRequestDelete', pvSendRequest) then
   begin
     try
       FContextLocker.lock();   
@@ -1353,7 +1383,7 @@ begin
            [FSendRequestLink.Count]), Self);
       end;
     finally
-      decReferenceCounter('TIocpClientContext.PostSendRequestDelete', pvSendRequest);
+      DecReferenceCounter('TIocpClientContext.PostSendRequestDelete', pvSendRequest);
     end;
   end else
   begin
@@ -1403,6 +1433,9 @@ begin
 {$ENDIF}
 
   lvCloseContext := false;
+
+  Assert(FContextLocker <> nil, 'error...');
+
   FContextLocker.lock('RequestDisconnect');
  
   if pvDebugInfo <> '' then
@@ -1454,7 +1487,7 @@ begin
   begin
     Assert(Self<> nil);
   end;
-  decReferenceCounter(pvDebugInfo, pvObj);
+  DecReferenceCounter(pvDebugInfo, pvObj);
 end;
 
 function TDiocpCustom.CheckClientContextValid(const pvClientContext:
@@ -1466,6 +1499,7 @@ end;
 constructor TDiocpCustom.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FRefCounter := 0;
   CheckWinSocketStart;
   FSafeLogger:=TSafeLogger.Create();
   FSafeLogger.setAppender(TLogFileAppender.Create(True));
@@ -1487,6 +1521,11 @@ begin
   FWSARecvBufferSize := 1024 * 4;
 
   FWSASendBufferSize := 1024 * 8;
+end;
+
+function TDiocpCustom.DecRefCounter: Integer;
+begin
+  Result := InterlockedDecrement(FRefCounter);
 end;
 
 destructor TDiocpCustom.Destroy;
@@ -1745,6 +1784,11 @@ begin
   {$ENDIF}
 end;
 
+function TDiocpCustom.IncRefCounter: Integer;
+begin
+  Result := InterlockedIncrement(FRefCounter);
+end;
+
 procedure TDiocpCustom.LogMessage(pvMsg: string; pvMsgType: string = '';
     pvLevel: TLogLevel = lgvMessage);
 begin
@@ -1829,13 +1873,9 @@ var
 begin
   l := GetTickCount;
   c := FOnlineContextList.Count;
-  while (c > 0) do
+  while (c > 0) or (FRefCounter > 0) do
   begin
-    {$IFDEF MSWINDOWS}
-    SwitchToThread;
-    {$ELSE}
-    TThread.Yield;
-    {$ENDIF}
+    Sleep(10);
 
     if GetTickCount - l > pvTimeOut then
     begin
@@ -2770,6 +2810,21 @@ begin
 
 end;
 
+procedure TDiocpCustomContext.AddRefernece;
+begin
+  FContextLocker.lock('AddRefernece');
+  Inc(FReferenceCounter);
+  FContextLocker.unLock;
+end;
+
+procedure TDiocpCustomContext.DecRefernece;
+begin
+  FContextLocker.lock('DecRefernece');
+  Dec(FReferenceCounter);
+  FContextLocker.unLock;
+end;
+
+
 function TDiocpCustomContext.InnerPostSendRequestAndCheckStart(
     pvSendRequest:TIocpSendRequest): Boolean;
 var
@@ -2821,7 +2876,7 @@ begin
   if len = 0 then raise Exception.Create('PostWSASendRequest::request buf is zero!');
   if self.Active then
   begin
-    if self.incReferenceCounter('PostWSASendRequest', Self) then
+    if self.IncReferenceCounter('PostWSASendRequest', Self) then
     begin
       try
         lvRequest := GetSendRequest;
@@ -2845,7 +2900,7 @@ begin
           FOwner.ReleaseSendRequest(lvRequest);
         end;
       finally
-        self.decReferenceCounter('PostWSASendRequest', Self);
+        self.DecReferenceCounter('PostWSASendRequest', Self);
       end;
     end;
   end;
