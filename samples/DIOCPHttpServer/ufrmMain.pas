@@ -16,8 +16,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer, diocp_ex_http_common, utils.byteTools,
-  System.Actions;
+  ComCtrls, diocp.ex.httpServer, diocp_ex_http_common, utils.byteTools;
 
 type
   TfrmMain = class(TForm)
@@ -128,7 +127,7 @@ var
     pvRequest.Response.WriteString('<div>');
 
     // 获取头信息
-    s := pvRequest.RequestHeader.Text;
+    s := pvRequest.RequestRawHeaderString;
     s := ReplaceText(s, sLineBreak, '<br>');
     pvRequest.Response.WriteString('头信息<br>');
     pvRequest.Response.WriteString('请求Url:' + pvRequest.RequestUrl + '<br>');
@@ -146,29 +145,28 @@ var
 
 
     pvRequest.Response.WriteString(Format('原始URL数据:%s<br>', [pvRequest.RequestRawURL]));
-    pvRequest.Response.WriteString(Format('原始数据长度:%d<br>', [pvRequest.RawPostData.Size]));
+    pvRequest.Response.WriteString(Format('原始数据长度:%d<br>', [pvRequest.RawDataLength]));
     pvRequest.Response.WriteString(Format('context-length:%d<br>', [pvRequest.ContextLength]));
 
-    SetLength(lvRawData,pvRequest.RawPostData.Size);
-    pvRequest.RawPostData.Position := 0;
-    pvRequest.RawPostData.Read(PByte(lvRawData)^, pvRequest.RawPostData.Size);
+
+    lvRawData := pvRequest.DataAsString;
     pvRequest.Response.WriteString('原始数据:');
     pvRequest.Response.WriteString(lvRawData);
     pvRequest.Response.WriteString('<br>=======================================<br>');
 
-    pvRequest.Response.WriteString('<br>');
-    pvRequest.Response.WriteString(Format('解码参数信息(参数数量:%d)<br>', [pvRequest.RequestParamsList.Count]));
-    pvRequest.Response.WriteString(pvRequest.RequestParamsList.Text);
-
-    if pvRequest.RequestParamsList.Count > 0 then
-    begin
-      pvRequest.Response.WriteString('<br>第一个参数:' + pvRequest.GetRequestParam(pvRequest.RequestParamsList.Names[0]));
-    end;
-    pvRequest.Response.WriteString('<br>获取b参数的原值:' +pvRequest.GetRequestParam('b'));
-    pvRequest.Response.WriteString('<br>获取b参数的Utf8解码:' +Utf8Decode(pvRequest.GetRequestParam('b')));
-
-    pvRequest.Response.WriteString('<br>');
-    pvRequest.Response.WriteString('=======================================<br>'); 
+//    pvRequest.Response.WriteString('<br>');
+//    pvRequest.Response.WriteString(Format('解码参数信息(参数数量:%d)<br>', [pvRequest.RequestParamsList.Count]));
+//    pvRequest.Response.WriteString(pvRequest.RequestParamsList.Text);
+//
+//    if pvRequest.RequestParamsList.Count > 0 then
+//    begin
+//      pvRequest.Response.WriteString('<br>第一个参数:' + pvRequest.GetRequestParam(pvRequest.RequestParamsList.Names[0]));
+//    end;
+//    pvRequest.Response.WriteString('<br>获取b参数的原值:' +pvRequest.GetRequestParam('b'));
+//    pvRequest.Response.WriteString('<br>获取b参数的Utf8解码:' +Utf8Decode(pvRequest.GetRequestParam('b')));
+//
+//    pvRequest.Response.WriteString('<br>');
+//    pvRequest.Response.WriteString('=======================================<br>');
 
 
     // 返回json
@@ -313,15 +311,15 @@ begin
   end;
 
 
-  if Pos('deflate',pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
-  begin
-    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'deflate';
-    pvRequest.Response.DeflateCompressContent;
-  end else if Pos('gzip', pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
-  begin
-    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'gzip';
-    pvRequest.Response.GZipContent;
-  end;
+//  if Pos('deflate',pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
+//  begin
+//    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'deflate';
+//    pvRequest.Response.DeflateCompressContent;
+//  end else if Pos('gzip', pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
+//  begin
+//    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'gzip';
+//    pvRequest.Response.GZipContent;
+//  end;
 
   // 应答完毕，发送会客户端
   pvRequest.ResponseEnd;

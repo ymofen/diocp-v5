@@ -26,14 +26,14 @@ uses
 
 type
 
-  TLogLevel=(lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug);
+  TLogLevel=(lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug, lgvWriteFile);
 
   TLogLevels = set of TLogLevel;
 
 const
-  TLogLevelCaption: array [TLogLevel] of string = ('error', 'warning', 'hint', 'message', 'debug');
+  TLogLevelCaption: array [TLogLevel] of string = ('error', 'warning', 'hint', 'message', 'debug', '');
 
-  LogAllLevels = [lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug];
+  LogAllLevels = [lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug, lgvWriteFile];
 
 type
   TSafeLogger = class;
@@ -378,7 +378,7 @@ end;
 constructor TSafeLogger.Create;
 begin
   inherited Create;
-  FLogFilter := [lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug];
+  FLogFilter := LogAllLevels;
   FWorkerAlive := 0;
   FEnable := true;
   FSyncMainThreadType := rtSync;

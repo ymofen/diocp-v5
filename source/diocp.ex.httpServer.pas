@@ -130,39 +130,14 @@ type
     FDiocpHttpServer:TDiocpHttpServer;
 
     /// <summary>
-    ///  请求头
-    /// </summary>
-    FHeader : TDValue;
-
-    /// <summary>
     ///   URL中的参数
     /// </summary>
     FURLParams: TDValue;
 
     FDiocpContext: TDiocpHttpClientContext;
 
-    /// 头信息
-    FHttpVersion: Word; // 10, 11
 
-    FRequestVersionStr: String;
 
-    FRequestMethod: String;
-    FRequestRawURL: String;       // 原始的请求URL，不进行任何解码
-
-    /// <summary>
-    ///  原始请求中的URL参数数据(没有经过URLDecode，因为在DecodeRequestHeader中要拼接RequestURL时临时进行了URLDecode)
-    ///  没有经过URLDecode是考虑到参数值中本身存在&字符，导致DecodeURLParam出现不解码异常
-    /// </summary>
-    FRequestURLParamData: string;
-
-    FRequestURL: String;          // URI + 参数
-
-    FRequestParamsList: TStringList; // TODO:存放http参数的StringList
-
-    // 存放客户端请求的Cookie信息
-    FRequestCookieList: TStrings;
-
-    FContextType: string;
     FKeepAlive: Boolean;
     FRequestAccept: String;
     FRequestReferer: String;
@@ -178,17 +153,6 @@ type
 
     FXForwardedFor: string;
 
-    FRawHeader: TMemoryStream;
-
-    /// <summary>
-    ///   原始的POST数据
-    /// </summary>
-    FRawPostData: TMemoryStream;
-
-    FPostDataLen: Integer;
-
-    FRequestHeader: TStringList;
-    FRequestRawHeaderString: string;
 
     FResponse: TDiocpHttpResponse;
 
@@ -198,19 +162,24 @@ type
     procedure Close;
 
     /// <summary>
-    /// 接收到的Buffer,写入数据
-    /// </summary>
-    procedure WriteRawHeaderBuffer(const buffer: Pointer; len: Integer);
-
-    /// <summary>
     ///   检测Cookie中的SessionID信息
     ///   不创建Session对象
     /// </summary>
     procedure CheckCookieSession;
     function GetContextLength: Int64;
-    function GetRequestCookieList: TStrings;
+    function GetContextType: String;
+    function GetDataAsMemory: PByte;
+    function GetDataAsString: String;
+    function GetHeader: TDValue;
+    function GetHttpVersion: Word;
+    function GetRawDataLength: Integer;
     function GetRequestCookies: string;
+    function GetRequestMethod: string;
+    function GetRequestRawHeaderString: string;
+    function GetRequestRawURL: String;
     function GetRequestURI: String;
+    function GetRequestURL: String;
+    function GetRequestURLParamData: string;
   protected
   public
     constructor Create;
@@ -265,7 +234,7 @@ type
     /// </summary>
     function GetCookie(pvCookieName:string):String;
 
-    property ContextType: String read FContextType;
+    property ContextType: String read GetContextType;
 
     property ContextLength: Int64 read GetContextLength;
 
@@ -274,44 +243,35 @@ type
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
+    property DataAsMemory: PByte read GetDataAsMemory;
+    property DataAsString: String read GetDataAsString;
 
     /// <summary>
     ///   请求头
     /// </summary>
-    property Header: TDValue read FHeader;
+    property Header: TDValue read GetHeader;
 
-    property HttpVersion: Word read FHttpVersion;
-    
-    /// <summary>
-    ///   原始的Post过来的数据
-    /// </summary>
-    property RawPostData: TMemoryStream read FRawPostData;
-
-    property RawHeader: TMemoryStream read FRawHeader;
+    property HttpVersion: Word read GetHttpVersion;
+    property RawDataLength: Integer read GetRawDataLength;
 
 
     property RequestAccept: String read FRequestAccept;
     property RequestAcceptEncoding: string read FRequestAcceptEncoding;
     property RequestAcceptLanguage: string read FRequestAcceptLanguage;
-    property RequestCookieList: TStrings read GetRequestCookieList;
     property RequestCookies: string read GetRequestCookies;
-
-    /// <summary>
-    ///   请求的头信息
-    /// </summary>
-    property RequestHeader: TStringList read FRequestHeader;
 
 
 
     /// <summary>
     ///   从头信息解码器出来的Url,包含参数
+    ///   URI + 参数
     /// </summary>
-    property RequestURL: String read FRequestURL;
+    property RequestURL: String read GetRequestURL;
 
     /// <summary>
     ///   从头信息提取出来的URL，未经过任何加工,包含参数
     /// </summary>
-    property RequestRawURL: String read FRequestRawURL;
+    property RequestRawURL: String read GetRequestRawURL;
 
     /// <summary>
     ///   不带URL参数
@@ -321,7 +281,7 @@ type
     /// <summary>
     ///  从头信息中读取的请求服务器请求方式
     /// </summary>
-    property RequestMethod: string read FRequestMethod;
+    property RequestMethod: string read GetRequestMethod;
 
     /// <summary>
     ///   从头信息中读取的请求服务器IP地址
@@ -341,9 +301,9 @@ type
     /// <summary>
     ///   从Url和Post数据中得到的参数信息: key = value
     /// </summary>
-    property RequestParamsList: TStringList read FRequestParamsList;
+    //property RequestParamsList: TStringList read FRequestParamsList;
 
-    property RequestRawHeaderString: string read FRequestRawHeaderString;
+    property RequestRawHeaderString: string read GetRequestRawHeaderString;
 
     property RequestReferer: String read FRequestReferer;
 
@@ -351,7 +311,7 @@ type
     ///  原始请求中的URL参数数据(没有经过URLDecode，因为在DecodeRequestHeader中要拼接RequestURL时临时进行了URLDecode)
     ///  没有经过URLDecode是考虑到参数值中本身存在&字符，导致DecodeURLParam出现不解码异常
     /// </summary>
-    property RequestURLParamData: string read FRequestURLParamData;
+    property RequestURLParamData: string read GetRequestURLParamData;
     property URLParams: TDValue read FURLParams;
 
     /// <summary>
@@ -387,14 +347,6 @@ type
     /// 1: http请求参数的值
     /// </returns>
     function GetRequestParam(ParamsKey: string): string;
-
-    /// <summary>
-    /// 解析POST和GET参数
-    /// </summary>
-    /// <pvParamText>
-    /// <param name="pvParamText">要解析的全部参数</param>
-    /// </pvParamText>
-    procedure ParseParams(pvParamText: string);
 
 
   end;
@@ -642,20 +594,8 @@ end;
 
 procedure TDiocpHttpRequest.Clear;
 begin
-  FRawHeader.Clear;
-  FRawPostData.Clear;
-  FURLParams.Clear;
-  FRequestURL := '';
-  FRequestRawURL := '';
-  FRequestVersionStr := '';
-  FRequestMethod := '';
-  FRequestParamsList.Clear;
-  FRequestCookieList.Clear;
-  FContextType := '';
-  FPostDataLen := 0;
   FResponse.Clear;
   FReleaseLater := false;
-  FRequestRawHeaderString := '';
   FInnerRequest.DoCleanUp;
 end;
 
@@ -677,70 +617,34 @@ var
   lvCookie:TDiocpHttpCookie;
 begin
   lvCookie := FResponse.FInnerResponse.GetCookie(pvCookieName);
-
-  Result := StringsValueOfName(RequestCookieList, pvCookieName, ['='], true);
+  if lvCookie <> nil then
+  begin
+    Result := lvCookie.Value;
+  end else
+  begin
+    Result := FInnerRequest.GetCookie(pvCookieName);
+  end;
 end;
 
 function TDiocpHttpRequest.GetRequestParam(ParamsKey: string): string;
-var
-  lvTemp: string; // 返回的参数值
-  lvParamsCount: Integer; // 参数数量
-  I: Integer;
 begin
-  Result := '';
-
-  lvTemp := ''; // 返回的参数值默认值为空
-
-  // 得到提交过来的参数的数量
-  lvParamsCount := self.FRequestParamsList.Count;
-
-  // 判断是否有提交过来的参数数据
-  if lvParamsCount = 0 then exit;
-
-  // 循环比较每一组参数的key，是否和当前输入一样
-  for I := 0 to lvParamsCount - 1 do
-  begin 
-    if Trim(self.FRequestParamsList.Names[I]) = Trim(ParamsKey) then
-    begin
-      lvTemp := Trim(self.FRequestParamsList.ValueFromIndex[I]);
-      Break;
-    end;
-  end; 
-
-  Result := lvTemp;
+  Result := FInnerRequest.URLParams.GetValueByName(ParamsKey, '');
 end;
 
 constructor TDiocpHttpRequest.Create;
 begin
   inherited Create;
   FInnerRequest := THttpRequest.Create;
-  
-  FHeader := TDValue.Create(vntObject);
-
-  FURLParams := TDValue.Create(vntObject);
-  
-  FRawHeader := TMemoryStream.Create();
-  FRawPostData := TMemoryStream.Create();
-  FRequestHeader := TStringList.Create();
   FResponse := TDiocpHttpResponse.Create();
 
-  FRequestParamsList := TStringList.Create; // TODO:创建存放http参数的StringList
-  FRequestCookieList := TStringList.Create;
+  //FRequestParamsList := TStringList.Create; // TODO:创建存放http参数的StringList
 end;
 
 destructor TDiocpHttpRequest.Destroy;
 begin
   FreeAndNil(FResponse);
-  FRawPostData.Free;
-  FRawHeader.Free;
-  FRequestHeader.Free;
 
-  FreeAndNil(FRequestParamsList); // TODO:释放存放http参数的StringList
-  FRequestCookieList.Free;
-
-  FHeader.Free;
-
-  FURLParams.Free;
+  //FreeAndNil(FRequestParamsList); // TODO:释放存放http参数的StringList
 
   FInnerRequest.Free;
 
@@ -759,137 +663,23 @@ begin
 end;
 
 procedure TDiocpHttpRequest.DecodePostDataParam({$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
-var
-  lvRawData : AnsiString;
-  lvRawParams, s, lvName, lvValue:String;
-  i:Integer;
-  lvStrings:TStrings;
-  lvSpliteStrings: TArrayStrings;
-{$IFDEF UNICODE}
-var
-  lvBytes:TBytes;
-{$ELSE}
-{$ENDIF}
 begin
-  if FRawPostData.Size = 0 then exit;
-
-  SetLength(lvSpliteStrings, 2);
-  
-  // 读取原始数据
-  SetLength(lvRawData, FRawPostData.Size);
-  FRawPostData.Position := 0;
-  FRawPostData.Read(PAnsiChar(lvRawData)^, FRawPostData.Size);
-
-  lvStrings := TStringList.Create;
-  try
-    // 先放入到Strings
-    SplitStrings(lvRawData, lvStrings, ['&']);
-
-    for i := 0 to lvStrings.Count - 1 do
-    begin
-      s := Trim(lvStrings[i]);
-      if length(s) > 0 then
-      begin
-        if SplitStr(s, '=', lvName, lvValue) then
-        begin
-          lvRawData := URLDecode(lvValue);
-          if lvRawData <> '' then   // 不合法的Key-Value会导致空字符串
-          begin
-            {$IFDEF UNICODE}
-            if pvEncoding <> nil then
-            begin
-              // 字符编码转换
-              SetLength(lvBytes, length(lvRawData));
-              Move(PByte(lvRawData)^, lvBytes[0], Length(lvRawData));
-              s := pvEncoding.GetString(lvBytes);
-            end else
-            begin
-              s := lvRawData;
-            end;
-            {$ELSE}
-            if pvUseUtf8Decode then
-            begin
-              s := UTF8Decode(lvRawData);
-            end else
-            begin
-              s := lvRawData;
-            end;
-            {$ENDIF}
-            if s = '' then s := lvRawData;
-            
-
-            // 解码参数
-            lvStrings.ValueFromIndex[i] := s;
-          end;
-        end;
-      end;
-    end;
-    FRequestParamsList.AddStrings(lvStrings);
-  finally
-    lvStrings.Free;
-  end;
+  {$IFDEF UNICODE}
+  FInnerRequest.DecodeContentAsFormUrlencoded(pvEncoding);
+  {$ELSE}
+  FInnerRequest.DecodeContentAsFormUrlencoded(pvUseUtf8Decode);
+  {$ENDIF}
 end;
 
 
 procedure TDiocpHttpRequest.DecodeURLParam(
   {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
-var
-  lvRawData : AnsiString;
-  s:String;
-  i:Integer;
-  lvStrings:TStrings;
-{$IFDEF UNICODE}
-var
-  lvBytes:TBytes;
-{$ELSE}
-{$ENDIF}
 begin
-  // 解析URL参数
-  if FRequestURLParamData = '' then exit;
-
-  lvStrings := TStringList.Create;
-  try
-    // 先放入到Strings
-    SplitStrings(FRequestURLParamData, lvStrings, ['&']);
-
-    for i := 0 to lvStrings.Count - 1 do
-    begin
-
-      lvRawData := URLDecode(lvStrings.ValueFromIndex[i]);
-      if lvRawData<> '' then
-      begin
-        {$IFDEF UNICODE}
-        if pvEncoding <> nil then
-        begin
-          // 字符编码转换
-          SetLength(lvBytes, length(lvRawData));
-          Move(PByte(lvRawData)^, lvBytes[0], Length(lvRawData));
-          s := pvEncoding.GetString(lvBytes);
-        end else
-        begin
-          s := lvRawData;
-        end;
-        {$ELSE}
-        if pvUseUtf8Decode then
-        begin
-          s := UTF8Decode(lvRawData);
-        end else
-        begin
-          s := lvRawData;
-        end;
-        {$ENDIF}
-
-        // 解码参数
-        lvStrings.ValueFromIndex[i] := s;
-        
-        FURLParams.ForceByName(lvStrings.Names[i]).AsString := s;
-      end;
-    end;
-    FRequestParamsList.AddStrings(lvStrings);
-  finally
-    lvStrings.Free;
-  end;
-
+  {$IFDEF UNICODE}
+  FInnerRequest.DecodeURLParam(pvEncoding);
+  {$ELSE}
+  FInnerRequest.DecodeURLParam(pvUseUtf8Decode);
+  {$ENDIF}
 end;
 
 function TDiocpHttpRequest.GetContextLength: Int64;
@@ -897,28 +687,70 @@ begin
   Result := FInnerRequest.ContentLength;
 end;
 
-function TDiocpHttpRequest.GetRequestCookieList: TStrings;
-var
-  lvCookies:String;
+function TDiocpHttpRequest.GetContextType: String;
 begin
-  if FRequestCookieList.Count = 0 then
-  begin
-    // Cookie:__gads=ID=6ff3a79a032e04d0:T=1425100914:S=ALNI_MZWDCQuaEqZV3ZYri0E4GU8osX7rw; pgv_pvi=5995954176; lzstat_uv=25556556142595371638|754770@2240623; Hm_lvt_674430fbddd66a488580ec86aba288f7=1433747304,1435200001; Hm_lvt_95eb98507622b340bc1da73ed59cfe34=1435906572; AJSTAT_ok_times=2; __utma=226521935.635858515.1425100841.1436162631.1437634125.12; __utmz=226521935.1437634125.12.12.utmcsr=baidu|utmccn=(organic)|utmcmd=organic; _gat=1; _ga=GA1.2.635858515.1425100841; .CNBlogsCookie=B70AF05C246EE95507A6B4E1206C55C394843B6EB1376064B7CE2199A3441791D09AB86E934DF47E48B2E409BC57F7F4C43950430B29D3B23CAC82C7E58212D912F3ECB144B6971C4D9A7EB4E609A900A50016DA
-    lvCookies := GetRequestCookies;
-    SplitStrings(lvCookies, FRequestCookieList, [';']);
-  end;
-  Result := FRequestCookieList;
+  Result := FInnerRequest.ContentType;
+end;
+
+function TDiocpHttpRequest.GetDataAsMemory: PByte;
+begin
+  Result := FInnerRequest.DataAsMemory;
+end;
+
+function TDiocpHttpRequest.GetDataAsString: String;
+begin
+  Result := FInnerRequest.DataAsString;
+end;
+
+function TDiocpHttpRequest.GetHeader: TDValue;
+begin
+  Result := FInnerRequest.Headers;
+end;
+
+function TDiocpHttpRequest.GetHttpVersion: Word;
+begin
+  Result := 1;
+  //Result := FInnerRequest.HttpVersion;
+end;
+
+function TDiocpHttpRequest.GetRawDataLength: Integer;
+begin
+  Result := FInnerRequest.DataLength;
 end;
 
 function TDiocpHttpRequest.GetRequestCookies: string;
-begin
-
+begin  
   Result := FInnerRequest.RawCookie;
+end;
+
+function TDiocpHttpRequest.GetRequestMethod: string;
+begin
+  Result := FInnerRequest.Method;
+end;
+
+function TDiocpHttpRequest.GetRequestRawHeaderString: string;
+begin
+  Result := FInnerRequest.RawHeader;
+end;
+
+function TDiocpHttpRequest.GetRequestRawURL: String;
+begin
+  Result := FInnerRequest.RequestRawURL;
 end;
 
 function TDiocpHttpRequest.GetRequestURI: String;
 begin
   Result := FInnerRequest.RequestURI;
+end;
+
+function TDiocpHttpRequest.GetRequestURL: String;
+begin
+  Result := FInnerRequest.RequestURL;
+end;
+
+function TDiocpHttpRequest.GetRequestURLParamData: string;
+begin
+  Result := FInnerRequest.RequestRawURLParamStr;
 end;
 
 procedure TDiocpHttpRequest.RemoveSession;
@@ -937,17 +769,6 @@ function TDiocpHttpRequest.GetSessionID: String;
 begin
   CheckCookieSession;
   Result := FSessionID;
-end;
-
-/// <summary>
-///  解析POST和GET参数
-/// </summary>
-/// <pvParamText>
-/// <param name="pvParamText">要解析的全部参数</param>
-/// </pvParamText>
-procedure TDiocpHttpRequest.ParseParams(pvParamText: string);
-begin
-  SplitStrings(pvParamText, FRequestParamsList, ['&']);
 end;
 
 procedure TDiocpHttpRequest.ResponseEnd;
@@ -1021,12 +842,6 @@ procedure TDiocpHttpRequest.SetReleaseLater(pvMsg:String);
 begin
   FReleaseLater := True;
   FReleaseLaterMsg := pvMsg;
-end;
-
-procedure TDiocpHttpRequest.WriteRawHeaderBuffer(const buffer: Pointer; len:
-    Integer);
-begin
-  FRawHeader.WriteBuffer(buffer^, len);
 end;
 
 procedure TDiocpHttpResponse.ChunkedFlush;
@@ -1321,7 +1136,11 @@ begin
     r := FCurrentRequest.FInnerRequest.InputBuffer(lvTmpBuf^);
     if r = -1 then
     begin
-      self.RequestDisconnect('无效的Http请求', self);
+      FCurrentRequest.Response.FInnerResponse.ResponseCode := 400;
+      FCurrentRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
+      FCurrentRequest.ResponseEnd;
+      FCurrentRequest.Close;
+      //self.RequestDisconnect('无效的Http请求', self);
       Exit;
     end;
 
@@ -1426,7 +1245,6 @@ begin
       lvMsg := StringReplace(lvMsg, sLineBreak, '<BR>', [rfReplaceAll]);
       pvRequest.Response.WriteString(lvMsg);
     end;
-
   end;
 end;
 

@@ -35,6 +35,11 @@ type
     FContentLength: Int64;
     FEndMatchIndex: Integer;
     FHeaders: TDValue;
+
+    FURLParams: TDValue;
+    
+    FRequestFormParams: TDValue;
+
     /// <summary>
     ///   0: 需要初始化
     ///   1: 已经初始化
@@ -46,8 +51,26 @@ type
     FMethod: String;
     FPtrBuffer: PByte;
     FRequestRawURL: string;
+
+    FRequestURL:String;
+
+    /// <summary>
+    ///   数据类型
+    /// </summary>
+    FContentType:String;
+
+
     FRequestRawCookie: string;
-    
+    // 存放客户端请求的Cookie信息
+    FRequestCookieList: TStrings;
+
+
+    /// <summary>
+    ///  原始请求中的URL参数数据(没有经过URLDecode，因为在DecodeRequestHeader中要拼接RequestURL时临时进行了URLDecode)
+    ///  没有经过URLDecode是考虑到参数值中本身存在&字符，导致DecodeURLParam出现不解码异常
+    /// </summary>
+    FRequestRawURLParamStr: string;
+
     FRequestURI: string;
     /// <summary>
     ///  0: RawHeader;
@@ -64,11 +87,32 @@ type
 
     function GetDataAsString: String;
     function GetRawCookie: String;
+
+    procedure CheckCookie;
+    function GetContentType: String;
+    function GetRequestCookieList: TStrings;
   public
     constructor Create;
     destructor Destroy; override;
 
+    /// <summary>
+    ///   将Post的原始数据解码，放到参数列表中
+    ///    content编码为: application/x-www-form-urlencoded
+    /// </summary>
+    procedure DecodeContentAsFormUrlencoded({$IFDEF UNICODE} pvEncoding:TEncoding
+        {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+    /// <summary>
+    ///   解码URL中的参数，放到参数列表中
+    ///   在OnDiocpHttpRequest中调用
+    /// </summary>
+    procedure DecodeURLParam({$IFDEF UNICODE} pvEncoding:TEncoding
+        {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+
     procedure DoCleanUp;
+    /// <summary>
+    ///  读取传入的Cookie值
+    /// </summary>
+    function GetCookie(pvCookieName:string): String;
 
     /// <summary>THttpRequest.InputBuffer
     /// </summary>
@@ -80,7 +124,6 @@ type
     /// </returns>
     /// <param name="pvByte"> (Byte) </param>
     function InputBuffer(pvByte:Byte): Integer;
-
 
     property DataAsMemory: PByte read GetDataAsMemory;
 
@@ -100,13 +143,30 @@ type
     property Method: String read FMethod write FMethod;
     
     property ContentLength: Int64 read GetContentLength;
+    property ContentType: String read GetContentType;
 
     property RawCookie: String read GetRawCookie;
+    property RequestCookieList: TStrings read GetRequestCookieList write
+        FRequestCookieList;
 
 
 
     property RequestRawURL: string read FRequestRawURL write FRequestRawURL;
+
+    property RequestRawURLParamStr: string read FRequestRawURLParamStr;
+
     property RequestURI: string read FRequestURI;
+
+    /// <summary>
+    ///   Decode之后才会有数据
+    /// </summary>
+    property URLParams: TDValue read FURLParams;
+
+    /// <summary>
+    ///  表单参数值, DecodeContentAsFormUrlencoded之后才会有数据
+    /// </summary>
+    property RequestFormParams: TDValue read FRequestFormParams;
+    property RequestURL: String read FRequestURL;
 
   end;
 
@@ -209,7 +269,14 @@ function BufferURLDecode(pvInputStr: string; pvOutBuffer: PByte;
 /// <summary>
 ///   urldecode -> utf8
 /// </summary>
-function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true): String;
+function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true): String; overload;
+
+{$IFDEF UNICODE}
+/// <summary>
+///   urldecode -> TEncoding
+/// </summary>
+function URLDecode(pvInputStr: string; pvEncoding:TEncoding): String; overload;
+{$ENDIF}
 
 
 
@@ -219,7 +286,7 @@ resourcestring
   { System.NetEncoding }
   sErrorDecodingURLText = 'Error decoding URL style (%%XX) encoded string at position %d';
   sInvalidURLEncodedChar = 'Invalid URL encoded character (%s) at position %d';
-  sErrorDecodingURL_InvalidateChar = 'URL中含有非法字符%s';
+  sErrorDecodingURL_InvalidateChar = 'URL中含有非法字符:%s';
   sErrorDecodingURL_BufferIsNotEnough = '传入的Buffer长度不够';
 
 function GetResponseCodeText(pvCode: Word): RAWString;
@@ -562,7 +629,7 @@ begin
         else
         begin
           // multi byte characters (不接受)   s
-          raise EHTTPException.CreateFmt(sErrorDecodingURL_InvalidateChar, [lvPtr^]);
+          raise EHTTPException.CreateFmt(sErrorDecodingURL_InvalidateChar, [Sp^]);
           //I := I + TEncoding.UTF8.GetBytes([Sp^], 0, 1, Bytes, I) - 1
         end;
       end;
@@ -577,19 +644,48 @@ begin
   Result := I;
 end;
 
+{$IFDEF UNICODE}
+function URLDecode(pvInputStr: string; pvEncoding:TEncoding): String; overload;
+var
+  lvBytes:TBytes;
+  l:Integer;
+begin
+  SetLength(lvBytes, Length(pvInputStr));
+  l := BufferURLDecode(pvInputStr, @lvBytes[0], Length(lvBytes));
+  SetLength(lvBytes, l);
+  result := pvEncoding.GetString(lvBytes);
+end;
+{$ENDIF}
+
 constructor THttpRequest.Create;
 begin
   inherited Create;
   FBufferBuilder := TDBufferBuilder.Create();
   FHeaders := TDValue.Create();
+  FURLParams := TDValue.Create();
+  FRequestFormParams := TDValue.Create();
+  
+  FRequestCookieList := TStringList.Create;
   FContentLength := -1;
 end;
 
 destructor THttpRequest.Destroy;
 begin
   FHeaders.Free;
+  FURLParams.Free;
+  FRequestFormParams.Free;
   FreeAndNil(FBufferBuilder);
+  FRequestCookieList.Free;
   inherited Destroy;
+end;
+
+procedure THttpRequest.CheckCookie;
+begin
+  if FRequestRawCookie = '-1' then
+  begin
+    FRequestRawCookie := FHeaders.GetValueByName('Cookie', '');
+    SplitStrings(FRequestRawCookie, FRequestCookieList, [';']);
+  end;
 end;
 
 function THttpRequest.DecodeHeader: Integer;
@@ -686,16 +782,77 @@ begin
 
   if Result = 0 then
   begin
+
+    // IE原始URL  : /中国.asp?topicid=a汉字a
+    // 后台接收到 : /%E4%B8%AD%E5%9B%BD.asp?topicid=a汉字a
+
+    // FireFox/360极速浏览器原始URL : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
+    // 后台接收到 : /%E4%B8%AD%E5%9B%BD.asp?topicid=a%E6%B1%89%E5%AD%97a
+
+
+    // URI需要进行URLDecode和Utf8解码
+
     //if lvPtr^='/' then inc(lvPtr);
     FRequestRawURL := LeftUntil(lvPtr, [' ', #9]);
     lvTempPtr := PChar(FRequestRawURL);
     if LeftUntil(lvTempPtr, ['?'], FRequestURI) = -1 then
     begin     // 截取URI
-      FRequestURI := FRequestRawURL;    
-    end;   
+      FRequestURI := URLDecode(FRequestRawURL);
+      FRequestURL := FRequestURI;
+    end else
+    begin
+      FRequestURI := URLDecode(FRequestURI);
+
+      // 后面部分是原始参数
+      Inc(lvTempPtr);
+      FRequestRawURLParamStr := lvTempPtr;
+
+      FRequestURL := FRequestURI + '?' + URLDecode(FRequestRawURLParamStr);
+    end;
 
     SkipChars(lvPtr, [' ', #9]);
     FHttpVersion := lvPtr;
+  end;
+end;
+
+procedure THttpRequest.DecodeContentAsFormUrlencoded({$IFDEF UNICODE}
+    pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+var
+  lvRawData : AnsiString;
+  lvRawParams, s, lvName, lvValue:String;
+  i:Integer;
+  lvStrings:TStrings;
+begin                       
+  if ContentLength = 0 then exit;
+
+  lvRawData := FBufferBuilder.ToRAWString;
+
+  lvStrings := TStringList.Create;
+  try
+    // 先放入到Strings
+    SplitStrings(lvRawData, lvStrings, ['&']);
+
+    for i := 0 to lvStrings.Count - 1 do
+    begin
+      s := Trim(lvStrings[i]);
+      if length(s) > 0 then
+      begin
+        if SplitStr(s, '=', lvName, lvValue) then
+        begin
+          {$IFDEF UNICODE}
+          lvName := URLDecode(lvName, pvEncoding);
+          lvValue := URLDecode(lvValue, pvEncoding);
+          {$ELSE}
+          lvName := URLDecode(lvName, pvUseUtf8Decode);
+          lvValue := URLDecode(lvValue, pvUseUtf8Decode);
+          {$ENDIF}
+          FRequestFormParams.ForceByName(lvName).AsString := lvValue;
+        end;
+      end;
+    end;
+    //FRequestParamsList.AddStrings(lvStrings);
+  finally
+    lvStrings.Free;
   end;
 end;
 
@@ -744,6 +901,50 @@ begin
   end;
 end;
 
+procedure THttpRequest.DecodeURLParam({$IFDEF UNICODE} pvEncoding:TEncoding
+    {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+var
+  lvRawData : String;
+  s:String;
+  i:Integer;
+  lvStrings:TStrings;
+begin
+  // 解析URL参数
+  if FRequestRawURLParamStr = '' then exit;
+
+  lvStrings := TStringList.Create;
+  try
+    lvStrings.Delimiter := '&';
+    lvStrings.DelimitedText := FRequestRawURLParamStr;
+
+//    // 先放入到Strings
+//    SplitStrings(FRequestURLParamData, lvStrings, ['&']);
+
+    for i := 0 to lvStrings.Count - 1 do
+    begin
+
+      lvRawData := lvStrings.ValueFromIndex[i];
+      if lvRawData<> '' then
+      begin
+        {$IFDEF UNICODE}
+        s := URLDecode(lvRawData, pvEncoding);
+        {$ELSE}
+        s := URLDecode(lvRawData, pvUseUtf8Decode);
+        {$ENDIF}
+
+        // 解码参数
+        lvStrings.ValueFromIndex[i] := s;
+        
+        FURLParams.ForceByName(lvStrings.Names[i]).AsString := s;
+      end;
+    end;
+   // FRequestParamsList.AddStrings(lvStrings);
+  finally
+    lvStrings.Free;
+  end;
+
+end;
+
 procedure THttpRequest.DoCleanUp;
 begin
   if FBufferBuilder <> nil then
@@ -757,6 +958,11 @@ begin
   FRawHeader := '';
   FRequestRawURL := '';
   FRequestRawCookie := '-1';
+  FContentType := '-1';
+  FRequestCookieList.Clear;
+  FRequestRawURLParamStr := '';
+  FURLParams.Clear;
+  FHeaders.Clear;
 end;
 
 function THttpRequest.GetContentLength: Int64;
@@ -766,6 +972,20 @@ begin
     FContentLength := FHeaders.GetValueByName('Content-Length', 0);
   end;
   Result := FContentLength;
+end;
+
+function THttpRequest.GetContentType: String;
+begin
+  if FContentType = '-1' then
+  begin
+    FContentType := FHeaders.GetValueByName('Content-Type', '');
+  end;
+  Result := FContentType;
+end;
+
+function THttpRequest.GetCookie(pvCookieName: string): String;
+begin
+  Result := StringsValueOfName(RequestCookieList, pvCookieName, ['='], true);
 end;
 
 function THttpRequest.GetDataAsMemory: PByte;
@@ -780,11 +1000,14 @@ end;
 
 function THttpRequest.GetRawCookie: String;
 begin
-  if FRequestRawCookie = '-1' then
-  begin
-    FRequestRawCookie := FHeaders.GetValueByName('Cookie', '');
-  end;
+  CheckCookie;
   Result := FRequestRawCookie;
+end;
+
+function THttpRequest.GetRequestCookieList: TStrings;
+begin
+  CheckCookie;
+  Result := FRequestCookieList;
 end;
 
 function THttpRequest.InputBuffer(pvByte:Byte): Integer;
@@ -802,7 +1025,7 @@ begin
   FBufferBuilder.Append(pvByte);
   Inc(FPtrBuffer);
 
-  if FDataLength = 7 then
+  if (FSectionFlag = 0) and (FDataLength = 7) then
   begin         // 查看方法是否合法
     if DecodeRequestMethod = -1 then
     begin

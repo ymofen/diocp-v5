@@ -8,6 +8,12 @@ uses
   utils.safeLogger, ComCtrls, diocp.sockets, ExtCtrls;
 
 type
+  TEchoContext = class(TIocpRemoteContext)
+    FMaxTick:Cardinal;
+    FStartTime:TDateTime;
+    FLastTick:Cardinal;
+  end;
+
   TfrmMain = class(TForm)
     PageControl1: TPageControl;
     TabSheet1: TTabSheet;
@@ -32,6 +38,7 @@ type
     chkCheckHeart: TCheckBox;
     btnSaveHistory: TButton;
     tmrCheckHeart: TTimer;
+    chkLogRecvTime: TCheckBox;
     procedure btnClearClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
@@ -41,6 +48,7 @@ type
     procedure btnSendObjectClick(Sender: TObject);
     procedure chkCheckHeartClick(Sender: TObject);
     procedure chkHexClick(Sender: TObject);
+    procedure chkLogRecvTimeClick(Sender: TObject);
     procedure chkRecvEchoClick(Sender: TObject);
     procedure chkRecvOnLogClick(Sender: TObject);
     procedure chkSendDataClick(Sender: TObject);
@@ -48,9 +56,10 @@ type
   private
     FSendDataOnConnected:Boolean;
     FSendDataOnRecv:Boolean;
+    FLogRecvInfo:Boolean;
     FRecvOnLog:Boolean;
     FConvertHex:Boolean;
-    { Private declarations }
+    FFileLogger:TSafeLogger;
     FIocpClientSocket: TDiocpTcpClient;
 
     procedure DoSend(pvConentxt: TDiocpCustomContext; s: AnsiString);
@@ -85,6 +94,8 @@ uses
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited;
+  FFileLogger := TSafeLogger.Create;
+  FFileLogger.setAppender(TLogFileAppender.Create(False), true);
   FSendDataOnRecv := chkRecvEcho.Checked;
   FRecvOnLog := chkRecvOnLog.Checked;
   FConvertHex := chkHex.Checked;
@@ -95,6 +106,7 @@ begin
   FIocpClientSocket.createDataMonitor;
   FIocpClientSocket.OnContextConnected := OnContextConnected;
   FIocpClientSocket.OnReceivedBuffer := OnRecvdBuffer;
+  FIocpClientSocket.RegisterContextClass(TEchoContext);
   TFMMonitor.createAsChild(tsMonitor, FIocpClientSocket);
 
   ReadHistory;
@@ -105,6 +117,7 @@ destructor TfrmMain.Destroy;
 begin
   FIocpClientSocket.Close;
   FIocpClientSocket.Free;
+  FFileLogger.Free;
   inherited Destroy;
 end;
 
@@ -225,6 +238,11 @@ begin
   end;
 end;
 
+procedure TfrmMain.chkLogRecvTimeClick(Sender: TObject);
+begin
+  FLogRecvInfo := chkLogRecvTime.Checked;
+end;
+
 procedure TfrmMain.chkRecvEchoClick(Sender: TObject);
 begin
   FSendDataOnRecv := chkRecvEcho.Checked;
@@ -271,6 +289,10 @@ procedure TfrmMain.OnContextConnected(pvContext: TDiocpCustomContext);
 var
   s:AnsiString;
 begin
+  TEchoContext(pvContext).FStartTime := Now();
+  TEchoContext(pvContext).FLastTick := GetTickCount;
+  TEchoContext(pvContext).FMaxTick := 0;
+
   s := mmoData.Lines.Text;
   if FSendDataOnConnected then
   begin
@@ -283,7 +305,26 @@ procedure TfrmMain.OnRecvdBuffer(pvContext: TDiocpCustomContext; buf: Pointer;
     len: cardinal; pvErrorCode: Integer);
 var
   lvStr:AnsiString;
+  lvContext:TEchoContext;
+  lvFmt:String;
+  lvTick:Cardinal;
 begin
+  lvContext := TEchoContext(pvContext);
+  if FLogRecvInfo then
+  begin
+    lvTick := GetTickCount;
+    lvFmt := Format('[%d], t: %s, data:%d, delay:%d',
+      [lvContext.SocketHandle,
+       FormatDateTime('yyyy-MM-dd hh:nn:ss', Now()),
+       len,
+       lvTick - TEchoContext(pvContext).FLastTick
+      ]);
+
+
+    FFileLogger.logMessage(lvFmt, '连接数据信息');
+    TEchoContext(pvContext).FLastTick := lvTick;
+    TEchoContext(pvContext).FMaxTick := 0;
+  end;
   if len = 0 then
   begin
     sfLogger.logMessage('recv err zero');
@@ -325,13 +366,14 @@ begin
   chkHex.Tag := 0;
 
   chkCheckHeart.Checked := lvDValue.ForceByName('chk_checkheart').AsBoolean;
-
+  chkLogRecvTime.Checked := lvDValue.ForceByName('chk_LogRecvInfo').AsBoolean;
   lvDValue.Free;
 
   FSendDataOnConnected := chkSendData.Checked;
   FRecvOnLog := chkRecvOnLog.Checked;
   FSendDataOnRecv := chkRecvEcho.Checked;
   FConvertHex := chkHex.Checked;
+  FLogRecvInfo := chkLogRecvTime.Checked;
 end;
 
 procedure TfrmMain.tmrCheckHeartTimer(Sender: TObject);
@@ -353,6 +395,7 @@ begin
   lvDValue.ForceByName('chk_send_onconnected').AsBoolean := chkSendData.Checked;
   lvDValue.ForceByName('chk_send_hex').AsBoolean := chkHex.Checked;
   lvDValue.ForceByName('chk_checkheart').AsBoolean := chkCheckHeart.Checked;
+  lvDValue.ForceByName('chk_LogRecvInfo').AsBoolean := chkLogRecvTime.Checked;
   JSONWriteToUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
   lvDValue.Free;
 end;

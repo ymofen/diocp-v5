@@ -193,6 +193,15 @@ object frmMain: TfrmMain
       TabOrder = 12
       OnClick = btnSaveHistoryClick
     end
+    object chkLogRecvTime: TCheckBox
+      Left = 600
+      Top = 39
+      Width = 147
+      Height = 17
+      Caption = #35760#24405#25509#25910#25968#25454#20449#24687
+      TabOrder = 13
+      OnClick = chkLogRecvTimeClick
+    end
   end
   object tmrCheckHeart: TTimer
     Interval = 10000

@@ -2866,8 +2866,9 @@ end;
 procedure TDiocpTcpServer.KickOut(pvTimeOut:Cardinal = 60000);
 var
   lvNowTickCount:Cardinal;
-  I:Integer;
+  I, j:Integer;
   lvContext:TIocpClientContext;
+  lvKickOutList: array of TIocpClientContext;
 {$IFDEF USE_HASHTABLE}
 var    
   lvBucket, lvNextBucket: PDHashData;
@@ -2879,6 +2880,11 @@ begin
   {$IFDEF USE_HASHTABLE}
   FLocker.lock('KickOut');
   try
+    j := 0;
+    if FOnlineContextList.Count > 0 then
+    begin
+      SetLength(lvKickOutList, FOnlineContextList.Count);
+    end;
     for I := 0 to FOnlineContextList.BucketSize - 1 do
     begin
       lvBucket := FOnlineContextList.Buckets[I];
@@ -2893,12 +2899,18 @@ begin
             if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
             begin
               // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
-              lvContext.PostWSACloseRequest();
+              lvKickOutList[j] := lvContext;
+              Inc(j);
             end;
           end;
         end;
         lvBucket:= lvNextBucket;
       end;
+    end;
+
+    for i := 0 to j - 1 do
+    begin
+      lvKickOutList[i].RequestDisconnect('超时检测主动断开');   
     end;
   finally
     FLocker.unLock;
