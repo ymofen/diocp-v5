@@ -33,7 +33,12 @@ type
   TDHttpCookie = class;
   THttpRequest = class(TObject)
   private
-    FBufferBuilder: TDBufferBuilder;
+    FContentBuilder: TDBufferBuilder;
+    FHeaderBuilder: TDBufferBuilder;
+
+    // 接收数据的Builder
+    FRecvBuilder:TDBufferBuilder;
+
     FContentLength: Int64;
     FEndMatchIndex: Integer;
     FHeaders: TDValue;
@@ -59,7 +64,7 @@ type
     /// </summary>
     FFlag: Byte;
     FRawHeader: String;
-    FDataLength: Integer;
+    FContentDataLength: Integer;
     FHttpVersion: String;
     FMethod: String;
     FPtrBuffer: PByte;
@@ -87,7 +92,7 @@ type
     FRequestURI: string;
     /// <summary>
     ///  0: RawHeader;
-    ///  1: DataAsRAWString;
+    ///  1: ContentAsRAWString;
     /// </summary>
     FSectionFlag: Byte;
 
@@ -95,20 +100,22 @@ type
     ///   解码状态
     /// </summary>
     FDecodeState: Integer;
-
     function DecodeRequestMethod: Integer;
 
     function DecodeHeader: Integer;
     procedure DecodeHeaderLine(pvLine:string);
     function DecodeFirstLine(pvLine: string): Integer;
     function GetContentLength: Int64;
-    function GetDataAsMemory: PByte;
+    function GetContentAsMemory: PByte;
 
-    function GetDataAsRAWString: String;
     function GetRawCookie: String;
 
     procedure CheckCookie;
+    function GetContentAsRAWString: RAWString;
     function GetContentType: String;
+    function GetHeaderAsMermory: PByte;
+    function GetHeaderAsRAWString: RAWString;
+    function GetHeaderDataLength: Integer;
     function GetRequestCookieList: TStrings;
   public
     constructor Create;
@@ -147,14 +154,20 @@ type
     /// <summary>
     ///   方法为POST, PUT时，保存的为提交的数据
     /// </summary>
-    property DataAsMemory: PByte read GetDataAsMemory;
-
-    property DataAsRAWString: RAWString read GetDataAsRAWString;
-
+    property ContentAsMemory: PByte read GetContentAsMemory;
+    property ContentAsRAWString: RAWString read GetContentAsRAWString;
     /// <summary>
     ///   数据长度
     /// </summary>
-    property DataLength: Integer read FDataLength;
+    property ContentDataLength: Integer read FContentDataLength;
+
+
+    property HeaderAsMermory: PByte read GetHeaderAsMermory;
+    property HeaderAsRAWString: RAWString read GetHeaderAsRAWString;
+    property HeaderDataLength: Integer read GetHeaderDataLength;
+
+
+
 
     property RawHeader: String read FRawHeader;
 
@@ -170,8 +183,6 @@ type
     property RawCookie: String read GetRawCookie;
     property RequestCookieList: TStrings read GetRequestCookieList write
         FRequestCookieList;
-
-
 
     property RequestRawURL: string read FRequestRawURL write FRequestRawURL;
 
@@ -234,6 +245,8 @@ type
     procedure GZipContent;
 
     procedure DeflateCompressContent;
+
+    procedure ZCompressContent;
   end;
 
   /// <summary>
@@ -267,6 +280,11 @@ function GetResponseCodeText(pvCode: Word): RAWString;
 procedure DeflateCompressBufferBuilder(pvBuilder:TDBufferBuilder);
 
 procedure ZDecompressBufferBuilder(pvBuilder:TDBufferBuilder);
+
+procedure ZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
+
+
+
 
 {$IFDEF USE_ZLIBExGZ}
 procedure GZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
@@ -364,6 +382,44 @@ begin
   else
     Result := IntToStr(pvCode) +  ' Unknown Error';
   end;
+end;
+
+procedure ZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
+{$IFDEF POSIX}
+var
+  lvBytes, lvOutBytes:TBytes;
+{$ELSE}
+var
+  lvInBuf: TBytes;
+  lvOutBuf: Pointer;
+  lvOutBytes: Integer;
+{$ENDIF}
+var
+  l: Integer;
+begin
+{$IFDEF POSIX}
+  error
+//  SetLength(lvBytes, pvInStream.Size);
+//  pvInStream.Position := 0;
+//  pvInStream.Read(lvBytes[0], pvInStream.Size);
+//  ZLib.ZCompress(lvBytes, lvOutBytes);                 // POSIX下只支持该中方式的压缩
+//  pvOutStream.Size := Length(lvOutBytes);
+//  pvOutStream.Position := 0;
+//  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
+{$ELSE}
+  try
+    {$if defined(NEWZLib)}
+    ZLib.ZCompress(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
+    {$ELSE}
+    ZLib.CompressBuf(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
+    {$ifend}
+
+    pvBuilder.Clear;
+    pvBuilder.AppendBuffer(lvOutBuf, lvOutBytes);
+  finally
+    FreeMem(lvOutBuf, lvOutBytes);
+  end;
+{$ENDIF}
 end;
 
 procedure DeflateCompressBufferBuilder(pvBuilder:TDBufferBuilder);
@@ -678,12 +734,16 @@ begin
   SetLength(lvBytes, l);
   result := pvEncoding.GetString(lvBytes);
 end;
+
+
+
 {$ENDIF}
 
 constructor THttpRequest.Create;
 begin
   inherited Create;
-  FBufferBuilder := TDBufferBuilder.Create();
+  FContentBuilder := TDBufferBuilder.Create();
+  FHeaderBuilder := TDBufferBuilder.Create();
   FHeaders := TDValue.Create();
   FURLParams := TDValue.Create();
   FRequestFormParams := TDValue.Create();
@@ -699,7 +759,8 @@ begin
   FURLParams.Free;
   FRequestFormParams.Free;
   FRequestParams.Free;
-  FreeAndNil(FBufferBuilder);
+  FreeAndNil(FContentBuilder);
+  FHeaderBuilder.Free;
   FRequestCookieList.Free;
   inherited Destroy;
 end;
@@ -855,7 +916,7 @@ var
 begin                       
   if ContentLength = 0 then exit;
 
-  lvRawData := FBufferBuilder.ToRAWString;
+  lvRawData := FContentBuilder.ToRAWString;
 
   lvStrings := TStringList.Create;
   try
@@ -891,7 +952,7 @@ var
   lvBuf:PChar;
   lvMethod:String;
 begin
-  lvMethod := ByteBufferToString(FBufferBuilder.Memory, 7);
+  lvMethod := ByteBufferToString(FHeaderBuilder.Memory, 7);
   lvBuf :=  PChar(lvMethod);
   if (StrLIComp(lvBuf, 'GET', 3) = 0) then
   begin
@@ -976,11 +1037,14 @@ end;
 
 procedure THttpRequest.DoCleanUp;
 begin
-  if FBufferBuilder <> nil then
-  begin
-    FBufferBuilder.Clear;
-  end;
-  FDataLength := 0;
+  if FContentBuilder <> nil then
+    FContentBuilder.Clear;
+  if FHeaderBuilder <> nil then
+    FHeaderBuilder.Clear;
+
+  FRecvBuilder := FHeaderBuilder;
+
+  FContentDataLength := 0;
   FSectionFlag := 0;
   FFlag := 0;
   FDecodeState := 0;
@@ -1020,14 +1084,29 @@ begin
   Result := StringsValueOfName(RequestCookieList, pvCookieName, ['='], true);
 end;
 
-function THttpRequest.GetDataAsMemory: PByte;
+function THttpRequest.GetContentAsMemory: PByte;
 begin
-  Result := FBufferBuilder.Memory;
+  Result := FContentBuilder.Memory;
 end;
 
-function THttpRequest.GetDataAsRAWString: String;
+function THttpRequest.GetContentAsRAWString: RAWString;
 begin
-  Result := ByteBufferToString(FBufferBuilder.Memory, FDataLength);
+  Result := ByteBufferToString(FContentBuilder.Memory, FContentBuilder.Length);
+end;
+
+function THttpRequest.GetHeaderAsMermory: PByte;
+begin
+  Result := FHeaderBuilder.Memory;
+end;
+
+function THttpRequest.GetHeaderAsRAWString: RAWString;
+begin
+  Result := ByteBufferToString(FHeaderBuilder.Memory, FHeaderBuilder.Length);
+end;
+
+function THttpRequest.GetHeaderDataLength: Integer;
+begin
+  Result := FHeaderBuilder.Length;
 end;
 
 function THttpRequest.GetRawCookie: String;
@@ -1046,7 +1125,7 @@ function THttpRequest.InputBuffer(pvByte:Byte): Integer;
 
   procedure InnerCaseZero;
   begin
-    if FDataLength = 7 then
+    if FContentDataLength = 7 then
     begin
       if DecodeRequestMethod = -1 then
       begin
@@ -1059,7 +1138,7 @@ function THttpRequest.InputBuffer(pvByte:Byte): Integer;
      Inc(FDecodeState);
     end;
 
-    if (FDataLength = MAX_HEADER_BUFFER_SIZE) then
+    if (FContentDataLength = MAX_HEADER_BUFFER_SIZE) then
     begin            // 头部数据过长
       FFlag := 0;
       Result := -2;
@@ -1069,14 +1148,15 @@ begin
   Result := 0;
   if FFlag = 0 then
   begin
-    FBufferBuilder.Clear;
+    FContentBuilder.Clear;
+    FHeaderBuilder.Clear;
     FFlag := 1;
     FEndMatchIndex := 0;
-    FDataLength := 0;
+    FContentDataLength := 0;
   end;
 
-  Inc(FDataLength);
-  FBufferBuilder.Append(pvByte);
+  Inc(FContentDataLength);
+  FRecvBuilder.Append(pvByte);
   Inc(FPtrBuffer);
 
   case FDecodeState of
@@ -1106,9 +1186,7 @@ begin
     begin
       if pvByte = 10 then
       begin  // Header
-        FRawHeader := ByteBufferToString(FBufferBuilder.Memory, FDataLength);
-        FBufferBuilder.Clear;
-        FDataLength := 0;
+        FRawHeader := ByteBufferToString(FRecvBuilder.Memory, FContentDataLength);
         if DecodeHeader = -1 then
         begin
           FSectionFlag := 0;
@@ -1120,6 +1198,9 @@ begin
           Result := 1;
           Inc(FDecodeState);
         end;
+        
+        FRecvBuilder := FContentBuilder;
+        FContentDataLength := 0;
         FFlag := 0;
         Exit;
       end else
@@ -1130,9 +1211,9 @@ begin
     end;
     4:  // 接收Content
     begin
-      if FContentLength = FDataLength then
+      if FContentLength = FContentDataLength then
       begin
-        Result := 2;     // DataAsRAWString
+        Result := 2;     // ContentAsRAWString
         FFlag := 0;      // 重新开始请求Buffer进行解码
         Exit;
       end;
@@ -1236,7 +1317,8 @@ begin
     pvBuilder.AppendRawStr('HTTP/1.1 ').AppendRawStr(GetResponseCodeText(lvCode)).AppendBreakLineBytes;
   end;
   pvBuilder.AppendRawStr('Server: DIOCP-V5/1.1').AppendBreakLineBytes;
-  pvBuilder.AppendRawStr('Content-Type:').AppendRawStr(FContentType).AppendBreakLineBytes;
+  if FContentType <> '' then
+    pvBuilder.AppendRawStr('Content-Type:').AppendRawStr(FContentType).AppendBreakLineBytes;
 
   for i := 0 to FHeaders.Count - 1 do
   begin
@@ -1283,6 +1365,11 @@ end;
 procedure THttpResponse.DeflateCompressContent;
 begin
   DeflateCompressBufferBuilder(FContentBuffer);
+end;
+
+procedure THttpResponse.ZCompressContent;
+begin
+  ZCompressBufferBuilder(FContentBuffer);   
 end;
 
 end.

@@ -163,11 +163,13 @@ type
     procedure CheckCookieSession;
     function GetContextLength: Int64;
     function GetContextType: String;
-    function GetDataAsMemory: PByte;
+    function GetContentAsMemory: PByte;
     function GetDataAsRawString: RAWString;
     function GetHeader: TDValue;
     function GetHttpVersion: Word;
-    function GetRawDataLength: Integer;
+    function GetContentDataLength: Integer;
+    function GetHeaderAsMemory: PByte;
+    function GetHeaderDataLength: Integer;
     function GetRequestCookies: string;
     function GetRequestMethod: string;
     function GetRequestParamsList: TDValue;
@@ -176,6 +178,7 @@ type
     function GetRequestURI: String;
     function GetRequestURL: String;
     function GetRequestURLParamData: string;
+    function GetURLParams: TDValue;
   protected
   public
     constructor Create;
@@ -239,8 +242,10 @@ type
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
-    property DataAsMemory: PByte read GetDataAsMemory;
-    property DataAsString: String read GetDataAsRawString;
+    property ContentAsMemory: PByte read GetContentAsMemory;
+    property ContentAsString: String read GetDataAsRawString;
+
+    
 
     /// <summary>
     ///   请求头
@@ -248,7 +253,10 @@ type
     property Header: TDValue read GetHeader;
 
     property HttpVersion: Word read GetHttpVersion;
-    property RawDataLength: Integer read GetRawDataLength;
+    property ContentDataLength: Integer read GetContentDataLength;
+    property HeaderAsMemory: PByte read GetHeaderAsMemory;
+    property HeaderDataLength: Integer read GetHeaderDataLength;
+
 
 
     property RequestAccept: String read FRequestAccept;
@@ -294,10 +302,6 @@ type
     /// </summary>
     property Response: TDiocpHttpResponse read FResponse;
 
-    /// <summary>
-    ///   从Url和Post数据中得到的参数信息: key = value
-    /// </summary>
-    //property RequestParamsList: TStringList read FRequestParamsList;
 
     property RequestRawHeaderString: string read GetRequestRawHeaderString;
 
@@ -313,6 +317,9 @@ type
     ///   所有的请求参数， 注意调用前先调用DecodeURL和DecodePostParams
     /// </summary>
     property RequestParamsList: TDValue read GetRequestParamsList;
+    property URLParams: TDValue read GetURLParams;
+
+    
 
     /// <summary>
     /// 应答完毕，发送会客户端
@@ -373,6 +380,8 @@ type
 
     function AddCookie: TDiocpHttpCookie; overload;
 
+    procedure LoadFromFile(pvFile:string);
+
     function AddCookie(pvName:String; pvValue:string): TDiocpHttpCookie; overload;
 
     function EncodeHeader: String;
@@ -395,6 +404,8 @@ type
     procedure GZipContent;
 
     procedure DeflateCompressContent;
+
+    procedure ZLibContent;
 
     procedure SetChunkedStart;
 
@@ -693,14 +704,14 @@ begin
   Result := FInnerRequest.ContentType;
 end;
 
-function TDiocpHttpRequest.GetDataAsMemory: PByte;
+function TDiocpHttpRequest.GetContentAsMemory: PByte;
 begin
-  Result := FInnerRequest.DataAsMemory;
+  Result := FInnerRequest.ContentAsMemory;
 end;
 
 function TDiocpHttpRequest.GetDataAsRawString: RAWString;
 begin
-  Result := FInnerRequest.DataAsRAWString;
+  Result := FInnerRequest.ContentAsRAWString;
 end;
 
 function TDiocpHttpRequest.GetHeader: TDValue;
@@ -714,9 +725,19 @@ begin
   //Result := FInnerRequest.HttpVersion;
 end;
 
-function TDiocpHttpRequest.GetRawDataLength: Integer;
+function TDiocpHttpRequest.GetContentDataLength: Integer;
 begin
-  Result := FInnerRequest.DataLength;
+  Result := FInnerRequest.ContentDataLength;
+end;
+
+function TDiocpHttpRequest.GetHeaderAsMemory: PByte;
+begin
+  Result := FInnerRequest.HeaderAsMermory;
+end;
+
+function TDiocpHttpRequest.GetHeaderDataLength: Integer;
+begin
+  Result := FInnerRequest.HeaderDataLength;
 end;
 
 function TDiocpHttpRequest.GetRequestCookies: string;
@@ -777,6 +798,11 @@ begin
   Result := FSessionID;
 end;
 
+function TDiocpHttpRequest.GetURLParams: TDValue;
+begin
+  Result := FInnerRequest.URLParams;
+end;
+
 procedure TDiocpHttpRequest.ResponseEnd;
 var
   lvFixedHeader: AnsiString;
@@ -815,7 +841,14 @@ var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
-  lvFixedHeader := FResponse.EncodeResponseHeader(pvContentLength);
+  if pvContentLength = 0 then
+  begin
+    lvFixedHeader := FResponse.EncodeResponseHeader(FResponse.FInnerResponse.ContentBuffer.Length);
+  end else
+  begin
+    lvFixedHeader := FResponse.EncodeResponseHeader(pvContentLength);
+  end;
+
 
   if (lvFixedHeader <> '') then
     lvFixedHeader := FixHeader(lvFixedHeader)
@@ -1000,6 +1033,16 @@ end;
 procedure TDiocpHttpResponse.DeflateCompressContent;
 begin
   FInnerResponse.DeflateCompressContent
+end;
+
+procedure TDiocpHttpResponse.LoadFromFile(pvFile:string);
+begin
+  FInnerResponse.ContentBuffer.LoadFromFile(pvFile);
+end;
+
+procedure TDiocpHttpResponse.ZLibContent;
+begin
+  FInnerResponse.ZCompressBufferBuilder;  
 end;
 
 constructor TDiocpHttpClientContext.Create;

@@ -11,7 +11,7 @@ uses
   , diocp.winapi.winsock2
   , SysConst
   {$ENDIF}
-  , SysUtils, utils_URL, utils.strings;
+  , SysUtils, utils_URL, utils.strings, diocp_ex_http_common;
 
 
 
@@ -38,8 +38,10 @@ type
     FRequestBody: TMemoryStream;
     FRequestContentType: String;
     FRequestHeader: TStringList;
+    FReponseBuilder: TDBufferBuilder;
     FResponseBody: TMemoryStream;
     FResponseContentType: String;
+    FResponseContentEncoding:String;
     FResponseHeader: TStringList;
     FTimeOut: Integer;
     /// <summary>
@@ -49,6 +51,8 @@ type
     procedure CheckSocketResult(pvSocketResult:Integer);
     procedure InnerExecuteRecvResponse();
     procedure Close;
+
+    procedure DoAfterResponse;
   public
     procedure Cleaup;
     constructor Create(AOwner: TComponent); override;
@@ -217,6 +221,7 @@ begin
   FRequestBody := TMemoryStream.Create;
   FRequestHeader := TStringList.Create;
   FCustomeHeader := TStringList.Create;
+  FReponseBuilder := TDBufferBuilder.Create;
   FCustomeHeader.NameValueSeparator := ':';
 
   FResponseBody := TMemoryStream.Create;
@@ -241,6 +246,7 @@ begin
   FRequestHeader.Free;
   FCustomeHeader.Free;
   FRequestBody.Free;
+  FReponseBuilder.Free;
   FURL.Free;
   FStringBuilder.Free;
   inherited;
@@ -387,12 +393,12 @@ var
   lvRawHeader, lvBytes:TBytes;
   r, l:Integer;
   lvTempStr, lvRawHeaderStr:String;
-
+  lvBuffer:PByte;
 begin
+  FReponseBuilder.Clear;
   // 超过2048以外的长度，认为是错误的
   SetLength(lvRawHeader, 2048);
   FillChar(lvRawHeader[0], 2048, 0);
-  //FRawSocket.SetReadTimeOut(3000);
   r := FRawSocket.RecvBufEnd(@lvRawHeader[0], 2048, @HTTP_HEADER_END[0], 4, FTimeOut);
   if r = 0 then
   begin
@@ -412,11 +418,26 @@ begin
   FResponseHeader.Text := lvRawHeaderStr;
   FResponseContentType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
   lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
+  FResponseContentEncoding :=StringsValueOfName(FResponseHeader, 'Content-Encoding', [':'], True);
   l := StrToIntDef(lvTempStr, 0);
   if l > 0 then
   begin
+    lvBuffer := FReponseBuilder.GetLockBuffer(l);
+    try
+      CheckRecv(lvBuffer, l);
+    finally
+      FReponseBuilder.ReleaseLockBuffer(l);
+    end;
+
+    if FResponseContentEncoding = 'zlib' then
+    begin
+      ZDecompressBufferBuilder(FReponseBuilder);
+    end;
+    l:= FReponseBuilder.Length;
+
+
     FResponseBody.Size := l;
-    CheckRecv(FResponseBody.Memory, l);
+    Move(lvBuffer^, FResponseBody.Memory^, l); 
   end;
 
   lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
@@ -427,10 +448,7 @@ begin
   end;
 
 
-  
-  
-  
-
+  DoAfterResponse; 
 end;
 
 procedure TDiocpHttpClient.Post(pvURL: String);
@@ -465,6 +483,11 @@ begin
     FRequestContentType := 'application/x-www-form-urlencoded';
   end;
   FRequestHeader.Add(Format('Content-Type: %s', [FRequestContentType]));
+
+  if FRequestAcceptEncoding <> '' then
+  begin
+    FRequestHeader.Add(Format('Accept-Encoding: %s', [FRequestAcceptEncoding]));
+  end;
 
   //FRequestHeader.Add('');                 // 添加一个回车符
 
@@ -549,6 +572,11 @@ end;
 procedure TDiocpHttpClient.CloseSocket;
 begin
   self.FRawSocket.Close;
+end;
+
+procedure TDiocpHttpClient.DoAfterResponse;
+begin
+
 end;
 
 procedure TDiocpHttpClient.SetRequestBodyAsString(pvRequestData: string;
