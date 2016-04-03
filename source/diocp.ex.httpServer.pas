@@ -1042,7 +1042,7 @@ end;
 
 procedure TDiocpHttpResponse.ZLibContent;
 begin
-  FInnerResponse.ZCompressBufferBuilder;  
+  FInnerResponse.ZCompressContent;
 end;
 
 constructor TDiocpHttpClientContext.Create;
