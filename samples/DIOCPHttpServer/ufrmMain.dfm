@@ -23,12 +23,8 @@ object frmMain: TfrmMain
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
-    ExplicitWidth = 661
-    ExplicitHeight = 346
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitWidth = 653
-      ExplicitHeight = 318
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -37,13 +33,15 @@ object frmMain: TfrmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitWidth = 653
-        ExplicitHeight = 318
       end
     end
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -56,6 +54,8 @@ object frmMain: TfrmMain
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
       ExplicitWidth = 653
       ExplicitHeight = 318
       object btnCompress: TButton
@@ -71,6 +71,10 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -114,7 +118,6 @@ object frmMain: TfrmMain
     Height = 41
     Align = alTop
     TabOrder = 1
-    ExplicitWidth = 661
     object edtPort: TEdit
       Left = 9
       Top = 7

@@ -5,7 +5,6 @@ interface
 {$DEFINE JSON}
 
 {$IFDEF JSON}
-  {$DEFINE USE_SuperObject}
   {$DEFINE USE_QJSON}
 {$ENDIF}
 
@@ -14,9 +13,9 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, ExtCtrls
-  {$IFDEF USE_SuperObject}, superobject{$ENDIF}
   , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer, diocp_ex_http_common, utils.byteTools;
+  ComCtrls, diocp.ex.httpServer, diocp_ex_http_common, utils.byteTools,
+  utils_dvalue_json;
 
 type
   TfrmMain = class(TForm)
@@ -69,7 +68,8 @@ var
 implementation
 
 uses
-  uFMMonitor, diocp.core.engine, utils.strings, diocp.ex.SimpleMsgPackSession;
+  uFMMonitor, diocp.core.engine, utils.strings, diocp.ex.SimpleMsgPackSession,
+  utils_dvalue;
 
 {$R *.dfm}
 
@@ -91,7 +91,6 @@ end;
 
 procedure TfrmMain.OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
 var
-  lvJSon:ISuperObject;
   s:String;
   lvRawData:AnsiString;
   lvSession:TDiocpSimpleMsgPackSession;
@@ -122,6 +121,8 @@ var
     pvRequest.Response.WriteString('<a href="/diocp-v5">查看diocp运行信息</a><br>');
     pvRequest.Response.WriteString('<a href="/input">表单提交测试</a><br>');
     pvRequest.Response.WriteString('<a href="/redirect">重新定向</a><br>');
+    pvRequest.Response.WriteString('<a href="/json">请求Json数据</a><br>');
+
     pvRequest.Response.WriteString('<br>');
 
     pvRequest.Response.WriteString('<div>');
@@ -154,36 +155,47 @@ var
     pvRequest.Response.WriteString(lvRawData);
     pvRequest.Response.WriteString('<br>=======================================<br>');
 
-//    pvRequest.Response.WriteString('<br>');
-//    pvRequest.Response.WriteString(Format('解码参数信息(参数数量:%d)<br>', [pvRequest.RequestParamsList.Count]));
-//    pvRequest.Response.WriteString(pvRequest.RequestParamsList.Text);
+    pvRequest.Response.WriteString('<br>');
+    pvRequest.Response.WriteString(Format('解码参数信息(参数数量:%d)<br>', [pvRequest.RequestParamsList.Count]));
+
+    lvRawData :=pvRequest.RequestParamsList.ToStrings();
+    pvRequest.Response.WriteString(lvRawData);
+    pvRequest.Response.WriteString('<br>');
 //
-//    if pvRequest.RequestParamsList.Count > 0 then
-//    begin
-//      pvRequest.Response.WriteString('<br>第一个参数:' + pvRequest.GetRequestParam(pvRequest.RequestParamsList.Names[0]));
-//    end;
-//    pvRequest.Response.WriteString('<br>获取b参数的原值:' +pvRequest.GetRequestParam('b'));
-//    pvRequest.Response.WriteString('<br>获取b参数的Utf8解码:' +Utf8Decode(pvRequest.GetRequestParam('b')));
-//
-//    pvRequest.Response.WriteString('<br>');
-//    pvRequest.Response.WriteString('=======================================<br>');
+    if pvRequest.RequestParamsList.Count > 0 then
+    begin
+      pvRequest.Response.WriteString('<br>第一个参数:' +
+        pvRequest.GetRequestParam(pvRequest.RequestParamsList[0].Name.AsString));
+    end;
+    pvRequest.Response.WriteString('<br>获取b参数的原值:' +pvRequest.GetRequestParam('b'));
+    //pvRequest.Response.WriteString('<br>获取b参数的Utf8解码:' +Utf8Decode(pvRequest.GetRequestParam('b')));
+
+    pvRequest.Response.WriteString('<br>');
+    pvRequest.Response.WriteString('=======================================<br>');
 
 
-    // 返回json
-    lvJSon := SO();
-    lvJSon.S['title'] := 'DIOCP3 Http 服务演示';
-    lvJSon.S['author'] := 'D10.天地弦';
-    lvJSon.S['date'] := DateTimeToStr(Now());
-    s := lvJSon.AsJSon(True, False);
-    s := ReplaceText(s, sLineBreak, '<br>');
-    pvRequest.Response.WriteString(s);
+
     pvRequest.Response.WriteString('</div>');
   end;
 
 var
   lvBytes:TBytes;
+  lvDValue:TDValue;
 
 begin
+  if pvRequest.RequestURI = '/json' then
+  begin
+    pvRequest.Response.ContentType := 'text/json';
+    lvDValue := TDValue.Create;
+    lvDValue.ForceByName('title').AsString := 'DIOCP-V5 Http 服务演示';
+    lvDValue.ForceByName('author').AsString := 'D10.天地弦';
+    lvDValue.ForceByName('time').AsString := DateTimeToStr(Now());
+    s := JSONEncode(lvDValue);
+    lvDValue.Free;
+    pvRequest.Response.WriteString(s);
+    pvRequest.ResponseEnd;
+    Exit;
+  end;
 
   if pvRequest.RequestURI = '/CHUNKED' then
   begin
@@ -229,8 +241,9 @@ begin
   pvRequest.DecodePostDataParam(nil);
   pvRequest.DecodeURLParam(nil);
   {$ELSE}
-  pvRequest.DecodePostDataParam(False);
-  pvRequest.DecodeURLParam(false);
+  // 使用UTF8方式解码
+  pvRequest.DecodePostDataParam(True);
+  pvRequest.DecodeURLParam(True);
   {$ENDIF}
 
 
