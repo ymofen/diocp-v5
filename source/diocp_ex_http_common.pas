@@ -25,7 +25,9 @@ uses
 
 const
   END_BYTES : array[0..3] of Byte = (13,10,13,10);
-  MAX_RAW_BUFFER_SIZE = 0;  
+
+  /// 头部最大10K
+  MAX_HEADER_BUFFER_SIZE = 1024 * 10;  
 
 type
   TDHttpCookie = class;
@@ -36,9 +38,20 @@ type
     FEndMatchIndex: Integer;
     FHeaders: TDValue;
 
+    /// <summary>
+    ///   URL中的参数
+    /// </summary>
     FURLParams: TDValue;
-    
+
+    /// <summary>
+    ///   Form提交的参数
+    /// </summary>
     FRequestFormParams: TDValue;
+
+    /// <summary>
+    ///   URL中的参数和Form提交的参数
+    /// </summary>
+    FRequestParams:TDValue;
 
     /// <summary>
     ///   0: 需要初始化
@@ -74,9 +87,15 @@ type
     FRequestURI: string;
     /// <summary>
     ///  0: RawHeader;
-    ///  1: DataAsString;
+    ///  1: DataAsRAWString;
     /// </summary>
     FSectionFlag: Byte;
+
+    /// <summary>
+    ///   解码状态
+    /// </summary>
+    FDecodeState: Integer;
+
     function DecodeRequestMethod: Integer;
 
     function DecodeHeader: Integer;
@@ -85,7 +104,7 @@ type
     function GetContentLength: Int64;
     function GetDataAsMemory: PByte;
 
-    function GetDataAsString: String;
+    function GetDataAsRAWString: String;
     function GetRawCookie: String;
 
     procedure CheckCookie;
@@ -118,17 +137,20 @@ type
     /// </summary>
     /// <returns>
     ///  0: 需要更多的数据来完成解码
-    ///  -2: 超过最大长度(MAX_RAW_BUFFER_SIZE)
+    ///  -2: 头部超过最大长度(MAX_HEADER_BUFFER_SIZE)
     ///  1: 解码到头
     ///  2: 解码到请求体
     /// </returns>
     /// <param name="pvByte"> (Byte) </param>
     function InputBuffer(pvByte:Byte): Integer;
 
+    /// <summary>
+    ///   方法为POST, PUT时，保存的为提交的数据
+    /// </summary>
     property DataAsMemory: PByte read GetDataAsMemory;
 
-    property DataAsString: String read GetDataAsString;
-    
+    property DataAsRAWString: RAWString read GetDataAsRAWString;
+
     /// <summary>
     ///   数据长度
     /// </summary>
@@ -166,6 +188,7 @@ type
     ///  表单参数值, DecodeContentAsFormUrlencoded之后才会有数据
     /// </summary>
     property RequestFormParams: TDValue read FRequestFormParams;
+    property RequestParams: TDValue read FRequestParams;
     property RequestURL: String read FRequestURL;
 
   end;
@@ -664,6 +687,7 @@ begin
   FHeaders := TDValue.Create();
   FURLParams := TDValue.Create();
   FRequestFormParams := TDValue.Create();
+  FRequestParams := TDValue.Create();
   
   FRequestCookieList := TStringList.Create;
   FContentLength := -1;
@@ -674,6 +698,7 @@ begin
   FHeaders.Free;
   FURLParams.Free;
   FRequestFormParams.Free;
+  FRequestParams.Free;
   FreeAndNil(FBufferBuilder);
   FRequestCookieList.Free;
   inherited Destroy;
@@ -730,7 +755,12 @@ begin
   if r = -1 then Exit;
 
   lvKey := LowerCase(Trim(lvKey));
+
   SkipChars(lvPtr, [':', ' ', #9]);
+  if lvKey = 'content-length' then
+  begin
+    FContentLength := StrToInt(lvPtr);
+  end;
   FHeaders.ForceByName(lvKey).AsString := lvPtr;
 end;
 
@@ -847,10 +877,10 @@ begin
           lvValue := URLDecode(lvValue, pvUseUtf8Decode);
           {$ENDIF}
           FRequestFormParams.ForceByName(lvName).AsString := lvValue;
+          FRequestParams.ForceByName(lvName).AsString := lvValue;
         end;
       end;
     end;
-    //FRequestParamsList.AddStrings(lvStrings);
   finally
     lvStrings.Free;
   end;
@@ -905,7 +935,7 @@ procedure THttpRequest.DecodeURLParam({$IFDEF UNICODE} pvEncoding:TEncoding
     {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 var
   lvRawData : String;
-  s:String;
+  s, lvName:String;
   i:Integer;
   lvStrings:TStrings;
 begin
@@ -932,10 +962,9 @@ begin
         s := URLDecode(lvRawData, pvUseUtf8Decode);
         {$ENDIF}
 
-        // 解码参数
-        lvStrings.ValueFromIndex[i] := s;
-        
-        FURLParams.ForceByName(lvStrings.Names[i]).AsString := s;
+        lvName := lvStrings.Names[i];
+        FURLParams.ForceByName(lvName).AsString := s;
+        FRequestParams.ForceByName(lvName).AsString := s;
       end;
     end;
    // FRequestParamsList.AddStrings(lvStrings);
@@ -954,6 +983,7 @@ begin
   FDataLength := 0;
   FSectionFlag := 0;
   FFlag := 0;
+  FDecodeState := 0;
   FContentLength := -1;
   FRawHeader := '';
   FRequestRawURL := '';
@@ -962,6 +992,8 @@ begin
   FRequestCookieList.Clear;
   FRequestRawURLParamStr := '';
   FURLParams.Clear;
+  FRequestParams.Clear;
+  FRequestFormParams.Clear;
   FHeaders.Clear;
 end;
 
@@ -993,9 +1025,9 @@ begin
   Result := FBufferBuilder.Memory;
 end;
 
-function THttpRequest.GetDataAsString: String;
+function THttpRequest.GetDataAsRAWString: String;
 begin
-  Result := Utf8BufferToString(FBufferBuilder.Memory, FDataLength);
+  Result := ByteBufferToString(FBufferBuilder.Memory, FDataLength);
 end;
 
 function THttpRequest.GetRawCookie: String;
@@ -1011,6 +1043,28 @@ begin
 end;
 
 function THttpRequest.InputBuffer(pvByte:Byte): Integer;
+
+  procedure InnerCaseZero;
+  begin
+    if FDataLength = 7 then
+    begin
+      if DecodeRequestMethod = -1 then
+      begin
+        FSectionFlag := 0;
+        Result := -1;
+        Exit;
+      end;
+    end else if pvByte = 13 then
+    begin
+     Inc(FDecodeState);
+    end;
+
+    if (FDataLength = MAX_HEADER_BUFFER_SIZE) then
+    begin            // 头部数据过长
+      FFlag := 0;
+      Result := -2;
+    end;
+  end;
 begin
   Result := 0;
   if FFlag = 0 then
@@ -1025,53 +1079,65 @@ begin
   FBufferBuilder.Append(pvByte);
   Inc(FPtrBuffer);
 
-  if (FSectionFlag = 0) and (FDataLength = 7) then
-  begin         // 查看方法是否合法
-    if DecodeRequestMethod = -1 then
+  case FDecodeState of
+    0:
+     begin
+       InnerCaseZero;
+     end;
+    1:    // 第一个 #10
     begin
-      FSectionFlag := 0;
-      Result := -1;
-      Exit;
-    end;
-  end;
-  
-
-  if (pvByte = END_BYTES[FEndMatchIndex]) then
-  begin
-    inc(FEndMatchIndex);
-
-    if (FSectionFlag = 0) and (FEndMatchIndex = 4) then
-    begin   // 包头
-      FRawHeader := ByteBufferToString(FBufferBuilder.Memory, FDataLength);
-      if DecodeHeader = -1 then
+      if pvByte = 10 then Inc(FDecodeState)
+      else
       begin
-        FSectionFlag := 0;
-        Result := -1;
+        FDecodeState := 0;
+        InnerCaseZero;
+      end;
+    end;
+    2:  // 第二个 #13
+    begin
+      if pvByte = 13 then Inc(FDecodeState)
+      else
+      begin
+        FDecodeState := 0;
+        InnerCaseZero;
+      end;
+    end;
+    3:  // 第二个 #10
+    begin
+      if pvByte = 10 then
+      begin  // Header
+        FRawHeader := ByteBufferToString(FBufferBuilder.Memory, FDataLength);
+        FBufferBuilder.Clear;
+        FDataLength := 0;
+        if DecodeHeader = -1 then
+        begin
+          FSectionFlag := 0;
+          Result := -1;
+          FDecodeState := 0;
+        end else
+        begin
+          FSectionFlag := 1;
+          Result := 1;
+          Inc(FDecodeState);
+        end;
+        FFlag := 0;
+        Exit;
       end else
       begin
-        FSectionFlag := 1;
-        Result := 1;
+        FDecodeState := 0;
+        InnerCaseZero;
       end;
-
-      FFlag := 0;
-
-      Exit;
-    end else if (FSectionFlag = 1) and (FEndMatchIndex = 2) then
-    begin   // 请求数据<以换行符为一个请求>
-      Result := 2;     // DataAsString                          
-      FFlag := 0;   // 重新开始请求Buffer进行解码
-      Exit;
     end;
-  end
-  else if (MAX_RAW_BUFFER_SIZE > 0) and (FDataLength = MAX_RAW_BUFFER_SIZE) then
-  begin            // 数据过长
-    FFlag := 0;
-    Result := -2;
-  end else
-  begin
-    FEndMatchIndex := 0;
+    4:  // 接收Content
+    begin
+      if FContentLength = FDataLength then
+      begin
+        Result := 2;     // DataAsRAWString
+        FFlag := 0;      // 重新开始请求Buffer进行解码
+        Exit;
+      end;
+    end;
   end;
-  Result := 0;
 end;
 
 function TDHttpCookie.ToString: String;

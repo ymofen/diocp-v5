@@ -295,6 +295,12 @@ type
     function ForceByPath(pvPath:String): TDValue;
 
     /// <summary>
+    ///   将子节点整理成字符串列表
+    /// </summary>
+    function ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string = ''):
+        String;
+
+    /// <summary>
     ///   本身作为一个数组添加一个子节点
     ///     如果之前不是数组类型，将会被清除
     /// </summary>
@@ -1879,6 +1885,18 @@ end;
 procedure TDValue.SetAsString(const Value: String);
 begin
   FValue.SetAsString(Value);
+end;
+
+function TDValue.ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
+    ''): String;
+var
+  i: Integer;
+begin
+  Result := '';
+  for i := 0 to Count - 1 do
+  begin
+    Result := Result + pvPreNameFix + Items[i].Name.AsString + pvNameSpliter + Items[i].AsString + sLineBreak;
+  end; 
 end;
 
 destructor TDValueItem.Destroy;

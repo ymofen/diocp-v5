@@ -129,11 +129,6 @@ type
     /// </summary>
     FDiocpHttpServer:TDiocpHttpServer;
 
-    /// <summary>
-    ///   URL中的参数
-    /// </summary>
-    FURLParams: TDValue;
-
     FDiocpContext: TDiocpHttpClientContext;
 
 
@@ -169,12 +164,13 @@ type
     function GetContextLength: Int64;
     function GetContextType: String;
     function GetDataAsMemory: PByte;
-    function GetDataAsString: String;
+    function GetDataAsRawString: RAWString;
     function GetHeader: TDValue;
     function GetHttpVersion: Word;
     function GetRawDataLength: Integer;
     function GetRequestCookies: string;
     function GetRequestMethod: string;
+    function GetRequestParamsList: TDValue;
     function GetRequestRawHeaderString: string;
     function GetRequestRawURL: String;
     function GetRequestURI: String;
@@ -244,7 +240,7 @@ type
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
     property DataAsMemory: PByte read GetDataAsMemory;
-    property DataAsString: String read GetDataAsString;
+    property DataAsString: String read GetDataAsRawString;
 
     /// <summary>
     ///   请求头
@@ -312,7 +308,11 @@ type
     ///  没有经过URLDecode是考虑到参数值中本身存在&字符，导致DecodeURLParam出现不解码异常
     /// </summary>
     property RequestURLParamData: string read GetRequestURLParamData;
-    property URLParams: TDValue read FURLParams;
+
+    /// <summary>
+    ///   所有的请求参数， 注意调用前先调用DecodeURL和DecodePostParams
+    /// </summary>
+    property RequestParamsList: TDValue read GetRequestParamsList;
 
     /// <summary>
     /// 应答完毕，发送会客户端
@@ -365,6 +365,7 @@ type
     procedure SetHttpCodeStr(const Value: String);
   public
     procedure Clear;
+    procedure ClearContent;
     constructor Create;
     destructor Destroy; override;
     procedure WriteBuf(pvBuf: Pointer; len: Cardinal);
@@ -628,7 +629,7 @@ end;
 
 function TDiocpHttpRequest.GetRequestParam(ParamsKey: string): string;
 begin
-  Result := FInnerRequest.URLParams.GetValueByName(ParamsKey, '');
+  Result := FInnerRequest.RequestParams.GetValueByName(ParamsKey, '');
 end;
 
 constructor TDiocpHttpRequest.Create;
@@ -697,9 +698,9 @@ begin
   Result := FInnerRequest.DataAsMemory;
 end;
 
-function TDiocpHttpRequest.GetDataAsString: String;
+function TDiocpHttpRequest.GetDataAsRawString: RAWString;
 begin
-  Result := FInnerRequest.DataAsString;
+  Result := FInnerRequest.DataAsRAWString;
 end;
 
 function TDiocpHttpRequest.GetHeader: TDValue;
@@ -726,6 +727,11 @@ end;
 function TDiocpHttpRequest.GetRequestMethod: string;
 begin
   Result := FInnerRequest.Method;
+end;
+
+function TDiocpHttpRequest.GetRequestParamsList: TDValue;
+begin
+  Result := FInnerRequest.RequestParams;
 end;
 
 function TDiocpHttpRequest.GetRequestRawHeaderString: string;
@@ -888,6 +894,11 @@ end;
 procedure TDiocpHttpResponse.ClearAllCookieObjects;
 begin
   FInnerResponse.ClearCookies;
+end;
+
+procedure TDiocpHttpResponse.ClearContent;
+begin
+  FInnerResponse.ContentBuffer.Clear;
 end;
 
 function TDiocpHttpResponse.EncodeResponseHeader(pvContentLength: Integer):
