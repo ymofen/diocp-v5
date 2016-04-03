@@ -4,7 +4,7 @@ interface
 
 {$DEFINE USE_ZLIBExGZ}
 
-{$if CompilerVersion>= 21}
+{$if CompilerVersion>= 23}
 {$DEFINE USE_NetEncoding}
 {$ifend}
 uses
@@ -563,7 +563,7 @@ const
   procedure AppendByte(B: Byte; var Buffer: PChar);
   const
     Hex = '0123456789ABCDEF';
-  {$if CompilerVersion>= 21}
+  {$if CompilerVersion>= 23}
     LOW_INDEX = Low(string);
   {$else}
     LOW_INDEX = 1;
