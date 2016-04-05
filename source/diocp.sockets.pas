@@ -704,6 +704,7 @@ type
     FContextDNA : Integer;
 
     function GetOnlineContextCount: Integer;
+    procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
 
     function RequestContextDNA: Integer;
 
@@ -1519,7 +1520,7 @@ begin
   FSendRequestPool := TBaseQueue.Create;
     
   FIocpEngine := TIocpEngine.Create();
-
+  FIocpEngine.IocpCore.OnIocpException := self.OnIocpException;
 
   // post wsaRecv block size
   FWSARecvBufferSize := 1024 * 4;
@@ -1869,6 +1870,21 @@ end;
 procedure TDiocpCustom.OnCreateContext(const context: TDiocpCustomContext);
 begin
 
+end;
+
+procedure TDiocpCustom.OnIocpException(pvRequest:TIocpRequest; E:Exception);
+begin
+  try
+    if pvRequest <> nil then
+    begin
+      LogMessage('未处理异常:%s, 请求(%s)信息:%s',[E.Message, pvRequest.ClassName, pvRequest.Remark],
+        CORE_LOG_FILE, lgvError);
+    end else
+    begin
+      LogMessage('未处理异常:%s',[E.Message], CORE_LOG_FILE, lgvError);
+    end;
+  except
+  end;
 end;
 
 procedure TDiocpCustom.RemoveFromOnOnlineList(pvObject: TDiocpCustomContext);
