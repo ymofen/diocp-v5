@@ -1,0 +1,10 @@
+2016-04-03 10:19:30
+  HttpRequest
+    - RawPostData,       可以用DataAsMemory， DataAsRawString代替
+    - RequestParamsList  类型由TStrings -> TDValue
+  HttpResponse
+    - Data    Data(TMemoryStream)
+      写入Buffer可以直接操作WriteBuffer
+      清空 ClearContent
+      LoadFromFile可以加载文件流
+    

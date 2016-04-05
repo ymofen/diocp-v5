@@ -146,6 +146,8 @@ type
     function AppendSingleQuoteStr(str:string): TDBufferBuilder;
     function AppendLine(str:string): TDBufferBuilder;
 
+    function LoadFromFile(pvFileName:string): Integer;
+
     /// <summary>
     ///   Ð´ÈëÊý¾Ý
     /// </summary>
@@ -1550,6 +1552,29 @@ end;
 function TDBufferBuilder.GetRemain: Integer;
 begin
   Result := FWritePosition - FReadPosition;
+end;
+
+function TDBufferBuilder.LoadFromFile(pvFileName:string): Integer;
+var
+  lvFileStream:TFileStream;
+  lvBuffer:PByte;
+begin
+  if FileExists(pvFileName) then
+  begin
+    lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
+    try
+      lvBuffer := Self.GetLockBuffer(lvFileStream.Size);
+      try
+        lvFileStream.Position := 0;
+        lvFileStream.ReadBuffer(lvBuffer^, lvFileStream.Size);
+      finally
+        self.ReleaseLockBuffer(lvFileStream.Size);
+      end;
+    finally
+      lvFileStream.Free;
+    end;
+  end;
+  
 end;
 
 function TDBufferBuilder.Memory: PByte;

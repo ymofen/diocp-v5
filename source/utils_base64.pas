@@ -11,6 +11,10 @@ uses
 {$ENDIF}
   ;
 
+{$IF (RTLVersion=22)}
+type
+  MarshaledAString = PAnsiChar;
+{$IFEND >=XE}
 
 
 function Base64Encode(buf: PByte; len: Integer; CharsPerLine: Integer = 0):
