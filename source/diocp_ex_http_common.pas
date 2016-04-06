@@ -1270,7 +1270,7 @@ begin
   FHeaderBuilder.Clear;
   FContentBuffer.Clear;
   FResponseCode := 0;
-  FContentType := '';
+  FContentType := '';    
   FResponseCodeStr := '';
 end;
 
@@ -1317,7 +1317,13 @@ begin
     pvBuilder.AppendRawStr('HTTP/1.1 ').AppendRawStr(GetResponseCodeText(lvCode)).AppendBreakLineBytes;
   end;
   pvBuilder.AppendRawStr('Server: DIOCP-V5/1.1').AppendBreakLineBytes;
-  if FContentType <> '' then
+  if FContentType = '' then
+  begin
+    if FContentBuffer.Length > 0 then
+    begin
+      pvBuilder.AppendRawStr('Content-Type:').AppendRawStr('text/html;charset=UTF-8').AppendBreakLineBytes;
+    end;
+  end else
     pvBuilder.AppendRawStr('Content-Type:').AppendRawStr(FContentType).AppendBreakLineBytes;
 
   for i := 0 to FHeaders.Count - 1 do

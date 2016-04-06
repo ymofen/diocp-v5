@@ -268,6 +268,7 @@ type
     procedure SetAsInteger(const Value: Int64);
     procedure SetAsString(const Value: String);
     function GetAsObject: TObject;
+    function GetAsStream: TMemoryStream;
   public
     constructor Create(pvType: TDValueObjectType); overload;
 
@@ -388,6 +389,8 @@ type
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
     property AsObject: TObject read GetAsObject;
 
+    property AsStream: TMemoryStream read GetAsStream;
+
   end;
 
   TDValueItem = class(TObject)
@@ -404,6 +407,7 @@ type
     function GetDataType: TDValueDataType;
 
     function GetAsObject: TObject;
+    function GetAsStream: TMemoryStream;
 
     procedure SetAsBoolean(const Value: Boolean);
     procedure SetAsFloat(const Value: Double);
@@ -438,6 +442,10 @@ type
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsObject: TObject read GetAsObject;
+
+    property AsStream: TMemoryStream read GetAsStream;
+
+
 
     property AsInterface: IInterface read GetAsInterface write SetAsInterface;
 
@@ -720,7 +728,7 @@ begin
       vdtStringW:
         Dispose(ADValue.Value.AsStringW);
       vdtStream:
-        FreeAndNil(ADValue.Value.AsStream);
+        FreeObject(TObject(ADValue.Value.AsStream));
       vdtInterface:
         Dispose(ADValue.Value.AsInterface);
       vdtObject, vdtPtr:
@@ -733,6 +741,8 @@ begin
 end;
 
 procedure CheckDValueSetType(ADValue:PDRawValue; AType: TDValueDataType);
+var
+  lvStream:TMemoryStream;
 begin
   if ADValue.ValueType <> AType then
   begin
@@ -747,7 +757,17 @@ begin
       vdtInterface:
         New(ADValue.Value.AsInterface);
       vdtStream:
-        ADValue.Value.AsStream := TMemoryStream.Create;
+      begin
+        lvStream := TMemoryStream.Create;
+        ADValue.Value.AsStream := lvStream;
+        {$IFDEF NEXTGEN}
+        // 移动平台下AData的计数需要增加，以避免自动释放
+        if Result <> nil then
+        begin
+          Result.__ObjAddRef;
+        end;
+        {$ENDIF}
+      end;
       vdtArray:
         ADValue.Value.ArrayLength := 0;
     end;
@@ -1586,6 +1606,11 @@ begin
   Result := FValue.GetAsObject;  
 end;
 
+function TDValue.GetAsStream: TMemoryStream;
+begin
+  Result := FValue.AsStream;
+end;
+
 function TDValue.GetAsString: String;
 begin
   Result := FValue.GetAsString;
@@ -1969,6 +1994,19 @@ end;
 function TDValueItem.GetAsObject: TObject;
 begin
   Result := DValueGetAsObject(@FRawValue);
+end;
+
+function TDValueItem.GetAsStream: TMemoryStream;
+begin
+  CheckDValueSetType(@FRawValue, vdtStream);
+  Result :=  TMemoryStream(FRawValue.Value.AsStream);
+  {$IFDEF NEXTGEN}
+  // 移动平台下AData的计数需要增加，以避免自动释放
+  if Result <> nil then
+  begin
+    Result.__ObjAddRef;
+  end;
+  {$ENDIF} 
 end;
 
 function TDValueItem.GetAsString: String;

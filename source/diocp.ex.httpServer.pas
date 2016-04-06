@@ -382,6 +382,8 @@ type
 
     procedure LoadFromFile(pvFile:string);
 
+    function LoadFromStream(pvStream: TStream; pvSize: Integer): Integer;
+
     function AddCookie(pvName:String; pvValue:string): TDiocpHttpCookie; overload;
 
     function EncodeHeader: String;
@@ -1038,6 +1040,12 @@ end;
 procedure TDiocpHttpResponse.LoadFromFile(pvFile:string);
 begin
   FInnerResponse.ContentBuffer.LoadFromFile(pvFile);
+end;
+
+function TDiocpHttpResponse.LoadFromStream(pvStream: TStream; pvSize: Integer):
+    Integer;
+begin
+  Result := FInnerResponse.ContentBuffer.LoadFromStream(pvStream, pvSize);
 end;
 
 procedure TDiocpHttpResponse.ZLibContent;

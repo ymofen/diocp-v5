@@ -431,14 +431,14 @@ end;
 
 procedure TRedisCommand.MakePublish(pvChannel:String; pvMessage:String);
 begin
-  Clear;
-  Command := 'subscribe';
-  Data.Clear;
-
-  for i := Low(pvSubscribeArgs) to High(pvSubscribeArgs) do
-  begin
-    Data.Add.AsString := pvSubscribeArgs[i];
-  end;
+//  Clear;
+//  Command := 'subscribe';
+//  Data.Clear;
+//
+//  for i := Low(pvSubscribeArgs) to High(pvSubscribeArgs) do
+//  begin
+//    Data.Add.AsString := pvSubscribeArgs[i];
+//  end;
 end;
 
 constructor TRedisClient.Create;

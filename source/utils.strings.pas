@@ -148,6 +148,10 @@ type
 
     function LoadFromFile(pvFileName:string): Integer;
 
+    function LoadFromStream(pvStream:TStream; pvSize:Integer): Integer;
+
+    procedure SaveToFile(pvFile:String);
+
     /// <summary>
     ///   Ð´ÈëÊý¾Ý
     /// </summary>
@@ -1577,6 +1581,20 @@ begin
   
 end;
 
+function TDBufferBuilder.LoadFromStream(pvStream:TStream; pvSize:Integer):
+    Integer;
+var
+  lvBuffer:PByte;
+begin
+  Result := 0;
+  lvBuffer := Self.GetLockBuffer(pvSize);
+  try
+    Result := pvStream.Read(lvBuffer^, pvSize);
+  finally
+    self.ReleaseLockBuffer(Result);
+  end;  
+end;
+
 function TDBufferBuilder.Memory: PByte;
 begin
   Result := @FData[0];
@@ -1624,6 +1642,25 @@ begin
   Inc(FWritePosition, pvLength);
   Result := Self;
   FBufferLocked := False;
+end;
+
+procedure TDBufferBuilder.SaveToFile(pvFile:String);
+var
+  lvFileStream:TFileStream;
+begin
+  if FileExists(pvFile) then
+  begin
+    lvFileStream := TFileStream.Create(pvFile, fmOpenWrite);
+  end else
+  begin
+    lvFileStream := TFileStream.Create(pvFile, fmCreate);
+  end;                                                   
+  try
+    lvFileStream.WriteBuffer(self.Memory^, self.Length);
+  finally
+    lvFileStream.Free;
+  end;
+  ;
 end;
 
 function TDBufferBuilder.ToBytes: TBytes;
