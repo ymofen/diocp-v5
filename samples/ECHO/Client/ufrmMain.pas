@@ -5,13 +5,15 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp.tcp.client,
-  utils.safeLogger, ComCtrls, diocp.sockets, ExtCtrls;
+  utils.safeLogger, ComCtrls, diocp.sockets, ExtCtrls, utils_async,
+  utils_BufferPool;
 
 type
   TEchoContext = class(TIocpRemoteContext)
     FMaxTick:Cardinal;
     FStartTime:TDateTime;
     FLastTick:Cardinal;
+    FLastSendTick:Cardinal;
   end;
 
   TfrmMain = class(TForm)
@@ -20,9 +22,6 @@ type
     tsMonitor: TTabSheet;
     mmoRecvMessage: TMemo;
     tsOperator: TTabSheet;
-    mmoData: TMemo;
-    btnFill1K: TButton;
-    btnSendObject: TButton;
     pnlTop: TPanel;
     btnConnect: TButton;
     edtHost: TEdit;
@@ -30,7 +29,6 @@ type
     btnClose: TButton;
     btnCreate: TButton;
     edtCount: TEdit;
-    chkSendData: TCheckBox;
     chkRecvEcho: TCheckBox;
     chkRecvOnLog: TCheckBox;
     btnClear: TButton;
@@ -39,6 +37,21 @@ type
     btnSaveHistory: TButton;
     tmrCheckHeart: TTimer;
     chkLogRecvTime: TCheckBox;
+    pnlOpera_Top: TPanel;
+    btnSendObject: TButton;
+    btnFill1K: TButton;
+    pnlOpera_Send: TPanel;
+    mmoData: TMemo;
+    tsEvent: TTabSheet;
+    mmoIntervalData: TMemo;
+    pnlIntervalTop: TPanel;
+    edtInterval: TEdit;
+    btnSetInterval: TButton;
+    grpOnConnected: TGroupBox;
+    grpInterval: TGroupBox;
+    chkSendData: TCheckBox;
+    mmoOnConnected: TMemo;
+    chkIntervalSendData: TCheckBox;
     procedure btnClearClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
@@ -46,19 +59,27 @@ type
     procedure btnFill1KClick(Sender: TObject);
     procedure btnSaveHistoryClick(Sender: TObject);
     procedure btnSendObjectClick(Sender: TObject);
+    procedure btnSetIntervalClick(Sender: TObject);
     procedure chkCheckHeartClick(Sender: TObject);
     procedure chkHexClick(Sender: TObject);
+    procedure chkIntervalSendDataClick(Sender: TObject);
     procedure chkLogRecvTimeClick(Sender: TObject);
     procedure chkRecvEchoClick(Sender: TObject);
     procedure chkRecvOnLogClick(Sender: TObject);
     procedure chkSendDataClick(Sender: TObject);
     procedure tmrCheckHeartTimer(Sender: TObject);
   private
+    FSpinLock:Integer;
+    
     FSendDataOnConnected:Boolean;
     FSendDataOnRecv:Boolean;
     FLogRecvInfo:Boolean;
     FRecvOnLog:Boolean;
     FConvertHex:Boolean;
+
+    FASyncInvoker:TASyncInvoker;
+    FSendInterval: Cardinal;
+    FSendDataOnInterval:Boolean;
     FFileLogger:TSafeLogger;
     FIocpClientSocket: TDiocpTcpClient;
 
@@ -68,6 +89,8 @@ type
 
     procedure OnRecvdBuffer(pvContext: TDiocpCustomContext; buf: Pointer; len:
         cardinal; pvErrorCode: Integer);
+
+    procedure OnASyncWork(pvASyncWorker:TASyncWorker);
 
     procedure WriteHistory;
 
@@ -94,6 +117,8 @@ uses
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited;
+  FASyncInvoker := TASyncInvoker.Create;
+  FASyncInvoker.Start(OnASyncWork);
   FFileLogger := TSafeLogger.Create;
   FFileLogger.setAppender(TLogFileAppender.Create(False), true);
   FSendDataOnRecv := chkRecvEcho.Checked;
@@ -115,6 +140,9 @@ end;
 
 destructor TfrmMain.Destroy;
 begin
+  FASyncInvoker.Terminate;
+  FASyncInvoker.WaitForStop;
+  FASyncInvoker.Free;
   FIocpClientSocket.Close;
   FIocpClientSocket.Free;
   FFileLogger.Free;
@@ -130,27 +158,36 @@ procedure TfrmMain.btnCloseClick(Sender: TObject);
 var
   i: Integer;
 begin
-  for i := 0 to FIocpClientSocket.Count-1 do
-  begin
-    FIocpClientSocket.Items[i].AutoReConnect := false;
-    FIocpClientSocket.Items[i].Close; 
+  SpinLock(FSpinLock);
+  try
+    for i := 0 to FIocpClientSocket.Count-1 do
+    begin
+      FIocpClientSocket.Items[i].AutoReConnect := false;
+      FIocpClientSocket.Items[i].Close;
+    end;
+    FIocpClientSocket.WaitForContext(30000);
+    FIocpClientSocket.ClearContexts;
+  finally
+    SpinUnLock(FSpinLock);
   end;
-  FIocpClientSocket.WaitForContext(30000);
-  FIocpClientSocket.ClearContexts;
 end;
 
 procedure TfrmMain.btnConnectClick(Sender: TObject);
 var
   lvClient:TIocpRemoteContext;
 begin
-  FIocpClientSocket.open;
+  SpinLock(FSpinLock);
+  try
+    FIocpClientSocket.open;
 
-  lvClient := FIocpClientSocket.Add;
-  lvClient.Host := edtHost.Text;
-  lvClient.Port := StrToInt(edtPort.Text);
-  lvClient.AutoReConnect := true;
-  lvClient.ConnectASync;
-
+    lvClient := FIocpClientSocket.Add;
+    lvClient.Host := edtHost.Text;
+    lvClient.Port := StrToInt(edtPort.Text);
+    lvClient.AutoReConnect := true;
+    lvClient.ConnectASync;
+  finally
+    SpinUnLock(FSpinLock);
+  end;
 
 
   mmoRecvMessage.Clear;
@@ -165,17 +202,22 @@ var
   i:Integer;
 
 begin
-  FIocpClientSocket.open;
+  chkRecvOnLog.Checked := StrToInt(edtCount.Text) < 10;
+  SpinLock(FSpinLock);
+  try
+    FIocpClientSocket.open;
 
-  for i := 1 to StrToInt(edtCount.Text) do
-  begin
-    lvClient := FIocpClientSocket.Add;
-    lvClient.Host := edtHost.Text;
-    lvClient.Port := StrToInt(edtPort.Text);
-    lvClient.AutoReConnect := true;
-    lvClient.connectASync;
+    for i := 1 to StrToInt(edtCount.Text) do
+    begin
+      lvClient := FIocpClientSocket.Add;
+      lvClient.Host := edtHost.Text;
+      lvClient.Port := StrToInt(edtPort.Text);
+      lvClient.AutoReConnect := true;
+      lvClient.connectASync;
+    end;
+  finally
+    SpinUnLock(FSpinLock);
   end;
-
 end;
 
 procedure TfrmMain.btnFill1KClick(Sender: TObject);
@@ -205,6 +247,15 @@ begin
   end;
 end;
 
+procedure TfrmMain.btnSetIntervalClick(Sender: TObject);
+var
+  lvInterval:Integer;
+begin
+  lvInterval := StrToIntDef(edtInterval.Text, 0) * 1000;
+  if lvInterval <=0 then raise Exception.Create('必须设定大于0的值');
+  FSendInterval := lvInterval;
+end;
+
 procedure TfrmMain.chkCheckHeartClick(Sender: TObject);
 begin
   ;
@@ -220,8 +271,6 @@ begin
   if chkHex.Tag = 1 then Exit;
 
   s := mmoData.Lines.Text;
-
-
   if FConvertHex then
   begin
     mmoData.Lines.Text := TByteTools.varToHexString(PAnsiChar(s)^, Length(s));
@@ -236,6 +285,43 @@ begin
     l := TByteTools.HexToBin(s, @lvBytes[0]);
     mmoData.Lines.Text := StrPas(@lvBytes[0]);
   end;
+
+  s := mmoOnConnected.Lines.Text;
+  if FConvertHex then
+  begin
+    mmoOnConnected.Lines.Text := TByteTools.varToHexString(PAnsiChar(s)^, Length(s));
+  end else
+  begin
+    s := StringReplace(s, ' ', '', [rfReplaceAll]);
+    s := StringReplace(s, #10, '', [rfReplaceAll]);
+    s := StringReplace(s, #13, '', [rfReplaceAll]);
+    l := Length(s);
+    SetLength(lvBytes, l);
+    FillChar(lvBytes[0], l, 0);
+    l := TByteTools.HexToBin(s, @lvBytes[0]);
+    mmoOnConnected.Lines.Text := StrPas(@lvBytes[0]);
+  end;
+
+  s := mmoIntervalData.Lines.Text;
+  if FConvertHex then
+  begin
+    mmoIntervalData.Lines.Text := TByteTools.varToHexString(PAnsiChar(s)^, Length(s));
+  end else
+  begin
+    s := StringReplace(s, ' ', '', [rfReplaceAll]);
+    s := StringReplace(s, #10, '', [rfReplaceAll]);
+    s := StringReplace(s, #13, '', [rfReplaceAll]);
+    l := Length(s);
+    SetLength(lvBytes, l);
+    FillChar(lvBytes[0], l, 0);
+    l := TByteTools.HexToBin(s, @lvBytes[0]);
+    mmoIntervalData.Lines.Text := StrPas(@lvBytes[0]);
+  end;
+end;
+
+procedure TfrmMain.chkIntervalSendDataClick(Sender: TObject);
+begin
+  FSendDataOnInterval := chkIntervalSendData.Checked;
 end;
 
 procedure TfrmMain.chkLogRecvTimeClick(Sender: TObject);
@@ -285,6 +371,46 @@ begin
 
 end;
 
+procedure TfrmMain.OnASyncWork(pvASyncWorker:TASyncWorker);
+var
+  i, l: Integer;
+  lvBytes:TBytes;
+  s:AnsiString;
+  lvEchoClient:TEchoContext;
+begin
+  while not FASyncInvoker.Terminated do
+  begin
+    if (FSendInterval > 0) and FSendDataOnInterval then
+    begin
+      s := mmoIntervalData.Lines.Text;
+      if s <> '' then
+      begin
+        SpinLock(FSpinLock);
+        try
+          for i := 0 to FIocpClientSocket.Count - 1 do
+          begin
+            if FASyncInvoker.Terminated then Exit;
+            
+            lvEchoClient := TEchoContext(FIocpClientSocket.Items[i]);
+            if lvEchoClient.Active then
+            begin
+              if tick_diff(lvEchoClient.FLastSendTick, GetTickCount) > FSendInterval  then
+              begin
+                DoSend(lvEchoClient, s);
+                lvEchoClient.FLastSendTick := GetTickCount;
+              end;
+            end;
+          end;
+        finally
+          SpinUnLock(FSpinLock);
+        end;
+      end;
+    end;
+
+    Sleep(1000);
+  end;
+end;
+
 procedure TfrmMain.OnContextConnected(pvContext: TDiocpCustomContext);
 var
   s:AnsiString;
@@ -293,7 +419,7 @@ begin
   TEchoContext(pvContext).FLastTick := GetTickCount;
   TEchoContext(pvContext).FMaxTick := 0;
 
-  s := mmoData.Lines.Text;
+  s := mmoOnConnected.Lines.Text;
   if FSendDataOnConnected then
   begin
     DoSend(pvContext, s);
@@ -367,6 +493,12 @@ begin
 
   chkCheckHeart.Checked := lvDValue.ForceByName('chk_checkheart').AsBoolean;
   chkLogRecvTime.Checked := lvDValue.ForceByName('chk_LogRecvInfo').AsBoolean;
+
+  chkIntervalSendData.Checked := lvDValue.ForceByName('chk_send_oninterval').AsBoolean;
+  edtInterval.Text := IntToStr(lvDValue.ForceByName('send_interval').AsInteger);
+  mmoIntervalData.Lines.Text := lvDValue.ForceByName('send_interval_data').AsString;
+  mmoOnConnected.Lines.Text := lvDValue.ForceByName('send_onconnected_data').AsString;
+
   lvDValue.Free;
 
   FSendDataOnConnected := chkSendData.Checked;
@@ -374,12 +506,21 @@ begin
   FSendDataOnRecv := chkRecvEcho.Checked;
   FConvertHex := chkHex.Checked;
   FLogRecvInfo := chkLogRecvTime.Checked;
+  FSendInterval := StrToIntDef(edtInterval.Text, 0) * 1000;
 end;
 
 procedure TfrmMain.tmrCheckHeartTimer(Sender: TObject);
 begin
   if chkCheckHeart.Checked then
-    self.FIocpClientSocket.KickOut(30000);
+  begin
+    SpinLock(FSpinLock);
+    try
+      self.FIocpClientSocket.KickOut(30000);
+    finally
+      SpinUnLock(FSpinLock);
+    end;
+
+  end;
 end;
 
 procedure TfrmMain.WriteHistory;
@@ -396,6 +537,10 @@ begin
   lvDValue.ForceByName('chk_send_hex').AsBoolean := chkHex.Checked;
   lvDValue.ForceByName('chk_checkheart').AsBoolean := chkCheckHeart.Checked;
   lvDValue.ForceByName('chk_LogRecvInfo').AsBoolean := chkLogRecvTime.Checked;
+  lvDValue.ForceByName('chk_send_oninterval').AsBoolean := chkIntervalSendData.Checked;
+  lvDValue.ForceByName('send_interval').AsInteger := StrToIntDef(edtInterval.Text, 0);
+  lvDValue.ForceByName('send_interval_data').AsString := mmoIntervalData.Lines.Text;
+  lvDValue.ForceByName('send_onconnected_data').AsString := mmoOnConnected.Lines.Text;
   JSONWriteToUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
   lvDValue.Free;
 end;

@@ -41,32 +41,156 @@ object frmMain: TfrmMain
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
-      object mmoData: TMemo
+      object pnlOpera_Top: TPanel
+        Left = 0
+        Top = 0
+        Width = 836
+        Height = 41
+        Align = alTop
+        Caption = 'pnlOpera_Top'
+        TabOrder = 0
+        object btnSendObject: TButton
+          Left = 100
+          Top = 8
+          Width = 142
+          Height = 25
+          Caption = #25152#26377#36830#25509#21457#36865#19968#27425#25968#25454
+          TabOrder = 0
+          OnClick = btnSendObjectClick
+        end
+        object btnFill1K: TButton
+          Left = 10
+          Top = 8
+          Width = 75
+          Height = 25
+          Caption = #22635#20805'1K'#23383#31526
+          TabOrder = 1
+          OnClick = btnFill1KClick
+        end
+      end
+      object pnlOpera_Send: TPanel
+        Left = 0
+        Top = 41
+        Width = 836
+        Height = 282
+        Align = alClient
+        Caption = 'pnlOpera_Send'
+        TabOrder = 1
+        object mmoData: TMemo
+          Left = 1
+          Top = 1
+          Width = 834
+          Height = 280
+          Align = alClient
+          Lines.Strings = (
+            '0123456789')
+          TabOrder = 0
+        end
+      end
+    end
+    object tsEvent: TTabSheet
+      Caption = #20107#20214
+      ImageIndex = 3
+      object grpOnConnected: TGroupBox
+        AlignWithMargins = True
         Left = 3
         Top = 3
-        Width = 450
-        Height = 206
-        Lines.Strings = (
-          '0123456789')
+        Width = 830
+        Height = 152
+        Align = alTop
+        Caption = #25104#21151#24314#31435#36830#25509
         TabOrder = 0
+        object chkSendData: TCheckBox
+          Left = 88
+          Top = 0
+          Width = 152
+          Height = 17
+          Caption = #36830#25509#21518#21457#36865#25968#25454
+          Checked = True
+          State = cbChecked
+          TabOrder = 0
+          OnClick = chkSendDataClick
+        end
+        object mmoOnConnected: TMemo
+          AlignWithMargins = True
+          Left = 5
+          Top = 18
+          Width = 820
+          Height = 129
+          Align = alClient
+          Lines.Strings = (
+            '0123456789')
+          TabOrder = 1
+          ExplicitLeft = 26
+          ExplicitTop = 3
+          ExplicitWidth = 832
+          ExplicitHeight = 120
+        end
       end
-      object btnFill1K: TButton
-        Left = 459
-        Top = 3
-        Width = 75
-        Height = 25
-        Caption = #22635#20805'1K'#23383#31526
+      object grpInterval: TGroupBox
+        AlignWithMargins = True
+        Left = 3
+        Top = 161
+        Width = 830
+        Height = 159
+        Align = alClient
+        Caption = #38388#38548
         TabOrder = 1
-        OnClick = btnFill1KClick
-      end
-      object btnSendObject: TButton
-        Left = 459
-        Top = 48
-        Width = 142
-        Height = 25
-        Caption = #25152#26377#36830#25509#21457#36865#19968#27425#25968#25454
-        TabOrder = 2
-        OnClick = btnSendObjectClick
+        ExplicitLeft = 0
+        ExplicitTop = 141
+        ExplicitWidth = 836
+        ExplicitHeight = 182
+        object pnlIntervalTop: TPanel
+          Left = 2
+          Top = 15
+          Width = 826
+          Height = 35
+          Align = alTop
+          BevelOuter = bvNone
+          TabOrder = 0
+          ExplicitWidth = 832
+          object edtInterval: TEdit
+            Left = 3
+            Top = 7
+            Width = 66
+            Height = 21
+            TabOrder = 0
+            Text = '10'
+          end
+          object btnSetInterval: TButton
+            Left = 84
+            Top = 7
+            Width = 89
+            Height = 25
+            Caption = #35774#23450#38388#38548#26102#38388
+            TabOrder = 1
+            OnClick = btnSetIntervalClick
+          end
+        end
+        object mmoIntervalData: TMemo
+          AlignWithMargins = True
+          Left = 5
+          Top = 53
+          Width = 820
+          Height = 101
+          Align = alClient
+          Lines.Strings = (
+            'mmoIntervalData')
+          TabOrder = 1
+          ExplicitLeft = 0
+          ExplicitTop = 0
+          ExplicitWidth = 836
+          ExplicitHeight = 184
+        end
+        object chkIntervalSendData: TCheckBox
+          Left = 88
+          Top = -1
+          Width = 109
+          Height = 17
+          Caption = #38388#38548#21457#36865#25968#25454
+          TabOrder = 2
+          OnClick = chkIntervalSendDataClick
+        end
       end
     end
   end
@@ -128,24 +252,13 @@ object frmMain: TfrmMain
       TabOrder = 5
       Text = '1000'
     end
-    object chkSendData: TCheckBox
-      Left = 278
-      Top = 56
-      Width = 152
-      Height = 17
-      Caption = #36830#25509#21518#21457#36865'(MEMO'#25968#25454')'
-      Checked = True
-      State = cbChecked
-      TabOrder = 6
-      OnClick = chkSendDataClick
-    end
     object chkRecvEcho: TCheckBox
       Left = 278
       Top = 37
       Width = 187
       Height = 17
       Caption = #25509#25910#21040#25968#25454#21518#30452#25509#36820#22238#25968#25454
-      TabOrder = 7
+      TabOrder = 6
       OnClick = chkRecvEchoClick
     end
     object chkRecvOnLog: TCheckBox
@@ -154,7 +267,7 @@ object frmMain: TfrmMain
       Width = 156
       Height = 17
       Caption = #25910#21040#25968#25454#35760#24405#26085#24535
-      TabOrder = 8
+      TabOrder = 7
       OnClick = chkRecvOnLogClick
     end
     object btnClear: TButton
@@ -163,7 +276,7 @@ object frmMain: TfrmMain
       Width = 75
       Height = 25
       Caption = #28165#31354#26085#24535
-      TabOrder = 9
+      TabOrder = 8
       OnClick = btnClearClick
     end
     object chkHex: TCheckBox
@@ -172,7 +285,7 @@ object frmMain: TfrmMain
       Width = 97
       Height = 17
       Caption = '16'#36827#21046#21457#36865
-      TabOrder = 10
+      TabOrder = 9
       OnClick = chkHexClick
     end
     object chkCheckHeart: TCheckBox
@@ -181,7 +294,7 @@ object frmMain: TfrmMain
       Width = 169
       Height = 17
       Caption = #24515#36339#26816#27979#20851#38381#27515#38142#25509
-      TabOrder = 11
+      TabOrder = 10
       OnClick = chkCheckHeartClick
     end
     object btnSaveHistory: TButton
@@ -190,7 +303,7 @@ object frmMain: TfrmMain
       Width = 75
       Height = 25
       Caption = #20445#23384#37197#32622
-      TabOrder = 12
+      TabOrder = 11
       OnClick = btnSaveHistoryClick
     end
     object chkLogRecvTime: TCheckBox
@@ -199,14 +312,14 @@ object frmMain: TfrmMain
       Width = 147
       Height = 17
       Caption = #35760#24405#25509#25910#25968#25454#20449#24687
-      TabOrder = 13
+      TabOrder = 12
       OnClick = chkLogRecvTimeClick
     end
   end
   object tmrCheckHeart: TTimer
     Interval = 10000
     OnTimer = tmrCheckHeartTimer
-    Left = 416
-    Top = 224
+    Left = 432
+    Top = 384
   end
 end
