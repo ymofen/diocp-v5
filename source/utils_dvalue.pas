@@ -298,8 +298,8 @@ type
     /// <summary>
     ///   将子节点整理成字符串列表
     /// </summary>
-    function ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string = ''):
-        String;
+    function ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string = '';
+        pvValueDelimiter: string = sLineBreak): String;
 
     /// <summary>
     ///   本身作为一个数组添加一个子节点
@@ -1913,15 +1913,25 @@ begin
 end;
 
 function TDValue.ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
-    ''): String;
+    ''; pvValueDelimiter: string = sLineBreak): String;
 var
   i: Integer;
 begin
   Result := '';
-  for i := 0 to Count - 1 do
+
+  if self.ObjectType = vntArray then
   begin
-    Result := Result + pvPreNameFix + Items[i].Name.AsString + pvNameSpliter + Items[i].AsString + sLineBreak;
-  end; 
+    for i := 0 to Count - 1 do
+    begin
+      Result := Result + Items[i].AsString + pvValueDelimiter;
+    end;
+  end else
+  begin
+    for i := 0 to Count - 1 do
+    begin
+      Result := Result + pvPreNameFix + Items[i].Name.AsString + pvNameSpliter + Items[i].AsString + pvValueDelimiter;
+    end;
+  end;
 end;
 
 destructor TDValueItem.Destroy;

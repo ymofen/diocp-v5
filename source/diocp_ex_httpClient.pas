@@ -437,7 +437,7 @@ begin
 
 
     FResponseBody.Size := l;
-    Move(lvBuffer^, FResponseBody.Memory^, l); 
+    Move(FReponseBuilder.Memory^, FResponseBody.Memory^, l); 
   end;
 
   lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);

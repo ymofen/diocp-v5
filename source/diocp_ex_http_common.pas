@@ -208,12 +208,13 @@ type
   private
     FHeaderBuilder: TDBufferBuilder;
     FContentBuffer: TDBufferBuilder;
-    FContentType: RAWString;
     FCookies: TDValue;
     FHeaders: TDValue;
     FResponseCode: Word;
     FResponseCodeStr: String;
+    function GetContentType: RAWString;
     procedure InnerBuildHeader(pvBuilder: TDBufferBuilder); virtual;
+    procedure SetContentType(const Value: RAWString);
   public
     procedure DoCleanUp;
     constructor Create;
@@ -221,7 +222,7 @@ type
     function AddCookie: TDHttpCookie; overload;
     function AddCookie(pvName:String; pvValue:string): TDHttpCookie; overload;
     property ContentBuffer: TDBufferBuilder read FContentBuffer;
-    property ContentType: RAWString read FContentType write FContentType;
+    property ContentType: RAWString read GetContentType write SetContentType;
     property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
     property Headers: TDValue read FHeaders;
     property ResponseCode: Word read FResponseCode write FResponseCode;
@@ -1270,7 +1271,6 @@ begin
   FHeaderBuilder.Clear;
   FContentBuffer.Clear;
   FResponseCode := 0;
-  FContentType := '';    
   FResponseCodeStr := '';
 end;
 
@@ -1317,14 +1317,13 @@ begin
     pvBuilder.AppendRawStr('HTTP/1.1 ').AppendRawStr(GetResponseCodeText(lvCode)).AppendBreakLineBytes;
   end;
   pvBuilder.AppendRawStr('Server: DIOCP-V5/1.1').AppendBreakLineBytes;
-  if FContentType = '' then
+  if GetContentType = '' then
   begin
     if FContentBuffer.Length > 0 then
     begin
       pvBuilder.AppendRawStr('Content-Type:').AppendRawStr('text/html;charset=UTF-8').AppendBreakLineBytes;
     end;
-  end else
-    pvBuilder.AppendRawStr('Content-Type:').AppendRawStr(FContentType).AppendBreakLineBytes;
+  end;
 
   for i := 0 to FHeaders.Count - 1 do
   begin
@@ -1371,6 +1370,16 @@ end;
 procedure THttpResponse.DeflateCompressContent;
 begin
   DeflateCompressBufferBuilder(FContentBuffer);
+end;
+
+function THttpResponse.GetContentType: RAWString;
+begin
+  Result := FHeaders.GetValueByName('content-type', '');
+end;
+
+procedure THttpResponse.SetContentType(const Value: RAWString);
+begin
+  FHeaders.ForceByName('content-type').AsString := Value;
 end;
 
 procedure THttpResponse.ZCompressContent;
