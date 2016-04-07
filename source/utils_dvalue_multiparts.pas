@@ -8,6 +8,8 @@ uses
 type
   TMultiPartsParser = class(TObject)
   private
+    FBoundaryMatchIndex:Integer;
+    FBoundaryBytes:TBytes;
     FBoundary: RAWString;
     FDecodeState:Integer;
     FData:TDValue;
@@ -15,6 +17,7 @@ type
     FCurrentHeader: RAWString;
 
     function DecodeHeader: Integer;
+    function DecodeContent: Integer;
 
   public
     constructor Create;
@@ -187,6 +190,12 @@ begin
   inherited Destroy;
 end;
 
+function TMultiPartsParser.DecodeContent: Integer;
+begin
+  
+  Result := 1;
+end;
+
 function TMultiPartsParser.DecodeHeader: Integer;
 begin
   FCurrentHeader := FBuffer.ToRAWString;
@@ -217,7 +226,9 @@ begin
     3:      // 解码Boundary
       begin
         if pvByte = 10 then
-        begin                    
+        begin
+          SetLength(FBoundaryBytes, FBuffer.Length - 2);
+          Move(FBuffer.Memory^, FBoundaryBytes[0],FBuffer.Length - 2);
           FBoundary := FBuffer.ToRAWString;
           FBuffer.Clear;
           Inc(FDecodeState);
@@ -229,7 +240,7 @@ begin
           Exit;
         end;
       end;
-    4:    // 开始解码头部
+    4:    // 开始解码单个头部
       begin
         if pvByte = 13 then Inc(FDecodeState);
       end;
@@ -261,6 +272,9 @@ begin
           begin
             FBuffer.Clear;
             Result := 1;
+            FBoundaryMatchIndex := 0;
+            // 下一步解码数据
+            Inc(FDecodeState);
             Exit;
           end else
           begin
@@ -269,6 +283,46 @@ begin
             FDecodeState := 0;
             Exit;
           end;
+        end else
+        begin
+          Result := -1;
+          FBuffer.Clear;
+          FDecodeState := 0;
+          Exit;
+        end;
+      end;
+    8:
+      begin  //开始解码数据
+        if pvByte = FBoundaryBytes[FBoundaryMatchIndex] then
+        begin
+          Inc(FBoundaryMatchIndex);
+          if FBoundaryMatchIndex = Length(FBoundaryBytes) then
+          begin
+            Inc(FDecodeState);
+          end;
+        end else
+        begin
+          FBoundaryMatchIndex := 0;
+        end;
+      end;
+    9:
+      begin
+        if pvByte = 13 then Inc(FDecodeState) else
+        begin
+          Result := -1;
+          FBuffer.Clear;
+          FDecodeState := 0;
+          Exit;
+        end;
+      end;
+    10:
+      begin
+        if pvByte = 10 then
+        begin  // 解码到一个数据
+          Result := 2;
+          FDecodeState := 4;
+          FBuffer.Clear;
+          Exit;
         end else
         begin
           Result := -1;
