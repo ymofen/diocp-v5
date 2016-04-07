@@ -685,6 +685,9 @@ function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
 var
   lvSB:TDStringBuilder;
 begin
+  Result := '';
+  if v = nil then Exit;
+  
   lvSB := TDStringBuilder.Create;
   try
     JSONEncodeEx(v, lvSB, 0, ADoEscape, ADoFormat, pvExceptValueTypes);
