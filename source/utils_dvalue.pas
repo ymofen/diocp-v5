@@ -315,6 +315,12 @@ type
 
     function Add(pvName:String): TDValue; overload;
 
+
+    /// <summary>
+    ///   直接绑定, 拥有该对象的生命周期
+    /// </summary>
+    procedure AttachDValue(pvName: String; pvDValue: TDValue);
+
     /// <summary>
     ///   根据名称移除掉一个子对象
     /// </summary>
@@ -1432,6 +1438,14 @@ begin
   Result := TDValue.Create(vntValue);
   Result.FParent := Self;
   FChildren.Add(Result);
+end;
+
+procedure TDValue.AttachDValue(pvName: String; pvDValue: TDValue);
+begin
+  CheckSetNodeType(vntObject);
+  pvDValue.FParent := Self;
+  pvDValue.FName.AsString := pvName;
+  FChildren.Add(pvDValue);    
 end;
 
 procedure TDValue.BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction

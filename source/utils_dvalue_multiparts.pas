@@ -13,22 +13,35 @@ type
     FBoundary: RAWString;
     FDecodeState:Integer;
     FData:TDValue;
+    FCurrentHeaders:TDValue;
     FBuffer: TDBufferBuilder;
-    FCurrentHeader: RAWString;
+    FCurrentFieldName: String;
+    FCurrentRAWHeader: RAWString;
 
+    function ParseContentDisposition: Integer;
     function DecodeHeader: Integer;
     function DecodeContent: Integer;
+    procedure DecodeHeaderLine(pvLine:string);
 
   public
     constructor Create;
     destructor Destroy; override;
     procedure SetDValue(pvData:TDValue);
 
+    /// <summary>
+    ///   0: 需要更多数据
+    ///   1: 解码到头
+    ///   2：解码到Content
+    ///   9: 解码完整
+    /// </summary>
     function InputBuffer(pvByte:Byte): Integer;
 
     property Boundary: RAWString read FBoundary;
+    property CurrentFieldName: String read FCurrentFieldName write
+        FCurrentFieldName;
 
-    property CurrentHeader: RAWString read FCurrentHeader;
+    property CurrentRAWHeader: RAWString read FCurrentRAWHeader;
+    
 
 
   end;
@@ -146,6 +159,7 @@ var
   lvByte:Byte;
   r: Integer;
 begin
+  Result := 0;
   lvParser := TMultiPartsParser.Create;
   try
     lvParser.SetDValue(v);
@@ -154,11 +168,10 @@ begin
       r :=lvParser.InputBuffer(lvByte);
       if r = 1 then
       begin
-        ShowMessage(lvParser.CurrentHeader);
+        ;
       end else if r = 2 then
       begin
-        Result := r;
-        exit;
+        Inc(Result);
       end;
     end;
   finally
@@ -191,18 +204,131 @@ begin
 end;
 
 function TMultiPartsParser.DecodeContent: Integer;
+var
+  lvRAW:TMemoryStream;
+  l:Integer;
 begin
-  
+  lvRAW := FCurrentHeaders.ForceByName('__raw').AsStream;
+  lvRAW.Clear;
+  l := FBuffer.Length - Length(FBoundaryBytes) - 2;
+  FCurrentHeaders.ForceByName('__raw-size').AsInteger := l;
+  lvRAW.SetSize(l);
+  Move(FBuffer.Memory^, lvRAW.Memory^, l);
   Result := 1;
 end;
 
 function TMultiPartsParser.DecodeHeader: Integer;
+var
+  lvPtr:PChar;
+  lvLine:String;
 begin
-  FCurrentHeader := FBuffer.ToRAWString;
-  Result := 1;
+  FCurrentRAWHeader := FBuffer.ToRAWString;
+  lvPtr := PChar(FCurrentRAWHeader);
+
+  FCurrentHeaders := TDValue.Create;
+  try
+    Result := -1;
+    FCurrentFieldName := '';
+    while True do
+    begin
+      SkipChars(lvPtr,  [#13, #10, ' ', #9]);
+      if LeftUntil(lvPtr, [#13, #10], lvLine) = 0 then
+      begin
+        DecodeHeaderLine(lvLine);
+      end else
+      begin
+        break;
+      end;
+    end;
+
+    if ParseContentDisposition = 1 then
+    begin
+      Result := 1;
+      FData.AttachDValue(FCurrentFieldName, FCurrentHeaders);
+    end;
+  finally
+    if Result = -1 then
+    begin
+      FCurrentHeaders.Free;
+      FCurrentHeaders := nil;
+    end;
+  end;
+end;
+
+procedure TMultiPartsParser.DecodeHeaderLine(pvLine:string);
+var
+  lvPtr:PChar;
+  lvKey:string;
+  r:Integer;
+begin
+  lvPtr := PChar(pvLine);
+
+  r := LeftUntil(lvPtr, [':'], lvKey);
+  if r = -1 then Exit;
+
+  lvKey := LowerCase(Trim(lvKey));
+
+  SkipChars(lvPtr, [':', ' ', #9]);
+
+  FCurrentHeaders.ForceByName(lvKey).AsString := lvPtr;
+end;
+
+function TMultiPartsParser.ParseContentDisposition: Integer;
+var
+  lvPtr:PChar;
+  lvValue, lvTempID, lvTempValue, lvFieldName:String;
+begin
+  Result := -1;
+  lvFieldName := '';
+  // Content-Disposition: form-data; name="fileID"
+  // Content-Disposition: form-data; name="data"; filename="DValueTester.exe"
+  lvValue := FCurrentHeaders.GetValueByName('Content-Disposition', '');
+  if lvValue = '' then Exit;
+  lvPtr := PChar(lvValue);
+  SkipUntil(lvPtr, [';']);
+  SkipChars(lvPtr, [' ', #9, ';']);  // skip form-data
+
+  while true do
+  begin
+    lvTempID := LeftUntil(lvPtr, ['=']);
+    if lvTempID = '' then Break;
+    SkipChars(lvPtr, ['=', ' ', '"']);
+
+
+    if (LeftUntil(lvPtr, ['"', ';'], lvTempValue) = 0) then
+    begin
+      if LowerCase(lvTempID) = 'name' then
+        lvFieldName := lvTempValue;
+
+      FCurrentHeaders.ForceByName(lvTempID).AsString := lvTempValue;
+    end else
+    begin
+      if LowerCase(lvTempID) = 'name' then
+        lvFieldName := lvPtr;
+      FCurrentHeaders.ForceByName(lvTempID).AsString := lvPtr;
+      Break;
+    end;
+    SkipChars(lvPtr, ['"', ';', ' ', #9]);
+  end;
+  if lvFieldName <> '' then
+  begin
+    FCurrentFieldName := lvFieldName;
+    Result := 1;
+  end;
+
 end;
 
 function TMultiPartsParser.InputBuffer(pvByte:Byte): Integer;
+function CheckHead():Integer;
+begin
+  if FBuffer.Length > 4096 then
+  begin
+    Result := -1;
+  end else
+  begin
+    Result := 0;
+  end;
+end;
 begin
   Result := 0;
   FBuffer.Append(pvByte);
@@ -240,7 +366,7 @@ begin
           Exit;
         end;
       end;
-    4:    // 开始解码单个头部
+    4:    // 开始解码单个data头部(双#13#10
       begin
         if pvByte = 13 then Inc(FDecodeState);
       end;
@@ -248,20 +374,30 @@ begin
       begin
         if pvByte = 10 then Inc(FDecodeState) else
         begin
-          Result := -1;
-          FBuffer.Clear;
-          FDecodeState := 0;
-          Exit;
+          if CheckHead = -1 then
+          begin
+            Result := -1;
+            FBuffer.Clear;
+            FDecodeState := 0;
+            FBoundaryMatchIndex := 0;
+            Exit;
+          end;
+          FDecodeState := 4;
         end;
       end;
     6:
       begin
         if pvByte = 13 then Inc(FDecodeState) else
         begin
-          Result := -1;
-          FBuffer.Clear;
-          FDecodeState := 0;
-          Exit;
+          if CheckHead = -1 then
+          begin
+            Result := -1;
+            FBuffer.Clear;
+            FDecodeState := 0;
+            FBoundaryMatchIndex := 0;
+            Exit;
+          end;
+          FDecodeState := 4;
         end;
       end;
     7:
@@ -285,14 +421,19 @@ begin
           end;
         end else
         begin
-          Result := -1;
-          FBuffer.Clear;
-          FDecodeState := 0;
-          Exit;
+          if CheckHead = -1 then
+          begin
+            Result := -1;
+            FBuffer.Clear;
+            FDecodeState := 0;
+            FBoundaryMatchIndex := 0;
+            Exit;
+          end;
+          FDecodeState := 4;
         end;
       end;
-    8:
-      begin  //开始解码数据
+    8:       //开始解码数据
+      begin
         if pvByte = FBoundaryBytes[FBoundaryMatchIndex] then
         begin
           Inc(FBoundaryMatchIndex);
@@ -307,11 +448,14 @@ begin
       end;
     9:
       begin
-        if pvByte = 13 then Inc(FDecodeState) else
+        if pvByte = 13 then Inc(FDecodeState)
+        else if pvByte = Ord('-') then FDecodeState := 12  //解码完成
+        else
         begin
           Result := -1;
           FBuffer.Clear;
           FDecodeState := 0;
+          FBoundaryMatchIndex := 0;
           Exit;
         end;
       end;
@@ -319,10 +463,20 @@ begin
       begin
         if pvByte = 10 then
         begin  // 解码到一个数据
-          Result := 2;
-          FDecodeState := 4;
-          FBuffer.Clear;
-          Exit;
+          if DecodeContent = 1 then
+          begin
+            Result := 2;
+            FDecodeState := 4;
+            FBoundaryMatchIndex := 0;
+            FBuffer.Clear;
+            Exit;
+          end else
+          begin
+            Result := -1;
+            FBuffer.Clear;
+            FDecodeState := 0;
+            Exit;
+          end;
         end else
         begin
           Result := -1;
@@ -330,6 +484,31 @@ begin
           FDecodeState := 0;
           Exit;
         end;
+      end;
+    12:
+      begin
+        if pvByte = Ord('-') then
+        begin           // 完整解码
+          if DecodeContent = 1 then
+          begin
+            Result := 9;
+            FBuffer.Clear;
+            FDecodeState := 0;
+            exit;
+          end else
+          begin
+            Result := -1;
+            FBuffer.Clear;
+            FDecodeState := 0;
+            Exit;
+          end;
+        end else
+        begin
+          Result := 0;
+          FDecodeState := 8;  // 继续解码数据
+          FBoundaryMatchIndex := 0;
+          Exit;
+        end;        
       end;
   end;
 end;
