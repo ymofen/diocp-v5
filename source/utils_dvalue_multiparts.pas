@@ -59,10 +59,27 @@ procedure MultiPartsEncode(v: TDValue; pvBuilder: TDBufferBuilder; pvBoundary:
 /// <param name="pvStream"> (TStream) </param>
 function MultiPartsParseFromStream(v: TDValue; pvStream: TStream): Integer;
 
+function MultiPartsParseFromBuffer(v: TDValue; pvBuff: Pointer; pvOffset,
+    pvBuffLen: Integer): Integer;
+
 function MultiPartsParseFromFile(v:TDValue; pvFile:String): Integer;
 
+procedure AddFieldValue(v: TDValue; pvFieldID:string; pvValue:String);
+    
 procedure AddFilePart(v: TDValue; pvFieldID:string; pvFileName:String;
     pvContentType:string = 'application/x-msdownload');
+
+function SavePartValueToFile(v:TDValue; pvFieldID:string; pvFileName:String):
+    Boolean;
+
+function ExtractPartFileName(v: TDValue; pvFieldID: string; pvDefault: string =
+    ''): string;
+
+function ExtractValueAsRAWString(v: TDValue; pvFieldID: string; pvDefault:
+    string = ''): String;
+
+function ExtractValueAsUtf8String(v: TDValue; pvFieldID: string; pvDefault:
+    string = ''): String;
 
 
 
@@ -78,7 +95,7 @@ procedure MultiPartsEncode(v: TDValue; pvBuilder: TDBufferBuilder; pvBoundary:
     string; pvIgnoreValueTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 var
   i, j:Integer;
-  lvItem, lvName, lvValue, lvChildItem:TDValue;
+  lvItem, lvName, lvValue, lvFileNameItem, lvChildItem:TDValue;
   lvBoundary, lvTempStr, lvNameStr:RAWString;
   lvFmt:RAWString;
 begin
@@ -94,42 +111,52 @@ begin
     if lvItem.Count = 0 then
     begin
       pvBuilder.AppendRawStr('--').AppendRawStr(lvBoundary).AppendBreakLineBytes;
-      pvBuilder.AppendRawStr('Content-Disposition: form-data; name="').AppendRawStr(lvItem.Name.AsString).AppendRawStr('"').AppendBreakLineBytes;
+      pvBuilder.AppendRawStr('Content-Disposition: form-data; name="').AppendUtf8(lvItem.Name.AsString).AppendRawStr('"').AppendBreakLineBytes;
       pvBuilder.AppendBreakLineBytes;
-      pvBuilder.AppendRawStr(lvItem.AsString).AppendBreakLineBytes;
+      pvBuilder.AppendUtf8(lvItem.AsString).AppendBreakLineBytes;
     end else
     begin
       lvName := lvItem.FindByName('name');
       lvValue := lvItem.FindByName('value');
       if (lvName <> nil) and (lvValue <> nil) then
       begin
-        pvBuilder.AppendRawStr('--').AppendRawStr(lvBoundary).AppendBreakLineBytes;
-        pvBuilder.AppendRawStr('Content-Disposition: form-data; name="').AppendRawStr(lvName.AsString).AppendRawStr('"');
-        pvBuilder.AppendRawStr('; filename="').AppendRawStr(lvItem.GetValueByName('fileName', '')).Append(Byte(Ord('"')));
-        pvBuilder.AppendBreakLineBytes;
-        for j := 0 to lvItem.Count - 1 do
+        lvFileNameItem := lvItem.FindByName('fileName');
+        if lvFileNameItem <> nil then
         begin
-          lvChildItem := lvItem.Items[j];
-          lvNameStr := LowerCase(Trim(lvChildItem.Name.AsString));
-          if (lvNameStr <> 'name') and (lvNameStr <> 'value') and (lvNameStr <> 'filename') then
+          pvBuilder.AppendRawStr('--').AppendRawStr(lvBoundary).AppendBreakLineBytes;
+          pvBuilder.AppendRawStr('Content-Disposition: form-data; name="').AppendUtf8(lvName.AsString).AppendRawStr('"');
+          pvBuilder.AppendRawStr('; filename="').AppendUtf8(lvFileNameItem.AsString).Append(Byte(Ord('"')));
+          pvBuilder.AppendBreakLineBytes;
+          for j := 0 to lvItem.Count - 1 do
           begin
-            pvBuilder.AppendRawStr(lvNameStr).Append(Byte(Ord(':'))).AppendRawStr(lvChildItem.AsString).AppendBreakLineBytes;          
+            lvChildItem := lvItem.Items[j];
+            lvNameStr := LowerCase(Trim(lvChildItem.Name.AsString));
+            if (lvNameStr <> 'name') and (lvNameStr <> 'value') and (lvNameStr <> 'filename') then
+            begin
+              pvBuilder.AppendRawStr(lvNameStr).Append(Byte(Ord(':'))).AppendRawStr(lvChildItem.AsString).AppendBreakLineBytes;          
+            end;
           end;
-        end;
-        pvBuilder.AppendBreakLineBytes;
-        if lvValue.Value.DataType in [vdtObject] then
-        begin
-          if (lvValue.AsObject is TStream) then
+          pvBuilder.AppendBreakLineBytes;
+          if lvValue.Value.DataType in [vdtObject] then
           begin
-            TStream(lvValue.AsObject).Position := 0;
-            pvBuilder.LoadFromStream(TStream(lvValue.AsObject), TStream(lvValue.AsObject).Size);
+            if (lvValue.AsObject is TStream) then
+            begin
+              TStream(lvValue.AsObject).Position := 0;
+              pvBuilder.LoadFromStream(TStream(lvValue.AsObject), TStream(lvValue.AsObject).Size);
+            end;
+          end else if lvValue.Value.DataType = vdtStream then
+          begin
+            lvValue.AsStream.Position := 0;
+            pvBuilder.LoadFromStream(lvValue.AsStream, lvValue.AsStream.Size);
           end;
-        end else if lvValue.Value.DataType = vdtStream then
-        begin
-          lvValue.AsStream.Position := 0;
-          pvBuilder.LoadFromStream(lvValue.AsStream, lvValue.AsStream.Size);
+          pvBuilder.AppendBreakLineBytes;
+        end else
+        begin   // 普通字段
+          pvBuilder.AppendRawStr('--').AppendRawStr(lvBoundary).AppendBreakLineBytes;
+          pvBuilder.AppendRawStr('Content-Disposition: form-data; name="').AppendUtf8(lvName.AsString).AppendRawStr('"').AppendBreakLineBytes;
+          pvBuilder.AppendBreakLineBytes;
+          pvBuilder.AppendUtf8(lvValue.AsString).AppendBreakLineBytes;
         end;
-        pvBuilder.AppendBreakLineBytes;
       end;
     end;
   end;
@@ -154,25 +181,45 @@ begin
 end;
 
 function MultiPartsParseFromStream(v: TDValue; pvStream: TStream): Integer;
+const
+  READ_SIZE = 4096;
 var
   lvParser:TMultiPartsParser;
-  lvByte:Byte;
-  r: Integer;
+  lvBuff:array [ 0.. READ_SIZE - 1] of Byte;
+  r, l, i, c, lvPrePos: Integer;
 begin
   Result := 0;
   lvParser := TMultiPartsParser.Create;
   try
     lvParser.SetDValue(v);
-    while (pvStream.Read(lvByte, 1) = 1) do
-    begin
-      r :=lvParser.InputBuffer(lvByte);
-      if r = 1 then
+
+    lvPrePos:= pvStream.Position;
+    c := 0;
+    try
+      while True do
       begin
-        ;
-      end else if r = 2 then
-      begin
-        Inc(Result);
+        l := pvStream.Read(lvBuff[0], READ_SIZE);
+        if l = 0 then Break;
+        for i := 0 to l - 1 do
+        begin
+          r :=lvParser.InputBuffer(lvBuff[i]);
+          Inc(c);
+          if r = 1 then
+          begin
+            ;
+          end else if r = 2 then
+          begin
+            Inc(Result);
+          end else if r = 9 then
+          begin
+            Inc(Result);
+            // 完整
+            exit;
+          end;
+        end;         
       end;
+    finally
+      pvStream.Position := lvPrePos + c;
     end;
   finally
     lvParser.Free;
@@ -189,6 +236,107 @@ begin
   finally
     lvFileStream.Free;
   end;
+end;
+
+function MultiPartsParseFromBuffer(v: TDValue; pvBuff: Pointer; pvOffset,
+    pvBuffLen: Integer): Integer;
+var
+  lvParser:TMultiPartsParser;
+  lvPtr:PByte;
+  r, j: Integer;
+begin
+  Result := 0;
+  j := 0;
+  lvPtr := PByte(pvBuff);
+  Inc(lvPtr, pvOffset);
+  lvParser := TMultiPartsParser.Create;
+  try
+    lvParser.SetDValue(v);
+    while j < pvBuffLen do
+    begin
+      r :=lvParser.InputBuffer(lvPtr^);
+      Inc(lvPtr);
+      Inc(j);
+      if r = 1 then
+      begin
+        ;
+      end else if r = 2 then
+      begin
+        Inc(Result);
+      end else if r = 9 then
+      begin
+        Inc(Result);
+        // 完整
+        exit;
+      end;
+    end;
+  finally
+    lvParser.Free;
+  end;
+end;
+
+function SavePartValueToFile(v:TDValue; pvFieldID:string; pvFileName:String):
+    Boolean;
+var
+  lvItem:TDValue;
+begin
+  Result := False;
+  lvItem := v.FindByName(pvFieldID);
+  if lvItem = nil then Exit;
+  lvItem := lvItem.FindByName('__raw');
+  if lvItem = nil then Exit;
+  lvItem.AsStream.SaveToFile(pvFileName);
+  Result := True;
+end;
+
+function ExtractValueAsRAWString(v: TDValue; pvFieldID: string; pvDefault:
+    string = ''): String;
+var
+  lvItem:TDValue;
+begin
+  Result := pvDefault;
+  lvItem := v.FindByName(pvFieldID);
+  if lvItem = nil then Exit;
+  lvItem := lvItem.FindByName('__raw');
+  if lvItem = nil then Exit;
+
+  Result := ByteBufferToString(PByte(lvItem.AsStream.Memory), lvItem.AsStream.Size);
+end;
+
+function ExtractValueAsUtf8String(v: TDValue; pvFieldID: string; pvDefault:
+    string = ''): String;
+var
+  lvItem:TDValue;
+begin
+  Result := pvDefault;
+  lvItem := v.FindByName(pvFieldID);
+  if lvItem = nil then Exit;
+  lvItem := lvItem.FindByName('__raw');
+  if lvItem = nil then Exit;
+
+  Result := Utf8BufferToString(PByte(lvItem.AsStream.Memory), lvItem.AsStream.Size);
+end;
+
+function ExtractPartFileName(v: TDValue; pvFieldID: string; pvDefault: string =
+    ''): string;
+var
+  lvItem:TDValue;
+begin
+  Result := pvDefault;
+  lvItem := v.FindByName(pvFieldID);
+  if lvItem = nil then Exit;
+  lvItem := lvItem.FindByName('fileName');
+  if lvItem = nil then Exit;
+  Result :=UTF8Decode(lvItem.AsString);
+end;
+
+procedure AddFieldValue(v: TDValue; pvFieldID:string; pvValue:String);
+var
+  lvItem:TDValue;
+begin
+  lvItem := v.ForceByName(pvFieldID);
+  lvItem.ForceByName('name').AsString := pvFieldID;
+  lvItem.ForceByName('value').AsString := pvValue; 
 end;
 
 constructor TMultiPartsParser.Create;

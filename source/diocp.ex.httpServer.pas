@@ -134,19 +134,6 @@ type
 
 
     FKeepAlive: Boolean;
-    FRequestAccept: String;
-    FRequestReferer: String;
-    FRequestAcceptLanguage: string;
-    FRequestAcceptEncoding: string;
-    FRequestUserAgent: string;
-    FRequestAuth: string;
-
-    FRequestHostName: string;
-    FRequestHostPort: string;
-
-
-
-    FXForwardedFor: string;
 
 
     FResponse: TDiocpHttpResponse;
@@ -170,7 +157,10 @@ type
     function GetContentDataLength: Integer;
     function GetHeaderAsMemory: PByte;
     function GetHeaderDataLength: Integer;
+    function GetRequestAccept: String;
+    function GetRequestAcceptEncoding: string;
     function GetRequestCookies: string;
+    function GetRequestHost: string;
     function GetRequestMethod: string;
     function GetRequestParamsList: TDValue;
     function GetRequestRawHeaderString: string;
@@ -233,6 +223,8 @@ type
     /// </summary>
     function GetCookie(pvCookieName:string):String;
 
+    procedure ContentSaveToFile(pvFile:String);
+
     property ContextType: String read GetContextType;
 
     property ContextLength: Int64 read GetContextLength;
@@ -244,8 +236,11 @@ type
     property Connection: TDiocpHttpClientContext read FDiocpContext;
     property ContentAsMemory: PByte read GetContentAsMemory;
     property ContentAsString: String read GetDataAsRawString;
+    /// <summary>
+    ///   请求数据(ConentAsMemory)长度应该与Content-Length一致
+    /// </summary>
+    property ContentDataLength: Integer read GetContentDataLength;
 
-    
 
     /// <summary>
     ///   请求头
@@ -253,15 +248,14 @@ type
     property Header: TDValue read GetHeader;
 
     property HttpVersion: Word read GetHttpVersion;
-    property ContentDataLength: Integer read GetContentDataLength;
+
     property HeaderAsMemory: PByte read GetHeaderAsMemory;
     property HeaderDataLength: Integer read GetHeaderDataLength;
 
 
 
-    property RequestAccept: String read FRequestAccept;
-    property RequestAcceptEncoding: string read FRequestAcceptEncoding;
-    property RequestAcceptLanguage: string read FRequestAcceptLanguage;
+    property RequestAccept: String read GetRequestAccept;
+    property RequestAcceptEncoding: string read GetRequestAcceptEncoding;
     property RequestCookies: string read GetRequestCookies;
 
 
@@ -290,12 +284,7 @@ type
     /// <summary>
     ///   从头信息中读取的请求服务器IP地址
     /// </summary>
-    property RequestHostName: string read FRequestHostName;
-
-    /// <summary>
-    ///   从头信息中读取的请求服务器端口
-    /// </summary>
-    property RequestHostPort: string read FRequestHostPort;
+    property RequestHost: string read GetRequestHost;
 
     /// <summary>
     /// Http响应对象，回写数据
@@ -304,8 +293,6 @@ type
 
 
     property RequestRawHeaderString: string read GetRequestRawHeaderString;
-
-    property RequestReferer: String read FRequestReferer;
 
     /// <summary>
     ///  原始请求中的URL参数数据(没有经过URLDecode，因为在DecodeRequestHeader中要拼接RequestURL时临时进行了URLDecode)
@@ -354,6 +341,12 @@ type
     /// 1: http请求参数的值
     /// </returns>
     function GetRequestParam(ParamsKey: string): string;
+
+
+    /// <summary>
+    ///   获取响应的数据长度(不包含头信息)
+    /// </summary>
+    function GetResponseLength: Integer;
 
 
   end;
@@ -676,6 +669,11 @@ begin
   end;
 end;
 
+procedure TDiocpHttpRequest.ContentSaveToFile(pvFile:String);
+begin
+  FInnerRequest.ContentSaveToFile(pvFile);
+end;
+
 procedure TDiocpHttpRequest.DecodePostDataParam({$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 begin
   {$IFDEF UNICODE}
@@ -742,9 +740,24 @@ begin
   Result := FInnerRequest.HeaderDataLength;
 end;
 
+function TDiocpHttpRequest.GetRequestAccept: String;
+begin
+  Result := FInnerRequest.Headers.GetValueByName('Accept', '');
+end;
+
+function TDiocpHttpRequest.GetRequestAcceptEncoding: string;
+begin
+  Result := FInnerRequest.Headers.GetValueByName('Accept-Encoding', '');
+end;
+
 function TDiocpHttpRequest.GetRequestCookies: string;
 begin  
   Result := FInnerRequest.RawCookie;
+end;
+
+function TDiocpHttpRequest.GetRequestHost: string;
+begin
+  Result := FInnerRequest.Headers.GetValueByName('Host', '');
 end;
 
 function TDiocpHttpRequest.GetRequestMethod: string;
@@ -780,6 +793,11 @@ end;
 function TDiocpHttpRequest.GetRequestURLParamData: string;
 begin
   Result := FInnerRequest.RequestRawURLParamStr;
+end;
+
+function TDiocpHttpRequest.GetResponseLength: Integer;
+begin
+  Result := FResponse.FInnerResponse.ContentBuffer.Length;
 end;
 
 procedure TDiocpHttpRequest.RemoveSession;

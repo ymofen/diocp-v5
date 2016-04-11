@@ -152,6 +152,8 @@ type
 
     procedure SaveToFile(pvFile:String);
 
+    procedure SaveToStream(pvStream:TStream);
+
     /// <summary>
     ///   Ð´ÈëÊý¾Ý
     /// </summary>
@@ -1661,6 +1663,11 @@ begin
     lvFileStream.Free;
   end;
   ;
+end;
+
+procedure TDBufferBuilder.SaveToStream(pvStream:TStream);
+begin
+  pvStream.WriteBuffer(self.Memory^, self.Length);
 end;
 
 function TDBufferBuilder.ToBytes: TBytes;

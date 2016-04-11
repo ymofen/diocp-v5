@@ -432,7 +432,15 @@ begin
     if FResponseContentEncoding = 'zlib' then
     begin
       ZDecompressBufferBuilder(FReponseBuilder);
-    end;
+    end
+    {$IFDEF MSWINDOWS}
+    else if FResponseContentEncoding = 'gzip' then
+    begin
+      GZDecompressBufferBuilder(FReponseBuilder);
+    end
+    {$ENDIF}
+    ;
+
     l:= FReponseBuilder.Length;
 
 

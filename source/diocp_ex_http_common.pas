@@ -2,7 +2,9 @@ unit diocp_ex_http_common;
 
 interface
 
+{$IFDEF MSWINDOWS}
 {$DEFINE USE_ZLIBExGZ}
+{$ENDIF}
 
 {$if CompilerVersion>= 23}
 {$DEFINE USE_NetEncoding}
@@ -151,11 +153,14 @@ type
     /// <param name="pvByte"> (Byte) </param>
     function InputBuffer(pvByte:Byte): Integer;
 
+    procedure ContentSaveToFile(pvFile:String);
+
     /// <summary>
     ///   方法为POST, PUT时，保存的为提交的数据
     /// </summary>
     property ContentAsMemory: PByte read GetContentAsMemory;
     property ContentAsRAWString: RAWString read GetContentAsRAWString;
+    
     /// <summary>
     ///   数据长度
     /// </summary>
@@ -773,6 +778,11 @@ begin
     FRequestRawCookie := FHeaders.GetValueByName('Cookie', '');
     SplitStrings(FRequestRawCookie, FRequestCookieList, [';']);
   end;
+end;
+
+procedure THttpRequest.ContentSaveToFile(pvFile:String);
+begin
+  FContentBuilder.SaveToFile(pvFile);
 end;
 
 function THttpRequest.DecodeHeader: Integer;
