@@ -65,8 +65,10 @@ type
   /// </summary>
   TIocpRequest = class(TObject)
   private
-
     FData: Pointer;
+
+    FWorkerThreadID:THandle;
+
     /// io request response info
     FIocpWorker: TIocpWorker;
 
@@ -113,6 +115,11 @@ type
     procedure CancelRequest; virtual;
 
   public
+    /// <summary>
+    ///   设置线程内部信息, 请在线程内部执行
+    /// </summary>
+    procedure SetWorkHintInfo(pvHint:String);
+
     constructor Create;
 
     property IocpWorker: TIocpWorker read FIocpWorker;
@@ -289,12 +296,22 @@ type
     FData: Pointer;
 
     FLastRequest:TIocpRequest;
+
+    FHintInfo: string;
+
+    /// <summary>
+    ///  设置线程当前信息(由线程内部调用执行)
+    /// </summary>
+    procedure SetHintInfo(pvHint:String);
+
   public
     constructor Create(AIocpCore: TIocpCore);
     
     procedure Execute; override;
 
-    procedure WriteStateINfo(const pvStrings: TStrings);
+    procedure WriteStateInfo(const pvStrings: TStrings);
+
+
 
     procedure SetFlag(pvFlag:Integer);{$IFDEF INLINE} inline; {$ENDIF}
 
@@ -692,6 +709,7 @@ begin
             lvTempRequest.FRespondStartTickCount := GetTickCount;
             lvTempRequest.FRespondEndTime := 0;
             lvTempRequest.FiocpWorker := Self;
+            lvTempRequest.FWorkerThreadID := self.ThreadID; 
             lvTempRequest.FErrorCode := lvErrCode;
             lvTempRequest.FBytesTransferred := lvBytesTransferred;
             lvTempRequest.FCompletionKey := lpCompletionKey;
@@ -706,8 +724,7 @@ begin
             lvTempRequest.FResponding := false;
           except
             on E:Exception do
-            begin
-              
+            begin              
               FIocpCore.HandleException(lvTempRequest, E);
             end;
           end;
@@ -771,11 +788,20 @@ begin
   FFlags := FFlags or pvFlag;
 end;
 
-procedure TIocpWorker.WriteStateINfo(const pvStrings: TStrings);
+procedure TIocpWorker.SetHintInfo(pvHint:String);
+begin
+  FHintInfo := pvHint;
+end;
+
+procedure TIocpWorker.WriteStateInfo(const pvStrings: TStrings);
 var
   s:String;
 begin
   pvStrings.Add(Format(strDebug_Worker_INfo, [self.ThreadID, FResponseCounter]));
+  if FHintInfo <> '' then
+  begin
+    pvStrings.Add('last hint:' + self.FHintInfo);
+  end;
   if CheckFlag(WORKER_OVER) then
   begin
     pvStrings.Add('work done!!!');
@@ -945,10 +971,12 @@ var
   lvStrings :TStrings;
   i, j:Integer;
   lvWorker:TIocpWorker;
+  lvTickcount:Cardinal;
 begin
   lvStrings := TStringList.Create;
   try
     j := 0;
+    lvTickcount := GetTickCount;
     lvStrings.Add(Format(strDebugINfo, [BoolToStr(self.FActive, True), self.WorkerCount]));
     self.FWorkerLocker.lock;
     try
@@ -958,8 +986,9 @@ begin
 
         if lvWorker.CheckFlag(WORKER_ISBUSY) then
         begin
-          if tick_diff(lvWorker.FLastRequest.FRespondStartTickCount, GetTickCount) > pvTimeOut then
+          if tick_diff(lvWorker.FLastRequest.FRespondStartTickCount, lvTickcount) > pvTimeOut then
           begin
+            lvStrings.Add(Format('t_s:%d, t_now:%d', [lvWorker.FLastRequest.FRespondStartTickCount, lvTickcount]));
             lvStrings.Add(Format(strDebug_WorkerTitle, [i + 1]));
             lvWorker.WriteStateINfo(lvStrings);
             inc(j);
@@ -1362,11 +1391,13 @@ begin
   Result :=Format('%s %s', [Self.ClassName, FRemark]);
   if FResponding then
   begin
-    Result :=Result + sLineBreak + Format('start:%s', [FormatDateTime('MM-dd hh:nn:ss.zzz', FRespondStartTime)]);
+    Result :=Result + sLineBreak + Format('start:%s',
+       [FormatDateTime('MM-dd hh:nn:ss.zzz', FRespondStartTime)]);
   end else
   begin
     Result :=Result + sLineBreak + Format('start:%s, end:%s',
-      [FormatDateTime('MM-dd hh:nn:ss.zzz', FRespondStartTime),FormatDateTime('MM-dd hh:nn:ss.zzz', FRespondEndTime)]);
+      [FormatDateTime('MM-dd hh:nn:ss.zzz', FRespondStartTime),
+        FormatDateTime('MM-dd hh:nn:ss.zzz', FRespondEndTime)]);
   end;
 end;
 
@@ -1378,6 +1409,15 @@ end;
 procedure TIocpRequest.ResponseDone;
 begin
   
+end;
+
+procedure TIocpRequest.SetWorkHintInfo(pvHint:String);
+begin
+  if FIocpWorker <> nil then
+  begin
+    Assert((GetCurrentThreadID() = FWorkerThreadID), '只能在本线线程中执行设置WorkHint信息');
+    FIocpWorker.SetHintInfo(pvHint);
+  end;
 end;
 
 destructor TIocpASyncRequest.Destroy;

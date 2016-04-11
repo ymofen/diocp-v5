@@ -318,6 +318,7 @@ type
     /// </summary>
     function LockContext(pvDebugInfo: string; pvObj: TObject): Boolean;
 
+
     procedure UnLockContext(pvDebugInfo: string; pvObj: TObject);
 
     /// <summary>
@@ -353,13 +354,18 @@ type
         TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
         overload;
 
+    /// <summary>
+    ///   设置当前的接收线程信息
+    /// </summary>
+    procedure SetRecvWorkerHint(pvHintStr: String); overload;
+    procedure SetRecvWorkerHint(pvFmtMsg: string; const args: array of const);
+        overload;
 
     property Active: Boolean read FActive;
 
     property Data: Pointer read FData write FData;
 
     property DebugInfo: string read GetDebugInfo write SetDebugInfo;
-
 
 
     /// <summary>
@@ -1871,6 +1877,12 @@ begin
   end;
 end;
 
+procedure TIocpClientContext.SetRecvWorkerHint(pvFmtMsg: string; const args:
+    array of const);
+begin
+  SetRecvWorkerHint(Format(pvFmtMsg, args));
+end;
+
 procedure TIocpClientContext.PostWSACloseRequest;
 begin
   PostWSASendRequest(nil, 0, dtNone, -1);
@@ -1966,6 +1978,12 @@ begin
   {$IFDEF SOCKET_REUSE}
   FDisconnectExRequest.FOwner := FOwner;
   {$ENDIF}
+end;
+
+procedure TIocpClientContext.SetRecvWorkerHint(pvHintStr: String);
+begin
+  if FRecvRequest <> nil then
+    FRecvRequest.SetWorkHintInfo(pvHintStr);
 end;
 
 procedure TIocpClientContext.SetSocketState(pvState:TSocketState);
