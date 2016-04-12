@@ -210,8 +210,15 @@ type
     ///   解码URL中的参数，放到参数列表中
     ///   在OnDiocpHttpRequest中调用
     /// </summary>
-    procedure DecodeURLParam(
-      {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+    procedure DecodeURLParam(pvUseUtf8Decode:Boolean); overload;
+
+    {$IFDEF UNICODE}
+    /// <summary>
+    ///   解码URL中的参数，放到参数列表中
+    ///   在OnDiocpHttpRequest中调用
+    /// </summary>
+    procedure DecodeURLParam(pvEncoding:TEncoding); overload;
+    {$ENDIF}
 
     /// <summary>
     ///   清理
@@ -683,15 +690,16 @@ begin
   {$ENDIF}
 end;
 
-
-procedure TDiocpHttpRequest.DecodeURLParam(
-  {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+{$IFDEF UNICODE}
+procedure TDiocpHttpRequest.DecodeURLParam(pvEncoding:TEncoding);
 begin
-  {$IFDEF UNICODE}
   FInnerRequest.DecodeURLParam(pvEncoding);
-  {$ELSE}
+end;
+{$ENDIF}
+
+procedure TDiocpHttpRequest.DecodeURLParam(pvUseUtf8Decode:Boolean);
+begin
   FInnerRequest.DecodeURLParam(pvUseUtf8Decode);
-  {$ENDIF}
 end;
 
 function TDiocpHttpRequest.GetContextLength: Int64;

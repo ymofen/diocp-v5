@@ -129,12 +129,17 @@ type
     /// </summary>
     procedure DecodeContentAsFormUrlencoded({$IFDEF UNICODE} pvEncoding:TEncoding
         {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+
+
     /// <summary>
     ///   解码URL中的参数，放到参数列表中
     ///   在OnDiocpHttpRequest中调用
     /// </summary>
-    procedure DecodeURLParam({$IFDEF UNICODE} pvEncoding:TEncoding
-        {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+    procedure DecodeURLParam(pvUseUtf8Decode:Boolean); overload;
+
+    {$IFDEF UNICODE}
+    procedure DecodeURLParam(pvEncoding:TEncoding); overload;
+    {$ENDIF}
 
     procedure DoCleanUp;
     /// <summary>
@@ -1003,8 +1008,7 @@ begin
   end;
 end;
 
-procedure THttpRequest.DecodeURLParam({$IFDEF UNICODE} pvEncoding:TEncoding
-    {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
+procedure THttpRequest.DecodeURLParam(pvUseUtf8Decode:Boolean);
 var
   lvRawData : String;
   s, lvName:String;
@@ -1028,11 +1032,9 @@ begin
       lvRawData := lvStrings.ValueFromIndex[i];
       if lvRawData<> '' then
       begin
-        {$IFDEF UNICODE}
-        s := URLDecode(lvRawData, pvEncoding);
-        {$ELSE}
+
+        // 重载函数不同部分
         s := URLDecode(lvRawData, pvUseUtf8Decode);
-        {$ENDIF}
 
         lvName := lvStrings.Names[i];
         FURLParams.ForceByName(lvName).AsString := s;
@@ -1045,6 +1047,43 @@ begin
   end;
 
 end;
+
+{$IFDEF UNICODE}
+procedure THttpRequest.DecodeURLParam(pvEncoding:TEncoding);
+var
+  lvRawData : String;
+  s, lvName:String;
+  i:Integer;
+  lvStrings:TStrings;
+begin
+  // 解析URL参数
+  if FRequestRawURLParamStr = '' then exit;
+
+  lvStrings := TStringList.Create;
+  try
+    lvStrings.Delimiter := '&';
+    lvStrings.DelimitedText := FRequestRawURLParamStr;
+
+    for i := 0 to lvStrings.Count - 1 do
+    begin
+      lvRawData := lvStrings.ValueFromIndex[i];
+      if lvRawData<> '' then
+      begin
+
+        // 只有这部分不同与 DecodeURLParam(pvUseUtf8Decode:Boolean)
+        s := URLDecode(lvRawData, pvEncoding);
+
+        lvName := lvStrings.Names[i];
+        FURLParams.ForceByName(lvName).AsString := s;
+        FRequestParams.ForceByName(lvName).AsString := s;
+      end;
+    end;
+   // FRequestParamsList.AddStrings(lvStrings);
+  finally
+    lvStrings.Free;
+  end;
+end;
+{$ENDIF}
 
 procedure THttpRequest.DoCleanUp;
 begin
