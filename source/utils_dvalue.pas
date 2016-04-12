@@ -319,7 +319,10 @@ type
     function Add: TDValue; overload;
 
     function Add(pvName:String): TDValue; overload;
-
+    function Add(pvName:string; pvValue:string): TDValue; overload;
+    function Add(pvName:string; pvValue:Integer): TDValue; overload;
+    function Add(pvName:string; pvValue:Boolean): TDValue; overload;
+    function Add(pvName:string; pvValue:Double): TDValue; overload;
 
     /// <summary>
     ///   直接绑定, 拥有该对象的生命周期
@@ -1434,6 +1437,46 @@ begin
   Result := TDValue.Create(vntValue);
   Result.FParent := Self;
   Result.FName.AsString := pvName;
+  FChildren.Add(Result);
+end;
+
+function TDValue.Add(pvName:string; pvValue:string): TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(vntValue);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
+  Result.AsString := pvValue;
+  FChildren.Add(Result);
+end;
+
+function TDValue.Add(pvName:string; pvValue:Integer): TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(vntValue);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
+  Result.AsInteger := pvValue;
+  FChildren.Add(Result);
+end;
+
+function TDValue.Add(pvName:string; pvValue:Boolean): TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(vntValue);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
+  Result.AsBoolean := pvValue;
+  FChildren.Add(Result);
+end;
+
+function TDValue.Add(pvName:string; pvValue:Double): TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(vntValue);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
+  Result.AsFloat := pvValue;
   FChildren.Add(Result);
 end;
 
