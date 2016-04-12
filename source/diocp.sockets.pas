@@ -261,6 +261,12 @@ type
         TDataReleaseType): Boolean; overload;
     procedure RequestDisconnect(pvDebugInfo: string = ''; pvObj: TObject = nil);
     procedure SetMaxSendingQueueSize(pvSize:Integer);
+    /// <summary>
+    ///   设置当前的接收线程信息
+    /// </summary>
+    procedure SetRecvWorkerHint(pvHintStr: String); overload;
+    procedure SetRecvWorkerHint(pvFmtMsg: string; const args: array of const);
+        overload;
 
     /// <summary>
     ///  是否已经连接
@@ -2984,6 +2990,18 @@ end;
 procedure TDiocpCustomContext.SetMaxSendingQueueSize(pvSize:Integer);
 begin
   FSendRequestLink.setMaxSize(pvSize);
+end;
+
+procedure TDiocpCustomContext.SetRecvWorkerHint(pvHintStr: String);
+begin
+  if FRecvRequest <> nil then
+    FRecvRequest.SetWorkHintInfo(pvHintStr);
+end;
+
+procedure TDiocpCustomContext.SetRecvWorkerHint(pvFmtMsg: string; const args:
+    array of const);
+begin
+  SetRecvWorkerHint(Format(pvFmtMsg, args));
 end;
 
 initialization
