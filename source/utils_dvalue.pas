@@ -305,7 +305,12 @@ type
     ///   本身作为一个数组添加一个子节点
     ///     如果之前不是数组类型，将会被清除
     /// </summary>
-    function AddArrayChild: TDValue;
+    function AddArrayChild: TDValue; overload;
+
+    /// <summary>
+    ///  作为一个子对象添加
+    /// </summary>
+    procedure AddArrayChild(pvDValue: TDValue); overload;
 
     /// <summary>
     ///   本身作为一个vntObject添加一个子节点
@@ -1438,6 +1443,13 @@ begin
   Result := TDValue.Create(vntValue);
   Result.FParent := Self;
   FChildren.Add(Result);
+end;
+
+procedure TDValue.AddArrayChild(pvDValue: TDValue);
+begin
+  CheckSetNodeType(vntArray);
+  pvDValue.FParent := Self;
+  FChildren.Add(pvDValue);
 end;
 
 procedure TDValue.AttachDValue(pvName: String; pvDValue: TDValue);
