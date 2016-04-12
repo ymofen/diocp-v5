@@ -235,7 +235,7 @@ type
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
     property ContentAsMemory: PByte read GetContentAsMemory;
-    property ContentAsString: String read GetDataAsRawString;
+    property ContentAsString: RAWString read GetDataAsRawString;
     /// <summary>
     ///   请求数据(ConentAsMemory)长度应该与Content-Length一致
     /// </summary>
