@@ -81,12 +81,14 @@ function ExtractValueAsRAWString(v: TDValue; pvFieldID: string; pvDefault:
 function ExtractValueAsUtf8String(v: TDValue; pvFieldID: string; pvDefault:
     string = ''): String;
 
+function CreateUniqueBoundary: RAWString;
+
 
 
 
 implementation
 
-function GenerateUniqueBoundary: RAWString;
+function CreateUniqueBoundary: RAWString;
 begin
   Result := 'dvalue' + FormatDateTime('mmddyyhhnnsszzz', Now);
 end;
@@ -102,7 +104,7 @@ begin
   lvBoundary := pvBoundary;
   if lvBoundary = '' then
   begin
-     lvBoundary := GenerateUniqueBoundary;
+     lvBoundary := CreateUniqueBoundary;
   end;
 
   for i := 0 to v.Count - 1 do
