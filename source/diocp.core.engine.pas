@@ -293,11 +293,18 @@ type
     FIocpCore: TIocpCore;
 
     FCoInitialized:Boolean;
+
     FData: Pointer;
 
     FLastRequest:TIocpRequest;
 
     FHintInfo: string;
+
+    FLastResponseClassStr: String;
+
+    FLastResponseStart:TDateTime;
+
+    FLastResponseEnd: TDateTime;
 
     /// <summary>
     ///  设置线程当前信息(由线程内部调用执行)
@@ -309,9 +316,7 @@ type
     
     procedure Execute; override;
 
-    procedure WriteStateInfo(const pvStrings: TStrings);
-
-
+    procedure WriteStateInfo(const pvStrings: TStrings);  
 
     procedure SetFlag(pvFlag:Integer);{$IFDEF INLINE} inline; {$ENDIF}
 
@@ -389,6 +394,16 @@ type
     ///   get worker handle response
     /// </summary>
     function GetWorkerStateInfo(pvTimeOut: Cardinal = 3000): string;
+
+    /// <summary>
+    ///  获取工作线程信息
+    /// </summary>
+    function GetWorkersInfo: String;
+
+    /// <summary>
+    ///  获取工作线程信息
+    /// </summary>
+    function GetWorkersHtmlInfo(pvTableID: String = ''): String;
 
     /// <summary>
     ///   get thread call stack
@@ -485,6 +500,9 @@ function IsDebugMode: Boolean;
 procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
+function TraceDateString(pvDate:TDateTime): String;
+
+
 implementation
 
 {$IFDEF DEBUG_ON}
@@ -500,6 +518,13 @@ resourcestring
   strDebug_Request_Title     = '请求状态信息:';
   
   strDebug_RequestState      = '完成: %s, 耗时(ms): %d';
+
+function TraceDateString(pvDate:TDateTime): String;
+begin
+  if pvDate > 0 then Result := FormatDateTime('yy-MM-dd hh:nn:ss.zzz', pvDate)
+  else Result := '';
+
+end;
 
 procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
 var
@@ -694,7 +719,7 @@ begin
         end;
 
         Inc(FResponseCounter);
-
+        FLastResponseStart := Now();
         lvTempRequest := lpOverlapped.iocpRequest;
         FLastRequest := lvTempRequest;
         try
@@ -702,7 +727,9 @@ begin
           begin
             Assert(FLastRequest<>NIL);
           end;
-          /// reply io request, invoke handleRepsone to do ....
+
+          FLastResponseClassStr := lvTempRequest.ClassName;
+
           try
             lvTempRequest.FResponding := true;
             lvTempRequest.FRespondStartTime := Now();
@@ -729,6 +756,7 @@ begin
             end;
           end;
         finally
+          FLastResponseEnd := Now();
           try
             if Assigned(lvTempRequest.OnResponseDone) then
             begin
@@ -743,8 +771,7 @@ begin
               FIocpCore.HandleException(lvTempRequest, E);
             end;
           end;
-        end;
-
+        end; 
       end else
       begin
         /// exit
@@ -772,7 +799,7 @@ begin
 {$ENDIF}
 
   try
-    FIocpEngine.decAliveWorker(Self);
+    FIocpEngine.DecAliveWorker(Self);
   except
     //Assert(False, ('diocp.core.engine name:' + FIocpEngine.Name));
   end;
@@ -917,6 +944,96 @@ begin
   try
     WriteStateINfo(lvStrings);
     Result := lvStrings.Text;
+  finally
+    lvStrings.Free;
+  end;
+end;
+
+function TIocpEngine.GetWorkersHtmlInfo(pvTableID: String = ''): String;
+var
+  lvStrings :TStrings;
+  i, j:Integer;
+  s:String;
+  lvWorker:TIocpWorker;
+  lvTickcount:Cardinal;
+begin
+  lvStrings := TStringList.Create;
+  try
+    lvStrings.Add('<table id = ' + pvTableID + '>');
+    lvStrings.Add('<tr>');
+    lvStrings.Add('<td>id</td>');
+    lvStrings.Add('<td>busy</td>');
+    lvStrings.Add('<td>reserved</td>');
+    lvStrings.Add('<td>counter</td>');
+    lvStrings.Add('<td>last_request</td>');
+    lvStrings.Add('<td>last_start</td>');
+    lvStrings.Add('<td>last_end</td>');
+    lvStrings.Add('<td>hint</td>');
+    lvStrings.Add('</tr>');
+    j := 0;
+    lvTickcount := GetTickCount;
+    self.FWorkerLocker.lock;
+    try
+      for i := 0 to FWorkerList.Count - 1 do
+      begin
+        lvWorker := TIocpWorker(FWorkerList[i]);
+        s := Format('<tr><td>%d</td><td>%d</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>hint:%s</td></tr>',
+            [lvWorker.ThreadID,
+             Ord(lvWorker.CheckFlag(WORKER_ISBUSY)),
+             Ord(lvWorker.CheckFlag(WORKER_RESERVED)),
+             lvWorker.FResponseCounter,
+             lvWorker.FLastResponseClassStr,
+             TraceDateString(lvWorker.FLastResponseStart),
+             TraceDateString(lvWorker.FLastResponseEnd),
+             lvWorker.FHintInfo
+            ]
+             );
+        lvStrings.Add(s);
+      end;
+    finally
+      lvStrings.Add('</table>');
+      self.FWorkerLocker.Leave;
+    end;
+    Result := lvStrings.Text; 
+  finally
+    lvStrings.Free;
+  end;
+end;
+
+function TIocpEngine.GetWorkersInfo: String;
+var
+  lvStrings :TStrings;
+  i, j:Integer;
+  s:String;
+  lvWorker:TIocpWorker;
+  lvTickcount:Cardinal;
+begin
+  lvStrings := TStringList.Create;
+  try
+    j := 0;
+    lvTickcount := GetTickCount;
+    self.FWorkerLocker.lock;
+    try
+      for i := 0 to FWorkerList.Count - 1 do
+      begin
+        lvWorker := TIocpWorker(FWorkerList[i]);
+        s := Format('id: %d, busy: %d, reserved:%d, counter:%d, last_request:%s, last_start:%s, last_end:%s, hint:%s',
+            [lvWorker.ThreadID,
+             Ord(lvWorker.CheckFlag(WORKER_ISBUSY)),
+             Ord(lvWorker.CheckFlag(WORKER_RESERVED)),
+             lvWorker.FResponseCounter,
+             lvWorker.FLastResponseClassStr,
+             TraceDateString(lvWorker.FLastResponseStart),
+             TraceDateString(lvWorker.FLastResponseEnd),
+             lvWorker.FHintInfo
+            ]
+             );
+        lvStrings.Add(s);
+      end;
+    finally
+      self.FWorkerLocker.Leave;
+    end;
+    Result := lvStrings.Text; 
   finally
     lvStrings.Free;
   end;

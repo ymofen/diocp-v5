@@ -37,9 +37,12 @@ const
 
 type
   TSafeLogger = class;
+  TLogDataObject = class;
   TSyncMainThreadType = (rtSync{$IFDEF MSWINDOWS}, rtPostMessage {$ENDIF});
 
   TThreadStackFunc = function(AThread:TThread):string;
+
+  TLogProc = procedure(pvLogData:TLogDataObject) of object;
 
   TLogDataObject = class(TObject)
   public
@@ -48,6 +51,7 @@ type
     FLogLevel:TLogLevel;
     FMsg:string;
     FMsgType:string;
+    FLogProc:TLogProc;
   end;
 
   TBaseAppender = class(TObject)
@@ -55,6 +59,11 @@ type
     FOwner:TSafeLogger;
   protected
     procedure AppendLog(pvData:TLogDataObject); virtual; abstract;
+
+    /// <summary>
+    ///   完成一次工作
+    /// </summary>
+    procedure NotifyOnceEnd(pvCounter:Integer); virtual;
   end;
 
   TConsoleAppender = class(TBaseAppender)
@@ -158,7 +167,7 @@ type
     function WorkersIsAlive(const pvWorker: TLogWorker): Boolean;
 
     procedure CheckForWorker;
-    procedure stopWorker(pvTimeOut: Cardinal);
+    procedure StopWorker(pvTimeOut: Cardinal);
   private
 
     FLogFilter: TLogLevels;
@@ -399,7 +408,7 @@ destructor TSafeLogger.Destroy;
 begin
   FEnable := false;
   
-  stopWorker(30000);
+  StopWorker(30000);
 
   ClearLogData;
 
@@ -661,7 +670,7 @@ begin
   //nothing to do ...
 end;
 
-procedure TSafeLogger.stopWorker(pvTimeOut: Cardinal);
+procedure TSafeLogger.StopWorker(pvTimeOut: Cardinal);
 var
   l:Cardinal;
   lvWrite:Boolean;
@@ -739,6 +748,7 @@ procedure TLogWorker.Execute;
 var
   lvPData:TLogDataObject;
   lvWaitResult:TWaitResult;
+  i:Integer;
 begin
   FSafeLogger.incWorkerCount;
   try
@@ -748,25 +758,37 @@ begin
       lvWaitResult := FNotify.WaitFor(1000 * 30);
       if (lvWaitResult=wrSignaled) then
       begin
-        FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor(), succ';
-        while not self.Terminated do
-        begin
-          lvPData :=TLogDataObject(FSafeLogger.FDataQueue.DeQueueObject);
-          if lvPData = nil then Break;
-
+        try
           try
-            FSafeLogger.FDebugData := lvPData;
-            ExecuteLogData(lvPData);
-          except
-            on E:Exception do
+            i := 0;
+            FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor(), succ';
+            while not self.Terminated do
             begin
+              lvPData :=TLogDataObject(FSafeLogger.FDataQueue.DeQueueObject);
+              if lvPData = nil then Break;
+              try
+                FSafeLogger.FDebugData := lvPData;
+                ExecuteLogData(lvPData);
+                inc(i);
+              except
+                on E:Exception do
+                begin
+                  SafeWriteFileMsg(Format(STRING_ERR_LOGERR, [e.Message]), 'sfLogger_err_');
+                  FSafeLogger.IncErrorCounter;
+                end;
+              end;
+              /// push back to logData pool
+              __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+            end;
+          finally
+            FSafeLogger.Appender.NotifyOnceEnd(i);
+          end;
+        except
+          on E:Exception do
+          begin
               SafeWriteFileMsg(Format(STRING_ERR_LOGERR, [e.Message]), 'sfLogger_err_');
               FSafeLogger.IncErrorCounter;
-            end;
           end;
-          
-          /// push back to logData pool
-          __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
         end;
       end else if lvWaitResult = wrTimeout then
       begin
@@ -978,6 +1000,13 @@ begin
         , pvData.FMsg
       ]
       ));
+end;
+
+{ TBaseAppender }
+
+procedure TBaseAppender.NotifyOnceEnd(pvCounter: Integer);
+begin
+  
 end;
 
 initialization
