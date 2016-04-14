@@ -32,10 +32,12 @@ type
     FOnAsyncEvent: TOnASyncEvent;
     FTerminated: Boolean;
     FStopEvent:TEvent;
+    FWaitEvent: TEvent;
     procedure InnerASync(pvWorker:TASyncWorker);
   public
     constructor Create;
     destructor Destroy; override;
+    procedure WaitForSleep(pvTime:Cardinal);
 
     procedure Start(pvASyncEvent: TOnASyncEvent);
     procedure Terminate;
@@ -117,11 +119,13 @@ constructor TASyncInvoker.Create;
 begin
   inherited Create;
   FStopEvent := TEvent.Create(nil, True, True, '');
+  FWaitEvent := TEvent.Create(nil, True, true, '');
 end;
 
 destructor TASyncInvoker.Destroy;
 begin
   FStopEvent.Free;
+  FWaitEvent.Free;
   inherited;
 end;
 
@@ -142,6 +146,13 @@ end;
 procedure TASyncInvoker.Terminate;
 begin
   FTerminated := True;
+  FWaitEvent.SetEvent;
+end;
+
+procedure TASyncInvoker.WaitForSleep(pvTime:Cardinal);
+begin
+  FWaitEvent.ResetEvent;
+  FWaitEvent.WaitFor(pvTime);
 end;
 
 procedure TASyncInvoker.WaitForStop;
