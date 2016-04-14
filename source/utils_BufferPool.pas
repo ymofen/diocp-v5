@@ -8,7 +8,7 @@ unit utils_BufferPool;
 
 interface
 
-{$DEFINE USE_SPINLOCK}
+{.$DEFINE USE_SPINLOCK}
 
 uses
   SyncObjs, SysUtils
