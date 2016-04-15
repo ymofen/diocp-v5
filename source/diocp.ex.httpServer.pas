@@ -151,6 +151,7 @@ type
     function GetContextLength: Int64;
     function GetContextType: String;
     function GetContentAsMemory: PByte;
+    function GetContentBody: TDBufferBuilder;
     function GetDataAsRawString: RAWString;
     function GetHeader: TDValue;
     function GetHttpVersion: Word;
@@ -243,10 +244,14 @@ type
     property Connection: TDiocpHttpClientContext read FDiocpContext;
     property ContentAsMemory: PByte read GetContentAsMemory;
     property ContentAsString: RAWString read GetDataAsRawString;
+
+    property ContentBody: TDBufferBuilder read GetContentBody;
     /// <summary>
     ///   请求数据(ConentAsMemory)长度应该与Content-Length一致
     /// </summary>
     property ContentDataLength: Integer read GetContentDataLength;
+
+    
 
 
     /// <summary>
@@ -365,6 +370,7 @@ type
     
     FInnerResponse:THttpResponse;
     procedure ClearAllCookieObjects;
+    function GetContentBody: TDBufferBuilder;
     function GetContentType: String;
     function GetHeader: TDValue;
     function GetHttpCodeStr: String;
@@ -390,10 +396,18 @@ type
 
     function EncodeResponseHeader(pvContentLength: Integer): string;
 
+    
+
     /// <summary>
     ///   与客户端建立的连接
     /// </summary>
     property Connection: TDiocpHttpClientContext read FDiocpContext;
+
+
+    /// <summary>
+    ///   不建议直接使用
+    /// </summary>
+    property ContentBody: TDBufferBuilder read GetContentBody;
 
     property ContentType: String read GetContentType write SetContentType;
 
@@ -715,6 +729,11 @@ end;
 function TDiocpHttpRequest.GetContentAsMemory: PByte;
 begin
   Result := FInnerRequest.ContentAsMemory;
+end;
+
+function TDiocpHttpRequest.GetContentBody: TDBufferBuilder;
+begin
+  Result := FInnerRequest.ContentBody;
 end;
 
 function TDiocpHttpRequest.GetDataAsRawString: RAWString;
@@ -1063,6 +1082,11 @@ begin
   FInnerResponse.DeflateCompressContent
 end;
 
+function TDiocpHttpResponse.GetContentBody: TDBufferBuilder;
+begin
+  Result := FInnerResponse.ContentBuffer;
+end;
+
 procedure TDiocpHttpResponse.LoadFromFile(pvFile:string);
 begin
   FInnerResponse.ContentBuffer.LoadFromFile(pvFile);
@@ -1071,7 +1095,7 @@ end;
 function TDiocpHttpResponse.LoadFromStream(pvStream: TStream; pvSize: Integer):
     Integer;
 begin
-  Result := FInnerResponse.ContentBuffer.LoadFromStream(pvStream, pvSize);
+  Result := FInnerResponse.ContentBuffer.CopyFrom(pvStream, pvSize);
 end;
 
 procedure TDiocpHttpResponse.ZLibContent;

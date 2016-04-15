@@ -471,7 +471,7 @@ type
     /// <summary>
     ///   post send
     /// </summary>
-    function ExecuteSend: Boolean; virtual;
+    function ExecuteSend: Integer; virtual;
   protected
     /// <summary>
     ///   iocp reply request, run in iocp thread
@@ -1329,6 +1329,7 @@ end;
 procedure TIocpClientContext.CheckNextSendRequest;
 var
   lvRequest:TIocpSendRequest;
+  r:Integer;
 begin
   Assert(FOwner <> nil);
 
@@ -1347,7 +1348,8 @@ begin
   if lvRequest <> nil then
   begin   
     FcurrSendRequest := lvRequest;
-    if lvRequest.ExecuteSend then
+    r := lvRequest.ExecuteSend;
+    if r = 0 then
     begin
       if (FOwner.FDataMoniter <> nil) then
       begin
@@ -1360,10 +1362,15 @@ begin
       /// 取消请求
       lvRequest.CancelRequest;
 
-      /// 踢出连接
-      RequestDisconnect(Format(strFuncFail,
-        [self.SocketHandle,'CheckNextSendRequest::lvRequest.ExecuteSend', lvRequest.FLastMsg]), lvRequest);
-
+      if r = -2 then
+      begin
+        RequestDisconnect(strWSACloseRequestEx, lvRequest);
+      end else
+      begin
+       /// 踢出连接
+        RequestDisconnect(Format(strFuncFail,
+          [self.SocketHandle,'CheckNextSendRequest::lvRequest.ExecuteSend', lvRequest.FLastMsg]), lvRequest);
+      end;
       FOwner.ReleaseSendRequest(lvRequest);
     end;
   end;
@@ -3529,19 +3536,25 @@ begin
   Result := PostRequest(FInnerBuffer.buf, FInnerBuffer.len);
 end;
 
-function TIocpSendRequest.ExecuteSend: Boolean;
+function TIocpSendRequest.ExecuteSend: Integer;
 begin
   if Tag = -1 then
   begin
     FLastMsg := strWSACloseRequest;
-    Result := False;
+    Result := -2;
   end else if (FBuf = nil) or (FLen = 0) then
   begin
     FLastMsg := strWSACloseRequest;
-    Result := False;
+    Result := -2;
   end else
   begin
-    Result := InnerPostRequest(FBuf, FLen);
+    if InnerPostRequest(FBuf, FLen) then
+    begin
+      Result := 0;
+    end else
+    begin
+      Result := -1;
+    end;
   end;
 
 end;

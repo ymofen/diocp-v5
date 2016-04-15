@@ -34,7 +34,7 @@ uses
   ;
 
 const
-  STRING_BLOCK_SIZE = $2000;  // Must be a power of 2 
+  BUFFER_BLOCK_SIZE = $2000;  // Must be a power of 2 
 
 type
 {$IFDEF MSWINDOWS}
@@ -84,7 +84,7 @@ type
     FMaxCapacity: Integer;
     FCapacity :Integer;
     FLineBreak: String;
-    procedure CheckNeedSize(pvSize:Integer);
+    procedure CheckNeedSize(pvSize: LongInt);
     function GetLength: Integer;
   public
     constructor Create;
@@ -108,22 +108,21 @@ type
     ///   换行符: 默认#13#10
     /// </summary>
     property LineBreak: String read FLineBreak write FLineBreak;
-
-
-
   end;
 
 
-  TDBufferBuilder = class(TObject)
+  TDBufferBuilder = class(TStream)
   private
     FData: TBytes;
-    FReadPosition: Integer;
-    FWritePosition: Integer;
+    FPosition: Integer;
+    FSize: Integer;
     FMaxCapacity: Integer;
     FCapacity :Integer;
     FBufferLocked:Boolean;
     FLineBreak: String;
-    procedure CheckNeedSize(pvSize:Integer);
+    
+    procedure CheckNeedSize(pvSize: LongInt); overload;
+    procedure CheckNeedSize(pvOffset, pvSize: LongInt); overload;
     function GetLength: Integer;
     function GetRemain: Integer;
   public
@@ -148,7 +147,8 @@ type
 
     function LoadFromFile(pvFileName:string): Integer;
 
-    function LoadFromStream(pvStream:TStream; pvSize:Integer): Integer;
+    procedure LoadFromStream(pvStream: TStream); overload;
+    procedure LoadFromStream(pvStream: TStream; pvCount:LongInt); overload;
 
     procedure SaveToFile(pvFile:String);
 
@@ -193,10 +193,16 @@ type
     /// </summary>
     function Memory: PByte;
 
+    function Read(var Buffer; Count: Longint): Longint; override;
+    function Seek(Offset: Longint; Origin: Word): Longint; override;
+    function Write(const Buffer; Count: Longint): Longint; override;
+    procedure SetSize(NewSize: Longint); override;
+
     /// <summary>
     ///   重新排列可用数据
     /// </summary>
     function ReArrange: TDBufferBuilder;
+
 
     /// <summary>
     ///   所有数据长度
@@ -1327,13 +1333,13 @@ begin
   Result := Append('''').Append(str).Append('''');
 end;
 
-procedure TDStringBuilder.CheckNeedSize(pvSize:Integer);
+procedure TDStringBuilder.CheckNeedSize(pvSize: LongInt);
 var
-  lvCapacity:Integer;
+  lvCapacity:LongInt;
 begin
   if FPosition + pvSize > FCapacity then
   begin
-    lvCapacity := (FPosition + pvSize + (STRING_BLOCK_SIZE - 1)) AND (not (STRING_BLOCK_SIZE - 1));
+    lvCapacity := (FPosition + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);     
   end;
@@ -1373,14 +1379,14 @@ begin
 {$IFDEF UNICODE}
   Result := AppendBuffer(@c, SizeOf(c));
 //  CheckNeedSize(2);
-//  Move(c, FData[FWritePosition], 2);
-//  Inc(FWritePosition, 2);
+//  Move(c, FData[FSize], 2);
+//  Inc(FSize, 2);
 //  Result := Self;
 {$ELSE}
   Result := AppendBuffer(@c, SizeOf(c));
 //  CheckNeedSize(1);
-//  FData[FWritePosition] := c;
-//  Inc(FWritePosition);
+//  FData[FSize] := c;
+//  Inc(FSize);
 //  Result := Self;
 {$ENDIF}
 
@@ -1452,9 +1458,9 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(2);
-  FData[FWritePosition] := 13;
-  FData[FWritePosition +1 ] := 10;
-  Inc(FWritePosition, 2);
+  FData[FSize] := 13;
+  FData[FSize +1 ] := 10;
+  Inc(FSize, 2);
   Result := Self;
 end;
 
@@ -1466,8 +1472,8 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(pvLength);
-  Move(pvBuffer^, FData[FWritePosition], pvLength);
-  Inc(FWritePosition, pvLength);
+  Move(pvBuffer^, FData[FSize], pvLength);
+  Inc(FSize, pvLength);
   Result := Self;
 end;
 
@@ -1511,13 +1517,25 @@ begin
   AppendBuffer(PByte(@lvBytes[0]), System.Length(lvBytes));
 end;
 
-procedure TDBufferBuilder.CheckNeedSize(pvSize:Integer);
+procedure TDBufferBuilder.CheckNeedSize(pvSize: LongInt);
 var
-  lvCapacity:Integer;
+  lvCapacity:LongInt;
 begin
-  if FWritePosition + pvSize > FCapacity then
+  if FSize + pvSize > FCapacity then
   begin
-    lvCapacity := (FWritePosition + pvSize + (STRING_BLOCK_SIZE - 1)) AND (not (STRING_BLOCK_SIZE - 1));
+    lvCapacity := (FSize + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    FCapacity := lvCapacity;
+    SetLength(FData, FCapacity);
+  end;
+end;
+
+procedure TDBufferBuilder.CheckNeedSize(pvOffset, pvSize: LongInt);
+var
+  lvCapacity:LongInt;
+begin
+  if pvOffset + pvSize > FCapacity then
+  begin
+    lvCapacity := (pvOffset + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);
   end;
@@ -1525,8 +1543,8 @@ end;
 
 procedure TDBufferBuilder.Clear;
 begin
-  FWritePosition := 0;
-  FReadPosition := 0;
+  FSize := 0;
+  FPosition := 0;
   {$IFDEF DEBUG}
   ZeroMemory(@FData[0], FCapacity);
   {$ENDIF}
@@ -1534,67 +1552,62 @@ end;
 
 function TDBufferBuilder.ReArrange: TDBufferBuilder;
 var
-  lvOffset:Integer;
+  lvOffset:LongInt;
 begin
-  lvOffset := FReadPosition;
-  Move(FData[FReadPosition], FData[0], Remain);
+  lvOffset := FPosition;
+  Move(FData[FPosition], FData[0], Remain);
   Result := Self;
-  Dec(FWritePosition, lvOffset);
-  FReadPosition := 0;
+  Dec(FSize, lvOffset);
+  FPosition := 0;
 end;
 
 function TDBufferBuilder.GetLength: Integer;
 begin
-  Result := FWritePosition;
+  Result := FSize;
 end;
 
 function TDBufferBuilder.GetLockBuffer(pvLength:Integer): PByte;
 begin
   CheckNeedSize(pvLength);
-  Result := @FData[FWritePosition];
+  Result := @FData[FSize];
   FBufferLocked := True;
 end;
 
 function TDBufferBuilder.GetRemain: Integer;
 begin
-  Result := FWritePosition - FReadPosition;
+  Result := FSize - FPosition;
 end;
 
 function TDBufferBuilder.LoadFromFile(pvFileName:string): Integer;
 var
-  lvFileStream:TFileStream;
-  lvBuffer:PByte;
+  Stream: TStream;
 begin
-  if FileExists(pvFileName) then
-  begin
-    lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
-    try
-      lvBuffer := Self.GetLockBuffer(lvFileStream.Size);
-      try
-        lvFileStream.Position := 0;
-        lvFileStream.ReadBuffer(lvBuffer^, lvFileStream.Size);
-      finally
-        self.ReleaseLockBuffer(lvFileStream.Size);
-      end;
-    finally
-      lvFileStream.Free;
-    end;
-  end;
-  
+  Stream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    LoadFromStream(Stream);
+  finally
+    Stream.Free;
+  end;  
 end;
 
-function TDBufferBuilder.LoadFromStream(pvStream:TStream; pvSize:Integer):
-    Integer;
+procedure TDBufferBuilder.LoadFromStream(pvStream: TStream);
 var
-  lvBuffer:PByte;
+  Count: Longint;
 begin
-  Result := 0;
-  lvBuffer := Self.GetLockBuffer(pvSize);
-  try
-    Result := pvStream.Read(lvBuffer^, pvSize);
-  finally
-    self.ReleaseLockBuffer(Result);
-  end;  
+  pvStream.Position := 0;
+  Count := pvStream.Size;
+  SetSize(Count);
+  if Count <> 0 then pvStream.ReadBuffer(FData[0], Count); 
+end;
+
+procedure TDBufferBuilder.LoadFromStream(pvStream: TStream; pvCount:LongInt);
+var
+  lvOldPosition:Integer;
+begin
+  lvOldPosition := FPosition;
+  Seek(0, soBeginning);
+  CopyFrom(pvStream, pvCount);
+  FPosition := lvOldPosition;
 end;
 
 function TDBufferBuilder.Memory: PByte;
@@ -1607,12 +1620,35 @@ var
   l:Integer;
 begin
   Result := 0;
-  l := FWritePosition - FReadPosition;
+  l := FSize - FPosition;
   if l = 0 then Exit;
 
   if l > pvLength then l := pvLength;
-  Move(FData[FReadPosition], pvBuffer^, l);
+  Move(FData[FPosition], pvBuffer^, l);
   Result := l;
+end;
+
+function TDBufferBuilder.Read(var Buffer; Count: Longint): Longint;
+begin
+  Result := 0;
+  Result := FSize - FPosition;
+  if Result = 0 then Exit;
+
+  if Result > Count then Result := Count;
+  Move(FData[FPosition], Buffer, Result);
+  Inc(FPosition, Result);
+//  if (FPosition >= 0) and (Count >= 0) then
+//  begin
+//    Result := FSize - FPosition;
+//    if Result > 0 then
+//    begin
+//      if Result > Count then Result := Count;
+//      Move(Pointer(Longint(@FData[0]) + FPosition)^, Buffer, Result);
+//      Inc(FPosition, Result);
+//      Exit;
+//    end;
+//  end;
+//  Result := 0;
 end;
 
 function TDBufferBuilder.ReadBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
@@ -1620,12 +1656,12 @@ var
   l:Integer;
 begin
   Result := 0;
-  l := FWritePosition - FReadPosition;
+  l := FSize - FPosition;
   if l = 0 then Exit;
 
   if l > pvLength then l := pvLength;
-  Move(FData[FReadPosition], pvBuffer^, l);
-  Inc(FReadPosition, l);
+  Move(FData[FPosition], pvBuffer^, l);
+  Inc(FPosition, l);
   Result := l;
 end;
 
@@ -1634,40 +1670,57 @@ begin
   Result := False;
   if Remain = 0 then Exit;
 
-  vByte :=  FData[FReadPosition];
-  Inc(FReadPosition);
+  vByte :=  FData[FPosition];
+  Inc(FPosition);
   Result := True;
 end;
 
 function TDBufferBuilder.ReleaseLockBuffer(pvLength:Integer): TDBufferBuilder;
 begin
-  Inc(FWritePosition, pvLength);
+  Inc(FSize, pvLength);
   Result := Self;
   FBufferLocked := False;
 end;
 
 procedure TDBufferBuilder.SaveToFile(pvFile:String);
 var
-  lvFileStream:TFileStream;
+  Stream: TStream;
 begin
-  if FileExists(pvFile) then
-  begin
-    lvFileStream := TFileStream.Create(pvFile, fmOpenWrite);
-  end else
-  begin
-    lvFileStream := TFileStream.Create(pvFile, fmCreate);
-  end;                                                   
+  Stream := TFileStream.Create(pvFile, fmCreate);
   try
-    lvFileStream.WriteBuffer(self.Memory^, self.Length);
+    SaveToStream(Stream);
   finally
-    lvFileStream.Free;
+    Stream.Free;
   end;
-  ;
 end;
 
 procedure TDBufferBuilder.SaveToStream(pvStream:TStream);
 begin
-  pvStream.WriteBuffer(self.Memory^, self.Length);
+  if FSize <> 0 then pvStream.WriteBuffer(Memory^, FSize);
+end;
+
+function TDBufferBuilder.Seek(Offset: Longint; Origin: Word): Longint;
+begin
+  case Origin of
+    soFromBeginning: FPosition := Offset;
+    soFromCurrent: Inc(FPosition, Offset);
+    soFromEnd: FPosition := FSize + Offset;
+  end;
+  if FPosition > FSize then
+  begin
+    FPosition := FSize;
+  end;
+  Result := FPosition;
+end;
+
+procedure TDBufferBuilder.SetSize(NewSize: Longint);
+var
+  OldPosition: Longint;
+begin
+  OldPosition := FPosition;
+  CheckNeedSize(0, NewSize);
+  FSize := NewSize;
+  if OldPosition > NewSize then Seek(0, soFromEnd);
 end;
 
 function TDBufferBuilder.ToBytes: TBytes;
@@ -1680,7 +1733,7 @@ function TDBufferBuilder.ToRAWString: RAWString;
 begin
 {$IFDEF MSWINDOWS}
   CheckNeedSize(1);
-  FData[FWritePosition] := 0;
+  FData[FSize] := 0;
   {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
   Result := AnsiStrings.StrPas(PAnsiChar(@FData[0]));
   {$ELSE}
@@ -1688,10 +1741,24 @@ begin
   {$IFEND >=XE5}
 {$ELSE}
   CheckNeedSize(2);
-  FData[FWritePosition] := 0;
-  FData[FWritePosition + 1] := 0; 
+  FData[FSize] := 0;
+  FData[FSize + 1] := 0; 
   Result := TEncoding.UTF8.GetString(pvBytes, 0, self.Length);
 {$ENDIF}
+end;
+
+function TDBufferBuilder.Write(const Buffer; Count: Longint): Longint;
+var
+  Pos: Longint;
+begin
+  if FBufferLocked then
+  begin
+    raise Exception.Create('Buffer Locked');
+  end;
+  CheckNeedSize(FPosition, Count);
+  Move(Buffer, FData[FPosition], Count);
+  Inc(FPosition, Count);
+  if FPosition >= FSize then FSize := FPosition;
 end;
 
 

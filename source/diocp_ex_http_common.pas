@@ -114,6 +114,7 @@ type
 
     procedure CheckCookie;
     function GetContentAsRAWString: RAWString;
+    function GetContentBody: TDBufferBuilder;
     function GetContentType: String;
     function GetHeaderAsMermory: PByte;
     function GetHeaderAsRAWString: RAWString;
@@ -164,7 +165,12 @@ type
     ///   方法为POST, PUT时，保存的为提交的数据
     /// </summary>
     property ContentAsMemory: PByte read GetContentAsMemory;
+
     property ContentAsRAWString: RAWString read GetContentAsRAWString;
+
+    property ContentBody: TDBufferBuilder read GetContentBody;
+
+
     
     /// <summary>
     ///   数据长度
@@ -294,7 +300,7 @@ procedure ZDecompressBufferBuilder(pvBuilder:TDBufferBuilder);
 
 procedure ZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
 
-
+function GetContentTypeFromFileExt(pvFileExt, pvDefault: string): String;
 
 
 {$IFDEF USE_ZLIBExGZ}
@@ -329,6 +335,8 @@ function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true): String; o
 /// </summary>
 function URLDecode(pvInputStr: string; pvEncoding:TEncoding): String; overload;
 {$ENDIF}
+
+
 
 
 
@@ -734,6 +742,27 @@ begin
   Result := I;
 end;
 
+
+function GetContentTypeFromFileExt(pvFileExt, pvDefault: string): String;
+var
+  lvExt:String;
+begin
+  lvExt := LowerCase(pvFileExt);
+  if lvExt = '.js' then
+  begin
+    Result := 'application/javascript';
+  end else if lvExt = '.css' then
+  begin
+    Result := 'text/css';
+  end else if (lvExt = '.html') or (lvExt = '.htm') then
+  begin
+    Result := 'text/html;charset=UTF-8';
+  end else
+  begin
+    Result := pvDefault;
+  end;
+end;
+
 {$IFDEF UNICODE}
 function URLDecode(pvInputStr: string; pvEncoding:TEncoding): String; overload;
 var
@@ -745,9 +774,6 @@ begin
   SetLength(lvBytes, l);
   result := pvEncoding.GetString(lvBytes);
 end;
-
-
-
 {$ENDIF}
 
 constructor THttpRequest.Create;
@@ -1142,6 +1168,11 @@ end;
 function THttpRequest.GetContentAsRAWString: RAWString;
 begin
   Result := ByteBufferToString(FContentBuilder.Memory, FContentBuilder.Length);
+end;
+
+function THttpRequest.GetContentBody: TDBufferBuilder;
+begin
+  Result := FContentBuilder;
 end;
 
 function THttpRequest.GetHeaderAsMermory: PByte;
