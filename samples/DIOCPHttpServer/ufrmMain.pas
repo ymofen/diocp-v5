@@ -15,7 +15,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   , utils.safeLogger, StrUtils,
   ComCtrls, diocp.ex.httpServer, diocp_ex_http_common, utils.byteTools,
-  utils_dvalue_json;
+  utils_dvalue_json, System.Actions;
 
 type
   TfrmMain = class(TForm)
@@ -146,11 +146,11 @@ var
 
 
     pvRequest.Response.WriteString(Format('原始URL数据:%s<br>', [pvRequest.RequestRawURL]));
-    pvRequest.Response.WriteString(Format('原始数据长度:%d<br>', [pvRequest.RawDataLength]));
+    pvRequest.Response.WriteString(Format('原始数据长度:%d<br>', [pvRequest.ContentDataLength]));
     pvRequest.Response.WriteString(Format('context-length:%d<br>', [pvRequest.ContextLength]));
 
 
-    lvRawData := pvRequest.DataAsString;
+    lvRawData := pvRequest.ContentAsString;
     pvRequest.Response.WriteString('原始数据:');
     pvRequest.Response.WriteString(lvRawData);
     pvRequest.Response.WriteString('<br>=======================================<br>');
@@ -299,7 +299,7 @@ begin
     if s = '' then
     begin
       pvRequest.Response.WriteString('重定向例子:<a href="/redirect?url=http://www.diocp.org">' +
-       Format('http://%s:%s/redirect?url=http://www.diocp.org',[pvRequest.RequestHostName, pvRequest.RequestHostPort]) + '</a>');
+       '/redirect?url=http://www.diocp.org</a>');
     end else
     begin
       pvRequest.Response.RedirectURL(s);
