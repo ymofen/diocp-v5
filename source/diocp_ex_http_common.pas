@@ -2,9 +2,12 @@ unit diocp_ex_http_common;
 
 interface
 
-{$IFDEF MSWINDOWS}
-{$DEFINE USE_ZLIBExGZ}
-{$ENDIF}
+// 小于2007的版本不使用ZlibExGZ
+{$if CompilerVersion>= 18}
+  {$IFDEF MSWINDOWS}
+    {$DEFINE USE_ZLIBExGZ}
+  {$ENDIF}
+{$ifend}
 
 {$if CompilerVersion>= 23}
 {$DEFINE USE_NetEncoding}
@@ -32,6 +35,10 @@ const
   MAX_HEADER_BUFFER_SIZE = 1024 * 10;  
 
 type
+{$if CompilerVersion < 18}
+  TBytes = utils.strings.TBytes;
+{$ifend}
+
   TDHttpCookie = class;
   THttpRequest = class(TObject)
   private
@@ -643,10 +650,10 @@ var
 begin
   if pvConvertUtf8 then
   begin
-    lvBytes := StringToUtf8Bytes(pvStr);
+    lvBytes :=TBytes(StringToUtf8Bytes(pvStr));
   end else
   begin
-    lvBytes := StringToBytes(pvStr);
+    lvBytes := TBytes(StringToBytes(pvStr));
   end;
 
   Result := BufferURLEncode(@lvBytes[0], Length(lvBytes));
@@ -654,7 +661,7 @@ end;
 
 function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true): String;
 var
-  lvBytes:TBytes;
+  lvBytes: TBytes;
   l:Integer;
 begin
   SetLength(lvBytes, Length(pvInputStr));
@@ -683,7 +690,7 @@ function BufferURLDecode(pvInputStr: string; pvOutBuffer: PByte;
     end;
   end;
 
-  function DecodeHexPair(const C1, C2: Char): Byte; inline;
+  function DecodeHexPair(const C1, C2: Char): Byte; 
   begin
     Result := DecodeHexChar(C1) shl 4 + DecodeHexChar(C2)
   end;

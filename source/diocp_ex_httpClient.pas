@@ -433,12 +433,14 @@ begin
     begin
       ZDecompressBufferBuilder(FReponseBuilder);
     end
+    {$if CompilerVersion>= 18}
     {$IFDEF MSWINDOWS}
     else if FResponseContentEncoding = 'gzip' then
     begin
       GZDecompressBufferBuilder(FReponseBuilder);
     end
     {$ENDIF}
+    {$ifend}
     ;
 
     l:= FReponseBuilder.Length;

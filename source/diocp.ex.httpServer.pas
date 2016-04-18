@@ -6,8 +6,6 @@
   *   2015-02-22 08:29:43
   *     DIOCP-V5 发布
 
-  *    Http协议处理单元
-  *    其中部分思路来自于delphi iocp framework中的iocp.HttpServer
   *
   *   2015-04-08 12:34:33
   *    (感谢 (Xjumping  990669769)/(suoler)反馈bug和提供bug重现)
