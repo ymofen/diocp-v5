@@ -194,7 +194,7 @@ type
 
     procedure Lock();
 
-    procedure unLock();
+    procedure UnLock;
 
   end;
 
@@ -821,7 +821,7 @@ begin
   FLocker.Enter;
 end;
 
-procedure TDHashTableSafe.unLock;
+procedure TDHashTableSafe.UnLock;
 begin
   FLocker.Leave;
 end;

@@ -107,6 +107,7 @@ type
     FData: Pointer;
     FOnConnectedEvent: TNotifyContextEvent;
     FOnDisconnectedEvent: TNotifyContextEvent;
+    FOnRecvBufferEvent: TOnBufferReceived;
     FOnSocketStateChanged: TNotifyEvent;
 
     /// sendRequest link
@@ -282,6 +283,10 @@ type
 
     property OnDisconnectedEvent: TNotifyContextEvent read FOnDisconnectedEvent
         write FOnDisconnectedEvent;
+
+    property OnRecvBufferEvent: TOnBufferReceived read FOnRecvBufferEvent write
+        FOnRecvBufferEvent;
+
     property Owner: TDiocpCustom read FOwner write SetOwner;
 
     property RawSocket: TRawSocket read FRawSocket;
@@ -1587,6 +1592,10 @@ end;
 procedure TDiocpCustom.DoReceiveData(pvIocpContext: TDiocpCustomContext;
     pvRequest: TIocpRecvRequest);
 begin
+  if Assigned(pvIocpContext.FOnRecvBufferEvent) then
+    pvIocpContext.FOnRecvBufferEvent(pvIocpContext,
+      pvRequest.FRecvBuffer.buf, pvRequest.FBytesTransferred,
+      pvRequest.ErrorCode);
 
 
   if Assigned(FOnReceivedBuffer) then

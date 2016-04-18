@@ -237,12 +237,16 @@ type
     destructor Destroy; override;
     function AddCookie: TDHttpCookie; overload;
     function AddCookie(pvName:String; pvValue:string): TDHttpCookie; overload;
+    
     property ContentBuffer: TDBufferBuilder read FContentBuffer;
+
     property ContentType: RAWString read GetContentType write SetContentType;
     property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
     property Headers: TDValue read FHeaders;
     property ResponseCode: Word read FResponseCode write FResponseCode;
     property ResponseCodeStr: String read FResponseCodeStr write FResponseCodeStr;
+
+
 
     /// <summary>
     ///  读取传入的Cookie值
