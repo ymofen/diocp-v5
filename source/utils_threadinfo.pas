@@ -127,14 +127,18 @@ end;
 
 procedure InitalizeForThreadInfo;
 begin
-  __info_list := TDHashTableSafe.Create();
+  if __info_list = nil then
+    __info_list := TDHashTableSafe.Create();
 end;
 
 procedure FinalizeForThreadInfo;
 begin
+  if __info_list <> nil then
+  begin
   __info_list.FreeAllDataAsObject;
   __info_list.Free;
   __info_list := nil;
+  end;
 end;
 
 procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
@@ -168,8 +172,11 @@ end;
 
 
 initialization
+  InitalizeForThreadInfo;
 
-
+finalization
+  FinalizeForThreadInfo;
+  Assert(__info_list = nil, 'utils_thread_memoery_leak');
 
 
 
