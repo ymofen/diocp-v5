@@ -3,7 +3,7 @@ unit utils_dvalue_multiparts;
 interface
 
 uses
-  utils_dvalue, utils.strings, SysUtils, Classes, Dialogs;
+  utils_dvalue, utils.strings, SysUtils, Classes;
 
 type
   TMultiPartsParser = class(TObject)
