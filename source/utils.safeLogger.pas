@@ -755,7 +755,7 @@ begin
     while not self.Terminated do
     begin
       FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor()';
-      SetCurrentThreadInfo('Safelogger.Thread.Execute::FNotify.WaitFor()');
+      SetCurrentThreadInfo(FSafeLogger.Name +  ':Safelogger.Thread.Execute::FNotify.WaitFor()');
       lvWaitResult := FNotify.WaitFor(1000 * 30);
       if (lvWaitResult=wrSignaled) then
       begin
@@ -763,16 +763,16 @@ begin
           try
             i := 0;
             FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor(), succ';
-            SetCurrentThreadInfo('Safelogger.Execute::FNotify.WaitFor(), succ');
+            SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::FNotify.WaitFor(), succ');
             while not self.Terminated do
             begin
               lvPData :=TLogDataObject(FSafeLogger.FDataQueue.DeQueueObject);
               if lvPData = nil then Break;
               try
                 FSafeLogger.FDebugData := lvPData;
-                SetCurrentThreadInfo('Safelogger.Execute::LogDataStart');
+                SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataStart');
                 ExecuteLogData(lvPData);
-                SetCurrentThreadInfo('Safelogger.Execute::LogDataEnd');
+                SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataEnd');
                 inc(i);
               except
                 on E:Exception do
@@ -800,7 +800,7 @@ begin
       end;
     end;
   finally
-    SetCurrentThreadInfo('Safelogger.Execute::End finally');
+    SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::End finally');
     FSafeLogger.decWorker(Self);
   end;
 end;
@@ -1020,6 +1020,7 @@ initialization
   __dataObjectPool := TBaseQueue.Create;
   __dataObjectPool.Name := 'safeLogger.LogDataPool';
   sfLogger := TSafeLogger.Create();
+  sfLogger.Name := 'defaultLogger';
   sfLogger.setAppender(TLogFileAppender.Create(True));
   {$IFDEF MSWINDOWS}
   {$ELSE}
