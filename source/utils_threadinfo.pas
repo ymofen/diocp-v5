@@ -3,7 +3,12 @@ unit utils_threadinfo;
 interface
 
 uses
-  utils.hashs, Windows, Classes, utils.strings, SysUtils;
+  utils.hashs,
+  {$IFDEF MSWINDOWS}
+  Windows,
+  {$ELSE}
+  {$ENDIF}
+  Classes, utils.strings, SysUtils;
 
 const
   TYPE_NONE = 0;
