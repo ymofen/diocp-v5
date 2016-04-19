@@ -49,7 +49,11 @@ var
   lvCurrentID:THandle;
   lvInfo:TThreadInfoObject;
 begin
+  {$IFDEF MSWINDOWS}
   lvCurrentID := GetCurrentThreadId;
+  {$ELSE}
+  lvCurrentID := TThread.CurrentThread.ThreadID;
+  {$ENDIF}
   Assert(__info_list <> nil, 'GetCurrentInfoObject not initalize');
   __info_list.Lock;
   try
