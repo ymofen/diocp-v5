@@ -24,7 +24,9 @@ type
     property ThreadID: THandle read FThreadID write FThreadID;
   end;
 
-procedure SetCurrentThreadInfo(pvInfo: String);
+procedure SetCurrentThreadInfo(pvInfo: String); overload;
+procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
+    overload;
 procedure BindThreadObject(pvObject: TObject; pvFreeType: Integer = TYPE_NONE);
 function GetCurrentThreadBindObject: TObject;
 function GetThreadsHintInfo: String;
@@ -124,6 +126,11 @@ begin
   __info_list.FreeAllDataAsObject;
   __info_list.Free;
   __info_list := nil;
+end;
+
+procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
+begin
+  SetCurrentThreadInfo(Format(pvFmtMsg, args));
 end;
 
 destructor TThreadInfoObject.Destroy;

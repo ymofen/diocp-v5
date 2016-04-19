@@ -21,7 +21,7 @@ uses
   {$IFDEF ANDROID}
   , Androidapi.Log
   {$ENDIF}
-  ;
+  , utils_threadinfo;
 
 
 type
@@ -755,6 +755,7 @@ begin
     while not self.Terminated do
     begin
       FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor()';
+      SetCurrentThreadInfo('Safelogger.Thread.Execute::FNotify.WaitFor()');
       lvWaitResult := FNotify.WaitFor(1000 * 30);
       if (lvWaitResult=wrSignaled) then
       begin
@@ -762,13 +763,16 @@ begin
           try
             i := 0;
             FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor(), succ';
+            SetCurrentThreadInfo('Safelogger.Execute::FNotify.WaitFor(), succ');
             while not self.Terminated do
             begin
               lvPData :=TLogDataObject(FSafeLogger.FDataQueue.DeQueueObject);
               if lvPData = nil then Break;
               try
                 FSafeLogger.FDebugData := lvPData;
+                SetCurrentThreadInfo('Safelogger.Execute::LogDataStart');
                 ExecuteLogData(lvPData);
+                SetCurrentThreadInfo('Safelogger.Execute::LogDataEnd');
                 inc(i);
               except
                 on E:Exception do
@@ -796,6 +800,7 @@ begin
       end;
     end;
   finally
+    SetCurrentThreadInfo('Safelogger.Execute::End finally');
     FSafeLogger.decWorker(Self);
   end;
 end;
