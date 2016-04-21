@@ -371,9 +371,11 @@ function TMultiPartsParser.DecodeHeader: Integer;
 var
   lvPtr:PChar;
   lvLine:String;
+  lvHeader:string;
 begin
   FCurrentRAWHeader := FBuffer.ToRAWString;
-  lvPtr := PChar(FCurrentRAWHeader);
+  lvHeader := FCurrentRAWHeader;
+  lvPtr := PChar(lvHeader);
 
   FCurrentHeaders := TDValue.Create;
   try
