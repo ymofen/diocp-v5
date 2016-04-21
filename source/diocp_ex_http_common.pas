@@ -9,7 +9,7 @@ interface
   {$ENDIF}
 {$ifend}
 
-{$if CompilerVersion>= 23}
+{$if CompilerVersion>= 28}    // XE7:28
 {$DEFINE USE_NetEncoding}
 {$ifend}
 uses
@@ -593,7 +593,7 @@ const
   procedure AppendByte(B: Byte; var Buffer: PChar);
   const
     Hex = '0123456789ABCDEF';
-  {$if CompilerVersion>= 23}
+  {$if CompilerVersion>= 28}   // XE7
     LOW_INDEX = Low(string);
   {$else}
     LOW_INDEX = 1;
