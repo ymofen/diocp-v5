@@ -45,6 +45,7 @@ type
   TRawSocket = class(TObject)
   private
     FSocketHandle: TSocket;
+    procedure CheckDestroyHandle;
   public
     procedure Close(pvShutdown: Boolean = true);
     procedure CreateTcpSocket;
@@ -189,7 +190,7 @@ begin
     FSocketHandle := INVALID_SOCKET;
     
     if pvShutdown then
-    begin  
+    begin
       // To assure that all data is sent and received on a connected socket before it is closed,
       // an application should use shutdown to close connection before calling closesocket.
       diocp.winapi.winsock2.shutdown(lvTempSocket, SD_BOTH);
@@ -279,6 +280,7 @@ end;
 
 procedure TRawSocket.CreateTcpOverlappedSocket;
 begin
+  CheckDestroyHandle;
   FSocketHandle := WSASocket(AF_INET,SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
@@ -289,6 +291,7 @@ end;
 
 procedure TRawSocket.CreateTcpSocket;
 begin
+  CheckDestroyHandle;
   FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
@@ -299,6 +302,7 @@ end;
 
 procedure TRawSocket.CreateUdpOverlappedSocket;
 begin
+  CheckDestroyHandle;
   FSocketHandle := WSASocket(AF_INET,SOCK_DGRAM, IPPROTO_UDP, Nil, 0, WSA_FLAG_OVERLAPPED);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
@@ -309,8 +313,23 @@ end;
 
 destructor TRawSocket.Destroy;
 begin
-  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_SOCKET)), 'socket handle not closed!');
+  CheckDestroyHandle;
   inherited;
+end;
+
+procedure TRawSocket.CheckDestroyHandle;
+var
+  lvTempSocket: TSocket;
+begin
+  lvTempSocket := FSocketHandle;
+  if (lvTempSocket <> 0) and (lvTempSocket <> INVALID_SOCKET) then
+  begin
+    FSocketHandle := INVALID_SOCKET;
+
+    Closesocket(lvTempSocket);
+
+    InterlockedIncrement(__DebugWSACloseCounter);
+  end;
 end;
 
 function TRawSocket.GetIpAddrByName(const host:string): String;

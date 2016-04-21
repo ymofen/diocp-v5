@@ -24,7 +24,9 @@ type
     constructor Create(AOnAsyncEvent: TOnASyncEvent);
     procedure Execute; override;
     property Data: Pointer read FData write FData;
-    property DataObj: TObject read FDataObj write SetDataObj;     
+    property DataObj: TObject read FDataObj write SetDataObj;
+
+    property Terminated;     
   end;
 
   TASyncInvoker = class(TObject)
@@ -33,21 +35,23 @@ type
     FTerminated: Boolean;
     FStopEvent:TEvent;
     FWaitEvent: TEvent;
+    FWorker:TASyncWorker;
     procedure InnerASync(pvWorker:TASyncWorker);
   public
     constructor Create;
     destructor Destroy; override;
     procedure WaitForSleep(pvTime:Cardinal);
 
-    procedure Start(pvASyncEvent: TOnASyncEvent);
+    procedure Start(pvASyncEvent: TOnASyncEvent; pvData: Pointer = nil;
+        pvDataObject: TObject = nil);
     procedure Terminate;
     procedure WaitForStop;
 
     property Terminated: Boolean read FTerminated write FTerminated;
   end;
 
-procedure ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
-    pvDataObject: TObject = nil);
+function ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
+    pvDataObject: TObject = nil): TASyncWorker;
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 
@@ -70,15 +74,13 @@ begin
     result := High(Cardinal) - tick_start + tick_end;
 end;
 
-procedure ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
-    pvDataObject: TObject = nil);
-var
-  lvWorker:TASyncWorker;
+function ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
+    pvDataObject: TObject = nil): TASyncWorker;
 begin
-  lvWorker := TASyncWorker.Create(pvASyncProc);
-  lvWorker.Data := pvData;
-  lvWorker.DataObj := pvDataObject;
-  lvWorker.Resume;
+  Result := TASyncWorker.Create(pvASyncProc);
+  Result.Data := pvData;
+  Result.DataObj := pvDataObject;
+  Result.Resume;
 end;
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
@@ -133,18 +135,22 @@ procedure TASyncInvoker.InnerASync(pvWorker:TASyncWorker);
 begin
   FOnAsyncEvent(pvWorker);
   FStopEvent.SetEvent;
+  FWorker := nil;
+  FTerminated := True;
 end;
 
-procedure TASyncInvoker.Start(pvASyncEvent: TOnASyncEvent);
+procedure TASyncInvoker.Start(pvASyncEvent: TOnASyncEvent; pvData: Pointer =
+    nil; pvDataObject: TObject = nil);
 begin
   FTerminated := False;
   FStopEvent.ResetEvent;
   FOnAsyncEvent := pvASyncEvent;
-  ASyncInvoke(InnerASync);
+  FWorker := ASyncInvoke(InnerASync, pvData, pvDataObject);
 end;
 
 procedure TASyncInvoker.Terminate;
 begin
+  if FWorker <> nil then FWorker.Terminate;
   FTerminated := True;
   FWaitEvent.SetEvent;
 end;
