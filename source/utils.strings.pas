@@ -1905,7 +1905,7 @@ begin
   CheckNeedSize(2);
   FData[FSize] := 0;
   FData[FSize + 1] := 0; 
-  Result := TEncoding.UTF8.GetString(pvBytes, 0, self.Length);
+  Result := TEncoding.UTF8.GetString(FData, 0, self.Length);
 {$ENDIF}
 end;
 

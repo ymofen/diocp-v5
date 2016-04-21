@@ -776,9 +776,9 @@ begin
         ADValue.Value.AsStream := lvStream;
         {$IFDEF NEXTGEN}
         // 移动平台下AData的计数需要增加，以避免自动释放
-        if Result <> nil then
+        if lvStream <> nil then
         begin
-          Result.__ObjAddRef;
+          lvStream.__ObjAddRef;
         end;
         {$ENDIF}
       end;
