@@ -16,6 +16,10 @@
  *  修正SearchPointer中的一严重bug(只比较了前两位字符的匹配性)
       2015-09-11 09:08:22
  *)
+
+{$if CompilerVersion>= 28}    // XE7:28
+  {$DEFINE USE_NetEncoding}
+{$ifend}
  
 unit utils.strings;
 
@@ -26,8 +30,11 @@ uses
 {$IFDEF MSWINDOWS}
     , windows
 {$ELSE}
+{$IFDEF USE_NetEncoding}
     , System.NetEncoding
 {$ENDIF}
+{$ENDIF}
+
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
     , AnsiStrings
 {$IFEND >=XE5}
