@@ -265,6 +265,9 @@ begin
           JSONEscapeWithoutDoEscape(pvBuilder, v.AsString);
         end;        
         pvBuilder.Append('"');
+      end else if v.Value.DataType in [vdtNull, vdtUnset] then
+      begin
+        pvBuilder.Append('null');   // json标准表示
       end else if v.Value.DataType = vdtBoolean then
       begin
         if v.AsBoolean then
