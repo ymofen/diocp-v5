@@ -134,13 +134,6 @@ end;
 
 destructor TDiocpBlockTcpClient.Destroy;
 begin
-  if FActive then
-  begin
-    self.Disconnect;
-  end;
-
-  
-
   FRawSocket.Free;
   inherited Destroy;
 end;

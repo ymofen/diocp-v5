@@ -51,6 +51,7 @@ type
   private
     FSockaddr: sockaddr_in;
     FSocketHandle:THandle;
+    procedure CheckDestroyHandle;
   public
     function Bind(const pvAddr: string; pvPort: Integer): Boolean;
     procedure CreateTcpSocket;
@@ -226,7 +227,7 @@ end;
 
 destructor TRawSocket.Destroy;
 begin
-  Assert(((FSocketHandle=0) or (FSocketHandle = INVALID_HANDLE_VALUE)), 'socket handle not closed!');
+  CheckDestroyHandle;
   inherited;
 end;
 
@@ -247,6 +248,19 @@ begin
   // Œ¥≤‚ ‘
   FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(s)));
   Result := Posix.SysSocket.Bind(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in))  = 0;
+end;
+
+procedure TRawSocket.CheckDestroyHandle;
+var
+  lvTempSocket: TSocket;
+begin
+  lvTempSocket := FSocketHandle;
+  if (lvTempSocket <> 0) and (lvTempSocket <> INVALID_HANDLE_VALUE) then
+  begin
+    FSocketHandle := INVALID_HANDLE_VALUE;
+
+    __close(lvTempSocket);
+  end;
 end;
 
 procedure TRawSocket.Close(pvShutdown: Boolean = true);
@@ -341,6 +355,7 @@ end;
 
 procedure TRawSocket.CreateTcpSocket;
 begin
+  CheckDestroyHandle;
   FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if FSocketHandle = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
@@ -348,6 +363,7 @@ end;
 
 procedure TRawSocket.CreateUdpSocket;
 begin
+  CheckDestroyHandle;
   FSocketHandle := socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 end;
 
