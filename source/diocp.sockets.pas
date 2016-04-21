@@ -22,7 +22,7 @@ uses
   diocp.core.rawWinSocket, SyncObjs, Windows, SysUtils,
   utils.safeLogger,
   utils.hashs,
-  utils.queues, utils.locker, diocp.tcp.server;
+  utils.queues, utils.locker;
 
 const
   CORE_LOG_FILE = 'diocp_core_exception';
@@ -41,6 +41,9 @@ type
 
   TOnContextError = procedure(pvContext: TDiocpCustomContext; pvErrorCode: Integer)
       of object;
+
+  TOnContextBufferEvent = procedure(pvContext: TDiocpCustomContext; pvBuff: Pointer; len:
+      Cardinal; pvBufferTag, pvErrorCode: Integer) of object;
 
   TOnBufferReceived = procedure(pvContext: TDiocpCustomContext; buf: Pointer; len:
       cardinal; pvErrorCode: Integer) of object;
@@ -72,6 +75,9 @@ type
     FContextLocker: TIocpLocker;
     FLastErrorCode:Integer;
     FDebugINfo: string;
+
+    FSendBytesSize:Int64;
+    FRecvBytesSize:Int64;
 
     procedure SetDebugINfo(const Value: string);
 
@@ -108,6 +114,7 @@ type
     FOnConnectedEvent: TNotifyContextEvent;
     FOnDisconnectedEvent: TNotifyContextEvent;
     FOnRecvBufferEvent: TOnBufferReceived;
+    FOnSendBufferCompleted: TOnContextBufferEvent;
     FOnSocketStateChanged: TNotifyEvent;
 
     /// sendRequest link
@@ -287,9 +294,17 @@ type
     property OnRecvBufferEvent: TOnBufferReceived read FOnRecvBufferEvent write
         FOnRecvBufferEvent;
 
+    /// <summary>
+    ///   发送的Buffer已经完成
+    /// </summary>
+    property OnSendBufferCompleted: TOnContextBufferEvent read
+        FOnSendBufferCompleted write FOnSendBufferCompleted;
+
     property Owner: TDiocpCustom read FOwner write SetOwner;
 
     property RawSocket: TRawSocket read FRawSocket;
+    property RecvBytesSize: Int64 read FRecvBytesSize;
+    property SendBytesSize: Int64 read FSendBytesSize;
 
     property SocketState: TSocketState read FSocketState;
 
@@ -300,6 +315,7 @@ type
     /// </summary>
     property OnSocketStateChanged: TNotifyEvent read FOnSocketStateChanged write
         FOnSocketStateChanged;
+
   end;
 
   /// <summary>
@@ -684,6 +700,7 @@ type
     procedure DoReceiveData(pvIocpContext: TDiocpCustomContext; pvRequest:
         TIocpRecvRequest);
   protected
+
     /// <summary>
     ///   pop sendRequest object
     /// </summary>
@@ -713,7 +730,11 @@ type
     procedure SetName(const NewName: TComponentName); override;
   private
     FContextDNA : Integer;
+    FOnSendBufferCompleted: TOnContextBufferEvent;
 
+    procedure DoSendBufferCompletedEvent(pvContext: TDiocpCustomContext; pvBuff:
+        Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+        
     function GetOnlineContextCount: Integer;
     procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
 
@@ -807,6 +828,11 @@ type
         
     procedure logMessage(pvMsg: string; const args: array of const; pvMsgType:
         string = ''; pvLevel: TLogLevel = lgvMessage); overload;
+    /// <summary>
+    ///   发送的Buffer已经完成
+    /// </summary>
+    property OnSendBufferCompleted: TOnContextBufferEvent read
+        FOnSendBufferCompleted write FOnSendBufferCompleted;
   published
 
     /// <summary>
@@ -1099,6 +1125,8 @@ end;
 
 procedure TDiocpCustomContext.DoCleanUp;
 begin
+  FSendBytesSize:=0;
+  FRecvBytesSize:= 0;
   FLastActivity := 0;
   FRequestDisconnect := false;
   FSending := false;
@@ -1133,7 +1161,7 @@ begin
         Assert(not FActive);
       end;
       {$IFDEF DEBUG_ON}
-       FOwner.logMessage('on DoConnected event is already actived', CORE_DEBUG_FILE);
+       FOwner.logMessage('on DoConnected event is already actived', CORE_LOG_FILE);
       {$ENDIF}
     end else
     begin
@@ -1219,6 +1247,8 @@ begin
   try
     FLastActivity := GetTickCount;
 
+    Inc(self.FRecvBytesSize, FRecvRequest.FBytesTransferred);
+
     OnRecvBuffer(FRecvRequest.FRecvBuffer.buf,
       FRecvRequest.FBytesTransferred,
       FRecvRequest.ErrorCode);
@@ -1233,7 +1263,7 @@ begin
         FOwner.OnContextError(Self, -1);
       end else
       begin
-        __svrLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+        __diocp_logger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
       end;
     end;
   end;
@@ -1662,6 +1692,13 @@ begin
     begin
       InterlockedIncrement(FDataMoniter.FSendRequestReturnCounter);
     end;
+
+    if pvObject.FBuf <> nil then
+    begin
+      /// Buff处理完成, 响应事件
+      DoSendBufferCompletedEvent(pvObject.FContext, pvObject.FBuf, pvObject.FLen, pvObject.Tag, pvObject.ErrorCode);
+    end;
+    
     pvObject.DoCleanUp;
     pvObject.FOwner := nil;
     FSendRequestPool.EnQueue(pvObject);
@@ -1752,6 +1789,25 @@ begin
   finally
     FLocker.unLock;
   end;
+end;
+
+procedure TDiocpCustom.DoSendBufferCompletedEvent(pvContext:
+    TDiocpCustomContext; pvBuff: Pointer; len: Cardinal; pvBufferTag,
+    pvErrorCode: Integer);
+begin
+  try
+    if Assigned(pvContext.FOnSendBufferCompleted) then
+      pvContext.FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvErrorCode);
+
+    if Assigned(FOnSendBufferCompleted) then
+      FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvErrorCode);
+  except
+    on e:Exception do
+    begin
+      LogMessage('DoSendBufferCompletedEvent error:' + e.Message, '', lgvError);
+    end;
+  end;
+
 end;
 
 function TDiocpCustom.GetOnlineContextCount: Integer;
@@ -2404,10 +2460,12 @@ begin
       begin
         FOwner.FDataMoniter.incResponseSendObjectCounter;
       end;
-
+      Inc(lvContext.FSendBytesSize, FBytesTransferred);
       if Assigned(FOnDataRequestCompleted) then
       begin
         FOnDataRequestCompleted(lvContext, Self);
+
+
       end;
 
       lvContext.DoSendRequestCompleted(Self);
