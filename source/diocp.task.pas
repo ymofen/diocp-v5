@@ -614,7 +614,7 @@ end;
 
 destructor TIocpTaskRequest.Destroy;
 begin
-  //FreeAndNil(FMessageEvent);
+  if FMessageEvent <> nil then FreeAndNil(FMessageEvent);
   inherited Destroy;
 end;
 
