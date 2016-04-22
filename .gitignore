@@ -52,3 +52,4 @@
 # Delphi history and backups
 __history/
 *.~*
+/source/*.dcu
