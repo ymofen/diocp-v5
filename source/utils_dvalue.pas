@@ -776,9 +776,9 @@ begin
         ADValue.Value.AsStream := lvStream;
         {$IFDEF NEXTGEN}
         // 移动平台下AData的计数需要增加，以避免自动释放
-        if Result <> nil then
+        if lvStream <> nil then
         begin
-          Result.__ObjAddRef;
+          lvStream.__ObjAddRef;
         end;
         {$ENDIF}
       end;
@@ -1560,9 +1560,20 @@ begin
 end;
 
 procedure TDValue.Clear;
+var
+  lvDebug:String;
 begin
-  ClearChildren;
-  FValue.Clear;
+  try
+    lvDebug := 'ClearChildren';
+    ClearChildren;
+    lvDebug := 'Value.Clear';
+    FValue.Clear;
+  except
+    on e:Exception do
+    begin
+      raise Exception.CreateFmt('%s:%s:%s', [e.ClassName, lvDebug, e.Message]);
+    end;
+  end;
 end;
 
 procedure TDValue.Delete(pvIndex:Integer);

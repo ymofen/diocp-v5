@@ -783,7 +783,14 @@ begin
   SetLength(lvBytes, Length(pvInputStr));
   l := BufferURLDecode(pvInputStr, @lvBytes[0], Length(lvBytes));
   SetLength(lvBytes, l);
-  result := pvEncoding.GetString(lvBytes);
+  if pvEncoding <> nil then
+  begin
+    result := pvEncoding.GetString(lvBytes);
+  end else
+  begin
+    result := pvEncoding.Default.GetString(lvBytes);
+  end;
+
 end;
 {$ENDIF}
 

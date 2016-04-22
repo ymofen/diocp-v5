@@ -38,7 +38,7 @@ uses
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
     , AnsiStrings
 {$IFEND >=XE5}
-  ;
+  , Math;
 
 const
   BUFFER_BLOCK_SIZE = $2000;  // Must be a power of 2 
@@ -488,6 +488,14 @@ function LoadStringFromUtf8NoBOMFile(pvFile:string): String;
 
 procedure WriteStringToUtf8NoBOMFile(pvFile, pvData: String);
 
+/// <summary>
+///   转换字符串,
+///   copy from qdac.qstrings.pas
+/// </summary>
+function ParseNumeric(var S: PChar; var ANum: Extended): Boolean;
+function ParseHex(var p: PChar; var Value: Int64): Integer; 
+function ParseInt(var S: PChar; var ANum: Int64): Integer;
+
 
 
 implementation
@@ -657,6 +665,153 @@ begin
       Break;
   end;
   Result := p - ps;
+end;
+
+
+function ParseHex(var p: PChar; var Value: Int64): Integer;
+var
+  ps: PChar;
+begin
+  Value := 0;
+  ps := p;
+  while IsHexChar(p^) do
+  begin
+    Value := (Value shl 4) + HexValue(p^);
+    Inc(p);
+  end;
+  Result := p - ps;
+end;
+
+
+function ParseInt(var S: PChar; var ANum: Int64): Integer;
+var
+  ps: PChar;
+  ANeg: Boolean;
+begin
+  ps := S;
+  // 跳过16进制开始字符
+  if S[0] = '$' then
+  begin
+    Inc(S);
+    Result := ParseHex(S, ANum);
+  end
+  else if (S[0] = '0') and ((S[1] = 'x') or (S[1] = 'X')) then
+  begin
+    Inc(S, 2);
+    Result := ParseHex(S, ANum);
+  end
+  else
+  begin
+    if (S^ = '-') then
+    begin
+      ANeg := True;
+      Inc(S);
+    end
+    else
+    begin
+      ANeg := False;
+      if S^ = '+' then
+        Inc(S);
+    end;
+    ANum := 0;
+    while (S^ >= '0') and (S^ <= '9') do
+    begin
+      ANum := ANum * 10 + Ord(S^) - Ord('0');
+      if ANum < 0 then // 溢出？
+      begin
+        Result := 0;
+        S := ps;
+        Exit;
+      end;
+      Inc(S);
+    end;
+    if ANeg then
+      ANum := -ANum;
+    Result := S - ps;
+  end;
+end;
+
+function ParseNumeric(var S: PChar; var ANum: Extended): Boolean;
+var
+  ps: PChar;
+  function ParseHexInt: Boolean;
+  var
+    iVal: Int64;
+  begin
+    iVal := 0;
+    while IsHexChar(S^) do
+    begin
+      iVal := (iVal shl 4) + HexValue(S^);
+      Inc(S);
+    end;
+    Result := (S <> ps);
+    ANum := iVal;
+  end;
+
+  function ParseDec: Boolean;
+  var
+    ACount: Integer;
+    iVal: Int64;
+    APow: Extended;
+    ANeg: Boolean;
+  begin
+    try
+      ANeg := S^ = '-';
+      if ANeg then
+        Inc(S);
+      Result := ParseInt(S, iVal) > 0;
+      if not Result then
+        Exit;
+      if ANeg then
+        ANum := -iVal
+      else
+        ANum := iVal;
+      if S^ = '.' then // 小数部分
+      begin
+        Inc(S);
+        ACount := ParseInt(S, iVal);
+        if ACount > 0 then
+        begin
+          if (ANum < 0) or ANeg then
+            ANum := ANum - iVal / IntPower(10, ACount)
+          else
+            ANum := ANum + iVal / IntPower(10, ACount);
+        end;
+      end;
+      if (S^ = 'e') or (S^ = 'E') then
+      begin
+        Inc(S);
+        if ParseNumeric(S, APow) then
+        begin
+          ANum := ANum * Power(10, APow);
+
+        end;
+      end;
+      Result := (S <> ps);
+    except
+      on e: EOverflow do
+        Result := False;
+    end;
+  end;
+
+begin
+  ps := S;
+  if (S^ = '$') or (S^ = '&') then
+  begin
+    Inc(S);
+    Result := ParseHexInt;
+    Exit;
+  end
+  else if (S[0] = '0') and ((S[1] = 'x') or (S[1] = 'X')) then
+  begin
+    Inc(S, 2);
+    Result := ParseHexInt;
+    Exit;
+  end
+  else
+    Result := ParseDec;
+  if not Result then
+    S := ps;
 end;
 
 
@@ -1750,7 +1905,7 @@ begin
   CheckNeedSize(2);
   FData[FSize] := 0;
   FData[FSize + 1] := 0; 
-  Result := TEncoding.UTF8.GetString(pvBytes, 0, self.Length);
+  Result := TEncoding.UTF8.GetString(FData, 0, self.Length);
 {$ENDIF}
 end;
 

@@ -9,7 +9,7 @@ unit utils_dvalue_json;
 interface
 
 uses
-  utils_dvalue, utils.strings, classes;
+  utils_dvalue, utils.strings, classes, Math;
 
 type
   TByteChar = record
@@ -265,6 +265,18 @@ begin
           JSONEscapeWithoutDoEscape(pvBuilder, v.AsString);
         end;        
         pvBuilder.Append('"');
+      end else if v.Value.DataType in [vdtNull, vdtUnset] then
+      begin
+        pvBuilder.Append('null');   // json标准表示
+      end else if v.Value.DataType = vdtBoolean then
+      begin
+        if v.AsBoolean then
+        begin
+          pvBuilder.Append('true');   // json标准表示
+        end else
+        begin
+          pvBuilder.Append('false');  // json标准表示
+        end;
       end else
       begin
         JSONEscape(pvBuilder, v.AsString, ADoEscape);
@@ -435,6 +447,33 @@ function JSONParseValue(var ptrData: PChar; pvDValue: TDValue; pvParser:
 var
   lvEndChar:Char;
   lvStart:PChar;
+  lvStr:String;
+  procedure __innerSetValue(pvStr:string);
+  var
+    lvTempPtr:PChar;
+    lvValue:Extended;
+  begin
+    lvTempPtr := PChar(pvStr);
+    if ParseNumeric(lvTempPtr, lvValue) then
+    begin
+      if SameValue(lvValue, Trunc(lvValue), 5E-324) then
+        pvDValue.AsInteger := Trunc(lvValue)
+      else
+        pvDValue.AsFloat := lvValue;
+    end else if StartWith(lvTempPtr, 'false') then
+    begin
+      pvDValue.AsBoolean := False;
+    end else if StartWith(lvTempPtr, 'true') then
+    begin
+      pvDValue.AsBoolean := True;
+    end else if StartWith(lvTempPtr, 'null') then
+    begin
+      pvDValue.Clear;
+    end else            
+    begin
+      pvDValue.AsString := pvStr;
+    end;
+  end;
 begin
   pvParser.FLastStrValue := '';
   pvParser.FLastValue := '';
@@ -453,7 +492,7 @@ begin
     while ptrData^ <> #0 do
     begin
       if ptrData^ = lvEndChar then
-      begin
+      begin                             
         pvDValue.Value.AsString := pvBuilder.ToString;
         Inc(ptrData);
         if JSONSkipSpaceAndComment(ptrData, pvParser) = -1 then
@@ -491,12 +530,14 @@ begin
     begin
       if ptrData^ in [',',']','}'] then
       begin
-        pvDValue.Value.AsString := Copy(lvStart, 0, ptrData - lvStart);
+        lvStr := Copy(lvStart, 0, ptrData - lvStart);
+        __innerSetValue(lvStr);
         Result := 2;
         Exit;
       end else if ptrData^ in [#32, #9, #13, #10] then      // space, tab, \r, \n
       begin
-        pvDValue.Value.AsString := Copy(lvStart, 0, ptrData - lvStart);
+        lvStr := Copy(lvStart, 0, ptrData - lvStart);
+        __innerSetValue(lvStr);
         if JSONSkipSpaceAndComment(ptrData, pvParser) = -1 then
         begin
           Result := -1;
