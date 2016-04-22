@@ -417,25 +417,21 @@ end;
 procedure ZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
 {$IFDEF POSIX}
 var
-  lvBytes, lvOutBytes:TBytes;
+  lvOutBuf: TBytes;
 {$ELSE}
 var
   lvInBuf: TBytes;
   lvOutBuf: Pointer;
   lvOutBytes: Integer;
-{$ENDIF}
 var
   l: Integer;
+{$ENDIF}
+
 begin
 {$IFDEF POSIX}
-  error
-//  SetLength(lvBytes, pvInStream.Size);
-//  pvInStream.Position := 0;
-//  pvInStream.Read(lvBytes[0], pvInStream.Size);
-//  ZLib.ZCompress(lvBytes, lvOutBytes);                 // POSIX下只支持该中方式的压缩
-//  pvOutStream.Size := Length(lvOutBytes);
-//  pvOutStream.Position := 0;
-//  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
+  ZLib.ZCompress(pvBuilder.ToBytes, lvOutBuf);
+  pvBuilder.Clear;
+  pvBuilder.AppendBuffer(@lvOutBuf[0], length(lvOutBuf));
 {$ELSE}
   try
     {$if defined(NEWZLib)}
@@ -467,14 +463,14 @@ var
   l: Integer;
 begin
 {$IFDEF POSIX}
-  error
-//  SetLength(lvBytes, pvInStream.Size);
-//  pvInStream.Position := 0;
-//  pvInStream.Read(lvBytes[0], pvInStream.Size);
-//  ZLib.ZCompress(lvBytes, lvOutBytes);                 // POSIX下只支持该中方式的压缩
-//  pvOutStream.Size := Length(lvOutBytes);
-//  pvOutStream.Position := 0;
-//  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
+  ZLib.ZCompress(pvBuilder.ToBytes, lvOutBytes);
+
+  // 截取前面2位标识符和后四位（2007测试通过OK, deflate压缩方式)
+  lvRefBuf := PByte(@lvOutBytes[0]);
+  inc(lvRefBuf, 2);
+
+  pvBuilder.Clear;
+  pvBuilder.AppendBuffer(lvRefBuf, length(lvOutBytes) -2 -4);
 {$ELSE}
   try
     {$if defined(NEWZLib)}
@@ -510,13 +506,9 @@ var
 begin
   if pvBuilder.Length = 0 then exit;
 {$IFDEF POSIX}
-  SetLength(lvBytes, l);
-  pvInStream.Position := 0;
-  pvInStream.Read(lvBytes[0], pvInStream.Size);
-  ZLib.ZDecompress(lvBytes, lvOutBytes);  //POSIX下，只支持该方式
-  pvOutStream.Size := Length(lvOutBytes);
-  pvOutStream.Position := 0;
-  pvOutStream.Write(lvOutBytes[0], Length(lvOutBytes));
+  ZLib.ZDecompress(pvBuilder.ToBytes, lvOutBytes);
+  pvBuilder.Clear;
+  pvBuilder.AppendBuffer(@lvOutBytes[0], length(lvOutBytes));
 {$ELSE}
   {$if defined(NEWZLib)}
   ZLib.ZDecompress(pvBuilder.Memory, pvBuilder.Length, OutBuf, OutBytes);
@@ -969,7 +961,7 @@ end;
 procedure THttpRequest.DecodeContentAsFormUrlencoded({$IFDEF UNICODE}
     pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 var
-  lvRawData : AnsiString;
+  lvRawData : RAWString;
   lvRawParams, s, lvName, lvValue:String;
   i:Integer;
   lvStrings:TStrings;
