@@ -1560,9 +1560,20 @@ begin
 end;
 
 procedure TDValue.Clear;
+var
+  lvDebug:String;
 begin
-  ClearChildren;
-  FValue.Clear;
+  try
+    lvDebug := 'ClearChildren';
+    ClearChildren;
+    lvDebug := 'Value.Clear';
+    FValue.Clear;
+  except
+    on e:Exception do
+    begin
+      raise Exception.CreateFmt('%s:%s:%s', [e.ClassName, lvDebug, e.Message]);
+    end;
+  end;
 end;
 
 procedure TDValue.Delete(pvIndex:Integer);

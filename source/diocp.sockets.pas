@@ -2455,6 +2455,8 @@ begin
 //      lvContext.RequestDisconnect(Format('TIocpSendRequest.HandleResponse FErrorCode:%d',  [FErrorCode]), Self);
     end else
     begin
+      
+      lvContext.FLastActivity := GetTickCount;
       // succ
       if FOwner.FDataMoniter <> nil then
       begin
@@ -2464,8 +2466,6 @@ begin
       if Assigned(FOnDataRequestCompleted) then
       begin
         FOnDataRequestCompleted(lvContext, Self);
-
-
       end;
 
       lvContext.DoSendRequestCompleted(Self);
