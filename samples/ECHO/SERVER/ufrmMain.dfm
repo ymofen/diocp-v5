@@ -79,7 +79,6 @@ object frmMain: TfrmMain
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitTop = -6
     object btnDisconectAll: TButton
       Left = 216
       Top = 5
@@ -160,6 +159,14 @@ object frmMain: TfrmMain
       Caption = #20869#23384#27744#20449#24687
       TabOrder = 8
       OnClick = btnPoolInfoClick
+    end
+    object edtThread: TEdit
+      Left = 9
+      Top = 32
+      Width = 121
+      Height = 21
+      TabOrder = 9
+      Text = '0'
     end
   end
   object actlstMain: TActionList

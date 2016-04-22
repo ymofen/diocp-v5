@@ -121,10 +121,6 @@ object frmMain: TfrmMain
           Lines.Strings = (
             '0123456789')
           TabOrder = 1
-          ExplicitLeft = 26
-          ExplicitTop = 3
-          ExplicitWidth = 832
-          ExplicitHeight = 120
         end
       end
       object grpInterval: TGroupBox
@@ -136,10 +132,6 @@ object frmMain: TfrmMain
         Align = alClient
         Caption = #38388#38548
         TabOrder = 1
-        ExplicitLeft = 0
-        ExplicitTop = 141
-        ExplicitWidth = 836
-        ExplicitHeight = 182
         object pnlIntervalTop: TPanel
           Left = 2
           Top = 15
@@ -148,7 +140,6 @@ object frmMain: TfrmMain
           Align = alTop
           BevelOuter = bvNone
           TabOrder = 0
-          ExplicitWidth = 832
           object edtInterval: TEdit
             Left = 3
             Top = 7
@@ -177,10 +168,6 @@ object frmMain: TfrmMain
           Lines.Strings = (
             'mmoIntervalData')
           TabOrder = 1
-          ExplicitLeft = 0
-          ExplicitTop = 0
-          ExplicitWidth = 836
-          ExplicitHeight = 184
         end
         object chkIntervalSendData: TCheckBox
           Left = 88
@@ -266,7 +253,7 @@ object frmMain: TfrmMain
       Top = 39
       Width = 156
       Height = 17
-      Caption = #25910#21040#25968#25454#35760#24405#26085#24535
+      Caption = #25910#21040#21518#26174#31034#25968#25454
       TabOrder = 7
       OnClick = chkRecvOnLogClick
     end

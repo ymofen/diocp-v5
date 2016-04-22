@@ -34,6 +34,7 @@ type
     btnPushToAll: TButton;
     actPushToAll: TAction;
     btnPoolInfo: TButton;
+    edtThread: TEdit;
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
@@ -112,6 +113,7 @@ end;
 
 procedure TfrmMain.actOpenExecute(Sender: TObject);
 begin
+  FTcpServer.WorkerCount := StrToInt(edtThread.Text);
   FTcpServer.Port := StrToInt(edtPort.Text);
   FTcpServer.OnDataReceived := self.OnRecvBuffer;
   FTcpServer.Active := true;
