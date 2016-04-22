@@ -1707,8 +1707,10 @@ procedure TDBufferBuilder.Clear;
 begin
   FSize := 0;
   FPosition := 0;
+  {$IFDEF MSWINDOWS}
   {$IFDEF DEBUG}
   ZeroMemory(@FData[0], FCapacity);
+  {$ENDIF}
   {$ENDIF}
 end;
 
