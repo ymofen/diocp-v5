@@ -252,7 +252,7 @@ end;
 
 procedure TRawSocket.CheckDestroyHandle;
 var
-  lvTempSocket: TSocket;
+  lvTempSocket: THandle;
 begin
   lvTempSocket := FSocketHandle;
   if (lvTempSocket <> 0) and (lvTempSocket <> INVALID_HANDLE_VALUE) then
