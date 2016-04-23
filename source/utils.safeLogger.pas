@@ -767,22 +767,27 @@ begin
             while not self.Terminated do
             begin
               lvPData :=TLogDataObject(FSafeLogger.FDataQueue.DeQueueObject);
-              if lvPData = nil then Break;
-              try
-                FSafeLogger.FDebugData := lvPData;
-                SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataStart');
-                ExecuteLogData(lvPData);
-                SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataEnd');
-                inc(i);
-              except
-                on E:Exception do
-                begin
-                  SafeWriteFileMsg(Format(STRING_ERR_LOGERR, [e.Message]), 'sfLogger_err_');
-                  FSafeLogger.IncErrorCounter;
+              if lvPData <> nil then
+              begin
+                try
+                  FSafeLogger.FDebugData := lvPData;
+                  SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataStart');
+                  ExecuteLogData(lvPData);
+                  SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataEnd');
+                  inc(i);
+                except
+                  on E:Exception do
+                  begin
+                    SafeWriteFileMsg(Format(STRING_ERR_LOGERR, [e.Message]), 'sfLogger_err_');
+                    FSafeLogger.IncErrorCounter;
+                  end;
                 end;
+                /// push back to logData pool
+                __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+              end else
+              begin
+                break;
               end;
-              /// push back to logData pool
-              __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
             end;
           finally
             FSafeLogger.Appender.NotifyOnceEnd(i);
@@ -796,7 +801,7 @@ begin
         end;
       end else if lvWaitResult = wrTimeout then
       begin
-        Break;
+        Sleep(100);
       end;
     end;
   finally

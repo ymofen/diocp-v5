@@ -109,12 +109,15 @@ procedure TSingleFileWriter.WriteString(pvData: string);
 var
   lvBytes:TBytes;
 begin
-  CheckInitialized;
-  if OpenLogFile(FFilePreFix) then
-  begin
-    lvBytes := StringToUtf8Bytes(pvData);
-    FWriter.Write(lvBytes[0], Length(lvBytes));
-    if FCacheSize <= 0 then Flush;
+  try
+    CheckInitialized;
+    if OpenLogFile(FFilePreFix) then
+    begin
+      lvBytes := StringToUtf8Bytes(pvData);
+      FWriter.Write(lvBytes[0], Length(lvBytes));
+      if FCacheSize <= 0 then Flush;
+    end;
+  except
   end;
 end;
 
