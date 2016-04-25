@@ -1623,6 +1623,7 @@ begin
   FData[FSize] := 13;
   FData[FSize +1 ] := 10;
   Inc(FSize, 2);
+  FPosition := FSize;
   Result := Self;
 end;
 
@@ -1634,8 +1635,12 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(pvLength);
+
+  // 在最后添加
   Move(pvBuffer^, FData[FSize], pvLength);
   Inc(FSize, pvLength);
+  // 移动Position
+  FPosition := FSize;
   Result := Self;
 end;
 

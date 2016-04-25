@@ -144,12 +144,12 @@ begin
             if (lvValue.AsObject is TStream) then
             begin
               TStream(lvValue.AsObject).Position := 0;
-              pvBuilder.LoadFromStream(TStream(lvValue.AsObject), TStream(lvValue.AsObject).Size);
+              pvBuilder.CopyFrom(TStream(lvValue.AsObject), TStream(lvValue.AsObject).Size);
             end;
           end else if lvValue.Value.DataType = vdtStream then
           begin
             lvValue.AsStream.Position := 0;
-            pvBuilder.LoadFromStream(lvValue.AsStream, lvValue.AsStream.Size);
+            pvBuilder.CopyFrom(lvValue.AsStream, lvValue.AsStream.Size);
           end;
           pvBuilder.AppendBreakLineBytes;
         end else
