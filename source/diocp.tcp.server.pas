@@ -165,6 +165,12 @@ type
 
 
     /// <summary>
+    ///   正在请求关闭,不响应任何的接收数据事件
+    /// </summary>
+    FRequestClose: Byte;
+
+
+    /// <summary>
     ///  当前正在发送的请求
     /// </summary>
     FCurrSendRequest:TIocpSendRequest;
@@ -1547,6 +1553,9 @@ begin
   FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvDebugInfo]), strRequestDisconnectFileID, lgvDebug);
 {$ENDIF}
 
+  // 关闭请求
+  FRequestClose := 1;
+
   FContextLocker.lock('RequestDisconnect');
   try
     {$IFDEF DEBUG_ON}
@@ -1643,6 +1652,7 @@ end;
 procedure TIocpClientContext.DoCleanUp;
 begin
   FLastActivity := 0;
+  FRequestClose := 0;
 
   FOwner := nil;
   FRequestDisconnect := false;
@@ -1731,6 +1741,12 @@ end;
 procedure TIocpClientContext.DoReceiveData;
 begin
   try
+    if FRequestClose = 1 then
+    begin
+      // 不再响应任何的接收数据请求
+      Exit;
+    end;
+
     FLastActivity := GetTickCount;
 
     OnRecvBuffer(FRecvRequest.FRecvBuffer.buf,
@@ -1892,7 +1908,11 @@ end;
 
 procedure TIocpClientContext.PostWSACloseRequest;
 begin
+  if not FActive then exit;
+  
+  FRequestClose := 1;
   PostWSASendRequest(nil, 0, dtNone, -1);
+  
 end;
 
 procedure TIocpClientContext.PostWSARecvRequest;
