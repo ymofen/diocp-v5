@@ -3,7 +3,7 @@ unit utils_base64;
 interface
 
 uses
-  utils.strings, SysUtils
+  utils.strings, SysUtils, Classes
 {$IFDEF MSWINDOWS}
     , windows
 {$ELSE}
@@ -17,13 +17,18 @@ type
 {$IFEND >=XE}
 
 
+function Base64Encode(pvStream: TStream; CharsPerLine: Integer = 0): string;
+    overload;
+
 function Base64Encode(buf: PByte; len: Integer; CharsPerLine: Integer = 0):
     string; overload;
 function Base64Encode(pvString: string; CharsPerLine: Integer = 0): string;
     overload;
 function Base64Decode(pvSrc:PByte; pvSrcLen:Integer; pvDest:PByte): Integer; overload;
+function Base64Decode(pvSrc:PByte; pvSrcLen:Integer; pvOutStream:TStream):
+    Integer; overload;
 function Base64Decode(pvString:string): string; overload;
-
+function Base64Decode(pvString:string; pvOutStream:TStream): Integer; overload;
 
 
 /// <summary>
@@ -41,6 +46,10 @@ implementation
 
 type
   Int8    = ShortInt;
+
+  {$if CompilerVersion < 18} //before delphi 2007
+  TBytes = array of Byte;
+  {$ifend}
 
 const
     LineSeparator : array[0..1] of Byte = (13,10);
@@ -394,6 +403,199 @@ begin
   finally
     lvBuilder.Free;
   end;
+end;
+
+function Base64Encode(pvStream: TStream; CharsPerLine: Integer = 0): string;
+const
+  BLOCK_SIZE = 8192;
+var
+  lvPOut:PByte;
+  BytesRead, BytesWrite: Integer;
+  State: TEncodeState;
+  l, r, x:Integer;
+  lvBuilder:TDBufferBuilder;
+  lvBytes:array[0..BLOCK_SIZE -1] of Byte;
+begin
+  lvBuilder := TDBufferBuilder.Create;
+  try
+    InitEncodeState(State);
+    while true do
+    begin
+      x := pvStream.Read(lvBytes[0], BLOCK_SIZE);
+      if x = 0 then Break;
+
+      l := EstimateEncodeLength(x, CharsPerLine);  // #0#0
+      lvPOut := lvBuilder.GetLockBuffer(l);  //
+      try
+        l := 0;
+        r := EncodeBytes(@lvBytes[0], lvPOut, x, 1, LineSeparator, State, CharsPerLine);
+
+        // 真正的长度
+        l := r;
+      finally
+        lvBuilder.ReleaseLockBuffer(l);
+      end;
+    end;
+
+    lvPOut := lvBuilder.GetLockBuffer(10);  //
+    try
+      l := 0;
+      // 3个字符
+      r := EncodeBytesEnd(lvPOut, 1, State);
+      inc(lvPOut, r);
+      Inc(l, r);
+
+      // 后面弄2个0(避免有其他字符串)
+      lvPOut^ := 0;
+      Inc(lvPOut);
+      lvPOut^ := 0;
+    finally
+      lvBuilder.ReleaseLockBuffer(l);
+    end;
+
+
+    {$IFDEF UNICODE}
+    Result := MarshaledAString(lvBuilder.Memory);
+    {$ELSE}
+    Result := PAnsiChar(lvBuilder.Memory);
+    {$ENDIF}
+  finally
+    lvBuilder.Free;
+  end;
+
+end;
+
+function DecodeBuffer(Input: PByte; pvOutStream: TStream; InputLen: Integer;
+    CharSize: SmallInt; var State: TDecodeState): Integer;
+var
+  POut: TStream;
+  Fragment: Integer;
+  P, PEnd: PByte;
+  lvCurrentValue:Byte;
+  lvPrePos:Integer;
+
+begin
+  lvPrePos := pvOutStream.Position;
+  POut := pvOutStream;
+  P := Input;
+  PEnd := P;
+  Inc(PEnd, InputLen);
+  //PEnd := P + InputLen;
+  lvCurrentValue := State.Result;
+  //POut^ := State.Result;
+  while True do
+  begin
+    case State.Step of
+      DecodeStepA:
+      begin
+        repeat
+          if P = PEnd then
+          begin
+            State.Result := lvCurrentValue;
+            Result := pvOutStream.Position - lvPrePos;
+            Exit;
+            //Exit(POut - pvOutStream);
+          end;
+          Fragment := DecodeValue(Ord(P^));
+          Inc(P, CharSize);
+        until (Fragment >= 0) ;
+        lvCurrentValue := (Fragment and $03F) shl 2;
+        //POut^ := (Fragment and $03F) shl 2;
+
+        State.Step := DecodeStepB;
+      end;
+
+      DecodeStepB:
+      begin
+        repeat
+          if P = PEnd then
+          begin
+            State.Result := lvCurrentValue;
+            Result := pvOutStream.Position - lvPrePos;
+            Exit;
+          end;
+          Fragment := DecodeValue(Ord(P^));
+          Inc(P, CharSize);
+        until (Fragment >= 0) ;
+        lvCurrentValue := (lvCurrentValue or ((Fragment and $030) shr 4));
+        POut.Write(lvCurrentValue, 1);
+        lvCurrentValue :=                     ((Fragment and $00F) shl 4);
+//        POut^ := (POut^ or ((Fragment and $030) shr 4));
+//        Inc(POut);
+//        POut^ :=           ((Fragment and $00F) shl 4);
+        State.Step := DecodeStepC;
+      end;
+
+      DecodeStepC:
+      begin
+        repeat
+          if P = PEnd then
+          begin
+            State.Result := lvCurrentValue;
+            Result := pvOutStream.Position - lvPrePos;
+            Exit;
+            //Exit(POut - pvOutStream);
+          end;
+          Fragment := DecodeValue(Ord(P^));
+          Inc(P, CharSize);
+        until (Fragment >= 0) ;
+        lvCurrentValue := (lvCurrentValue or ((Fragment and $03C) shr 2));
+        POut.Write(lvCurrentValue, 1);
+        lvCurrentValue :=                     ((Fragment and $003) shl 6);
+
+//        POut^ := (POut^ or ((Fragment and $03C) shr 2));
+//        Inc(POut);
+//        POut^ :=           ((Fragment and $003) shl 6);
+        State.Step := DecodeStepD;
+      end;
+
+      DecodeStepD:
+      begin
+        repeat
+          if P = PEnd then
+          begin
+            State.Result := lvCurrentValue;
+            Result := pvOutStream.Position - lvPrePos;
+            Exit;
+            //Exit(POut - pvOutStream);
+          end;
+          Fragment := DecodeValue(Ord(P^));
+          Inc(P, CharSize);
+        until (Fragment >= 0) ;
+        lvCurrentValue := (lvCurrentValue or (Fragment and $03F));
+        POut.Write(lvCurrentValue, 1);
+
+//        POut^ := (POut^ or (Fragment and $03F));
+//        Inc(POut);
+        State.Step := DecodeStepA;
+      end;
+    end;
+  end;
+end;
+
+function Base64Decode(pvString:string; pvOutStream:TStream): Integer; overload;
+var
+  l :Integer;
+  {$IFDEF UNICODE}
+  lvBytes:TBytes;
+  {$ENDIF}
+begin
+  {$IFDEF UNICODE}
+  lvBytes := StringToUtf8Bytes(pvString);
+  l := Base64Decode(@lvBytes[0], Length(lvBytes), pvOutStream);
+  {$ELSE}
+  l := Base64Decode(PByte(pvString), Length(pvString), pvOutStream);
+  {$ENDIF}
+  Result := l;
+end;
+
+function Base64Decode(pvSrc:PByte; pvSrcLen:Integer; pvOutStream:TStream):
+    Integer; overload;
+var
+  State: TDecodeState;
+begin
+  InitDecodeState(State);
+  Result := DecodeBuffer(pvSrc, pvOutStream, pvSrcLen, 1, State);
 end;
 
 end.

@@ -19,7 +19,7 @@ uses classes, sysutils, variants,
 {$IFDEF HAVE_GENERICS}
      System.Generics.Collections,
 {$ENDIF}
-     varutils, math;
+     varutils, math, utils_base64;
 
 
 type
@@ -331,6 +331,8 @@ type
 
     /// <summary>
     ///   根据名称移除掉一个子对象
+    ///   (对应的对象将被销毁)
+    ///   请使用Delete
     /// </summary>
     function RemoveByName(pvName:String): Integer;
 
@@ -343,14 +345,30 @@ type
     procedure RemoveAll;
 
     /// <summary>
-    ///   清理值
+    ///   清理值(名称不会被清除)
     /// </summary>
     procedure Clear;
 
     /// <summary>
-    ///   根据索引删除掉一个子对象
+    ///   根据索引删除掉一个子对象(对应的对象将被销毁)
     /// </summary>
-    procedure Delete(pvIndex:Integer);
+    procedure Delete(pvIndex:Integer); overload;
+
+    /// <summary>
+    ///   根据名称移除掉一个子对象
+    ///   (对应的对象将被销毁)
+    /// </summary>
+    function Delete(pvName:String): Integer; overload;
+
+    /// <summary>
+    ///   根据索引移除一个子对象(对应的对象不会被销毁)
+    /// </summary>
+    function UnAttach(pvIndex:Integer): TDValue; overload;
+
+    /// <summary>
+    ///   根据索引移除一个子对象(对应的对象不会被销毁)
+    /// </summary>
+    function UnAttach(pvName:String): TDValue; overload;
 
     /// <summary>
     ///  子项目数量
@@ -394,9 +412,23 @@ type
     function GetValueByPath(pvPath:string; pvDefault:Boolean): Boolean; overload;
     function GetValueByPath(pvPath:string; pvDefault:Double): Double; overload;
 
+
+    /// <summary>
+    ///   把流进行Base64编码赋值给Value
+    /// </summary>
+    procedure Base64LoadFromStream(pvInStream: TStream);
+
+    procedure Base64SaveToStream(pvOutStream:TStream);
+
+    procedure Base64LoadFromFile(pvFileName: String);
+
+    procedure Base64SaveToFile(pvFileName: String);
+
     // 对Value的访问封装, 可以直接访问Value.AsXXXX
     procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
         faFree);
+
+
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
@@ -404,6 +436,8 @@ type
     property AsObject: TObject read GetAsObject;
 
     property AsStream: TMemoryStream read GetAsStream;
+
+
 
   end;
 
@@ -1503,6 +1537,40 @@ begin
   FChildren.Add(pvDValue);    
 end;
 
+procedure TDValue.Base64LoadFromFile(pvFileName: String);
+var
+  lvFileStream:TFileStream;
+begin
+  lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    Base64LoadFromStream(lvFileStream);
+  finally
+    lvFileStream.Free;
+  end;
+end;
+
+procedure TDValue.Base64LoadFromStream(pvInStream: TStream);
+begin
+  SetAsString(Base64Encode(pvInStream, 0));
+end;
+
+procedure TDValue.Base64SaveToFile(pvFileName: String);
+var
+  lvFileStream:TFileStream;
+begin
+  lvFileStream := TFileStream.Create(pvFileName, fmCreate);
+  try
+    Base64SaveToStream(lvFileStream);
+  finally
+    lvFileStream.Free;
+  end;
+end;
+
+procedure TDValue.Base64SaveToStream(pvOutStream: TStream);
+begin
+  Base64Decode(GetAsString, pvOutStream);  
+end;
+
 procedure TDValue.BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction
     = faFree);
 begin
@@ -1578,8 +1646,17 @@ end;
 
 procedure TDValue.Delete(pvIndex:Integer);
 begin
-  TDValueItem(FChildren[pvIndex]).Free;
+  TDValue(FChildren[pvIndex]).Free;
   FChildren.Delete(pvIndex);
+end;
+
+function TDValue.Delete(pvName:String): Integer;
+begin
+  Result := IndexOf(pvName);
+  if Result >= 0 then
+  begin
+    Delete(Result);
+  end;
 end;
 
 function TDValue.FindByName(pvName:String): TDValue;
@@ -1963,14 +2040,15 @@ begin
 end;
 
 function TDValue.RemoveByName(pvName:String): Integer;
-begin
-
+begin  
   Result := IndexOf(pvName);
   if Result >= 0 then
   begin
     Delete(Result);
   end;
 end;
+
+
 
 procedure TDValue.SetAsBoolean(const Value: Boolean);
 begin
@@ -2012,6 +2090,24 @@ begin
       Result := Result + pvPreNameFix + Items[i].Name.AsString + pvNameSpliter + Items[i].AsString + pvValueDelimiter;
     end;
   end;
+end;
+
+function TDValue.UnAttach(pvIndex:Integer): TDValue;
+begin
+  Result := TDValue(FChildren[pvIndex]);
+  Result.FParent := nil;
+  FChildren.Delete(pvIndex);
+end;
+
+function TDValue.UnAttach(pvName:String): TDValue;
+var
+  j:Integer;
+begin
+  j := IndexOf(pvName);
+  if j <> -1 then
+    Result := UnAttach(j)
+  else
+    Result := nil;
 end;
 
 destructor TDValueItem.Destroy;
