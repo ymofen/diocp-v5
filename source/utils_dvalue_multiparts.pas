@@ -94,7 +94,8 @@ begin
 end;
 
 procedure MultiPartsEncode(v: TDValue; pvBuilder: TDBufferBuilder; pvBoundary:
-    string; pvIgnoreValueTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+    string; pvIgnoreValueTypes: TDValueDataTypes = [vdtInterface, vdtObject,
+    vdtPtr]);
 var
   i, j:Integer;
   lvItem, lvName, lvValue, lvFileNameItem, lvChildItem:TDValue;

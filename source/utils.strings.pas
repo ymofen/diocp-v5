@@ -155,8 +155,6 @@ type
     function LoadFromFile(pvFileName:string): Integer;
 
     procedure LoadFromStream(pvStream: TStream); overload;
-    procedure LoadFromStream(pvStream: TStream; pvCount:LongInt); overload;
-
     procedure SaveToFile(pvFile:String);
 
     procedure SaveToStream(pvStream:TStream);
@@ -1767,16 +1765,6 @@ begin
   Count := pvStream.Size;
   SetSize(Count);
   if Count <> 0 then pvStream.ReadBuffer(FData[0], Count); 
-end;
-
-procedure TDBufferBuilder.LoadFromStream(pvStream: TStream; pvCount:LongInt);
-var
-  lvOldPosition:Integer;
-begin
-  lvOldPosition := FPosition;
-  Seek(0, soBeginning);
-  CopyFrom(pvStream, pvCount);
-  FPosition := lvOldPosition;
 end;
 
 function TDBufferBuilder.Memory: PByte;
