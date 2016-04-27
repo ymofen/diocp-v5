@@ -79,6 +79,7 @@ type
   PDRawValue = ^TDRawValue;
 
   /// 一个值对象
+  ///  修改时主要要修改RawCopyFrom函数
   TDRawInnerValue = record
     case Integer of
       0:
@@ -276,6 +277,9 @@ type
 
     destructor Destroy; override;
 
+    procedure CloneFrom(pvSource: TDValue; pvIgnoreValueTypes: TDValueDataTypes =
+        [vdtInterface, vdtObject, vdtPtr]);
+
     /// <summary>
     ///   设置节点类型, 类型转换时会丢失数据
     /// </summary>
@@ -464,6 +468,9 @@ type
 
     procedure SetAsString(const Value: String);
   public
+    procedure CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes: TDValueDataTypes
+        = [vdtInterface, vdtObject, vdtPtr]);
+
     /// <summary>
     ///   设置为数组方式同时设置数组大小
     ///    如果之前不是数组方式，将会被清理
@@ -529,6 +536,7 @@ procedure CheckDValueSetType(ADValue:PDRawValue; AType: TDValueDataType);
 
 procedure CheckDValueSetArrayLength(ADValue: PDRawValue; ALen: Integer);
 
+
 procedure DValueSetAsString(ADValue:PDRawValue; pvString:String);
 function DValueGetAsString(ADValue:PDRawValue): string;
 
@@ -555,9 +563,11 @@ function DValueGetAsInteger(ADValue: PDRawValue): Integer;
 procedure DValueSetAsFloat(ADValue:PDRawValue; pvValue:Double);
 function DValueGetAsFloat(ADValue: PDRawValue): Double;
 
-
 procedure DValueSetAsBoolean(ADValue:PDRawValue; pvValue:Boolean);
 function DValueGetAsBoolean(ADValue: PDRawValue): Boolean;
+
+procedure RawValueCopyFrom(pvSource, pvDest: PDRawValue; pvIgnoreValueTypes:
+    TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 
 function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW; overload;
 function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW; overload;
@@ -1258,6 +1268,78 @@ begin
   end;
 end;
 
+procedure RawValueCopyFrom(pvSource, pvDest: PDRawValue; pvIgnoreValueTypes:
+    TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+var
+  l:Int64;
+  i: Integer;
+begin
+  ClearDValue(pvDest);
+  if pvSource.ValueType in pvIgnoreValueTypes then Exit;  
+  if pvSource.ValueType <> vdtUnset then
+  begin
+    case pvSource.ValueType of
+      vdtGuid:
+        begin
+          CheckDValueSetType(pvDest, vdtGuid);
+          pvDest.Value.AsGuid^:= pvSource.Value.AsGuid^;
+        end;
+      vdtString:
+        begin
+          CheckDValueSetType(pvDest, vdtString);
+          pvDest.Value.AsString^:= pvSource.Value.AsString^;
+        end;
+      vdtStringW:
+        begin
+          CheckDValueSetType(pvDest, vdtStringW);
+          pvDest.Value.AsStringW^:= pvSource.Value.AsStringW^;
+        end;
+      vdtStream:
+        begin
+          CheckDValueSetType(pvDest, vdtStream);
+          TMemoryStream(pvDest.Value.AsStream).LoadFromStream(
+            TMemoryStream(pvSource.Value.AsStream));
+        end;
+      vdtInterface:
+        begin
+          CheckDValueSetType(pvDest, vdtInterface);
+          pvDest.Value.AsInterface^:= pvSource.Value.AsInterface^;
+        end;
+      vdtObject:
+        begin
+          CheckDValueSetType(pvDest, vdtObject);
+          pvDest.Value.AsPointer := pvSource.Value.AsPointer;
+      {$IFDEF NEXTGEN}
+          // 移动平台下AData的计数需要增加，以避免自动释放
+          TObject(pvDest.Value.AsPointer).__ObjAddRef;
+      {$ENDIF}
+          pvDest.Value.PtrReleaseAction := praNone;   // 二次引用，不进行处理
+        end;
+      vdtPtr:
+        begin
+          CheckDValueSetType(pvDest, vdtPtr);
+          pvDest.Value.AsPointer := pvSource.Value.AsPointer;
+          pvDest.Value.PtrReleaseAction := praNone;   // 二次引用，不进行处理
+        end;
+      vdtArray:
+        begin
+          CheckDValueSetArrayLength(pvDest, pvSource.Value.ArrayLength);
+          for i := 0 to pvSource.Value.ArrayLength -1 do
+          begin
+             RawValueCopyFrom(
+                GetDValueItem(pvSource, i),
+                GetDValueItem(pvDest, i));
+          end;
+        end;
+    else
+      begin
+        pvDest.Value := pvSource.Value;
+      end;
+    end;
+    pvDest.ValueType := pvSource.ValueType;
+  end;
+end;
+
 destructor TDValueObject.Destroy;
 begin
   ClearDValue(@FRawValue);
@@ -1641,6 +1723,26 @@ begin
     begin
       raise Exception.CreateFmt('%s:%s:%s', [e.ClassName, lvDebug, e.Message]);
     end;
+  end;
+end;
+
+procedure TDValue.CloneFrom(pvSource: TDValue; pvIgnoreValueTypes:
+    TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+var
+  i: Integer;
+  lvDValue:TDValue;
+begin
+  self.Clear;
+  CheckSetNodeType(pvSource.ObjectType);
+
+  FName.CloneFrom(pvSource.FName);
+  FValue.CloneFrom(pvSource.FValue, pvIgnoreValueTypes);
+  for i := 0 to pvSource.Count -1 do
+  begin
+    lvDValue := TDValue.Create(vntValue);
+    lvDValue.FParent := Self;
+    FChildren.Add(lvDValue);
+    lvDValue.CloneFrom(pvSource[i], pvIgnoreValueTypes);
   end;
 end;
 
@@ -2128,6 +2230,12 @@ end;
 procedure TDValueItem.Clear;
 begin
   ClearDValue(@FRawValue);
+end;
+
+procedure TDValueItem.CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes:
+    TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+begin
+  RawValueCopyFrom(@pvSource.FRawValue, @FRawValue, pvIgnoreValueTypes);
 end;
 
 function TDValueItem.Equal(pvItem:TDValueItem): Boolean;
