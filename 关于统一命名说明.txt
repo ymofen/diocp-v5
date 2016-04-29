@@ -1,0 +1,19 @@
+为了使用统一的命名方式，兼容BC使用
+diocp中所有文件名都统一规范命名
+
+如果你的项目中有使用到 diocp源码你可以这样处理
+
+假如你的项目路径在
+E:\workspace\DiocpPRC
+
+1.把下面三个文件 copy到项目路径[E:\workspace\DiocpPRC]
+diocp_repl_src.bat
+SR32.exe
+SrExt.dll
+
+2.双击运行
+diocp_repl_src.bat
+
+好了已经对源码中的diocp相关文件进行了命名。
+
+* 为了确保代码安全，请先备份好现有代码。
