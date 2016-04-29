@@ -102,7 +102,7 @@ type
         (AsStream: Pointer);
       16:    // Array
         (
-          ArrayLength: Cardinal;
+          ArrayLength: Integer;
           ArrayItemsEntry: PDRawValue;
         );
       17:
@@ -410,6 +410,7 @@ type
     function GetValueByName(pvName:string; pvDefault:string): String;overload;
     function GetValueByName(pvName:String; pvDefault:Boolean): Boolean; overload;
     function GetValueByName(pvName:String; pvDefault:Double): Double; overload;
+    function GetValueByName(pvName:String; pvDefault:TObject): TObject; overload;
 
     function GetValueByPath(pvPath:string; pvDefault:string): string; overload;
     function GetValueByPath(pvPath: string; pvDefault: Int64): Int64; overload;
@@ -1994,6 +1995,20 @@ begin
   end;
 
 
+end;
+
+function TDValue.GetValueByName(pvName:String; pvDefault:TObject): TObject;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsObject;
+  end;
 end;
 
 function TDValue.GetValueByPath(pvPath: string; pvDefault: Double): Double;
