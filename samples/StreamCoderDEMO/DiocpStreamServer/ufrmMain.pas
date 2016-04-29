@@ -4,8 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ActnList, diocp.tcp.server, ExtCtrls,
-  ComObj, ComCtrls, utils.safeLogger;
+  Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
+  ComObj, ComCtrls, utils_safeLogger;
 
 type
   TfrmMain = class(TForm)

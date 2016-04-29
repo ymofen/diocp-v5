@@ -3,7 +3,7 @@ unit uMyClientContext;
 interface
 
 uses
-  diocp.coder.tcpServer, SysUtils, Classes, Windows, Math;
+  diocp_coder_tcpServer, SysUtils, Classes, Windows, Math;
 
 
 type

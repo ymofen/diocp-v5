@@ -3,7 +3,7 @@ unit diocp.session;
 interface
 
 uses
-  utils.hashs, SysUtils, Windows, Classes;
+  utils_hashs, SysUtils, Windows, Classes;
 
 type
   TSessionItem = class(TObject)

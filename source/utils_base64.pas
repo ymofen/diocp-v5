@@ -3,7 +3,7 @@ unit utils_base64;
 interface
 
 uses
-  utils.strings, SysUtils, Classes
+  utils_strings, SysUtils, Classes
 {$IFDEF MSWINDOWS}
     , windows
 {$ELSE}

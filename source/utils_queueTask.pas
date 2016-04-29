@@ -3,7 +3,7 @@ unit utils_queueTask;
 interface
 
 uses
-  utils.queues, Classes, SysUtils,
+  utils_queues, Classes, SysUtils,
   {$IFDEF MSWINDOWS} Windows, Messages, ActiveX, {$ENDIF}
   SyncObjs;
 

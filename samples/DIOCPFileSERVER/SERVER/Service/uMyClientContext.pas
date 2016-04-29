@@ -3,7 +3,7 @@ unit uMyClientContext;
 interface
 
 uses
-  diocp.coder.tcpServer, Classes,  SysUtils, uZipTools, SimpleMsgPack;
+  diocp_coder_tcpServer, Classes,  SysUtils, uZipTools, SimpleMsgPack;
 
 type
   TMyClientContext = class(TIOCPCoderClientContext)

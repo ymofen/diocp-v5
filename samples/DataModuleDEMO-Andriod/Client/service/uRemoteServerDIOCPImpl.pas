@@ -6,11 +6,11 @@ uses
   uIRemoteServer,
   uRawTcpClientCoderImpl,
   uStreamCoderSocket,
-  utils.zipTools,
+  utils_zipTools,
   SimpleMsgPack,
   Classes,
   SysUtils,
-  diocp.tcp.blockClient, uICoderSocket;
+  diocp_tcp_blockClient, uICoderSocket;
 
 type
   TRemoteServerDIOCPImpl = class(TInterfacedObject, IRemoteServer)

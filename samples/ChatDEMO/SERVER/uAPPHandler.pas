@@ -3,7 +3,7 @@ unit uAPPHandler;
 interface
 
 uses
-  SimpleMsgPack, utils.unipool, utils.unipool.tools, diocp.session, diocp.tcp.server;
+  SimpleMsgPack, utils.unipool, utils.unipool.tools, diocp.session, diocp_tcp_server;
 
 type
   TCHATSession = class(TSessionItem)
@@ -55,7 +55,7 @@ var
 implementation
 
 uses
-  utils.safeLogger, SysUtils, ComObj, utils.base64, diocp.coder.tcpServer, Uni;
+  utils_safeLogger, SysUtils, ComObj, utils.base64, diocp_coder_tcpServer, Uni;
 
 /// <summary> ½øÐÐÐÄÌø
 /// </summary>

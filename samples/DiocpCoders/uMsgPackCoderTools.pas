@@ -3,7 +3,7 @@ unit uMsgPackCoderTools;
 interface
 
 uses
-  qmsgpack, Classes, sysUtils, uZipTools, utils.byteTools;
+  qmsgpack, Classes, sysUtils, uZipTools, utils_byteTools;
 
 type
   TMsgPackCoderTools = class(TObject)

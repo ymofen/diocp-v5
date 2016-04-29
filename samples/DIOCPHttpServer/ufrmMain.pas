@@ -13,8 +13,8 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, ExtCtrls
-  , utils.safeLogger, StrUtils,
-  ComCtrls, diocp.ex.httpServer, diocp_ex_http_common, utils.byteTools,
+  , utils_safeLogger, StrUtils,
+  ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
   utils_dvalue_json, System.Actions;
 
 type
@@ -68,7 +68,7 @@ var
 implementation
 
 uses
-  uFMMonitor, diocp.core.engine, utils.strings, diocp.ex.SimpleMsgPackSession,
+  uFMMonitor, diocp_core_engine, utils_strings, diocp.ex.SimpleMsgPackSession,
   utils_dvalue;
 
 {$R *.dfm}

@@ -4,9 +4,9 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
-  Controls, Forms, Dialogs, StdCtrls, diocp.task,
-  uStreamCoderSocket, uRawTcpClientCoderImpl, utils.safeLogger,
-  diocp.tcp.blockClient;
+  Controls, Forms, Dialogs, StdCtrls, diocp_task,
+  uStreamCoderSocket, uRawTcpClientCoderImpl, utils_safeLogger,
+  diocp_tcp_blockClient;
 
 type
   TfrmMain = class(TForm)

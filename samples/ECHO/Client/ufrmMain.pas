@@ -4,8 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
-  Controls, Forms, Dialogs, StdCtrls, diocp.tcp.client,
-  utils.safeLogger, ComCtrls, diocp.sockets, ExtCtrls, utils_async,
+  Controls, Forms, Dialogs, StdCtrls, diocp_tcp_client,
+  utils_safeLogger, ComCtrls, diocp_sockets, ExtCtrls, utils_async,
   utils_BufferPool;
 
 type
@@ -109,7 +109,7 @@ var
 implementation
 
 uses
-  uFMMonitor, utils_dvalue, utils_DValue_JSON, utils.byteTools;
+  uFMMonitor, utils_dvalue, utils_DValue_JSON, utils_byteTools;
 {$R *.dfm}
 
 { TfrmMain }

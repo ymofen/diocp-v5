@@ -40,7 +40,7 @@ implementation
   //PACK_FLAG  + CRC_VALUE + STREAM_LEN + STREAM_DATA
 
 uses
-  utils.byteTools;
+  utils_byteTools;
 
 function verifyData(const buf; len: Cardinal): Cardinal;
 var

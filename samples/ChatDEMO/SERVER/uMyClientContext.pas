@@ -3,7 +3,7 @@ unit uMyClientContext;
 interface
 
 uses
-  diocp.coder.tcpServer, SysUtils, Classes, Windows, Math, SimpleMsgPack;
+  diocp_coder_tcpServer, SysUtils, Classes, Windows, Math, SimpleMsgPack;
 
 
 type
@@ -24,7 +24,7 @@ type
 implementation
 
 uses
-  CHATHandler, utils.safeLogger;
+  CHATHandler, utils_safeLogger;
 
 procedure TMyClientContext.DoContextAction(const pvObject: TObject);
 var

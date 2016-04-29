@@ -4,13 +4,13 @@ interface
 
 uses
   uIRemoteServer,
-  diocp.tcp.blockClient,
+  diocp_tcp_blockClient,
   uDTcpClientCoderImpl,
   uStreamCoderSocket,
   SimpleMsgPack,
   Classes,
   SysUtils,
-  utils.zipTools,
+  utils_zipTools,
   uICoderSocket;
 
 type

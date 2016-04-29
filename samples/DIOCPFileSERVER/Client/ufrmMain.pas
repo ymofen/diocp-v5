@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ExtCtrls, IdTCPClient, diocp.tcp.blockClient,
+  Dialogs, StdCtrls, ExtCtrls, IdTCPClient, diocp_tcp_blockClient,
   uICoderSocket, DiocpFileOperator;
 
 type

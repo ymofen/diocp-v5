@@ -3,8 +3,8 @@ unit utils_redis;
 interface
 
 uses
-  utils_DValue, SysUtils, diocp.core.rawWinSocket, diocp.winapi.winsock2, Classes, utils_rawPackage,
-  utils_async, utils.strings, SysConst;
+  utils_DValue, SysUtils, diocp_core_rawWinSocket, diocp_winapi_winsock2, Classes, utils_rawPackage,
+  utils_async, utils_strings, SysConst;
 
 const
   MAX_LEN = 10240;

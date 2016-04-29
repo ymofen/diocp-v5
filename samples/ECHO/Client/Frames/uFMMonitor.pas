@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, 
-  Dialogs, diocp.sockets, StdCtrls, ExtCtrls, uRunTimeINfoTools;
+  Dialogs, diocp_sockets, StdCtrls, ExtCtrls, uRunTimeINfoTools;
 
 type
   TFMMonitor = class(TFrame)

@@ -3,7 +3,7 @@ unit uIOCPMsgPackCoder;
 interface
 
 uses
-  diocp.coder.baseObject, diocp.tcp.server, qmsgpack, Classes, 
+  diocp_coder_baseObject, diocp_tcp_server, qmsgpack, Classes, 
   uZipTools, SysUtils, uMsgPackObject, uByteTools;
 
 const

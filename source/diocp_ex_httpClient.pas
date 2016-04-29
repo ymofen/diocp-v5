@@ -5,13 +5,13 @@ interface
 uses
   Classes
   {$IFDEF POSIX}
-  , diocp.core.rawPosixSocket
+  , diocp_core_rawPosixSocket
   {$ELSE}
-  , diocp.core.rawWinSocket
-  , diocp.winapi.winsock2
+  , diocp_core_rawWinSocket
+  , diocp_winapi_winsock2
   , SysConst
   {$ENDIF}
-  , SysUtils, utils_URL, utils.strings, diocp_ex_http_common;
+  , SysUtils, utils_URL, utils_strings, diocp_ex_http_common;
 
 
 

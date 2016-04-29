@@ -9,7 +9,7 @@ unit utils_dvalue_json;
 interface
 
 uses
-  utils_dvalue, utils.strings, classes, Math;
+  utils_dvalue, utils_strings, classes, Math;
 
 type
   TByteChar = record

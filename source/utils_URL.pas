@@ -3,7 +3,7 @@ unit utils_URL;
 interface
 
 uses
-  utils.strings;
+  utils_strings;
 
 
 type

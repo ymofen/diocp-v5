@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ActnList, diocp.coder.tcpServer, uDIOCPStreamCoder, ExtCtrls,
+  Dialogs, StdCtrls, ActnList, diocp_coder_tcpServer, uDIOCPStreamCoder, ExtCtrls,
   ComObj, ComCtrls, uMyClientContext;
 
 type

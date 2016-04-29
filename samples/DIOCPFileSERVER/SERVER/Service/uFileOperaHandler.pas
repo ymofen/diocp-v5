@@ -52,7 +52,7 @@ type
 implementation
 
 uses
-  utils.safeLogger;
+  utils_safeLogger;
 
 { TFTPWrapper_ProgressBar }
 

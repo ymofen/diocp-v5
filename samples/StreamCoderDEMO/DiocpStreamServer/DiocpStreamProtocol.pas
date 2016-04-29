@@ -42,7 +42,7 @@ type
 implementation
 
 uses
-  utils.byteTools;
+  utils_byteTools;
 
 constructor TDiocpStreamObject.Create;
 begin

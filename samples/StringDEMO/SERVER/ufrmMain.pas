@@ -4,8 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ActnList, diocp.tcp.server, ExtCtrls,
-  ComCtrls, utils.safeLogger, diocp.ex.server;
+  Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
+  ComCtrls, utils_safeLogger, diocp_ex_server;
 
 type
   TfrmMain = class(TForm)
@@ -55,7 +55,7 @@ var
 implementation
 
 uses
-  uFMMonitor, diocp.core.engine, diocp.core.rawWinSocket;
+  uFMMonitor, diocp_core_engine, diocp_core_rawWinSocket;
 
 {$R *.dfm}
 

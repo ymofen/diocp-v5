@@ -13,7 +13,7 @@ interface
 {$DEFINE USE_NetEncoding}
 {$ifend}
 uses
-  utils.strings, SysUtils, utils_dvalue
+  utils_strings, SysUtils, utils_dvalue
 {$IFDEF USE_NetEncoding}
     , System.NetEncoding
 {$ENDIF}
@@ -36,7 +36,7 @@ const
 
 type
 {$if CompilerVersion < 18}
-  TBytes = utils.strings.TBytes;
+  TBytes = utils_strings.TBytes;
 {$ifend}
 
   TDHttpCookie = class;

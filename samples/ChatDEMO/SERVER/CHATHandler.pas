@@ -3,7 +3,7 @@ unit CHATHandler;
 interface
 
 uses
-  SimpleMsgPack, diocp.session, diocp.tcp.server;
+  SimpleMsgPack, diocp.session, diocp_tcp_server;
 
 type
   TCHATSession = class(TSessionItem)
@@ -60,7 +60,7 @@ var
 implementation
 
 uses
-  utils.safeLogger, SysUtils, ComObj,diocp.coder.tcpServer,
+  utils_safeLogger, SysUtils, ComObj,diocp_coder_tcpServer,
   Classes;
 
 procedure SendCMDObject(pvCMDObject:TSimpleMsgPack; pvContext: TObject);

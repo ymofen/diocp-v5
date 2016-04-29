@@ -3,7 +3,7 @@ unit diocp_ex_strObjectCoder;
 interface
 
 uses
-  diocp.coder.baseObject, diocp.tcp.server, Classes, SysUtils, utils.buffer;
+  diocp_coder_baseObject, diocp_tcp_server, Classes, SysUtils, utils_buffer;
 
 type
   TMessageHead = packed record
@@ -57,7 +57,7 @@ function verifyData(const buf; len:Cardinal): Cardinal;
 implementation
 
 uses
-  utils.byteTools;
+  utils_byteTools;
 
 function verifyData(const buf; len: Cardinal): Cardinal;
 var

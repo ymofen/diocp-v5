@@ -4,10 +4,10 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
-  Controls, Forms, Dialogs, StdCtrls, diocp.coder.tcpClient,
-  utils.safeLogger,
+  Controls, Forms, Dialogs, StdCtrls, diocp_coder_tcpClient,
+  utils_safeLogger,
   uDIOCPDxStreamCoder,
-  diocp.task, diocp.sockets, diocp.tcp.client;
+  diocp_task, diocp_sockets, diocp_tcp_client;
 
 type
   TfrmMain = class(TForm)

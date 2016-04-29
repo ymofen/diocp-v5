@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls,diocp.udp, utils.safeLogger;
+  Dialogs, StdCtrls,diocp_udp, utils_safeLogger;
 
 type
   TForm1 = class(TForm)

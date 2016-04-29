@@ -9,7 +9,7 @@ unit uRawTcpClientCoderImpl;
 interface
 
 uses
-  uICoderSocket, diocp.tcp.blockClient;
+  uICoderSocket, diocp_tcp_blockClient;
 
 type
   TRawTcpClientCoderImpl = class(TInterfacedObject, ICoderSocket)

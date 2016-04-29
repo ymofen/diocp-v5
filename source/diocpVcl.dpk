@@ -31,6 +31,6 @@ requires
   rtl;
 
 contains
-  diocp.vclreg in 'diocp.vclreg.pas';
+  diocp_vclreg in 'diocp_vclreg.pas';
 
 end.

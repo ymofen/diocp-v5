@@ -3,7 +3,7 @@ unit diocp.ex.SimpleMsgPackSession;
 interface
 
 uses
-  diocp.ex.httpServer, SimpleMsgPack;
+  diocp_ex_httpServer, SimpleMsgPack;
 
 
 type

@@ -3,7 +3,7 @@ unit utils_fileWriter;
 interface
 
 uses
-  Classes, utils.strings, SysUtils;
+  Classes, utils_strings, SysUtils;
 
 type
   /// <summary>

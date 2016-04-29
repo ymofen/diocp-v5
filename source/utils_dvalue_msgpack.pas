@@ -3,7 +3,7 @@ unit utils_dvalue_msgpack;
 interface
 
 uses
-  utils_dvalue, utils.strings, classes, SysUtils;
+  utils_dvalue, utils_strings, classes, SysUtils;
 
 procedure MsgPackEncode(pvInDValue: TDValue; pvOutStream: TStream;
     pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);

@@ -3,7 +3,7 @@ unit DiocpStreamClientContext;
 interface
 
 uses
-  SysUtils, Classes, Windows, Math, diocp.tcp.server, DiocpStreamProtocol;
+  SysUtils, Classes, Windows, Math, diocp_tcp_server, DiocpStreamProtocol;
 
 
 type
