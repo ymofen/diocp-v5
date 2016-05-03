@@ -366,6 +366,7 @@ end;
 
 procedure TSafeLogger.CheckForWorker;
 begin
+  SetCurrentThreadInfo(Name +  ':logMessage CheckForWorker - 1.0');
   if AtomicCmpExchange(FWorkerAlive, 1, 0) = 0 then
   begin
     if FLogWorker = nil then
@@ -382,6 +383,7 @@ begin
   begin
     FLogWorker.FNotify.SetEvent;
   end;
+  SetCurrentThreadInfo(Name +  ':logMessage CheckForWorker - 2.0');
 end;
 
 constructor TSafeLogger.Create;
@@ -594,50 +596,59 @@ procedure TSafeLogger.logMessage(pvMsg: string; pvMsgType: string = '';
 var
   lvPData:TLogDataObject;
 begin
-  if not FEnable then exit;
-
-  if not (pvLevel in FLogFilter) then Exit;
-
+  SetCurrentThreadInfo(Name +  ':logMessage START');
   try
-    lvPData :=TLogDataObject(__dataObjectPool.DeQueueObject);
-    if lvPData = nil then lvPData:=TLogDataObject.Create;
-  {$IFDEF MSWINDOWS}
-    lvPData.FThreadID := GetCurrentThreadId;
-  {$ELSE}
-    lvPData.FThreadID := TThread.CurrentThread.ThreadID;
-  {$ENDIF};
-    lvPData.FTime := Now();
-    lvPData.FLogLevel := pvLevel;
-    lvPData.FMsg := pvMsg;
-    lvPData.FMsgType := pvMsgType;
-    // dataQueue只引用对象
-    FDataQueue.EnQueueObject(lvPData, raNone);
+    if not FEnable then exit;
 
-  {$IFDEF MSWINDOWS}
-    InterlockedIncrement(FPostCounter);
-  {$ELSE}
-    TInterlocked.Increment(FPostCounter);
+    if not (pvLevel in FLogFilter) then Exit;
 
-  {$ENDIF}
-  {$IFDEF MSWINDOWS}
-    if (FAppendInMainThread) and (FSyncMainThreadType = rtPostMessage) then
-    begin
-      if not isWorking then
+    try
+      SetCurrentThreadInfo(Name +  ':logMessage START - 1.0');
+      lvPData :=TLogDataObject(__dataObjectPool.DeQueueObject);
+      SetCurrentThreadInfo(Name +  ':logMessage START - 1.1');
+      if lvPData = nil then lvPData:=TLogDataObject.Create;
+    {$IFDEF MSWINDOWS}
+      lvPData.FThreadID := GetCurrentThreadId;
+    {$ELSE}
+      lvPData.FThreadID := TThread.CurrentThread.ThreadID;
+    {$ENDIF};
+      lvPData.FTime := Now();
+      lvPData.FLogLevel := pvLevel;
+      lvPData.FMsg := pvMsg;
+      lvPData.FMsgType := pvMsgType;
+      SetCurrentThreadInfo(Name +  ':logMessage START - 2.0');
+      // dataQueue只引用对象
+      FDataQueue.EnQueueObject(lvPData, raNone);
+
+      SetCurrentThreadInfo(Name +  ':logMessage START - 3.0');
+    {$IFDEF MSWINDOWS}
+      InterlockedIncrement(FPostCounter);
+    {$ELSE}
+      TInterlocked.Increment(FPostCounter);
+
+    {$ENDIF}
+    {$IFDEF MSWINDOWS}
+      if (FAppendInMainThread) and (FSyncMainThreadType = rtPostMessage) then
       begin
-        PostMessage(FMessageHandle, WM_NOTIFY_WORK, 0, 0);
+        if not isWorking then
+        begin
+          PostMessage(FMessageHandle, WM_NOTIFY_WORK, 0, 0);
+        end;
+      end else
+      begin
+        CheckForWorker;
       end;
-    end else
-    begin
+    {$ELSE}
       CheckForWorker;
+    {$ENDIF};
+    except
+      on E:Exception do
+      begin
+        SafeWriteFileMsg(Format(STRING_ERR_POSTLOGERR, [pvMsg, e.Message]), 'sfLogger_err_');
+      end;
     end;
-  {$ELSE}
-    CheckForWorker;
-  {$ENDIF};
-  except
-    on E:Exception do
-    begin
-      SafeWriteFileMsg(Format(STRING_ERR_POSTLOGERR, [pvMsg, e.Message]), 'sfLogger_err_');
-    end;
+  finally
+    SetCurrentThreadInfo(Name +  ':logMessage finally');
   end;
 end;
 
