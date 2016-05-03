@@ -28,6 +28,7 @@ type
   TDiocpHttpClient = class(TComponent)
   private
     FStringBuilder:TDStringBuilder;
+    FRequestHeaderBuilder:TDStringBuilder;
     FCustomeHeader: TStrings;
     FURL: TURL;
     FRawSocket: TRawSocket;
@@ -100,6 +101,7 @@ type
 
     property RequestBody: TMemoryStream read FRequestBody;
     property RequestHeader: TStringList read FRequestHeader;
+    property RequestHeaderBuilder: TDStringBuilder read FRequestHeaderBuilder;
 
     property ResponseBody: TMemoryStream read FResponseBody;
     property ResponseResultCode: Integer read GetResponseResultCode;
@@ -235,6 +237,7 @@ constructor TDiocpHttpClient.Create(AOwner: TComponent);
 begin
   inherited;
   FStringBuilder := TDStringBuilder.Create;
+  FRequestHeaderBuilder := TDStringBuilder.Create;
   FRawSocket := TRawSocket.Create;
   FRequestBody := TMemoryStream.Create;
   FRequestHeader := TStringList.Create;
@@ -267,6 +270,7 @@ begin
   FReponseBuilder.Free;
   FURL.Free;
   FStringBuilder.Free;
+  FRequestHeaderBuilder.Free;
   inherited;
 end;
 
@@ -535,15 +539,15 @@ begin
       RaiseLastOSError;
     end;
 
-    FStringBuilder.Clear;
-    FStringBuilder.Append(FRequestHeader.Text);
+    FRequestHeaderBuilder.Clear;
+    FRequestHeaderBuilder.Append(FRequestHeader.Text);
     if FCustomeHeader.Count > 0 then
     begin
-      FStringBuilder.Append(FCustomeHeader.Text);
+      FRequestHeaderBuilder.Append(FCustomeHeader.Text);
     end;
-    FStringBuilder.Append(FStringBuilder.LineBreak);
+    FRequestHeaderBuilder.Append(FRequestHeaderBuilder.LineBreak);
   {$IFDEF UNICODE}
-    lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
+    lvRawHeader := TEncoding.Default.GetBytes(FRequestHeaderBuilder.ToString());
     len := Length(lvRawHeader);
     r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
     CheckSocketResult(r);
@@ -552,7 +556,7 @@ begin
       raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
     end;
   {$ELSE}
-    lvRawHeader := FStringBuilder.ToString();
+    lvRawHeader := FRequestHeaderBuilder.ToString();
     len := Length(lvRawHeader);
     r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
     CheckSocketResult(r);

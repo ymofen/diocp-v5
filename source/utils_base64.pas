@@ -10,11 +10,12 @@ uses
     , System.NetEncoding
 {$ENDIF}
   ;
-
-{$IF (RTLVersion=22)}
+{$IFDEF UNICODE}
+{$IF (RTLVersion<=23)}
 type
   MarshaledAString = PAnsiChar;
-{$IFEND >=XE}
+{$IFEND >=XE2}
+{$ENDIF}
 
 
 function Base64Encode(pvStream: TStream; CharsPerLine: Integer = 0): string;
@@ -345,10 +346,10 @@ begin
       lvBuilder.ReleaseLockBuffer(l);
     end;
 
-    {$IFDEF UNICODE}
-    Result := MarshaledAString(lvBuilder.Memory);
-    {$ELSE}
+    {$IFDEF MSWINDOWS}
     Result := PAnsiChar(lvBuilder.Memory);
+    {$ELSE}
+    Result := MarshaledAString(lvBuilder.Memory);
     {$ENDIF}
   finally
     lvBuilder.Free;
@@ -453,11 +454,10 @@ begin
       lvBuilder.ReleaseLockBuffer(l);
     end;
 
-
-    {$IFDEF UNICODE}
-    Result := MarshaledAString(lvBuilder.Memory);
-    {$ELSE}
+    {$IFDEF MSWINDOWS}
     Result := PAnsiChar(lvBuilder.Memory);
+    {$ELSE}
+    Result := MarshaledAString(lvBuilder.Memory);
     {$ENDIF}
   finally
     lvBuilder.Free;
