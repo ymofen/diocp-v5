@@ -184,13 +184,9 @@ type
     /// </summary>
     property ContentDataLength: Integer read FContentDataLength;
 
-
     property HeaderAsMermory: PByte read GetHeaderAsMermory;
     property HeaderAsRAWString: RAWString read GetHeaderAsRAWString;
     property HeaderDataLength: Integer read GetHeaderDataLength;
-
-
-
 
     property RawHeader: String read FRawHeader;
 
@@ -224,6 +220,60 @@ type
     property RequestFormParams: TDValue read FRequestFormParams;
     property RequestParams: TDValue read FRequestParams;
     property RequestURL: String read FRequestURL;
+  end;
+
+  /// <summary>
+  ///   用于解码数据
+  /// </summary>
+  THttpBuffer = class(TObject)
+  private
+    // 接收数据的Builder
+    FRecvBuilder:TDBufferBuilder;
+
+    FContentBuilder: TDBufferBuilder;
+    FContentLength: Int64;
+    FHeaderBuilder: TDBufferBuilder;
+
+    FRecvSize: Integer;
+    
+    /// <summary>
+    ///   解码状态
+    /// </summary>
+    FDecodeState: Integer;
+
+    /// <summary>
+    ///   0: 需要初始化
+    ///   1: 已经初始化
+    /// </summary>
+    FFlag: Byte;
+
+    /// <summary>
+    ///  0: RawHeader;
+    ///  1: ContentAsRAWString;
+    /// </summary>
+    FSectionFlag: Byte;
+  public
+    constructor Create();
+
+    destructor Destroy; override;
+
+    procedure DoCleanUp;
+
+    /// <summary>THttpBuffer.InputBuffer
+    /// </summary>
+    /// <returns>
+    ///  0: 需要更多的数据来完成解码
+    ///  -2: 头部超过最大长度(MAX_HEADER_BUFFER_SIZE)
+    ///  1: 解码到头
+    ///  2: 解码到请求体
+    /// </returns>
+    /// <param name="pvByte"> (Byte) </param>
+    function InputBuffer(pvByte:Byte): Integer;
+
+    /// <summary>
+    ///   需要接收的数据长度
+    /// </summary>
+    property ContentLength: Int64 read FContentLength write FContentLength;
 
   end;
 
@@ -251,8 +301,8 @@ type
     property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
     property Headers: TDValue read FHeaders;
     property ResponseCode: Word read FResponseCode write FResponseCode;
-    property ResponseCodeStr: String read FResponseCodeStr write FResponseCodeStr;
 
+    property ResponseCodeStr: String read FResponseCodeStr write FResponseCodeStr;
 
 
     /// <summary>
@@ -1475,6 +1525,114 @@ end;
 procedure THttpResponse.ZCompressContent;
 begin
   ZCompressBufferBuilder(FContentBuffer);   
+end;
+
+{ THttpBuffer }
+
+constructor THttpBuffer.Create;
+begin
+  FContentBuilder := TDBufferBuilder.Create;
+  FHeaderBuilder := TDBufferBuilder.Create;
+end;
+
+destructor THttpBuffer.Destroy;
+begin
+  FreeAndNil(FContentBuilder);
+  FreeAndNil(FHeaderBuilder);
+  inherited Destroy;
+end;
+
+procedure THttpBuffer.DoCleanUp;
+begin
+  if FContentBuilder <> nil then
+    FContentBuilder.Clear;
+  if FHeaderBuilder <> nil then
+    FHeaderBuilder.Clear;
+
+  FRecvBuilder := FHeaderBuilder;
+
+  FRecvSize := 0;
+  FSectionFlag := 0;
+  FFlag := 0;
+  FDecodeState := 0;
+end;
+
+function THttpBuffer.InputBuffer(pvByte:Byte): Integer;
+
+  procedure InnerCaseZero;
+  begin
+    if pvByte = 13 then
+    begin
+      Inc(FDecodeState);
+    end;
+
+    if FHeaderBuilder.Size >= MAX_HEADER_BUFFER_SIZE then
+    begin            // 头部数据过长
+      FFlag := 0;
+      Result := -2;
+    end;
+  end;
+begin
+  Result := 0;
+  if FFlag = 0 then
+  begin
+    FContentBuilder.Clear;
+    FHeaderBuilder.Clear;
+    FFlag := 1;
+    FRecvSize := 0;
+  end;
+
+  FRecvBuilder.Append(pvByte);
+
+  case FDecodeState of
+    0:
+     begin
+       InnerCaseZero;
+     end;
+    1:    // 第一个 #10
+    begin
+      if pvByte = 10 then Inc(FDecodeState)
+      else
+      begin
+        FDecodeState := 0;
+        InnerCaseZero;
+      end;
+    end;
+    2:  // 第二个 #13
+    begin
+      if pvByte = 13 then Inc(FDecodeState)
+      else
+      begin
+        FDecodeState := 0;
+        InnerCaseZero;
+      end;
+    end;
+    3:  // 第二个 #10
+    begin
+      if pvByte = 10 then
+      begin  // Header
+        FSectionFlag := 1;
+        Result := 1;
+        Inc(FDecodeState);
+        
+        FRecvBuilder := FContentBuilder;
+        Exit;
+      end else
+      begin
+        FDecodeState := 0;
+        InnerCaseZero;
+      end;
+    end;
+    4:  // 接收Content
+    begin
+      if FContentLength = FContentBuilder.Size then
+      begin
+        Result := 2;     // ContentAsRAWString
+        FFlag := 0;      // 重新开始请求Buffer进行解码
+        Exit;
+      end;
+    end;
+  end;
 end;
 
 end.
