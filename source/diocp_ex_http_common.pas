@@ -270,10 +270,12 @@ type
     /// <param name="pvByte"> (Byte) </param>
     function InputBuffer(pvByte:Byte): Integer;
 
+    property ContentBuilder: TDBufferBuilder read FContentBuilder;
     /// <summary>
     ///   需要接收的数据长度
     /// </summary>
     property ContentLength: Int64 read FContentLength write FContentLength;
+    property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
 
   end;
 
@@ -1408,6 +1410,7 @@ end;
 procedure THttpResponse.DoCleanUp;
 begin
   FCookies.Clear;
+  FHeaders.Clear;
   FHeaderBuilder.Clear;
   FContentBuffer.Clear;
   FResponseCode := 0;

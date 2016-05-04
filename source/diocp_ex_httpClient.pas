@@ -27,6 +27,7 @@ type
 
   TDiocpHttpClient = class(TComponent)
   private
+    FHttpBuffer:THttpBuffer;
     FStringBuilder:TDStringBuilder;
     FRequestHeaderBuilder:TDStringBuilder;
     FCustomeHeader: TStrings;
@@ -54,15 +55,18 @@ type
     procedure CheckRecv(buf: Pointer; len: cardinal);
     procedure CheckSocketResult(pvSocketResult:Integer);
     procedure InnerExecuteRecvResponse();
+    procedure InnerExecuteRecvResponseTimeOut;
     procedure Close;
 
     procedure DoAfterResponse;
     function GetResponseResultCode: Integer;
 
+
     procedure ResetState;
   public
     procedure Cleaup;
     constructor Create(AOwner: TComponent); override;
+    
     destructor Destroy; override;
     procedure Post(pvURL:String);
     procedure Get(pvURL:String);
@@ -236,13 +240,15 @@ end;
 constructor TDiocpHttpClient.Create(AOwner: TComponent);
 begin
   inherited;
+  FHttpBuffer:= THttpBuffer.Create;
+  FReponseBuilder := FHttpBuffer.ContentBuilder;
+  
   FStringBuilder := TDStringBuilder.Create;
   FRequestHeaderBuilder := TDStringBuilder.Create;
   FRawSocket := TRawSocket.Create;
   FRequestBody := TMemoryStream.Create;
   FRequestHeader := TStringList.Create;
   FCustomeHeader := TStringList.Create;
-  FReponseBuilder := TDBufferBuilder.Create;
   FCustomeHeader.NameValueSeparator := ':';
 
   FResponseBody := TMemoryStream.Create;
@@ -267,10 +273,10 @@ begin
   FRequestHeader.Free;
   FCustomeHeader.Free;
   FRequestBody.Free;
-  FReponseBuilder.Free;
   FURL.Free;
   FStringBuilder.Free;
   FRequestHeaderBuilder.Free;
+  FHttpBuffer.Free;
   inherited;
 end;
 
@@ -412,69 +418,100 @@ begin
 end;
 
 procedure TDiocpHttpClient.InnerExecuteRecvResponse;
+const
+  BLOCK_SIZE = 2048;
 var
   lvRawHeader, lvBytes:TBytes;
-  r, l:Integer;
+  x, l:Integer;
   lvTempStr, lvRawHeaderStr:String;
   lvBuffer:PByte;
-begin
-  FReponseBuilder.Clear;
-  // 超过2048以外的长度，认为是错误的
-  SetLength(lvRawHeader, 2048);
-  FillChar(lvRawHeader[0], 2048, 0);
-  r := FRawSocket.RecvBufEnd(@lvRawHeader[0], 2048, @HTTP_HEADER_END[0], 4, FTimeOut);
-  if r = 0 then
-  begin
-    // 对方被关闭
-    Close;
-    raise Exception.Create('与服务器断开连接！');
-  end;
-  // 检测是否有错误
-  CheckSocketResult(r);
 
-  Inc(FResponseSize, r);
-  
-  {$IFDEF UNICODE}
-  lvRawHeaderStr := TEncoding.Default.GetString(lvRawHeader);
-  {$ELSE}
-  lvRawHeaderStr := StrPas(@lvRawHeader[0]);
-  {$ENDIF}
+  lvTempBuffer:array[0.. BLOCK_SIZE -1] of Byte;
 
-  FResponseHeader.Text := lvRawHeaderStr;
-  FResponseContentType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
-  lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
-  FResponseContentEncoding :=StringsValueOfName(FResponseHeader, 'Content-Encoding', [':'], True);
-  l := StrToIntDef(lvTempStr, 0);
-  if l > 0 then
+  function DecodeHttp():Integer;
+  var
+    r, i:Integer;
   begin
-    lvBuffer := FReponseBuilder.GetLockBuffer(l);
-    try
-      CheckRecv(lvBuffer, l);
-    finally
-      Inc(FResponseSize, l);
-      FReponseBuilder.ReleaseLockBuffer(l);
+    Result := 0;
+    for i := 0 to l - 1 do
+    begin
+      r := FHttpBuffer.InputBuffer(lvTempBuffer[i]);
+      Inc(FResponseSize);
+      if r = 1 then
+      begin
+        lvRawHeaderStr := FHttpBuffer.HeaderBuilder.ToRAWString;
+        FResponseHeader.Text := lvRawHeaderStr;
+        FResponseContentType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
+        lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
+        FResponseContentEncoding :=StringsValueOfName(FResponseHeader, 'Content-Encoding', [':'], True);
+        l := StrToIntDef(lvTempStr, 0);
+        if l = 0  then
+        begin
+          Result := 1;
+          Break;
+        end else
+        begin
+          FHttpBuffer.ContentLength := l;
+        end;
+      end else if r = -2 then               
+      begin
+        Close;
+        raise Exception.CreateFmt('%d超过Http设定的头部大小(%d)！', [FHttpBuffer.HeaderBuilder.Size, MAX_HEADER_BUFFER_SIZE]);
+      end else if r = 2 then
+      begin  // 解码到消息体
+        if FResponseContentEncoding = 'zlib' then
+        begin
+          ZDecompressBufferBuilder(FHttpBuffer.ContentBuilder);
+        end
+        {$if CompilerVersion>= 18}
+        {$IFDEF MSWINDOWS}
+        else if FResponseContentEncoding = 'gzip' then
+        begin
+          GZDecompressBufferBuilder(FHttpBuffer.ContentBuilder);
+        end
+        {$ENDIF}
+        {$ifend}
+        ;
+
+        l:= FHttpBuffer.ContentBuilder.Length;
+
+
+        FResponseBody.Size := l;
+        Move(FHttpBuffer.ContentBuilder.Memory^, FResponseBody.Memory^, l);
+
+        Result := 1;
+        Break;
+      end;
     end;
-
-    if FResponseContentEncoding = 'zlib' then
-    begin
-      ZDecompressBufferBuilder(FReponseBuilder);
-    end
-    {$if CompilerVersion>= 18}
-    {$IFDEF MSWINDOWS}
-    else if FResponseContentEncoding = 'gzip' then
-    begin
-      GZDecompressBufferBuilder(FReponseBuilder);
-    end
-    {$ENDIF}
-    {$ifend}
-    ;
-
-    l:= FReponseBuilder.Length;
-
-
-    FResponseBody.Size := l;
-    Move(FReponseBuilder.Memory^, FResponseBody.Memory^, l); 
   end;
+
+begin
+  FHttpBuffer.DoCleanUp;
+
+  while True do
+  begin
+//    if not FRawSocket.Readable(FTimeOut) then
+//    begin
+//      l := -2;
+//      CheckSocketResult(l);
+//    end;
+    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE, FTimeOut);
+    if l = -1 then CheckSocketResult(l);
+    if l = 0 then
+    begin
+      // 对方被关闭
+      Close;
+      raise Exception.Create('与服务器断开连接！');
+    end;
+    x := DecodeHttp;
+    if x = 1 then
+    begin
+      Break;
+    end;
+  end;
+
+
+
 
   lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
 
@@ -621,6 +658,7 @@ begin
   ResetState;
   FRawSocket.CreateTcpSocket;
   try
+    FRawSocket.SetNoDelayOption(true);
     // 进行域名解析
     lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
   
@@ -670,6 +708,84 @@ begin
     
   end;
   Result := FResponseResultCode;
+end;
+
+procedure TDiocpHttpClient.InnerExecuteRecvResponseTimeOut;
+var
+  lvRawHeader, lvBytes:TBytes;
+  r, l:Integer;
+  lvTempStr, lvRawHeaderStr:String;
+  lvBuffer:PByte;
+begin
+  FHttpBuffer.DoCleanUp;
+
+  FReponseBuilder.Clear;
+  // 超过2048以外的长度，认为是错误的
+  SetLength(lvRawHeader, 2048);
+  FillChar(lvRawHeader[0], 2048, 0);
+  r := FRawSocket.RecvBufEnd(@lvRawHeader[0], 2048, @HTTP_HEADER_END[0], 4, FTimeOut);
+  if r = 0 then
+  begin
+    // 对方被关闭
+    Close;
+    raise Exception.Create('与服务器断开连接！');
+  end;
+  // 检测是否有错误
+  CheckSocketResult(r);
+
+  Inc(FResponseSize, r);
+  
+  {$IFDEF UNICODE}
+  lvRawHeaderStr := TEncoding.Default.GetString(lvRawHeader);
+  {$ELSE}
+  lvRawHeaderStr := StrPas(@lvRawHeader[0]);
+  {$ENDIF}
+
+  FResponseHeader.Text := lvRawHeaderStr;
+  FResponseContentType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
+  lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
+  FResponseContentEncoding :=StringsValueOfName(FResponseHeader, 'Content-Encoding', [':'], True);
+  l := StrToIntDef(lvTempStr, 0);
+  if l > 0 then
+  begin
+    lvBuffer := FReponseBuilder.GetLockBuffer(l);
+    try
+      CheckRecv(lvBuffer, l);
+    finally
+      Inc(FResponseSize, l);
+      FReponseBuilder.ReleaseLockBuffer(l);
+    end;
+
+    if FResponseContentEncoding = 'zlib' then
+    begin
+      ZDecompressBufferBuilder(FReponseBuilder);
+    end
+    {$if CompilerVersion>= 18}
+    {$IFDEF MSWINDOWS}
+    else if FResponseContentEncoding = 'gzip' then
+    begin
+      GZDecompressBufferBuilder(FReponseBuilder);
+    end
+    {$ENDIF}
+    {$ifend}
+    ;
+
+    l:= FReponseBuilder.Length;
+
+
+    FResponseBody.Size := l;
+    Move(FReponseBuilder.Memory^, FResponseBody.Memory^, l); 
+  end;
+
+  lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
+
+  if lvTempStr <> '' then
+  begin  
+    FRawCookie := lvTempStr;
+  end;
+
+
+  DoAfterResponse; 
 end;
 
 procedure TDiocpHttpClient.ResetState;
