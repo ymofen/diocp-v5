@@ -41,6 +41,7 @@ procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
 procedure BindThreadObject(pvObject: TObject; pvFreeType: Integer = TYPE_NONE);
 function GetCurrentThreadBindObject: TObject;
 function GetThreadsHintInfo: String;
+procedure ResetThreadHintInfo;
 
 procedure InitalizeForThreadInfo;
 procedure FinalizeForThreadInfo;
@@ -205,6 +206,17 @@ begin
   if __waitEvent = nil then __waitEvent := TEvent.Create(nil, True, False, '');
   __worker := TRecordWorker.Create(pvInterval);
   
+end;
+
+procedure ResetThreadHintInfo;
+begin
+  __info_list.Lock;
+  try
+    __info_list.FreeAllDataAsObject;
+    __info_list.Clear;
+  finally
+    __info_list.UnLock;
+  end;
 end;
 
 destructor TThreadInfoObject.Destroy;

@@ -18,6 +18,7 @@ type
   private
     FData: Pointer;
     FDataObj: TObject;
+    FDataTag: Integer;
     FOnAsyncEvent: TOnASyncEvent;
     procedure SetDataObj(const Value: TObject);
   public
@@ -25,6 +26,8 @@ type
     procedure Execute; override;
     property Data: Pointer read FData write FData;
     property DataObj: TObject read FDataObj write SetDataObj;
+    property DataTag: Integer read FDataTag write FDataTag;
+
 
     property Terminated;     
   end;
@@ -51,7 +54,7 @@ type
   end;
 
 function ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
-    pvDataObject: TObject = nil): TASyncWorker;
+    pvDataObject: TObject = nil; pvDataTag: Integer = 0): TASyncWorker;
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 
@@ -75,11 +78,12 @@ begin
 end;
 
 function ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
-    pvDataObject: TObject = nil): TASyncWorker;
+    pvDataObject: TObject = nil; pvDataTag: Integer = 0): TASyncWorker;
 begin
   Result := TASyncWorker.Create(pvASyncProc);
   Result.Data := pvData;
   Result.DataObj := pvDataObject;
+  Result.DataTag := pvDataTag;
   Result.Resume;
 end;
 
