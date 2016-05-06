@@ -23,8 +23,6 @@ object frmMain: TfrmMain
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #21387#21147#27979#35797
-      ExplicitWidth = 281
-      ExplicitHeight = 165
       object Label1: TLabel
         Left = 24
         Top = 5
@@ -91,8 +89,6 @@ object frmMain: TfrmMain
     object TabSheet2: TTabSheet
       Caption = 'TabSheet2'
       ImageIndex = 1
-      ExplicitWidth = 281
-      ExplicitHeight = 165
     end
   end
   object mmoInfo: TMemo
@@ -104,7 +100,5 @@ object frmMain: TfrmMain
     Lines.Strings = (
       'mmoInfo')
     TabOrder = 1
-    ExplicitTop = 242
-    ExplicitHeight = 139
   end
 end
