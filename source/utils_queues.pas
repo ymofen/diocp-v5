@@ -476,16 +476,20 @@ end;
 function TQueueDataPool.Pop: PQueueData;
 begin
   FLocker.Enter;
-  Result := FFirst;
-  if Result <> nil then
-  begin
-    FFirst := Result.Next;
-    Dec(FCount);
+  try
+    Result := FFirst;
+    if Result <> nil then
+    begin
+      FFirst := Result.Next;
+      Dec(FCount);
+    end;
+    {$IFDEF DEBUG_ON}
+      Inc(FPopCounter);
+    {$ENDIF}
+  finally
+    FLocker.Leave;
   end;
-  {$IFDEF DEBUG_ON}
-    Inc(FPopCounter);
-  {$ENDIF}
-  FLocker.Leave;
+
 
   if Result = nil then
   begin
@@ -502,17 +506,21 @@ begin
   Assert(pvQueueData <> nil);
 
   FLocker.Enter;
-  ADoFree := (FCount = FSize);
-  if not ADoFree then
-  begin
-    pvQueueData.Next := FFirst;
-    FFirst := pvQueueData;
-    Inc(FCount);
+  try
+    ADoFree := (FCount >= FSize);
+    if not ADoFree then
+    begin
+      pvQueueData.Next := FFirst;
+      FFirst := pvQueueData;
+      Inc(FCount);
+    end;
+    {$IFDEF DEBUG_ON}
+    Inc(FPushCounter);
+    {$ENDIF}
+  finally
+    FLocker.Leave;
   end;
-  {$IFDEF DEBUG_ON}
-  Inc(FPushCounter);
-  {$ENDIF}
-  FLocker.Leave;
+
 
   if ADoFree then
   begin

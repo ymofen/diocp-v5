@@ -211,8 +211,7 @@ begin
   end else
   begin
     FFilePerSize := Value;
-  end;
-
+  end;  
   
 end;
 
