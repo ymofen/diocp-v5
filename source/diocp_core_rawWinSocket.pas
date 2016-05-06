@@ -371,29 +371,29 @@ begin
 end;
 
 function TRawSocket.Readable(pvTimeOut:Integer): Boolean;
-//var
-//  lvFDSet:TFDSet;
-//  lvTime_val: TTimeval;
 var
-  lvTick:Cardinal;
+  lvFDSet:TFDSet;
+  lvTime_val: TTimeval;
+//var
+//  lvTick:Cardinal;
 begin
-  lvTick := GetTickCount;
-  while (GetTickCount - lvTick) < pvTimeOut do
-  begin
-    Result := ReceiveLength > 0;
-    if Result then
-    begin
-      Break;
-    end;
-    Sleep(100);
-  end;
+//  lvTick := GetTickCount;
+//  while (GetTickCount - lvTick) < pvTimeOut do
+//  begin
+//    Result := ReceiveLength > 0;
+//    if Result then
+//    begin
+//      Break;
+//    end;
+//    Sleep(100);
+//  end;
 
-//  FD_ZERO(lvFDSet);
-//  _FD_SET(FSocketHandle, lvFDSet);
-//
-//  lvTime_val.tv_sec := pvTimeOut div 1000;
-//  lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
-//  Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
+  FD_ZERO(lvFDSet);
+  _FD_SET(FSocketHandle, lvFDSet);
+
+  lvTime_val.tv_sec := pvTimeOut div 1000;
+  lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
+  Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
 end;
 
 function TRawSocket.ReceiveLength: Integer;
@@ -416,7 +416,11 @@ begin
     begin
       Result := -2;
       Exit;
-    end else  if ReceiveLength > 0 then
+    end else if Readable(1000) then
+    begin
+      Result := recv(FSocketHandle, data, len, 0);
+      Exit;
+    end else if ReceiveLength > 0 then
     begin
       Result := recv(FSocketHandle, data, len, 0);
       Exit;

@@ -170,6 +170,8 @@ begin
   finally
     SpinUnLock(FSpinLock);
   end;
+
+  Self.Caption := 'diocpv5 echo client[stop]';
 end;
 
 procedure TfrmMain.btnConnectClick(Sender: TObject);
@@ -196,11 +198,9 @@ begin
 end;
 
 procedure TfrmMain.btnCreateClick(Sender: TObject);
-
 var
   lvClient:TIocpRemoteContext;
   i:Integer;
-
 begin
   chkRecvOnLog.Checked := StrToInt(edtCount.Text) < 10;
   SpinLock(FSpinLock);
@@ -215,6 +215,8 @@ begin
       lvClient.AutoReConnect := true;
       lvClient.connectASync;
     end;
+
+    Self.Caption := Format('diocpv5 echo client[running:%d]', [StrToInt(edtCount.Text)]);
   finally
     SpinUnLock(FSpinLock);
   end;
@@ -487,6 +489,7 @@ begin
   chkRecvOnLog.Checked := lvDValue.ForceByName('chk_recvonlog').AsBoolean;
   chkSendData.Checked := lvDValue.ForceByName('chk_send_onconnected').AsBoolean;
 
+
   chkHex.Tag := 1;
   chkHex.Checked := lvDValue.ForceByName('chk_send_hex').AsBoolean;
   chkHex.Tag := 0;
@@ -498,7 +501,8 @@ begin
   edtInterval.Text := IntToStr(lvDValue.ForceByName('send_interval').AsInteger);
   mmoIntervalData.Lines.Text := lvDValue.ForceByName('send_interval_data').AsString;
   mmoOnConnected.Lines.Text := lvDValue.ForceByName('send_onconnected_data').AsString;
-
+  edtCount.Text := lvDValue.ForceByName('client_num').AsString;
+  
   lvDValue.Free;
 
   FSendDataOnConnected := chkSendData.Checked;
@@ -530,6 +534,7 @@ begin
   lvDValue := TDValue.Create();
   lvDValue.ForceByName('host').AsString := edtHost.Text;
   lvDValue.ForceByName('port').AsString := edtPort.Text;
+  lvDValue.ForceByName('client_num').AsString := edtCount.Text;
   lvDValue.ForceByName('sendText').AsString := mmoData.Lines.Text;
   lvDValue.ForceByName('chk_recvecho').AsBoolean := chkRecvEcho.Checked;
   lvDValue.ForceByName('chk_recvonlog').AsBoolean := chkRecvOnLog.Checked;
