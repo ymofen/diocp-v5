@@ -218,6 +218,7 @@ type
     FValue: TDValueItem;
     FObjectType: TDValueObjectType;
     FParent: TDValue;
+    FLastMsg:String;
 
     {$IFDEF HAVE_GENERICS}
     FChildren: TList<TDValue>;
@@ -1486,6 +1487,11 @@ begin
   begin
     for i := 0 to FChildren.Count - 1 do
     begin
+      try
+        FLastMsg := Format('[%d/%d]:%s', [i, FChildren.Count, TObject(FChildren[i]).ClassName]);
+      except
+        FLastMsg := Format('[%d/%d]', [i, FChildren.Count]);
+      end;
       TDValueItem(FChildren[i]).Free;
     end;
     FChildren.Clear;
@@ -1715,6 +1721,7 @@ var
   lvDebug:String;
 begin
   try
+    FLastMsg := '';
     lvDebug := 'ClearChildren';
     ClearChildren;
     lvDebug := 'Value.Clear';
@@ -1722,7 +1729,7 @@ begin
   except
     on e:Exception do
     begin
-      raise Exception.CreateFmt('%s:%s:%s', [e.ClassName, lvDebug, e.Message]);
+      raise Exception.CreateFmt('%s(%s):%s:%s', [e.ClassName, FLastMsg, lvDebug, e.Message]);
     end;
   end;
 end;
