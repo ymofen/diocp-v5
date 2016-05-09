@@ -88,7 +88,6 @@ type
   private
     FData: TCharArray;
     FPosition: Integer;
-    FMaxCapacity: Integer;
     FCapacity :Integer;
     FLineBreak: String;
     procedure CheckNeedSize(pvSize: LongInt);
@@ -123,7 +122,6 @@ type
     FData: TBytes;
     FPosition: Integer;
     FSize: Integer;
-    FMaxCapacity: Integer;
     FCapacity :Integer;
     FBufferLocked:Boolean;
     FLineBreak: String;
@@ -152,7 +150,7 @@ type
     function AppendSingleQuoteStr(str:string): TDBufferBuilder;
     function AppendLine(str:string): TDBufferBuilder;
 
-    function LoadFromFile(pvFileName:string): Integer;
+    procedure LoadFromFile(pvFileName:string);
 
     procedure LoadFromStream(pvStream: TStream); overload;
     procedure SaveToFile(pvFile:String);
@@ -200,7 +198,7 @@ type
 
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(Offset: Longint; Origin: Word): Longint; override;
-    function Write(const Buffer; Count: Longint): Longint; override;
+    function Write(const Buffer; Count: Longint): Integer; override;
     procedure SetSize(NewSize: Longint); override;
 
     /// <summary>
@@ -509,8 +507,10 @@ type
 var
   hMsvcrtl: HMODULE;
   VCStrStr: TMSVCStrStr;
+{$IFDEF UNICODE}
   VCStrStrW: TMSVCStrStrW;
-  VCMemCmp: TMSVCMemCmp;
+{$ENDIF}
+//  VCMemCmp: TMSVCMemCmp;
 {$ENDIF}
 
 {$if CompilerVersion < 20}
@@ -1297,7 +1297,7 @@ begin
 {$IFDEF UNICODE}
   Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
 {$ELSE}
-  l := Length(pvBytes) - pvOffset;
+  l := Cardinal(Length(pvBytes)) - pvOffset;
   SetLength(lvRawStr, l);
   Move(pvBytes[pvOffset], PansiChar(lvRawStr)^, l);
   Result := UTF8Decode(lvRawStr);
@@ -1330,6 +1330,7 @@ begin
 {$ELSE}
   lvRawStr := pvData;
   Move(PAnsiChar(lvRawStr)^, pvBytes[0], Length(lvRawStr));
+  Result := Length(lvRawStr);
 {$ENDIF}
 end;
 
@@ -1595,7 +1596,6 @@ end;
 function TDBufferBuilder.Append(str: string; pvConvertToUtf8Bytes: Boolean):
     TDBufferBuilder;
 var
-  l:Integer;
   lvBytes:TBytes;
 begin
   if pvConvertToUtf8Bytes then
@@ -1674,7 +1674,6 @@ end;
 
 function TDBufferBuilder.AppendUtf8(str:String): TDBufferBuilder;
 var
-  l:Integer;
   lvBytes:TBytes;
 begin 
   Result := Self;
@@ -1745,7 +1744,7 @@ begin
   Result := FSize - FPosition;
 end;
 
-function TDBufferBuilder.LoadFromFile(pvFileName:string): Integer;
+procedure TDBufferBuilder.LoadFromFile(pvFileName:string);
 var
   Stream: TStream;
 begin
@@ -1787,7 +1786,6 @@ end;
 
 function TDBufferBuilder.Read(var Buffer; Count: Longint): Longint;
 begin
-  Result := 0;
   Result := FSize - FPosition;
   if Result = 0 then Exit;
 
@@ -1904,9 +1902,7 @@ begin
 {$ENDIF}
 end;
 
-function TDBufferBuilder.Write(const Buffer; Count: Longint): Longint;
-var
-  Pos: Longint;
+function TDBufferBuilder.Write(const Buffer; Count: Longint): Integer;
 begin
   if FBufferLocked then
   begin
@@ -1916,6 +1912,7 @@ begin
   Move(Buffer, FData[FPosition], Count);
   Inc(FPosition, Count);
   if FPosition >= FSize then FSize := FPosition;
+  Result := Count;
 end;
 
 
@@ -2018,18 +2015,19 @@ end;
 initialization
 
 {$IFDEF MSWINDOWS}
+VCStrStr := nil;
+{$IFDEF UNICODE}
+VCStrStrW := nil;
+{$ENDIF}
+//VCMemCmp := nil;
 hMsvcrtl := LoadLibrary('msvcrt.dll');
 if hMsvcrtl <> 0 then
 begin
   VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
+  {$IFDEF UNICODE}
   VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
-  VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
-end
-else
-begin
-  VCStrStr := nil;
-  VCStrStrW := nil;
-  VCMemCmp := nil;
+  {$ENDIF}
+  //VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
 end;
 {$ENDIF}
 

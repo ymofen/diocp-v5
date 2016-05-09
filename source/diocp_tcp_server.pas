@@ -3059,6 +3059,7 @@ var
   lvRequest:TIocpAcceptExRequest;
   i, j:Integer;
 begin
+  j := 0;
   Assert(FOwner <> nil);
   FLocker.lock;
   try
@@ -3359,9 +3360,11 @@ var
   lvRefCount:Integer;
   lvDebugStep:Integer;
 begin
+  lvDebugStep := 1;
+  lvDNACounter := 0;
   try
-    lvDebugStep := 1;
     lvDNACounter := Self.FCounter;
+
 
     {$IFDEF DEBUG_ON}
     InterlockedDecrement(FOverlapped.RefCount);
@@ -3884,6 +3887,11 @@ begin
 
     FPushSendQueueCounter := 0;
     FResponseSendObjectCounter := 0;
+
+    FSpeed_WSASentSize := 0;
+    FSpeed_WSARecvSize := 0;
+    FLastSpeed_RecvSize := 0;
+    FLastSpeed_WSASentSize := 0;
 
     //FPostWSAAcceptExCounter:=0;
     //FResponseWSAAcceptExCounter:=0;

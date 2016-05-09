@@ -221,6 +221,7 @@ end;
 
 /// <summary>
 ///   检测一块内存是否有越界情况
+///   false 有越界清空
 /// </summary>
 function CheckBufferBlockBounds(ABlock: PBufferBlock): Boolean;
 var
@@ -230,6 +231,7 @@ begin
   Result := True;
   lvBuffer:= PByte(ABlock);
   Inc(lvBuffer, BLOCK_SIZE + ABlock.owner.FBlockSize);
+
   for I := 0 to protect_size - 1 do
   begin
     if lvBuffer^ <> 0 then
@@ -238,7 +240,8 @@ begin
       Break;
     end;
     Inc(lvBuffer);
-  end;      
+  end;
+
 end;
 
 function GetBuffer(ABuffPool:PBufferPool): PByte;
@@ -326,7 +329,7 @@ end;
 
 function ReleaseRef(pvBuffer:PByte): Integer;
 begin
-  ReleaseRef(pvBuffer, True);
+  Result := ReleaseRef(pvBuffer, True);
 end;
 
 function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
@@ -375,9 +378,8 @@ end;
 
 function CheckBufferBounds(ABuffPool:PBufferPool): Integer;
 var
-  lvBlock, lvNext:PBufferBlock;  
+  lvBlock:PBufferBlock;  
 begin
-  Result := 0;
   if protect_size = 0 then
   begin   // 没有保护边界的大小
     Result := -1;

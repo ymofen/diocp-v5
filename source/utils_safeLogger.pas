@@ -768,11 +768,11 @@ begin
       FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor()';
       SetCurrentThreadInfo(FSafeLogger.Name +  ':Safelogger.Thread.Execute::FNotify.WaitFor()');
       lvWaitResult := FNotify.WaitFor(1000 * 30);
+      i := 0;
       if (lvWaitResult=wrSignaled) then
       begin
         try
           try
-            i := 0;
             FSafeLogger.FDebugInfo := 'Thread.Execute::FNotify.WaitFor(), succ';
             SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::FNotify.WaitFor(), succ');
             while not self.Terminated do

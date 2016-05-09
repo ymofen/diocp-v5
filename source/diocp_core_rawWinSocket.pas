@@ -106,6 +106,9 @@ type
 
     function Readable(pvTimeOut:Integer): Boolean;
 
+    /// <summary>
+    ///  -1:出现了异常
+    /// </summary>
     function ReceiveLength: Integer;
 
     function SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
@@ -401,6 +404,10 @@ var
   r :Integer;
 begin
   r := ioctlsocket(FSocketHandle, FIONREAD, Cardinal(Result));
+  if r = -1 then
+  begin
+    Result := -1;
+  end;
 end;            
 
 

@@ -952,10 +952,9 @@ end;
 function TIocpEngine.GetWorkersHtmlInfo(pvTableID: String = ''): String;
 var
   lvStrings :TStrings;
-  i, j:Integer;
+  i:Integer;
   s:String;
   lvWorker:TIocpWorker;
-  lvTickcount:Cardinal;
 begin
   lvStrings := TStringList.Create;
   try
@@ -970,8 +969,6 @@ begin
     lvStrings.Add('<td>last_end</td>');
     lvStrings.Add('<td>hint</td>');
     lvStrings.Add('</tr>');
-    j := 0;
-    lvTickcount := GetTickCount;
     self.FWorkerLocker.lock;
     try
       for i := 0 to FWorkerList.Count - 1 do
@@ -1003,15 +1000,12 @@ end;
 function TIocpEngine.GetWorkersInfo: String;
 var
   lvStrings :TStrings;
-  i, j:Integer;
+  i:Integer;
   s:String;
   lvWorker:TIocpWorker;
-  lvTickcount:Cardinal;
 begin
   lvStrings := TStringList.Create;
   try
-    j := 0;
-    lvTickcount := GetTickCount;
     self.FWorkerLocker.lock;
     try
       for i := 0 to FWorkerList.Count - 1 do
