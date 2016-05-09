@@ -19,7 +19,9 @@ interface
 uses
   diocp_sockets, SysUtils, diocp_sockets_utils
   {$IFDEF UNICODE}, Generics.Collections{$ELSE}, Contnrs {$ENDIF}
-  , Classes, Windows, utils_objectPool, diocp_res, utils_buffer;
+  , Classes, Windows, utils_objectPool, diocp_res
+  , utils_async
+  , utils_buffer;
 
 type
   TIocpRemoteContext = class(TDiocpCustomContext)

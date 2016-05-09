@@ -59,8 +59,9 @@ type
     FPort: Integer;
     FRawSocket: TRawSocket;
     FReadTimeOut: Integer;
+    function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
-    
+
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -103,7 +104,7 @@ type
         Integer): Integer;
     property RawSocket: TRawSocket read FRawSocket;
   published
-    property Active: Boolean read FActive write SetActive;
+    property Active: Boolean read GetActive write SetActive;
 
     property Host: String read FHost write FHost;
 
@@ -247,13 +248,15 @@ end;
 procedure TDiocpBlockTcpClient.Disconnect;
 begin
   if not FActive then Exit;
-
   if Assigned(FOnDisconnected) then FOnDisconnected(Self);
-  
 
   FRawSocket.Close(False);
-
   FActive := false;
+end;
+
+function TDiocpBlockTcpClient.GetActive: Boolean;
+begin
+  Result := FActive;
 end;
 
 function TDiocpBlockTcpClient.Peek(buf: Pointer; len: Cardinal): Integer;
@@ -284,6 +287,7 @@ begin
 
     if lvTempL = 0 then
     begin
+      Disconnect;
       raise Exception.Create(STRING_E_RECV_ZERO);
     end;
 
@@ -302,6 +306,7 @@ begin
     Result := FRawSocket.RecvBuf(buf^, len, FReadTimeOut);
   if Result = 0 then
   begin
+    Disconnect;
     raise Exception.Create(STRING_E_RECV_ZERO);
   end;
   CheckSocketResult(Result);
@@ -313,6 +318,7 @@ begin
   Result := FRawSocket.RecvBufEnd(buf, len, endBuf, endBufLen, FReadTimeOut);
   if Result = 0 then
   begin
+    Disconnect;
     raise Exception.Create(STRING_E_RECV_ZERO);
   end;
   CheckSocketResult(Result);
