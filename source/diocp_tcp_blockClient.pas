@@ -210,18 +210,25 @@ begin
   if FActive then exit;
 
   FRawSocket.createTcpSocket;
-  if FReadTimeOut > 0 then
-  begin
-    FRawSocket.setReadTimeOut(FReadTimeOut);
-  end;
+  try
+    if FReadTimeOut > 0 then
+    begin
+      FRawSocket.setReadTimeOut(FReadTimeOut);
+    end;
 
-  // 进行域名解析
-  lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
+    // 进行域名解析
+    lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
 
-  FActive := FRawSocket.connect(lvIpAddr, FPort);
-  if not FActive then
-  begin
-    RaiseLastOSError;
+    FActive := FRawSocket.connect(lvIpAddr, FPort);
+    if not FActive then
+    begin
+      RaiseLastOSError;
+    end;
+  finally
+    if not FActive then
+    begin
+      FRawSocket.Close(False);    
+    end;                      
   end;
 end;
 
