@@ -341,6 +341,7 @@ type
     /// </summary>
     function RemoveByName(pvName:String): Integer;
 
+
     function IndexDataOf(pvData:Pointer): Integer;
 
     /// <summary>
@@ -417,7 +418,7 @@ type
     function GetValueByPath(pvPath: string; pvDefault: Int64): Int64; overload;
     function GetValueByPath(pvPath:string; pvDefault:Boolean): Boolean; overload;
     function GetValueByPath(pvPath:string; pvDefault:Double): Double; overload;
-
+    function GetValueByPath(pvPath:string; pvDefault:TObject): TObject; overload;
 
     /// <summary>
     ///   把流进行Base64编码赋值给Value
@@ -2044,6 +2045,20 @@ begin
   end else
   begin
     Result := lvItem.AsString;
+  end;
+end;
+
+function TDValue.GetValueByPath(pvPath:string; pvDefault:TObject): TObject;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByPath(pvPath);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsObject;
   end;
 end;
 
