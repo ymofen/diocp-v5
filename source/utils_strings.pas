@@ -189,6 +189,8 @@ type
     /// </summary>
     function ToBytes: TBytes;
 
+    function DecodeUTF8: string;
+
     function ToRAWString: RAWString;
 
     /// <summary>
@@ -1714,6 +1716,18 @@ begin
   ZeroMemory(@FData[0], FCapacity);
   {$ENDIF}
   {$ENDIF}
+end;
+
+function TDBufferBuilder.DecodeUTF8: string;
+begin
+{$IFDEF MSWINDOWS}
+  Result := Utf8BufferToString(@FData[0], FSize);
+{$ELSE}
+  CheckNeedSize(2);
+  FData[FSize] := 0;
+  FData[FSize + 1] := 0;
+  Result := TEncoding.UTF8.GetString(FData, 0, self.Length);
+{$ENDIF}
 end;
 
 function TDBufferBuilder.ReArrange: TDBufferBuilder;
