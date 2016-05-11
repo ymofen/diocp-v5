@@ -62,7 +62,7 @@ type
 
 
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
-    vdtInteger, vdtInt64, vdtCurrency, vdtGuid, vdtDateTime,
+    vdtInteger, vdtInt64, vdtUInt64, vdtCurrency, vdtGuid, vdtDateTime,
     vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtObject, vdtArray);
 
   TDValueDataTypes = set of TDValueDataType;
@@ -90,6 +90,8 @@ type
         (AsInteger: Integer);
       3:
         (AsInt64: Int64);
+      4:
+        (AsUInt64: UInt64);
       5:
         (AsGuid: PGuid);
       6:
@@ -271,6 +273,8 @@ type
     procedure SetAsString(const Value: String);
     function GetAsObject: TObject;
     function GetAsStream: TMemoryStream;
+    function GetAsUInt: UInt64;
+    procedure SetAsUInt(const Value: UInt64);
   public
     constructor Create(pvType: TDValueObjectType); overload;
 
@@ -440,9 +444,12 @@ type
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
+    property AsUInt: UInt64 read GetAsUInt write SetAsUInt;
+
     property AsObject: TObject read GetAsObject;
 
     property AsStream: TMemoryStream read GetAsStream;
+
 
 
 
@@ -463,6 +470,7 @@ type
 
     function GetAsObject: TObject;
     function GetAsStream: TMemoryStream;
+    function GetAsUInt: UInt64;
 
     procedure SetAsBoolean(const Value: Boolean);
     procedure SetAsFloat(const Value: Double);
@@ -470,6 +478,7 @@ type
     procedure SetAsInterface(const Value: IInterface);
 
     procedure SetAsString(const Value: String);
+    procedure SetAsUInt(const Value: UInt64);
   public
     procedure CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes: TDValueDataTypes
         = [vdtInterface, vdtObject, vdtPtr]);
@@ -498,6 +507,8 @@ type
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
+    property AsUInt: UInt64 read GetAsUInt write SetAsUInt;
+
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsObject: TObject read GetAsObject;
 
@@ -509,6 +520,7 @@ type
 
     procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
         faFree);
+
 
     /// <summary>
     ///   根据索引获取对象
@@ -559,6 +571,10 @@ function DValueGetAsInterface(ADValue:PDRawValue): IInterface;
 procedure DValueSetAsInt64(ADValue:PDRawValue; pvValue:Int64);
 function DValueGetAsInt64(ADValue: PDRawValue): Int64;
 
+procedure DValueSetAsUInt64(ADValue:PDRawValue; pvValue:UInt64);
+function DValueGetAsUInt64(ADValue: PDRawValue): UInt64;
+
+
 procedure DValueSetAsInteger(ADValue:PDRawValue; pvValue:Integer);
 function DValueGetAsInteger(ADValue: PDRawValue): Integer;
 
@@ -592,7 +608,7 @@ resourcestring
 
 const
   DValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
-    'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'Currency', 'Guid',
+    'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'UInt64', 'Currency', 'Guid',
     'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'Pointer', 'Object', 'Array');
 
 procedure FreeObject(AObject: TObject);
@@ -707,6 +723,8 @@ begin
       Result := SizeOf(Integer);
     vdtInt64:
       Result := SizeOf(Int64);
+    vdtUInt64:
+      Result := SizeOf(UInt64);
     vdtCurrency:
       Result := SizeOf(Currency);
     vdtGuid:
@@ -1343,6 +1361,40 @@ begin
   end;
 end;
 
+procedure DValueSetAsUInt64(ADValue:PDRawValue; pvValue:UInt64);
+begin
+  CheckDValueSetType(ADValue, vdtUInt64);
+  ADValue.Value.AsUInt64 := pvValue;
+end;
+
+function DValueGetAsUInt64(ADValue: PDRawValue): UInt64;
+begin
+  case ADValue.ValueType of
+    vdtInt64:
+      Result := UInt64(ADValue.Value.AsInt64);
+    vdtUInt64:
+      Result := UInt64(ADValue.Value.AsUInt64);
+    vdtInteger:
+      Result := UInt64(ADValue.Value.AsInteger);    
+    vdtUnset, vdtNull:
+      Result := 0;
+    vdtBoolean:
+      Result := UInt64(ADValue.Value.AsBoolean);
+    vdtSingle:
+      Result := UInt64(Trunc(ADValue.Value.AsSingle));
+    vdtFloat, vdtDateTime:
+      Result := UInt64(Trunc(ADValue.Value.AsFloat));
+    vdtCurrency:
+      Result := ADValue.Value.AsUInt64 div 10000;
+    vdtString:
+      Result := StrToInt64(ADValue.Value.AsString^)
+  else
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
+      DValueTypeName[vdtInt64]]);
+  end;
+
+end;
+
 destructor TDValueObject.Destroy;
 begin
   ClearDValue(@FRawValue);
@@ -1884,6 +1936,11 @@ begin
   Result := FValue.GetAsString;
 end;
 
+function TDValue.GetAsUInt: UInt64;
+begin
+  Result := FValue.AsUInt;
+end;
+
 function TDValue.GetValueByName(pvName:String; pvDefault:Boolean): Boolean;
 var
   lvItem:TDValue;
@@ -2209,6 +2266,11 @@ begin
   FValue.SetAsString(Value);
 end;
 
+procedure TDValue.SetAsUInt(const Value: UInt64);
+begin
+  FValue.SetAsUInt(Value);
+end;
+
 function TDValue.ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
     ''; pvValueDelimiter: string = sLineBreak): String;
 var
@@ -2345,6 +2407,11 @@ begin
   Result := DValueGetAsString(@FRawValue);
 end;
 
+function TDValueItem.GetAsUInt: UInt64;
+begin
+  Result := DValueGetAsUInt64(@FRawValue);
+end;
+
 function TDValueItem.GetDataType: TDValueDataType;
 begin
   Result := FRawValue.ValueType;
@@ -2395,6 +2462,11 @@ end;
 procedure TDValueItem.SetAsString(const Value: String);
 begin
   DValueSetAsString(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetAsUInt(const Value: UInt64);
+begin
+  // TODO -cMM: TDValueItem.SetAsUInt default body inserted
 end;
 
 end.

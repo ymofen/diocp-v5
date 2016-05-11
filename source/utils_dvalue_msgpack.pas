@@ -843,6 +843,7 @@ begin
         end;
       $cf:
         begin
+          // delphi÷–√ª”–uint64
           //  uint 64 stores a 64-bit big-endian unsigned integer
           //  +--------+--------+--------+--------+--------+--------+--------+--------+--------+
           //  |  0xcf  |ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|
