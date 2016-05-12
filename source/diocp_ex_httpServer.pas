@@ -639,7 +639,6 @@ end;
 
 function TDiocpHttpRequest.GetCookie(pvCookieName: string): String;
 var
-  i:Integer;
   lvCookie:TDiocpHttpCookie;
 begin
   lvCookie := FResponse.FInnerResponse.GetCookie(pvCookieName);
@@ -1441,7 +1440,11 @@ begin
     if lvSession <> nil then
     begin
       // 会触发OnSessionRemove, 归还对应的对象到池
-      FSessionList.Remove(pvSessionID);
+      Result := FSessionList.Remove(pvSessionID);
+
+    end else
+    begin
+      Result := false;
     end;
   finally
     FSessionList.unLock;

@@ -21,6 +21,8 @@ uses
   {$IFDEF UNICODE}, Generics.Collections{$ELSE}, Contnrs {$ENDIF}
   , Classes, Windows, utils_objectPool, diocp_res
   , utils_async
+  , utils_fileWriter
+  , utils_threadinfo
   , utils_buffer;
 
 type
@@ -98,20 +100,16 @@ type
     function GetCount: Integer;
     function GetItems(pvIndex: Integer): TIocpRemoteContext;
   private
+    FASyncInvoker:TASyncInvoker;
     FDisableAutoConnect: Boolean;
-    FReconnectRequestPool:TObjectPool;
 
-    function CreateReconnectRequest:TObject;
-
+  private
     /// <summary>
-    ///   响应完成，归还请求对象到池
+    ///  检测使用重新连接 ,单线程使用，仅供DoAutoReconnect调用
     /// </summary>
-    procedure OnReconnectRequestResponseDone(pvObject:TObject);
-
-    /// <summary>
-    ///   响应重连请求Request
-    /// </summary>
-    procedure OnReconnectRequestResponse(pvObject:TObject);
+    procedure DoAutoReconnect(pvASyncWorker:TASyncWorker);
+    procedure OnASyncWork(pvASyncWorker:TASyncWorker);
+    procedure SetDisableAutoConnect(const Value: Boolean);
   private
   {$IFDEF UNICODE}
     FList: TObjectList<TIocpRemoteContext>;
@@ -119,10 +117,6 @@ type
     FList: TObjectList;
   {$ENDIF}
   protected
-    /// <summary>
-    ///   投递重连请求事件
-    /// </summary>
-    procedure PostReconnectRequestEvent(pvContext: TIocpRemoteContext);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -146,7 +140,8 @@ type
     /// <summary>
     ///   禁止所有连接对象自动重连
     /// </summary>
-    property DisableAutoConnect: Boolean read FDisableAutoConnect write FDisableAutoConnect;
+    property DisableAutoConnect: Boolean read FDisableAutoConnect write
+        SetDisableAutoConnect;
 
     /// <summary>
     ///   通过位置索引获取其中的一个连接
@@ -287,14 +282,7 @@ begin
 
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
 
-      if (CanAutoReConnect) then
-      begin
-        Sleep(100);
-        PostConnectRequest;
-      end else
-      begin
-        SetSocketState(ssDisconnected);
-      end;
+      SetSocketState(ssDisconnected);
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;
@@ -327,10 +315,6 @@ begin
       if not FConnectExRequest.PostRequest(FHost, FPort) then
       begin
         FIsConnecting := false;
-
-        Sleep(1000);
-
-        if CanAutoReConnect then Result := PostConnectRequest;
       end else
       begin
         Result := True;
@@ -358,22 +342,16 @@ end;
 
 procedure TIocpRemoteContext.SetSocketState(pvState: TSocketState);
 begin
-  inherited;
+  inherited SetSocketState(pvState);
   if pvState = ssDisconnected then
   begin
     // 记录最后断开时间
     FLastDisconnectTime := GetTickCount;
-
-    if CanAutoReConnect then
-    begin
-      TDiocpTcpClient(Owner).PostReconnectRequestEvent(Self);
-    end;
   end;
 end;
 
 procedure TDiocpTcpClient.ClearContexts;
 begin
-  FReconnectRequestPool.WaitFor(20000);
   FList.Clear;
 end;
 
@@ -385,25 +363,41 @@ begin
 {$ELSE}
   FList := TObjectList.Create();
 {$ENDIF}
-  FDisableAutoConnect := false;
+  FASyncInvoker := TASyncInvoker.Create;
 
-  FReconnectRequestPool := TObjectPool.Create(CreateReconnectRequest);
-end;
-
-function TDiocpTcpClient.CreateReconnectRequest: TObject;
-begin
-  Result := TIocpASyncRequest.Create;
-
+  DisableAutoConnect := False;
 end;
 
 destructor TDiocpTcpClient.Destroy;
 begin
-  FReconnectRequestPool.WaitFor(20000);
+  FASyncInvoker.Terminate;
+  FASyncInvoker.WaitForStop;
   Close;
   FList.Clear;
   FList.Free;
-  FReconnectRequestPool.Free;
+  FASyncInvoker.Free;
   inherited Destroy;
+end;
+
+procedure TDiocpTcpClient.DoAutoReconnect(pvASyncWorker:TASyncWorker);
+var
+  i: Integer;
+  lvContext:TIocpRemoteContext;
+begin
+  for i := 0 to FList.Count - 1 do
+  begin
+    if pvASyncWorker.Terminated then Break;
+
+    lvContext := TIocpRemoteContext(FList[i]);
+  
+    if lvContext.CanAutoReConnect then
+    begin
+      if not (lvContext.SocketState in [ssConnecting, ssConnected]) then
+      begin
+        lvContext.ConnectASync;
+      end;
+    end;
+  end;
 end;
 
 function TDiocpTcpClient.Add: TIocpRemoteContext;
@@ -507,56 +501,58 @@ begin
   end;
 end;
 
-procedure TDiocpTcpClient.OnReconnectRequestResponse(pvObject: TObject);
+procedure TDiocpTcpClient.OnASyncWork(pvASyncWorker: TASyncWorker);
 var
-  lvContext:TIocpRemoteContext;
-  lvRequest:TIocpASyncRequest;
+  lvFileWriter: TSingleFileWriter;  
 begin
+  lvFileWriter := TSingleFileWriter.Create;
   try
-    // 退出
-    if not Self.Active then Exit;
-    
-    lvRequest := TIocpASyncRequest(pvObject);
-    lvContext := TIocpRemoteContext(lvRequest.Data);
-
-    // 退出重连请求
-    if not lvContext.CanAutoReConnect then Exit;     
-
-    if tick_diff(lvContext.FLastDisconnectTime, GetTickCount) >= RECONNECT_INTERVAL  then
+    lvFileWriter.FilePreFix := self.Name + '_ASync_';
+    {$IFDEF DEBUG}
+    lvFileWriter.LogMessage('启动时间:' + FormatDateTime('yyyy-mm-dd:HH:nn:ss.zzz', Now));
+    {$ENDIF}
+    while not pvASyncWorker.Terminated do
     begin
-      // 投递真正的连接请求
-      lvContext.PostConnectRequest();
-    end else
-    begin
-      // 再次投递连接请求
-      PostReconnectRequestEvent(lvContext);
+      try
+        SetCurrentThreadInfo('开始进行重连');
+        DoAutoReconnect(pvASyncWorker);
+        SetCurrentThreadInfo('结束重连过程');
+        Sleep(2000);
+      except
+        on e:Exception do
+        begin
+          lvFileWriter.LogMessage('ERR:' + e.Message);
+        end;  
+      end;
     end;
   finally
-    self.DecRefCounter;
+    {$IFDEF DEBUG}
+    lvFileWriter.LogMessage('停止时间:' + FormatDateTime('yyyy-mm-dd:HH:nn:ss.zzz', Now));
+    {$ENDIF}
+    lvFileWriter.Flush;    
+    lvFileWriter.Free;
   end;
 end;
 
-procedure TDiocpTcpClient.OnReconnectRequestResponseDone(pvObject: TObject);
+procedure TDiocpTcpClient.SetDisableAutoConnect(const Value: Boolean);
 begin
-  FReconnectRequestPool.ReleaseObject(pvObject);
+  if Value <> FDisableAutoConnect then
+  begin
+    FDisableAutoConnect := Value;
+    if FDisableAutoConnect then
+    begin
+      FASyncInvoker.Terminate;
+      FASyncInvoker.WaitForStop;
+    end;
+  end;
+
+  if not FDisableAutoConnect then
+  begin
+    if FASyncInvoker.Terminated then
+      FASyncInvoker.Start(OnASyncWork);
+  end;
 end;
 
-procedure TDiocpTcpClient.PostReconnectRequestEvent(pvContext:
-    TIocpRemoteContext);
-var
-  lvRequest:TIocpASyncRequest;
-begin
-  /// 锁定不能进行关闭
-  Self.IncRefCounter;
-
-  lvRequest := TIocpASyncRequest(FReconnectRequestPool.GetObject);
-  lvRequest.DoCleanUp;
-  lvRequest.OnResponseDone := OnReconnectRequestResponseDone;
-  lvRequest.OnResponse := OnReconnectRequestResponse;
-  lvRequest.Data := pvContext;
-  IocpEngine.PostRequest(lvRequest);
-
-end;
 
 constructor TDiocpExRemoteContext.Create;
 begin

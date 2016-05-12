@@ -1660,7 +1660,7 @@ begin
   // engine start
   FIocpEngine.checkStart;
 
-  FActive := True;
+  FActive := True;    
 end;
 
 procedure TDiocpCustom.RegisterContextClass(pvContextClass: TIocpContextClass);

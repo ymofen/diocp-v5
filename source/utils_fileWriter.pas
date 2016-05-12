@@ -20,7 +20,6 @@ type
     FCacheSize: Integer;
     FFilePreFix: String;
     FInitialized: Boolean;
-    FCurrentWriter: TWriter;
     FFilePerSize: Integer;
     procedure CheckInitialized;
     function OpenLogFile(pvPre: String = ''): Boolean;

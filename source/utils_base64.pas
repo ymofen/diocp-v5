@@ -317,7 +317,6 @@ function Base64Encode(buf: PByte; len: Integer; CharsPerLine: Integer = 0):
     string;
 var
   lvPOut:PByte;
-  BytesRead, BytesWrite: Integer;
   State: TEncodeState;
   l, r:Integer;
   lvBuilder:TDBufferBuilder;
@@ -383,6 +382,7 @@ var
 begin
   lvBuilder := TDBufferBuilder.Create;
   try
+    l := 0;
     lvPBuffer := lvBuilder.GetLockBuffer(Length(pvString) + 2);
     try
       {$IFDEF UNICODE}
@@ -411,7 +411,6 @@ const
   BLOCK_SIZE = 8192;
 var
   lvPOut:PByte;
-  BytesRead, BytesWrite: Integer;
   State: TEncodeState;
   l, r, x:Integer;
   lvBuilder:TDBufferBuilder;
@@ -438,9 +437,9 @@ begin
       end;
     end;
 
+    l := 0;
     lvPOut := lvBuilder.GetLockBuffer(10);  //
     try
-      l := 0;
       // 3¸ö×Ö·û
       r := EncodeBytesEnd(lvPOut, 1, State);
       inc(lvPOut, r);

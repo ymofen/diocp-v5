@@ -486,7 +486,6 @@ begin
   begin
     lvEndChar := ptrData^;
     inc(ptrData);
-    lvStart := ptrData;
     pvBuilder.Clear;
 
     while ptrData^ <> #0 do
@@ -565,10 +564,8 @@ function JSONParseEx(var ptrData: PChar; pvDValue: TDValue; pvParser:
 var
   lvEndChar:Char;
   lvChild:TDValue;
-  r:Integer;
-
 begin
-
+  Result := 0;
   if ptrData^ in ['{', '['] then
   begin
     if ptrData^ = '{' then
@@ -581,6 +578,9 @@ begin
       pvDValue.CheckSetNodeType(vntArray);
       lvEndChar := ']';
       Result := 2;
+    end else
+    begin
+      lvEndChar := #0;
     end;
     Inc(ptrData);
     if JSONSkipSpaceAndComment(ptrData, pvParser) = -1 then
@@ -614,7 +614,9 @@ begin
           end;
         end;
       end else  // Ω‚ŒˆÕÍ≥…
+      begin
         Exit;
+      end;
     end;  
     if JSONSkipSpaceAndComment(ptrData, pvParser) = -1 then
     begin

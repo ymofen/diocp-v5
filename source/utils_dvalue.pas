@@ -766,7 +766,7 @@ end;
 procedure ClearDValue(ADValue:PDRawValue);
   procedure ClearArray;
   var
-    I: Cardinal;
+    I: Integer;
   begin
     I := 0;
     while I < ADValue.Value.ArrayLength do
@@ -866,14 +866,14 @@ begin
     end
     else
     begin
-      if Cardinal(ALen) > ADValue.Value.ArrayLength then
+      if ALen > ADValue.Value.ArrayLength then
       begin
         ReallocMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDRawValue) * ALen);
         ADValue.Value.ArrayLength := ALen;
       end
       else
       begin
-        while ADValue.Value.ArrayLength > Cardinal(ALen) do
+        while ADValue.Value.ArrayLength > ALen do
         begin
           ClearDValue(GetDValueItem(ADValue, ADValue.Value.ArrayLength - 1));
           Dec(ADValue.Value.ArrayLength);

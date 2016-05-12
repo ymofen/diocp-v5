@@ -28,7 +28,7 @@ const
 {$IFDEF DEBUG}
   protect_size = 8;
 {$ELSE}
-  protect_size = 0;
+  protect_size = 2;
 {$ENDIF}
 
 type
@@ -385,6 +385,7 @@ begin
     Result := -1;
     Exit;
   end;
+  Result := 0;
   {$IFDEF USE_SPINLOCK}
   SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
   {$ELSE}

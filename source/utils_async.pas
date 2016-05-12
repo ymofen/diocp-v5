@@ -126,6 +126,7 @@ begin
   inherited Create;
   FStopEvent := TEvent.Create(nil, True, True, '');
   FWaitEvent := TEvent.Create(nil, True, true, '');
+  FTerminated := true;
 end;
 
 destructor TASyncInvoker.Destroy;
