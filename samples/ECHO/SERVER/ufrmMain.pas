@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
-  ComCtrls, utils_safeLogger, utils_BufferPool;
+  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter;
 
 type
   TfrmMain = class(TForm)
@@ -35,6 +35,9 @@ type
     actPushToAll: TAction;
     btnPoolInfo: TButton;
     edtThread: TEdit;
+    chkEcho: TCheckBox;
+    chkShowInMemo: TCheckBox;
+    chkSaveToFile: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
@@ -61,6 +64,7 @@ type
 
     procedure OnAccept(pvSocket: THandle; pvAddr: String; pvPort: Integer; var
         vAllowAccept: Boolean);
+    procedure OnDisconnected(pvClientContext: TIocpClientContext);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -90,6 +94,7 @@ begin
   FTcpServer.OnContextAccept := OnAccept;
   FTcpServer.createDataMonitor;
   FTcpServer.OnSendBufferCompleted := OnSendBufferCompleted;
+  FTcpServer.OnContextDisconnected := OnDisconnected;
   FPool := NewBufferPool(FTcpServer.WSARecvBufferSize);
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
 end;
@@ -144,6 +149,7 @@ end;
 
 procedure TfrmMain.actStopExecute(Sender: TObject);
 begin
+  FTcpServer.DisconnectAll;
   FTcpServer.SafeStop;
   RefreshState;
 end;
@@ -232,25 +238,59 @@ begin
 
 end;
 
+procedure TfrmMain.OnDisconnected(pvClientContext: TIocpClientContext);
+begin
+  if pvClientContext.Data <> nil then
+  begin
+    TObject(pvClientContext.Data).Free;
+    pvClientContext.Data := nil;
+  end;
+end;
+
 procedure TfrmMain.OnRecvBuffer(pvClientContext:TIocpClientContext;
     buf:Pointer; len:cardinal; errCode:Integer);
 var
   j, i:Integer;
   s:AnsiString;
   lvBuff:PByte;
+  lvFileWriter:TSingleFileWriter;
 begin
   if errCode = 0 then
   begin
-// 如果客户端发送的为字符串，可以用下面代码进行显示
-//    SetLength(s, len);
-//    Move(buf^, s[1], len);
-//    sfLogger.logMessage(s);
-    lvBuff := GetBuffer(FPool);
+    if chkShowInMemo.Checked then
+    begin
+      //   如果客户端发送的为字符串，可以用下面代码进行显示
+      SetLength(s, len);
+      Move(buf^, s[1], len);
+      sfLogger.logMessage(s);
+    end;
+    if chkEcho.Checked then
+    begin
 
-    //
-    AddRef(lvBuff);
+      lvBuff := GetBuffer(FPool);
 
-    pvClientContext.PostWSASendRequest(lvBuff, len, dtNone);
+      Move(buf^, lvBuff^, len);
+
+      //
+      AddRef(lvBuff);
+
+
+      pvClientContext.PostWSASendRequest(lvBuff, len, dtNone, 1);
+    end;
+
+    if chkSaveToFile.Checked then
+    begin
+      lvFileWriter := TSingleFileWriter(pvClientContext.Data);
+      if lvFileWriter = nil then
+      begin
+        lvFileWriter := TSingleFileWriter.Create;
+        pvClientContext.Data := lvFileWriter;
+        lvFileWriter.FilePreFix := Format('RECV_%d', [pvClientContext.SocketHandle]);
+        lvFileWriter.FilePerSize := 1024 * 1024 * 100;
+      end;
+
+      lvFileWriter.WriteBuffer(buf, len);
+    end;
 
   end else
   begin
@@ -261,7 +301,8 @@ end;
 procedure TfrmMain.OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff:
     Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
 begin
-  ReleaseRef(pvBuff);
+  if pvBufferTag = 1 then
+    ReleaseRef(pvBuff);
 end;
 
 procedure TfrmMain.tmrInfoTimer(Sender: TObject);

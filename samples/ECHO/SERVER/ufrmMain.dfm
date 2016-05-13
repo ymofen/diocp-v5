@@ -168,6 +168,32 @@ object frmMain: TfrmMain
       TabOrder = 9
       Text = '0'
     end
+    object chkEcho: TCheckBox
+      Left = 256
+      Top = 36
+      Width = 97
+      Height = 17
+      Caption = #22238#23556#25968#25454
+      Checked = True
+      State = cbChecked
+      TabOrder = 10
+    end
+    object chkShowInMemo: TCheckBox
+      Left = 359
+      Top = 36
+      Width = 97
+      Height = 17
+      Caption = #26174#31034#25968#25454
+      TabOrder = 11
+    end
+    object chkSaveToFile: TCheckBox
+      Left = 462
+      Top = 36
+      Width = 97
+      Height = 17
+      Caption = #20445#23384#21040#25991#20214
+      TabOrder = 12
+    end
   end
   object actlstMain: TActionList
     Left = 248
