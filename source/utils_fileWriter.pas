@@ -30,6 +30,7 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure WriteString(pvData: string);
+    procedure WriteBuffer(pvBuf: Pointer; pvBufLen: Integer);
     procedure LogMessage(pvData:string); overload;
     procedure Flush;
     procedure LogMessage(pvFmtMsg: string; const args: array of const); overload;
@@ -102,6 +103,19 @@ begin
     FFileStream.Free;
   end;
   inherited Destroy;
+end;
+
+procedure TSingleFileWriter.WriteBuffer(pvBuf: Pointer; pvBufLen: Integer);
+begin
+  try
+    CheckInitialized;
+    if OpenLogFile(FFilePreFix) then
+    begin
+      FWriter.Write(pvBuf^, pvBufLen);
+      if FCacheSize <= 0 then Flush;
+    end;
+  except
+  end;                              
 end;
 
 procedure TSingleFileWriter.WriteString(pvData: string);

@@ -73,6 +73,8 @@ type
     procedure ConnectTimeOut(pvMs:Cardinal);
     procedure Disconnect;
 
+    procedure CheckRecvResult(pvSocketResult:Integer);
+
     /// <summary>
     ///  是否可以接收数据,如果返回true， 代表可以执行RecvBuffer接收数据
     /// </summary>
@@ -165,6 +167,11 @@ begin
   {$ELSE}
   Result := FRawSocket.Readable(pvTimeout);
   {$ENDIF}
+end;
+
+procedure TDiocpBlockTcpClient.CheckRecvResult(pvSocketResult: Integer);
+begin
+  
 end;
 
 procedure TDiocpBlockTcpClient.CheckSocketResult(pvSocketResult:Integer);

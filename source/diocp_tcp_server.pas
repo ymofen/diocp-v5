@@ -107,6 +107,9 @@ type
     FRequestDisconnect:Boolean;
 
 
+    FManulPostWSARecvRequest:Boolean;
+
+
 
     FDebugInfo: string;
     procedure SetDebugInfo(const Value: string);
@@ -198,11 +201,6 @@ type
     /// </summary>
     procedure DoReceiveData;
 
-    /// <summary>
-    ///   called by sendRequest response
-    /// </summary>
-    procedure DoSendRequestCompleted(pvRequest: TIocpSendRequest);
-
 
 
     /// <summary>
@@ -237,7 +235,10 @@ type
     /// </summary>
     procedure PostWSARecvRequest();virtual;
 
-
+    /// <summary>
+    ///   called by sendRequest response
+    /// </summary>
+    procedure DoSendRequestCompleted(pvRequest: TIocpSendRequest); virtual;
 
     /// <summary>
     ///
@@ -383,6 +384,12 @@ type
     ///   最后交互数据的时间点
     /// </summary>
     property LastActivity: Cardinal read FLastActivity;
+
+    /// <summary>
+    ///   手动投递PostRecv请求, 处理完接收请求收不自动投递接收请求(默认为false)
+    /// </summary>
+    property ManulPostWSARecvRequest: Boolean read FManulPostWSARecvRequest write
+        FManulPostWSARecvRequest;
 
     property Owner: TDiocpTcpServer read FOwner write SetOwner;
 
@@ -1656,6 +1663,7 @@ begin
 
   FOwner := nil;
   FRequestDisconnect := false;
+  FManulPostWSARecvRequest := false;
   FSending := false;
 
   FWorkerEndTick := 0;
@@ -3440,7 +3448,7 @@ begin
       lvRefCount := FOverlapped.RefCount;
     
       // PostWSARecv before decReferenceCounter
-      if not FClientContext.FRequestDisconnect then
+      if (not FClientContext.FManulPostWSARecvRequest) and (not FClientContext.FRequestDisconnect) then
       begin
         FClientContext.PostWSARecvRequest;
       end;
