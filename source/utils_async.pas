@@ -11,6 +11,10 @@ uses
   {$ENDIF}
   ;
 
+{$IF defined(FPC) or (RTLVersion>=18))}
+  {$DEFINE HAVE_INLINE}
+{$IFEND HAVE_INLINE}
+
 type
   TASyncWorker = class;
   TOnASyncEvent = procedure(pvASyncWorker: TASyncWorker) of object;
@@ -62,7 +66,48 @@ function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
 function GetTickCount: Cardinal;
 
+{$IF RTLVersion<24}
+function AtomicCmpExchange(var Target: Integer; Value: Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+{$IFEND <XE5}
+
+
 implementation
+
+
+
+{$IF RTLVersion<24}
+function AtomicCmpExchange(var Target: Integer; Value: Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedCompareExchange(Target, Value, Comparand);
+{$ELSE}
+  Result := TInterlocked.CompareExchange(Target, Value, Comparand);
+{$ENDIF}
+end;
+
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedIncrement(Target);
+{$ELSE}
+  Result := TInterlocked.Increment(Target);
+{$ENDIF}
+end;
+
+function AtomicDecrement(var Target: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedDecrement(Target);
+{$ELSE}
+  Result := TInterlocked.Decrement(Target);
+{$ENDIF}
+end;
+
+{$IFEND <XE5}
 
 /// <summary>
 ///   计算两个TickCount时间差，避免超出49天后，溢出
