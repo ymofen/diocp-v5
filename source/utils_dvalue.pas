@@ -285,6 +285,9 @@ type
     procedure CloneFrom(pvSource: TDValue; pvIgnoreValueTypes: TDValueDataTypes =
         [vdtInterface, vdtObject, vdtPtr]);
 
+    procedure CloneValueFrom(pvSource: TDValue; pvIgnoreValueTypes:
+        TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+
     /// <summary>
     ///   设置节点类型, 类型转换时会丢失数据
     /// </summary>
@@ -1805,6 +1808,26 @@ begin
     FChildren.Add(lvDValue);
     lvDValue.CloneFrom(pvSource[i], pvIgnoreValueTypes);
   end;
+end;
+
+procedure TDValue.CloneValueFrom(pvSource: TDValue; pvIgnoreValueTypes:
+    TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+var
+  i: Integer;
+  lvDValue:TDValue;
+begin
+  ClearChildren;
+  CheckSetNodeType(pvSource.ObjectType);
+
+  FValue.CloneFrom(pvSource.FValue, pvIgnoreValueTypes);
+  for i := 0 to pvSource.Count -1 do
+  begin
+    lvDValue := TDValue.Create(vntValue);
+    lvDValue.FParent := Self;
+    FChildren.Add(lvDValue);
+    lvDValue.CloneFrom(pvSource[i], pvIgnoreValueTypes);
+  end;
+
 end;
 
 procedure TDValue.Delete(pvIndex:Integer);
