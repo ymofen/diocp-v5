@@ -285,7 +285,7 @@ begin
     SetLength(lvBytes, l);
     FillChar(lvBytes[0], l, 0);
     l := TByteTools.HexToBin(s, @lvBytes[0]);
-    mmoData.Lines.Text := StrPas(@lvBytes[0]);
+    mmoData.Lines.Text := StrPas(PAnsiChar(@lvBytes[0]));
   end;
 
   s := mmoOnConnected.Lines.Text;
@@ -301,7 +301,7 @@ begin
     SetLength(lvBytes, l);
     FillChar(lvBytes[0], l, 0);
     l := TByteTools.HexToBin(s, @lvBytes[0]);
-    mmoOnConnected.Lines.Text := StrPas(@lvBytes[0]);
+    mmoOnConnected.Lines.Text := StrPas(PAnsiChar(@lvBytes[0]));
   end;
 
   s := mmoIntervalData.Lines.Text;
@@ -317,7 +317,7 @@ begin
     SetLength(lvBytes, l);
     FillChar(lvBytes[0], l, 0);
     l := TByteTools.HexToBin(s, @lvBytes[0]);
-    mmoIntervalData.Lines.Text := StrPas(@lvBytes[0]);
+    mmoIntervalData.Lines.Text := StrPas(PAnsiChar(@lvBytes[0]));
   end;
 end;
 
