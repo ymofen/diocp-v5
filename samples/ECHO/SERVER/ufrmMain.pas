@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
-  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter;
+  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter, System.Actions;
 
 type
   TfrmMain = class(TForm)
@@ -133,7 +133,7 @@ var
   i:Integer;
   lvContext:TIocpClientContext;
 begin
-  ansiStr := AnsiToUtf8(mmoPushData.Lines.Text);
+  ansiStr := mmoPushData.Lines.Text;
   lvList := TList.Create;
   try
     FTcpServer.getOnlineContextList(lvList);
