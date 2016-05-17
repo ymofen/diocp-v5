@@ -99,7 +99,7 @@ destructor TSingleFileWriter.Destroy;
 begin
   if FFileStream <> nil then
   begin
-    FWriter.FlushBuffer;
+    if FWriter <> nil then FWriter.FlushBuffer;
     FFileStream.Free;
   end;
   inherited Destroy;
@@ -143,7 +143,7 @@ end;
 
 procedure TSingleFileWriter.Flush;
 begin
-  FWriter.FlushBuffer;
+  if FWriter <> nil then FWriter.FlushBuffer;
 end;
 
 procedure TSingleFileWriter.LogMessage(pvData:string);
@@ -162,14 +162,20 @@ var
     begin
       if FFileStream.Size >= (FFilePerSize) then
       begin  // 10M
-        FWriter.FlushBuffer;
-        FWriter.Free;
+        if FWriter <> nil then
+        begin
+          FWriter.FlushBuffer;
+          FWriter.Free;
+        end;
         FreeObject(FFileStream);
         FFileStream := nil;
       end else if lvNewFileID <> FLastFileID then
       begin
-        FWriter.FlushBuffer;
-        FWriter.Free;
+        if FWriter <> nil then
+        begin
+          FWriter.FlushBuffer;
+          FWriter.Free;
+        end;
         FreeObject(FFileStream);
         FFileStream := nil;
       end;
