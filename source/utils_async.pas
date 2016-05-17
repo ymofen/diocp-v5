@@ -129,7 +129,12 @@ begin
   Result.Data := pvData;
   Result.DataObj := pvDataObject;
   Result.DataTag := pvDataTag;
+  {$IFDEF UNICODE}
+  Result.Start;
+  {$ELSE}
   Result.Resume;
+  {$ENDIF}
+
 end;
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;

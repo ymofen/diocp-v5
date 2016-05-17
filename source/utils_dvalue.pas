@@ -19,7 +19,7 @@ uses classes, sysutils, variants,
 {$IFDEF HAVE_GENERICS}
      System.Generics.Collections,
 {$ENDIF}
-     varutils, math, utils_base64;
+     varutils, math, utils_base64, utils_strings;
 
 
 type
@@ -677,7 +677,7 @@ begin
   Result := '';
   while True do
   begin
-    if (strPtr^ in splitChars) then
+    if CharInSet(strPtr^ , splitChars) then
     begin
       l := strPtr - oPtr;
       if l > 0 then
@@ -1295,7 +1295,6 @@ end;
 procedure RawValueCopyFrom(pvSource, pvDest: PDRawValue; pvIgnoreValueTypes:
     TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 var
-  l:Int64;
   i: Integer;
 begin
   ClearDValue(pvDest);

@@ -4,6 +4,9 @@ interface
 
 uses
   utils_strings, SysUtils, Classes
+{$IFDEF UNICODE}
+  , System.AnsiStrings
+{$ENDIF}
 {$IFDEF MSWINDOWS}
     , windows
 {$ELSE}
@@ -346,9 +349,13 @@ begin
     end;
 
     {$IFDEF MSWINDOWS}
-    Result := PAnsiChar(lvBuilder.Memory);
+      {$IFDEF UNICODE}
+      Result := System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory));
+      {$ELSE}
+      Result := StrPas(PAnsiChar(lvBuilder.Memory));
+      {$ENDIF}
     {$ELSE}
-    Result := MarshaledAString(lvBuilder.Memory);
+      Result := MarshaledAString(lvBuilder.Memory);
     {$ENDIF}
   finally
     lvBuilder.Free;
@@ -454,7 +461,11 @@ begin
     end;
 
     {$IFDEF MSWINDOWS}
-    Result := PAnsiChar(lvBuilder.Memory);
+    {$IFDEF UNICODE}
+    Result := System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory));
+    {$ELSE}
+    Result := StrPas(PAnsiChar(lvBuilder.Memory));
+    {$ENDIF}
     {$ELSE}
     Result := MarshaledAString(lvBuilder.Memory);
     {$ENDIF}

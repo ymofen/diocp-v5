@@ -300,7 +300,7 @@ begin
     Result := -1;
     exit;
   end;
-  if ptrData^ in ['"', ''''] then
+  if CharInSet(ptrData^, ['"', '''']) then
   begin
     lvEndChar := ptrData^;
     inc(ptrData);
@@ -336,13 +336,13 @@ begin
     lvStart := ptrData;
     while ptrData^ <> #0 do
     begin
-      if ptrData^ in [':'] then
+      if CharInSet(ptrData^, [':']) then
       begin
         pvParser.FLastStrValue := Copy(lvStart, 0, ptrData - lvStart);
         Inc(ptrData);
         Result := 0;
         Exit;
-      end else if ptrData^ in [#32, #9, #13, #10] then  // space, tab, \r, \n
+      end else if CharInSet(ptrData^, [#32, #9, #13, #10]) then  // space, tab, \r, \n
       begin  
         pvParser.FLastStrValue := Copy(lvStart, 0, ptrData - lvStart);
         if JSONSkipSpaceAndComment(ptrData, pvParser) = -1 then
@@ -482,7 +482,7 @@ begin
     Result := -1;
     exit;
   end;
-  if ptrData^ in ['"', ''''] then
+  if CharInSet(ptrData^,['"', '''']) then
   begin
     lvEndChar := ptrData^;
     inc(ptrData);
@@ -499,7 +499,7 @@ begin
           Result := -1;
           exit;
         end;
-        if ptrData^ in [',',']','}'] then
+        if CharInSet(ptrData^ , [',',']','}']) then
         begin
           Result := 1;
           Exit;
@@ -518,7 +518,7 @@ begin
     end;
     Result := -1;
     Exit;
-  end else if ptrData^ in ['{', '['] then
+  end else if CharInSet(ptrData^ , ['{', '[']) then
   begin
     JSONParseEx(ptrData, pvDValue, pvParser, pvBuilder);
     Result := 5;    
@@ -527,13 +527,13 @@ begin
     lvStart := ptrData;
     while ptrData^ <> #0 do
     begin
-      if ptrData^ in [',',']','}'] then
+      if CharInSet(ptrData^ , [',',']','}']) then
       begin
         lvStr := Copy(lvStart, 0, ptrData - lvStart);
         __innerSetValue(lvStr);
         Result := 2;
         Exit;
-      end else if ptrData^ in [#32, #9, #13, #10] then      // space, tab, \r, \n
+      end else if CharInSet(ptrData^ , [#32, #9, #13, #10]) then      // space, tab, \r, \n
       begin
         lvStr := Copy(lvStart, 0, ptrData - lvStart);
         __innerSetValue(lvStr);
@@ -542,7 +542,7 @@ begin
           Result := -1;
           exit;
         end;
-        if ptrData^ in [',',']','}'] then
+        if CharInSet(ptrData^ , [',',']','}']) then
         begin
           Result := 2;
           Exit;
@@ -566,14 +566,14 @@ var
   lvChild:TDValue;
 begin
   Result := 0;
-  if ptrData^ in ['{', '['] then
+  if CharInSet(ptrData^ , ['{', '[']) then
   begin
     if ptrData^ = '{' then
     begin
       pvDValue.CheckSetNodeType(vntObject);
       lvEndChar := '}';
       Result := 1;
-    end else if ptrData^ = '[' then
+    end else if CharInSet(ptrData^ , ['[']) then
     begin
       pvDValue.CheckSetNodeType(vntArray);
       lvEndChar := ']';
@@ -711,7 +711,7 @@ begin
       Exit;
     end;
 
-    if (ptrData ^ in ['{', '[']) then
+    if CharInSet(ptrData ^ , ['{', '[']) then
     begin 
       JSONParseEx(ptrData, pvDValue, lvParser, lvStringBuilder);
       Result := 0;

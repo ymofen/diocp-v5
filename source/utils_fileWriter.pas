@@ -99,7 +99,12 @@ destructor TSingleFileWriter.Destroy;
 begin
   if FFileStream <> nil then
   begin
-    if FWriter <> nil then FWriter.FlushBuffer;
+    if FWriter <> nil then
+    begin
+      FWriter.FlushBuffer;
+      FWriter.Free;
+      FWriter := nil;
+    end;
     FFileStream.Free;
   end;
   inherited Destroy;
@@ -153,8 +158,7 @@ end;
 
 function TSingleFileWriter.OpenLogFile(pvPre: String = ''): Boolean;
 var
-  lvFileName, lvNewFileName, lvNewFileID:String;
-  lvFileSize: Integer;
+  lvFileName, lvNewFileID:String;
   procedure CheckNewFile();
   begin
     lvNewFileID := FormatDateTime('YY.M.D', Now());

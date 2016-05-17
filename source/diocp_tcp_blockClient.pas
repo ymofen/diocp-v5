@@ -308,7 +308,7 @@ begin
 
     CheckSocketResult(lvTempL);
 
-    lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));
+    lvPBuf := Pointer(IntPtr(lvPBuf) + lvTempL);
     lvReadL := lvReadL + Cardinal(lvTempL);
   end;
 end;

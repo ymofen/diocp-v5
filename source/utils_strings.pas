@@ -107,7 +107,7 @@ type
     function AppendSingleQuoteStr(str:string): TDStringBuilder;
     function AppendLine(str:string): TDStringBuilder;
 
-    function ToString: string;
+    function ToString: string;{$IFDEF UNICODE}override;{$ENDIF}
     property Length: Integer read GetLength;
 
     /// <summary>
@@ -456,7 +456,7 @@ function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;overload;
 /// <summary>
 ///
 /// </summary>
-function Utf8BytesToString(pvBytes: TBytes; pvOffset: Cardinal): String;
+function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 
 function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
@@ -494,7 +494,9 @@ function ParseNumeric(var S: PChar; var ANum: Extended): Boolean;
 function ParseHex(var p: PChar; var Value: Int64): Integer; 
 function ParseInt(var S: PChar; var ANum: Int64): Integer;
 
-
+{$if CompilerVersion < 20}
+function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
+{$ifend}
 
 implementation
 
@@ -508,7 +510,7 @@ type
 
 var
   hMsvcrtl: HMODULE;
-  VCStrStr: TMSVCStrStr;
+//  VCStrStr: TMSVCStrStr;
 {$IFDEF UNICODE}
   VCStrStrW: TMSVCStrStrW;
 {$ENDIF}
@@ -925,7 +927,7 @@ var
   {$IFDEF UNICODE_URL}
   lvRawBytes:TBytes;
   {$ELSE}
-  lvRawStr:AnsiString;
+  lvRawStr:URLString;
   {$ENDIF}
 begin
   {$IFDEF UNICODE_URL}
@@ -1289,17 +1291,17 @@ begin
 {$ENDIF}
 end;
 
-function Utf8BytesToString(pvBytes: TBytes; pvOffset: Cardinal): String;
+function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;
-  l:Cardinal;
+  l:Integer;
 {$ENDIF}
 begin
 {$IFDEF UNICODE}
   Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
 {$ELSE}
-  l := Cardinal(Length(pvBytes)) - pvOffset;
+  l := Length(pvBytes) - pvOffset;
   SetLength(lvRawStr, l);
   Move(pvBytes[pvOffset], PansiChar(lvRawStr)^, l);
   Result := UTF8Decode(lvRawStr);
@@ -2029,7 +2031,7 @@ end;
 initialization
 
 {$IFDEF MSWINDOWS}
-VCStrStr := nil;
+//VCStrStr := nil;
 {$IFDEF UNICODE}
 VCStrStrW := nil;
 {$ENDIF}
@@ -2037,7 +2039,7 @@ VCStrStrW := nil;
 hMsvcrtl := LoadLibrary('msvcrt.dll');
 if hMsvcrtl <> 0 then
 begin
-  VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
+//  VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
   {$IFDEF UNICODE}
   VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
   {$ENDIF}

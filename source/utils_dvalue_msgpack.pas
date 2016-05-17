@@ -194,7 +194,7 @@ begin
   Result := '';
   while True do
   begin
-    if (strPtr^ in splitChars) then
+    if CharInSet(strPtr^ , splitChars) then
     begin
       l := strPtr - oPtr;
       if l > 0 then
