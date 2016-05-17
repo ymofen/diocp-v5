@@ -202,12 +202,21 @@ type
 // copy from qdac
 function hashOf(const pvStrData:String): Integer; overload;
 function hashOf(const p:Pointer;l:Integer): Integer; overload;
+procedure FreeObject(AObject: TObject);
 
 implementation
 
 resourcestring
   SHashTableIndexError = 'Buckets index out of bounds (%d)';
 
+procedure FreeObject(AObject: TObject);
+begin
+{$IFDEF AUTOREFCOUNT}
+  AObject.DisposeOf;
+{$ELSE}
+  AObject.Free;
+{$ENDIF}
+end;
 
 function hashOf(const p:Pointer;l:Integer): Integer; overload;
 var
@@ -456,7 +465,7 @@ begin
     lvBucket := FBuckets[I];
     while lvBucket<>nil do
     begin
-      TObject(lvBucket.Data).Free;
+      FreeObject(TObject(lvBucket.Data));
       lvBucket:=lvBucket.Next;
     end;
   end;

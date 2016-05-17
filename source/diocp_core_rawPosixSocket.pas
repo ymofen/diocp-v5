@@ -372,7 +372,8 @@ var
   lvFDSet:fd_set;
   lvTime_val: timeval;
 begin
-  // 未测试
+  // 经过测试
+  // 在 android下面 该函数无效, 可以用receiveLength > 0判断
   FD_ZERO(lvFDSet);
   _FD_SET(FSocketHandle, lvFDSet);
 

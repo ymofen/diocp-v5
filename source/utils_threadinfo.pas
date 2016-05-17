@@ -98,6 +98,9 @@ begin
     begin
       lvInfo := TThreadInfoObject.Create;
       lvInfo.ThreadID := lvCurrentID;
+      {$IFDEF AUTOREFCOUNT}
+      lvInfo.__ObjAddRef();
+      {$ENDIF}
       __info_list.Values[lvCurrentID] := lvInfo;
     end;
   finally

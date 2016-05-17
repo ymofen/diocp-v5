@@ -167,6 +167,7 @@ begin
   {$ELSE}
   Result := FRawSocket.Readable(pvTimeout);
   {$ENDIF}
+  Result := Result or (ReceiveLength > 0);
 end;
 
 procedure TDiocpBlockTcpClient.CheckRecvResult(pvSocketResult: Integer);
