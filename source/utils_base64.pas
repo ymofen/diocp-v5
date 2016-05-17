@@ -2,11 +2,16 @@ unit utils_base64;
 
 interface
 
+{$IF (RTLVersion>=23)}
+{$DEFINE USE_AnsiStrings}
+{$IFEND >=XE2}
+
 uses
   utils_strings, SysUtils, Classes
-{$IFDEF UNICODE}
+{$IFDEF USE_AnsiStrings}
   , System.AnsiStrings
 {$ENDIF}
+
 {$IFDEF MSWINDOWS}
     , windows
 {$ELSE}
@@ -349,7 +354,7 @@ begin
     end;
 
     {$IFDEF MSWINDOWS}
-      {$IFDEF UNICODE}
+      {$IFDEF USE_AnsiStrings}
       Result := System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory));
       {$ELSE}
       Result := StrPas(PAnsiChar(lvBuilder.Memory));
@@ -461,7 +466,7 @@ begin
     end;
 
     {$IFDEF MSWINDOWS}
-    {$IFDEF UNICODE}
+    {$IFDEF USE_AnsiStrings}
     Result := System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory));
     {$ELSE}
     Result := StrPas(PAnsiChar(lvBuilder.Memory));
