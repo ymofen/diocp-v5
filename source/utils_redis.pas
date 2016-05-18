@@ -67,6 +67,8 @@ type
 
     procedure MakeHSET(pvKey, pvField, pvValue:String);
 
+    procedure MakeSET(pvKey, pvValue: String);
+
 
     function ExtractSubscribeMessage: String;
   end;
@@ -439,6 +441,17 @@ begin
 //  begin
 //    Data.Add.AsString := pvSubscribeArgs[i];
 //  end;
+end;
+
+procedure TRedisCommand.MakeSET(pvKey, pvValue: String);
+begin
+  Clear;
+  Command := 'SET';
+
+  Data.Clear;
+  Data.Add.AsString := pvKey;
+  Data.Add.AsString := pvValue;
+
 end;
 
 constructor TRedisClient.Create;
