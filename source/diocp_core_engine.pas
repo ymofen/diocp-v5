@@ -879,7 +879,11 @@ begin
     AWorker.FIocpEngine := Self;
     AWorker.FreeOnTerminate := True;
     FWorkerList.Add(AWorker);
+    {$IFDEF UNICODE}
+    AWorker.Start;
+    {$ELSE}
     AWorker.Resume;
+    {$ENDIF}
 
   finally
     FWorkerLocker.unLock;

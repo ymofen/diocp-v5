@@ -156,6 +156,7 @@ type
     ///   释放待发送队列中的发送请求(TSendRequest)
     /// </example>
     procedure CheckReleaseRes;
+    procedure InnerCloseContext;
 
 
     procedure SetOwner(const Value: TDiocpCustom);
@@ -214,13 +215,7 @@ type
     /// </summary>
     procedure DoConnected;
 
-    /// <summary>
-    ///   call in response event
-    /// </summary>
-    procedure DoDisconnect;
 
-
-    procedure InnerCloseContext;
     /// <summary>
     ///  1.post reqeust to sending queue,
     ///    return false if SendQueue Size is greater than maxSize,
@@ -1075,20 +1070,24 @@ var
 begin
   lvCloseContext := false;
   FContextLocker.lock('DecReferenceCounter');
-  Dec(FReferenceCounter);
-  Result := FReferenceCounter;
-  FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+  try
+    Dec(FReferenceCounter);
+    Result := FReferenceCounter;
+    FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
 
-  if FDebugStrings.Count > 20 then
-    FDebugStrings.Delete(0);
+    if FDebugStrings.Count > 20 then
+      FDebugStrings.Delete(0);
 
 
-  if FReferenceCounter < 0 then
-    Assert(FReferenceCounter >=0 );
-  if FReferenceCounter = 0 then
-    if FRequestDisconnect then lvCloseContext := true;
+    if FReferenceCounter < 0 then
+      Assert(FReferenceCounter >=0 );
+    if FReferenceCounter = 0 then
+      if FRequestDisconnect then lvCloseContext := true;
+  finally
+     FContextLocker.UnLock;
+  end;
     
-  FContextLocker.UnLock; 
+
 
   if lvCloseContext then
   begin
@@ -1107,20 +1106,24 @@ begin
       'RequestDisconnect');
 {$ENDIF}
   FContextLocker.lock('DecReferenceCounter');
-  FRequestDisconnect := true;
-  Dec(FReferenceCounter);
-  FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+  try
+    FRequestDisconnect := true;
+    Dec(FReferenceCounter);
+    FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
 
-  if FDebugStrings.Count > 20 then
-    FDebugStrings.Delete(0);
-  if FReferenceCounter < 0 then
-    Assert(FReferenceCounter >=0 );
-  if FReferenceCounter = 0 then
-    lvCloseContext := true;
-    
-  FContextLocker.UnLock; 
+    if FDebugStrings.Count > 20 then
+      FDebugStrings.Delete(0);
+    if FReferenceCounter < 0 then
+      Assert(FReferenceCounter >=0 );
+    if FReferenceCounter = 0 then
+      lvCloseContext := true;
+  finally
+    FContextLocker.UnLock;
+  end;
 
-  if lvCloseContext then InnerCloseContext; 
+
+
+  if lvCloseContext then InnerCloseContext;
 end;
 
 procedure TDiocpCustomContext.DoCleanUp;
@@ -1195,45 +1198,6 @@ begin
   finally
     FContextLocker.UnLock;
   end;
-  
-//
-//  FContextLocker.lock('DoConnected');
-//  try
-//    FSocketHandle := FRawSocket.SocketHandle;
-//    FSending := false;
-//    FRequestDisconnect := false;
-//    if not FActive then
-//    begin
-//      Assert(FOwner <> nil);
-//      FActive := true;
-//
-//      FOwner.FOnlineContextList.add(Self);
-//      try
-//
-//        if Assigned(FOwner.FOnContextConnected) then
-//        begin
-//          FOwner.FOnContextConnected(Self);
-//        end;
-//        OnConnected();
-//        if Assigned(FOnConnectedEvent) then
-//        begin
-//          FOnConnectedEvent(Self);
-//        end;
-//      except
-//      end;
-//
-//      SetSocketState(ssConnected);
-//      PostWSARecvRequest;
-//    end;
-//  finally
-//    FContextLocker.UnLock;
-//  end;
-
-end;
-
-procedure TDiocpCustomContext.DoDisconnect;
-begin
-  InnerCloseContext;
 end;
 
 procedure TDiocpCustomContext.DoError(pvErrorCode: Integer);
@@ -1312,11 +1276,16 @@ begin
     CORE_LOG_FILE);
   if not FActive then
   begin
-    FOwner.logMessage('InnerCloseContext FActive is false', CORE_LOG_FILE);
-    exit;
+    FOwner.logMessage('InnerCloseContext FActive is false, socketstate:%d', [Ord(FSocketState)], CORE_LOG_FILE);
+    FSocketState := ssDisconnected;
+    Exit;
   end;
 {$ENDIF}
-  if not FActive then exit;
+  if not FActive then
+  begin
+    FSocketState := ssDisconnected;
+    Exit;
+  end;
 
   try
     FActive := false;
@@ -1483,21 +1452,24 @@ begin
   Assert(FContextLocker <> nil, 'error...');
 
   FContextLocker.lock('RequestDisconnect');
- 
-  if pvDebugInfo <> '' then
-  begin
-    FDebugStrings.Add(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-    if FDebugStrings.Count > 40 then FDebugStrings.Delete(0);
-  end;
-  FRequestDisconnect := True;
+  try
+    if pvDebugInfo <> '' then
+    begin
+      FDebugStrings.Add(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+      if FDebugStrings.Count > 40 then FDebugStrings.Delete(0);
+    end;
+    FRequestDisconnect := True;
 
-  //
-  if FReferenceCounter = 0 then
-  begin
-    lvCloseContext := true;
+    //
+    if FReferenceCounter = 0 then
+    begin
+      lvCloseContext := true;
+    end;
+  finally
+    FContextLocker.UnLock;
   end;
-  
-  FContextLocker.UnLock; 
+
+
 
   if lvCloseContext then InnerCloseContext else FRawSocket.close; 
 end;

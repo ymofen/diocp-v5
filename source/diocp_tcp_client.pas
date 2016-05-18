@@ -319,6 +319,9 @@ begin
       begin
         Result := True;
       end;
+    end else
+    begin
+      sfLogger.logMessage('TIocpRemoteContext.PostConnectRequest:: 正在进行连接...');
     end;
   finally
     if not Result then
