@@ -74,6 +74,7 @@ const
   FREE_TYPE_FREEMEM = 1;
   FREE_TYPE_DISPOSE = 2;
   FREE_TYPE_OBJECTFREE = 3;
+  FREE_TYPE_OBJECTNONE = 4;
 
 
 function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
@@ -129,7 +130,18 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 {$EXTERNALSYM InterlockedCompareExchange}
 {$ifend}
 
+procedure FreeObject(AObject: TObject); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
 implementation
+
+procedure FreeObject(AObject: TObject);
+begin
+{$IFDEF AUTOREFCOUNT}
+  AObject.DisposeOf;
+{$ELSE}
+  AObject.Free;
+{$ENDIF}
+end;
 
 procedure ReleaseAttachData(pvBlock:PBufferBlock); {$IFDEF HAVE_INLINE} inline;{$ENDIF} 
 begin
@@ -139,7 +151,11 @@ begin
       0: ;
       1: FreeMem(pvBlock.data);
       2: Dispose(pvBlock.data);
-      3: TObject(pvBlock.data).Free;
+      3: FreeObject(pvBlock.data);
+{$IFDEF AUTOREFCOUNT}
+      FREE_TYPE_OBJECTNONE: TObject(pvBlock.data).__ObjRelease;
+{$ENDIF}
+
     else
       Assert(False, Format('BufferBlock[%s] unkown data free type:%d', [pvBlock.owner.FName, pvBlock.data_free_type]));
     end;
@@ -405,8 +421,6 @@ begin
   {$ENDIF}
 end;
 
-
-
 procedure AttachData(pvBuffer, pvData: Pointer; pvFreeType: Byte);
 var
   lvBuffer:PByte;
@@ -418,9 +432,14 @@ begin
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
 
   ReleaseAttachData(lvBlock);
-  
+
   lvBlock.data := pvData;
   lvBlock.data_free_type := pvFreeType;
+
+{$IFDEF AUTOREFCOUNT}
+  if pvFreeType in [FREE_TYPE_OBJECTFREE, FREE_TYPE_OBJECTNONE] then
+    TObject(pvData).__ObjAddRef();
+{$ENDIF}
 end;
 
 function GetAttachData(pvBuffer: Pointer; var X: Pointer): Integer;
@@ -464,6 +483,8 @@ begin
     Assert(Result > 0, 'DBuffer error release');
   end;
 end;
+
+
 
 
 end.
