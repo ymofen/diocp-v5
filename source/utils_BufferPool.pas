@@ -105,6 +105,9 @@ procedure AttachData(pvBuffer, pvData: Pointer; pvFreeType: Byte);
 /// </summary>
 function GetAttachData(pvBuffer: Pointer; var X: Pointer): Integer;
 
+
+function GetAttachDataAsObject(pvBuffer:Pointer): TObject;
+
 /// <summary>
 ///  检测池中内存块越界情况
 /// </summary>
@@ -462,6 +465,25 @@ begin
   end;
 end;
 
+function GetAttachDataAsObject(pvBuffer:Pointer): TObject;
+var
+  lvBuffer:PByte;
+  lvBlock:PBufferBlock;
+begin
+  lvBuffer := pvBuffer;
+  Dec(lvBuffer, BLOCK_SIZE);
+  lvBlock := PBufferBlock(lvBuffer);
+  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+
+  if lvBlock.data <> nil then
+  begin
+    Result :=TObject(lvBlock.data);
+  end else
+  begin
+    Result := nil;
+  end;
+end;
+
 function ReleaseRef(pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
     Integer; overload;
 var
@@ -476,13 +498,16 @@ begin
   AtomicIncrement(lvBlock.owner.FReleaseRef);
   if Result = 0 then
   begin
-    if pvReleaseAttachDataAtEnd then ReleaseAttachData(lvBlock);
+    if pvReleaseAttachDataAtEnd then
+      ReleaseAttachData(lvBlock);
     FreeBuffer(lvBlock);
   end else
   begin
     Assert(Result > 0, 'DBuffer error release');
   end;
 end;
+
+
 
 
 

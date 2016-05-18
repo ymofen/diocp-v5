@@ -288,6 +288,9 @@ type
     procedure CloneValueFrom(pvSource: TDValue; pvIgnoreValueTypes:
         TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 
+    procedure MergeValue(pvSource:TDValue; pvIgnoreValueTypes: TDValueDataTypes =
+        [vdtInterface, vdtObject, vdtPtr]);
+
     /// <summary>
     ///   设置节点类型, 类型转换时会丢失数据
     /// </summary>
@@ -1829,6 +1832,33 @@ begin
 
 end;
 
+procedure TDValue.MergeValue(pvSource:TDValue; pvIgnoreValueTypes:
+    TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+var
+  i: Integer;
+  lvItem:TDValue;
+begin
+  if (pvSource.FObjectType in [vntArray, vntValue]) then
+  begin
+    Self.CloneValueFrom(pvSource, pvIgnoreValueTypes);
+  end else if (pvSource.FObjectType in [vntObject]) then
+  begin
+    CheckSetNodeType(pvSource.ObjectType);
+    for i := 0 to pvSource.Count - 1 do
+    begin
+      lvItem := pvSource[i];
+      if not (lvItem.Value.DataType  in pvIgnoreValueTypes) then
+      begin
+        Self.ForceByName(lvItem.Name.AsString).MergeValue(lvItem, pvIgnoreValueTypes);
+      end;
+    end;
+  end else
+  begin
+    Self.CloneValueFrom(pvSource, pvIgnoreValueTypes);
+  end;
+end;
+
+
 procedure TDValue.Delete(pvIndex:Integer);
 begin
   TDValue(FChildren[pvIndex]).Free;
@@ -2251,6 +2281,7 @@ begin
     Inc(sPtr);
   end;
 end;
+
 
 procedure TDValue.RemoveAll;
 begin

@@ -510,9 +510,11 @@ type
 
 var
   hMsvcrtl: HMODULE;
-//  VCStrStr: TMSVCStrStr;
+
 {$IFDEF UNICODE}
   VCStrStrW: TMSVCStrStrW;
+{$ELSE}
+  VCStrStr: TMSVCStrStr;
 {$ENDIF}
 //  VCMemCmp: TMSVCMemCmp;
 {$ENDIF}
@@ -2031,17 +2033,20 @@ end;
 initialization
 
 {$IFDEF MSWINDOWS}
-//VCStrStr := nil;
+
 {$IFDEF UNICODE}
 VCStrStrW := nil;
+{$ELSE}
+VCStrStr := nil;
 {$ENDIF}
 //VCMemCmp := nil;
 hMsvcrtl := LoadLibrary('msvcrt.dll');
 if hMsvcrtl <> 0 then
 begin
-//  VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
   {$IFDEF UNICODE}
   VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
+  {$ELSE}
+  VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
   {$ENDIF}
   //VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
 end;
