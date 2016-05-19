@@ -2639,22 +2639,32 @@ begin
       // 绑定侦听端口
       if not FListenSocket.Bind(FDefaultListenAddress, FPort) then
       begin
-        FListenSocket.Close(False);
-        RaiseLastOSError;
+        try
+          RaiseLastOSError;
+        finally
+          FListenSocket.Close(False);
+        end;
       end;
 
       // 开启侦听
       if not FListenSocket.listen() then
       begin
-        RaiseLastOSError;
+        try
+          RaiseLastOSError;
+        finally
+          FListenSocket.Close(False);
+        end;
       end;
 
       // 将侦听套接字绑定到IOCP句柄
-      FIocpEngine.IocpCore.Bind2IOCPHandle(FListenSocket.SocketHandle, 0);
-
-//
-//      FIocpAcceptorMgr.FMinRequest := 10;
-//      FIocpAcceptorMgr.FMaxRequest := 100;
+      if FIocpEngine.IocpCore.Bind2IOCPHandle(FListenSocket.SocketHandle, 0) <= 0 then
+      begin
+        try
+          RaiseLastOSError;
+        finally
+          FListenSocket.Close(False);
+        end;
+      end;
 
       // post AcceptEx request
       FIocpAcceptorMgr.CheckPostRequest;
@@ -3105,7 +3115,7 @@ begin
           Inc(i);
           try
             // 出现异常，直接释放Context
-            lvRequest.FClientContext.RawSocket.Close;
+            lvRequest.FClientContext.RawSocket.Close(False);
             lvRequest.FClientContext.FAlive := false;
             lvRequest.FClientContext.Free;
             lvRequest.FClientContext := nil;

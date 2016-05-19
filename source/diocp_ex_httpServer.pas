@@ -1338,21 +1338,30 @@ var
   lvMsg:String;
 begin
   try
-    pvRequest.CheckCookieSession;
+    try
+      pvRequest.CheckCookieSession;
 
-    if Assigned(FOnDiocpHttpRequest) then
-    begin
-      FOnDiocpHttpRequest(pvRequest);
+      if Assigned(FOnDiocpHttpRequest) then
+      begin
+        FOnDiocpHttpRequest(pvRequest);
+      end;
+    except
+      on E:Exception do
+      begin
+        self.LogMessage('Http逻辑处理异常:%s', [e.Message], 'HTTP_ERR', lgvError);
+        pvRequest.FReleaseLater := False;
+        pvRequest.Response.FInnerResponse.ResponseCode := 500;
+        pvRequest.Response.Clear;
+        pvRequest.Response.ContentType := 'text/html; charset=utf-8';
+        lvMsg := e.Message;
+        lvMsg := StringReplace(lvMsg, sLineBreak, '<BR>', [rfReplaceAll]);
+        pvRequest.Response.WriteString(lvMsg);
+      end;
     end;
   except
     on E:Exception do
     begin
-      pvRequest.Response.FInnerResponse.ResponseCode := 500;
-      pvRequest.Response.Clear;
-      pvRequest.Response.ContentType := 'text/html; charset=utf-8';
-      lvMsg := e.Message;
-      lvMsg := StringReplace(lvMsg, sLineBreak, '<BR>', [rfReplaceAll]);
-      pvRequest.Response.WriteString(lvMsg);
+      self.LogMessage('Http逻辑处理异常:%s', [e.Message], CORE_LOG_FILE, lgvError);
     end;
   end;
 end;

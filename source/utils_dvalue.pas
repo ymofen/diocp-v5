@@ -1546,9 +1546,9 @@ begin
     for i := 0 to FChildren.Count - 1 do
     begin
       try
-        FLastMsg := Format('[%d/%d]:%s', [i, FChildren.Count, TObject(FChildren[i]).ClassName]);
+        FLastMsg := Format('正在清理[%d/%d]:%s', [i, FChildren.Count, TObject(FChildren[i]).ClassName]);
       except
-        FLastMsg := Format('[%d/%d]', [i, FChildren.Count]);
+        FLastMsg := Format('正在清理[%d/%d],无法获取类名', [i, FChildren.Count]);
       end;
       TDValueItem(FChildren[i]).Free;
     end;
