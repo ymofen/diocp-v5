@@ -631,9 +631,6 @@ type
 
   TDiocpCustom = class(TComponent)
   private
-    FSafeLogger:TSafeLogger;
-
-
     /// <summary>
     ///   引用计数
     /// </summary>
@@ -725,6 +722,7 @@ type
     procedure SetName(const NewName: TComponentName); override;
   private
     FContextDNA : Integer;
+    FDefaultMsgType: String;
     FOnSendBufferCompleted: TOnContextBufferEvent;
 
     procedure DoSendBufferCompletedEvent(pvContext: TDiocpCustomContext; pvBuff:
@@ -817,7 +815,7 @@ type
     ///     就进行关闭连接
     ///   使用循环检测，如果你有好的方案，欢迎提交您的宝贵意见
     /// </summary>
-    procedure KickOut(pvTimeOut:Cardinal = 60000);
+    function KickOut(pvTimeOut:Cardinal = 60000): Integer;
     procedure LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel: TLogLevel
         = lgvMessage); overload;
         
@@ -841,6 +839,11 @@ type
     /// </summary>
     property OnContextConnected: TNotifyContextEvent read FOnContextConnected write
         FOnContextConnected;
+
+    /// <summary>
+    ///   默认日志文件前缀
+    /// </summary>
+    property DefaultMsgType: String read FDefaultMsgType write FDefaultMsgType;
 
     /// <summary>
     ///   default cpu count * 2 -1
@@ -879,6 +882,8 @@ type
     /// </summary>
     property OnReceivedBuffer: TOnBufferReceived read FOnReceivedBuffer write
         FOnReceivedBuffer;
+
+
   end;
 
 /// compare target, cmp_val same set target = new_val
@@ -1388,7 +1393,7 @@ begin
       begin
       {$IFDEF DEBUG_ON}
         if FOwner.logCanWrite then
-          FOwner.FSafeLogger.logMessage('Push sendRequest to Sending Queue fail, queue size:%d',
+          FOwner.logMessage('Push sendRequest to Sending Queue fail, queue size:%d',
            [FSendRequestLink.Count]);
       {$ENDIF}
 
@@ -1471,7 +1476,7 @@ begin
 
 
 
-  if lvCloseContext then InnerCloseContext else FRawSocket.close; 
+  if lvCloseContext then InnerCloseContext else FRawSocket.close;
 end;
 
 procedure TDiocpCustomContext.SetDebugINfo(const Value: string);
@@ -1519,8 +1524,8 @@ begin
   inherited Create(AOwner);
   FRefCounter := 0;
   CheckWinSocketStart;
-  FSafeLogger:=TSafeLogger.Create();
-  FSafeLogger.setAppender(TLogFileAppender.Create(True));
+
+  FDefaultMsgType := self.ClassName;
 
   FLocker := TIocpLocker.Create('diocp_tcp_client');
 
@@ -1548,7 +1553,6 @@ end;
 
 destructor TDiocpCustom.Destroy;
 begin
-  FSafeLogger.Enable := false;
   
   FIsDestroying := true;
 
@@ -1563,8 +1567,6 @@ begin
   FIocpEngine.Free;
 
   FSendRequestPool.Free;
-  
-  FSafeLogger.Free;
 
   FLocker.Free;
   inherited Destroy;
@@ -1618,7 +1620,7 @@ end;
 
 function TDiocpCustom.logCanWrite: Boolean;
 begin
-  Result := (not isDestroying) and FSafeLogger.Enable;
+  Result := (not isDestroying) and __diocp_logger.Enable;
 end;
 
 
@@ -1837,7 +1839,7 @@ begin
   Result := InterlockedIncrement(FRefCounter);
 end;
 
-procedure TDiocpCustom.KickOut(pvTimeOut:Cardinal = 60000);
+function TDiocpCustom.KickOut(pvTimeOut:Cardinal = 60000): Integer;
 var
   lvNowTickCount:Cardinal;
   I, j:Integer;
@@ -1866,8 +1868,6 @@ begin
             begin
               if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
               begin
-                // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
-                //lvContext.PostWSACloseRequest();
                 lvKickOutList[j] := lvContext;
                 Inc(j);
               end;
@@ -1880,9 +1880,11 @@ begin
       FLocker.unLock;
     end;
 
+    Result := 0;
     for i := 0 to j - 1 do
     begin
-      lvKickOutList[i].RequestDisconnect('超时检测主动断开');   
+      lvKickOutList[i].RequestDisconnect('超时检测主动断开');
+      Inc(Result);
     end;
 
 
@@ -1897,7 +1899,13 @@ procedure TDiocpCustom.LogMessage(pvMsg: string; pvMsgType: string = '';
 begin
   if logCanWrite then
   begin
-    FSafeLogger.logMessage(pvMsg, pvMsgType, pvLevel);
+    if pvMsgType <> '' then
+    begin
+      __diocp_logger.logMessage(pvMsg, pvMsgType, pvLevel);
+    end else
+    begin
+      __diocp_logger.logMessage(pvMsg, FDefaultMsgType, pvLevel);
+    end;
   end;
 end;
 
@@ -1906,7 +1914,14 @@ procedure TDiocpCustom.logMessage(pvMsg: string; const args: array of const;
 begin
   if logCanWrite then
   begin
-    FSafeLogger.logMessage(pvMsg, args, pvMsgType, pvLevel);
+    if pvMsgType <> '' then
+    begin
+      __diocp_logger.logMessage(pvMsg, args, pvMsgType, pvLevel);
+    end else
+    begin
+      __diocp_logger.logMessage(pvMsg, args, FDefaultMsgType, pvLevel);
+    end;
+
   end;  
 end;
 
@@ -1957,15 +1972,6 @@ end;
 procedure TDiocpCustom.SetName(const NewName: TComponentName);
 begin
   inherited;
-{$IFDEF DEBUG_ON}
-  if FSafeLogger.Appender is TLogFileAppender then
-  begin
-    if NewName <> '' then
-    begin
-      TLogFileAppender(FSafeLogger.Appender).FilePreFix := NewName + '_';
-    end;
-  end;
-{$ENDIF}
 end;
 
 procedure TDiocpCustom.SetWSARecvBufferSize(const Value: Cardinal);
@@ -1999,7 +2005,7 @@ begin
     begin
       {$IFDEF DEBUG_ON}
        if logCanWrite then
-        FSafeLogger.logMessage('WaitForContext End Current num:%d', [c], CORE_LOG_FILE);
+        logMessage('WaitForContext End Current num:%d', [c], CORE_LOG_FILE);
       {$ENDIF}
       Break;
     end;
@@ -2203,7 +2209,7 @@ begin
     end else if ErrorCode <> 0 then
     begin
       {$IFDEF DEBUG_ON}
-      FOwner.FSafeLogger.logMessage(
+      FOwner.logMessage(
         Format(strRecvError, [FContext.FSocketHandle, FErrorCode])
         );
       {$ENDIF}

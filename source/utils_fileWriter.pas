@@ -18,6 +18,7 @@ type
     FFileSN:Integer;
     FBasePath: string;
     FCacheSize: Integer;
+    FFileFormat: Integer;
     FFilePreFix: String;
     FInitialized: Boolean;
     FFilePerSize: Integer;
@@ -36,8 +37,16 @@ type
     procedure LogMessage(pvFmtMsg: string; const args: array of const); overload;
     property BasePath: string read FBasePath write FBasePath;
     property CacheSize: Integer read FCacheSize write SetCacheSize;
+
+    /// <summary>
+    ///   0: ansi, 1: utf8 (EF BB BF), 2:unicode(#$FF#$FE)
+    /// </summary>
+    property FileFormat: Integer read FFileFormat write FFileFormat;
+
     property FilePerSize: Integer read FFilePerSize write SetFilePerSize;
     property FilePreFix: String read FFilePreFix write FFilePreFix;
+
+
   end;
 
 implementation
@@ -59,6 +68,11 @@ begin
   FFilePerSize := 1024 * 1024 * 50;
   FCacheSize := 0;
   FLastFileID := '';
+  {$IFDEF UNICODE}
+  FFileFormat := 2;
+  {$ELSE}
+  FFileFormat := 0;
+  {$ENDIF}
 end;
 
 
@@ -126,13 +140,36 @@ end;
 procedure TSingleFileWriter.WriteString(pvData: string);
 var
   lvBytes:TBytes;
+  {$IFDEF UNICODE}
+  {$ELSE}
+  lvWideStr:WideString;
+  {$ENDIF}
 begin
   try
     CheckInitialized;
     if OpenLogFile(FFilePreFix) then
     begin
-      lvBytes := StringToUtf8Bytes(pvData);
-      FWriter.Write(lvBytes[0], Length(lvBytes));
+      if FFileFormat = 1 then
+      begin
+        lvBytes := StringToUtf8Bytes(pvData);
+        FWriter.Write(lvBytes[0], Length(lvBytes));
+      end else if FFileFormat = 2 then
+      begin
+        {$IFDEF UNICODE}
+        FWriter.Write(PChar(pvData)^, Length(pvData) * 2);
+        {$ELSE}
+        lvWideStr := pvData;
+        FWriter.Write(PWideChar(lvWideStr)^, Length(lvWideStr) * 2);
+        {$ENDIF}
+      end else
+      begin
+        {$IFDEF UNICODE}
+        lvBytes := StringToBytes(pvData);
+        FWriter.Write(lvBytes[0], Length(lvBytes));
+        {$ELSE}
+        FWriter.Write(PAnsiChar(pvData)^, Length(pvData));
+        {$ENDIF}
+      end;
       if FCacheSize <= 0 then Flush;
     end;
   except
@@ -202,6 +239,15 @@ var
       end else
       begin
         FWriter := TWriter.Create(FFileStream, FCacheSize);
+      end;
+
+      if FFileFormat = 1 then
+      begin
+        // UTF8-BOM
+        FWriter.Write(#$EF#$BB#$BF, 3);
+      end else if FFileFormat = 2 then
+      begin  // unicode
+        FWriter.Write(#$FF#$FE, 2); 
       end;
 
       FLastFileID := lvNewFileID;
