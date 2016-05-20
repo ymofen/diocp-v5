@@ -85,12 +85,14 @@ var
   lvCurrentID:THandle;
   lvInfo:TThreadInfoObject;
 begin
+  Result := nil;
   {$IFDEF MSWINDOWS}
   lvCurrentID := GetCurrentThreadId;
   {$ELSE}
   lvCurrentID := TThread.CurrentThread.ThreadID;
   {$ENDIF}
-  Assert(__info_list <> nil, 'GetCurrentInfoObject not initalize');
+  if __info_list = nil then Exit;
+  //  Assert(__info_list <> nil, 'GetCurrentInfoObject not initalize');
   __info_list.Lock;
   try
     lvInfo := TThreadInfoObject(__info_list.Values[lvCurrentID]);
@@ -116,10 +118,10 @@ var
 begin
   try
     lvInfo := GetCurrentInfoObject;
-    lvInfo.HintInfo := pvInfo;
+    if lvInfo <> nil then lvInfo.HintInfo := pvInfo;
   except
     on e: Exception do
-    begin
+    begin     // 关闭时可能对象已经被释放了
       if IsDebugMode then
       begin
         Assert(False, e.Message);
