@@ -458,7 +458,7 @@ function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;overload;
 /// </summary>
 function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 
-function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
+function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
 
 function StringToUtf8Bytes(pvData:string): TBytes; overload;
 
@@ -469,7 +469,7 @@ function StringToBytes(pvData:string): TBytes; overload;
 /// <summary>
 ///   请注意pvBytes后面不可预计字符串
 /// </summary>
-function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
+function BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 function ByteBufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
 function SpanPointer(const pvStart, pvEnd: PByte): Integer;
@@ -861,6 +861,7 @@ end;
 function URLDecode(const ASrc: URLString; pvIsPostData: Boolean = true): URLString;
 var
   i, j: integer;
+  s:String;
   {$IFDEF UNICODE_URL}
   lvRawBytes:TBytes;
   lvSrcBytes:TBytes;
@@ -910,7 +911,8 @@ begin
     begin
       Inc(i); // skip the % char
       try
-      Result[j] := URLChar(StrToInt('$' + ASrc[i] + ASrc[i+1]));
+        s := Format('$%s%s', ['$', ASrc[i], ASrc[i+1]]);
+        Result[j] := URLChar(StrToInt(s));
       except end;
       Inc(i, 1);  // 再跳过一个字符.
 
@@ -929,6 +931,7 @@ end;
 function URLEncode(S: URLString; pvIsPostData: Boolean = true): URLString;
 var
   i: Integer; // loops thru characters in string
+  strTemp:String;
   {$IFDEF UNICODE_URL}
   lvRawBytes:TBytes;
   {$ELSE}
@@ -973,7 +976,10 @@ begin
           Result := Result + '%20';
         end
     else
-      Result := Result + '%' + SysUtils.IntToHex(Ord(lvRawStr[i]), 2);
+      begin
+        strTemp := SysUtils.IntToHex(Ord(lvRawStr[i]), 2);
+        Result := Result + '%' + URLString(strTemp);
+      end;
     end;
   end;
   {$ENDIF}
@@ -1343,7 +1349,7 @@ begin
 {$ENDIF}
 end;
 
-function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
+function BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;
@@ -1357,7 +1363,7 @@ begin
 {$ENDIF}
 end;
 
-function Utf8BufferToString(pvBuff:PByte; pvLen:Cardinal): string;
+function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;

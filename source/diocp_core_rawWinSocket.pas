@@ -351,7 +351,7 @@ begin
 //    RaiseLastOSError(lvErr);
 //  end;
 
-  Result := inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^);
+  Result :=string(inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^));
 end;
 
 function TRawSocket.Listen(const backlog: Integer = 0): Boolean;

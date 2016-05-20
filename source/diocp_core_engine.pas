@@ -1200,7 +1200,11 @@ begin
     AWorker.FIocpEngine := Self;
 
     AWorker.FreeOnTerminate := True;
+    {$IFDEF UNICODE}
+    AWorker.Start;
+    {$ELSE}
     AWorker.Resume;
+    {$ENDIF}
     FWorkerList.Add(AWorker);
 
     // set worker use processor

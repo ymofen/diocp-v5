@@ -3,7 +3,11 @@ unit utils_fileWriter;
 interface
 
 uses
-  Classes, utils_strings, SysUtils;
+  Classes, utils_strings,
+  {$IFDEF MSWINDOWS}
+  Windows,
+  {$ENDIF}
+  SysUtils;
 
 type
   /// <summary>

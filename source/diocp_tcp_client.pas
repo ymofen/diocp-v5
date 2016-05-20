@@ -441,7 +441,7 @@ end;
 
 function TDiocpTcpClient.CheckContext(pvContext:TObject): TIocpRemoteContext;
 begin
-  if FList.IndexOf(pvContext) = -1 then
+  if FList.IndexOf(TIocpRemoteContext(pvContext)) = -1 then
     Result := nil
   else
     Result := TIocpRemoteContext(pvContext);
