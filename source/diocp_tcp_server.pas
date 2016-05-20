@@ -30,6 +30,10 @@ uses
   Classes, diocp_sockets_utils, diocp_core_engine,
   winsock, diocp_winapi_winsock2, diocp_res,
 
+{$if CompilerVersion >= 18}
+  types,
+{$ifend}
+
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,

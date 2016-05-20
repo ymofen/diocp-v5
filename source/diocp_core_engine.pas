@@ -24,6 +24,10 @@ interface
 
 uses
   Windows, diocp_sockets_utils, SysUtils, Classes, SyncObjs
+{$if CompilerVersion >= 18}
+  , types
+{$ifend}
+
   , ComObj, ActiveX, utils_locker;
 
 
