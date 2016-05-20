@@ -97,6 +97,12 @@ type
     property OnBufferAction: TOnContextBufferNotifyEvent read FOnBufferAction write FOnBufferAction;
   end;
 
+  /// <summary>
+  ///   注意
+  ///   Add, ClearContexts, 对列表进行写入，没有对列表进行线程安全处理
+  ///   Find, CheckContext，Items函数也没有对列表进行锁定
+  ///   所以，最好在开始之前对列表进行处理列表. 在停止后对列表进行ClearContexts
+  /// </summary>
   TDiocpTcpClient = class(TDiocpCustom)
   private
     function GetCount: Integer;
@@ -132,6 +138,14 @@ type
     ///   添加一个连对象
     /// </summary>
     function Add: TIocpRemoteContext;
+
+    /// <summary>
+    ///   pvContext是否是当前列表中的对象
+    ///   nil:不是
+    /// </summary>
+    function CheckContext(pvContext:TObject): TIocpRemoteContext;
+
+    
     function GetStateInfo: String;
 
     /// <summary>
@@ -146,7 +160,7 @@ type
         SetDisableAutoConnect;
 
     /// <summary>
-    ///   通过位置索引获取其中的一个连接
+    ///    通过位置索引获取其中的一个连接
     /// </summary>
     property Items[pvIndex: Integer]: TIocpRemoteContext read GetItems; default;
 
@@ -423,6 +437,14 @@ begin
   end;
   Result.Owner := Self;
   FList.Add(Result);
+end;
+
+function TDiocpTcpClient.CheckContext(pvContext:TObject): TIocpRemoteContext;
+begin
+  if FList.IndexOf(pvContext) = -1 then
+    Result := nil
+  else
+    Result := TIocpRemoteContext(pvContext);
 end;
 
 function TDiocpTcpClient.GetCount: Integer;

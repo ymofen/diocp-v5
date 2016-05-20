@@ -708,7 +708,7 @@ var
   lvBytes: TBytes;
   l:Integer;
 begin
-  SetLength(lvBytes, Length(pvInputStr));
+  SetLength(lvBytes, Length(pvInputStr) + 2);
   l := BufferURLDecode(pvInputStr, @lvBytes[0], Length(lvBytes));
   SetLength(lvBytes, l);
   if pvConvertUtf8 then
@@ -1056,6 +1056,7 @@ var
   lvBuf:PChar;
   lvMethod:String;
 begin
+  Result := 0;
   lvMethod := ByteBufferToString(FHeaderBuilder.Memory, 7);
   lvBuf :=  PChar(lvMethod);
   if (StrLIComp(lvBuf, 'GET', 3) = 0) then

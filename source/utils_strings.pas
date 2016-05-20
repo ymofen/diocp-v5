@@ -466,6 +466,9 @@ function StringToBytes(pvData:String; pvBytes:TBytes): Integer; overload;
 
 function StringToBytes(pvData:string): TBytes; overload;
 
+/// <summary>
+///   请注意pvBytes后面不可预计字符串
+/// </summary>
 function BytesToString(pvBytes:TBytes; pvOffset: Cardinal): String;
 function ByteBufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
@@ -1365,7 +1368,7 @@ var
 {$ENDIF}
 begin
 {$IFDEF UNICODE}
-  SetLength(lvBytes, pvLen);
+  SetLength(lvBytes, pvLen); 
   Move(pvBuff^, lvBytes[0], pvLen);
   Result := TEncoding.UTF8.GetString(lvBytes);
   //Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);

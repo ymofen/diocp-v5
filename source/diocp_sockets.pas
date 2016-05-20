@@ -164,6 +164,10 @@ type
     procedure SetOwner(const Value: TDiocpCustom);
 
     procedure KickOut();
+
+    procedure InnerAddToDebugStrings(pvMsg:String); overload;
+    procedure InnerAddToDebugStrings(pvMsg: string; const args: array of const;
+        pvMsgType: string); overload;
   protected
     /// <summary>
     ///   request recv data
@@ -285,7 +289,9 @@ type
     property Data: Pointer read FData write FData;
 
     property DebugINfo: string read FDebugINfo write SetDebugINfo;
-    
+
+    function GetDebugStrings: String;
+
     property OnConnectedEvent: TNotifyContextEvent read FOnConnectedEvent write
         FOnConnectedEvent;
 
@@ -578,7 +584,7 @@ type
     /// </summary>
     procedure CalcuMaxOnlineCount(pvOnlineCount:Integer);
 
-    procedure clear;
+    procedure Clear;
     /// <summary>
     ///   统计数据，计算时间信息
     /// </summary>
@@ -612,28 +618,6 @@ type
     property SentSize: Int64 read FSentSize;
     property Speed_WSARecvResponse: Int64 read FSpeed_WSARecvResponse;
     property Speed_WSASendResponse: Int64 read FSpeed_WSASendResponse;
-  end;
-
-  TContextDoublyLinked = class(TObject)
-  private
-    FLocker: TIocpLocker;
-    FHead:TDiocpCustomContext;
-    FTail:TDiocpCustomContext;
-    FCount:Integer;
-  public
-    constructor Create;
-    destructor Destroy; override;
-
-    procedure add(pvContext:TDiocpCustomContext);
-    function remove(pvContext:TDiocpCustomContext): Boolean;
-
-    function Pop:TDiocpCustomContext;
-
-    procedure write2List(pvList:TList);
-
-    property Count: Integer read FCount;
-    property Locker: TIocpLocker read FLocker;
-
   end;
 
 
@@ -736,17 +720,22 @@ type
     procedure DoSendBufferCompletedEvent(pvContext: TDiocpCustomContext; pvBuff:
         Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
         
-    function GetOnlineContextCount: Integer;
+
     procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
 
     function RequestContextDNA: Integer;
 
     procedure SetWSASendBufferSize(const Value: Cardinal);
 
-  protected
+  private    
 
     /// <summary>
-    ///   添加到在先列表中
+    ///   获取当前在线数量
+    /// </summary>
+    function GetOnlineContextCount: Integer;
+
+    /// <summary>
+    ///   添加到在线列表中
     /// </summary>
     procedure AddToOnlineList(pvObject: TDiocpCustomContext);
 
@@ -800,9 +789,14 @@ type
     procedure Open;
 
     /// <summary>
-    ///   get online client list
+    ///   获取在线列表
     /// </summary>
     procedure GetOnlineContextList(pvList:TList);
+
+    /// <summary>
+    ///   从在线列表中查找
+    /// </summary>
+    function FindContext(pvSocketHandle: THandle): TDiocpCustomContext;
 
     /// <summary>
     ///   wait for all conntext is off
@@ -932,6 +926,29 @@ resourcestring
 
 var
   __innerLogger:TSafeLogger;
+
+type
+  TContextDoublyLinked = class(TObject)
+  private
+    FLocker: TIocpLocker;
+    FHead:TDiocpCustomContext;
+    FTail:TDiocpCustomContext;
+    FCount:Integer;
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    procedure add(pvContext:TDiocpCustomContext);
+    function remove(pvContext:TDiocpCustomContext): Boolean;
+
+    function Pop:TDiocpCustomContext;
+
+    procedure write2List(pvList:TList);
+
+    property Count: Integer read FCount;
+    property Locker: TIocpLocker read FLocker;
+
+  end;
 
 //{$IFDEF DEBUG_ON}
 //procedure logDebugMessage(pvMsg: string; const args: array of const);
@@ -1087,10 +1104,8 @@ begin
   try
     Dec(FReferenceCounter);
     Result := FReferenceCounter;
-    FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-
-    if FDebugStrings.Count > 20 then
-      FDebugStrings.Delete(0);
+    
+    InnerAddToDebugStrings(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
 
 
     if FReferenceCounter < 0 then
@@ -1123,10 +1138,8 @@ begin
   try
     FRequestDisconnect := true;
     Dec(FReferenceCounter);
-    FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+    InnerAddToDebugStrings(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
 
-    if FDebugStrings.Count > 20 then
-      FDebugStrings.Delete(0);
     if FReferenceCounter < 0 then
       Assert(FReferenceCounter >=0 );
     if FReferenceCounter = 0 then
@@ -1134,8 +1147,6 @@ begin
   finally
     FContextLocker.UnLock;
   end;
-
-
 
   if lvCloseContext then InnerCloseContext;
 end;
@@ -1148,7 +1159,7 @@ begin
   FRequestDisconnect := false;
   FSending := false;
 
-  FDebugStrings.Add(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), '-----DoCleanUp-----']));
+  InnerAddToDebugStrings(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), '-----DoCleanUp-----']));
 
   if IsDebugMode then
   begin
@@ -1169,6 +1180,7 @@ begin
 
   FContextLocker.lock('DoConnected');
   try
+    
     FSocketHandle := FRawSocket.SocketHandle;
     Assert(FOwner <> nil);
     if FActive then
@@ -1187,6 +1199,8 @@ begin
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
       FOwner.AddToOnlineList(Self);
+      InnerAddToDebugStrings(Format('*(%d),%s', [FReferenceCounter, 'DoConnected:添加到在线列表']));
+
 
       if self.LockContext('onConnected', Self) then
       try
@@ -1272,9 +1286,7 @@ begin
   end else
   begin
     Inc(FReferenceCounter);
-    FDebugStrings.Add(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-
-    if FDebugStrings.Count > 20 then FDebugStrings.Delete(0);
+    InnerAddToDebugStrings(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
 
     Result := true;
   end;
@@ -1304,7 +1316,7 @@ begin
 
   try
     FActive := false;
-    FRawSocket.close;
+    FRawSocket.Close;
     CheckReleaseRes;
 
     try
@@ -1328,6 +1340,8 @@ begin
     end;
   finally
     FOwner.RemoveFromOnOnlineList(Self);
+    InnerAddToDebugStrings(Format('*(%d),%s', [FReferenceCounter, 'InnerCloseContext:移除在线列表']));
+
   end;
 end;
 
@@ -1478,8 +1492,7 @@ begin
   try
     if pvDebugInfo <> '' then
     begin
-      FDebugStrings.Add(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-      if FDebugStrings.Count > 40 then FDebugStrings.Delete(0);
+      InnerAddToDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     end;
     FRequestDisconnect := True;
 
@@ -1799,6 +1812,16 @@ begin
     end;
   end;
 
+end;
+
+function TDiocpCustom.FindContext(pvSocketHandle: THandle): TDiocpCustomContext;
+begin
+  FLocker.lock('FindContext');
+  try
+    Result := TDiocpCustomContext(FOnlineContextList.FindFirstData(pvSocketHandle));
+  finally
+    FLocker.UnLock();
+  end;
 end;
 
 function TDiocpCustom.GetOnlineContextCount: Integer;
@@ -2621,7 +2644,7 @@ begin
   FSendBufferReleaseType := dtNone;
 end;
 
-procedure TIocpDataMonitor.clear;
+procedure TIocpDataMonitor.Clear;
 begin
   FLocker.Enter;
   try
@@ -2967,6 +2990,28 @@ begin
   FContextLocker.UnLock;
 end;
 
+function TDiocpCustomContext.GetDebugStrings: String;
+begin
+  FContextLocker.lock();
+  try
+    Result := FDebugStrings.Text;
+  finally
+    FContextLocker.unLock
+  end;
+end;
+
+procedure TDiocpCustomContext.InnerAddToDebugStrings(pvMsg: string; const args:
+    array of const; pvMsgType: string);
+begin
+  InnerAddToDebugStrings(Format(pvMsg, args));
+end;
+
+procedure TDiocpCustomContext.InnerAddToDebugStrings(pvMsg:String);
+begin
+  FDebugStrings.Add(pvMsg);
+  if FDebugStrings.Count > 50 then FDebugStrings.Delete(0);
+end;
+
 
 function TDiocpCustomContext.InnerPostSendRequestAndCheckStart(
     pvSendRequest:TIocpSendRequest): Boolean;
@@ -3041,8 +3086,7 @@ begin
   try
     if pvDebugInfo <> '' then
     begin
-      FDebugStrings.Add(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-      if FDebugStrings.Count > 40 then FDebugStrings.Delete(0);
+      InnerAddToDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     end;
 
     FRequestDisconnect := True;
