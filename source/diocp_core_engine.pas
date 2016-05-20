@@ -751,7 +751,7 @@ begin
             lvTempRequest.FResponding := false;
           except
             on E:Exception do
-            begin              
+            begin                          
               FIocpCore.HandleException(lvTempRequest, E);
             end;
           end;

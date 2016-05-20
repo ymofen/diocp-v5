@@ -48,6 +48,8 @@ type
 
     procedure SetSocketState(pvState:TSocketState); override;
 
+    procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
+
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -292,6 +294,13 @@ end;
 procedure TIocpRemoteContext.OnDisconnected;
 begin
   inherited;
+end;
+
+procedure TIocpRemoteContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
+  ErrCode: WORD);
+begin
+  inherited;
+
 end;
 
 function TIocpRemoteContext.PostConnectRequest: Boolean;
