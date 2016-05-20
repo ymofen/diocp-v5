@@ -245,6 +245,8 @@ type
     /// </summary>
     function LockContext(pvDebugInfo: string; pvObj: TObject): Boolean;
     procedure unLockContext(pvDebugInfo: string; pvObj: TObject);
+
+    procedure AddDebugStrings(pvDebugInfo:String);
   public
 
     /// <summary>
@@ -309,6 +311,7 @@ type
 
     property DisconnectedCounter: Integer read FDisconnectedCounter;
     property KickCounter: Integer read FKickCounter;
+    property LastActivity: Cardinal read FLastActivity;
     property Owner: TDiocpCustom read FOwner write SetOwner;
 
     property RawSocket: TRawSocket read FRawSocket;
@@ -2976,6 +2979,16 @@ begin
 
 end;
 
+procedure TDiocpCustomContext.AddDebugStrings(pvDebugInfo:String);
+begin
+  FContextLocker.lock('AddDebugStrings');
+  try
+    InnerAddToDebugStrings(pvDebugInfo);
+  finally
+    FContextLocker.unLock;
+  end;
+end;
+
 procedure TDiocpCustomContext.AddRefernece;
 begin
   FContextLocker.lock('AddRefernece');
@@ -3060,7 +3073,7 @@ var
 begin
   InterlockedIncrement(FKickCounter);
 
-  Self.DebugINfo :=Format('[%d]进入->KickOut:%d', [self.SocketHandle, self.FReferenceCounter]);
+  AddDebugStrings(Format('[%d]进入->KickOut:%d', [self.SocketHandle, self.FReferenceCounter]));
 
   pvDebugInfo := '超时主动断开连接';
   pvObj := nil;

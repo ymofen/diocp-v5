@@ -224,6 +224,7 @@ function TRedisCommand.InputBufferForDecode(pvBuf: Byte): Integer;
 var
   lvBytes: TBytes;
   l: Integer;
+  lvTempStr:String;
 begin
   if FDecodePackTypeChr = Char(0) then
   begin
@@ -256,12 +257,14 @@ begin
       ResetPacakge(@FRawPackage);
       ConfigStartAndEndBytes(FDecodeTypeChr, sLineBreak);
     end;
+    // type chr也输入到rawPackage中
     l := InputBuffer(@FRawPackage, pvBuf);
     if l = 1 then
     begin
       if FDecodeTypeChr = ':' then
       begin
-        FLastResponseIntValue := StrToInt(FLastCmdString);
+        lvTempStr := BytesToString(FRawPackage.FRawBytes, 1);
+        FLastResponseIntValue := StrToInt(lvTempStr);
       end;
       FResponseMessage := Utf8BytesToString(FRawPackage.FRawBytes, 1);
       Result := 1;
