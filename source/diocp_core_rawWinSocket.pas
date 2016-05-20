@@ -236,7 +236,7 @@ var
 
 begin
   lvFlags := 1;  // 非阻塞模式
-  ioctlsocket(FSocketHandle, FIONBIO, lvFlags);
+  ioctlsocket(FSocketHandle, LongInt(FIONBIO), lvFlags);
 
   FillChar(sockaddr, SizeOf(sockaddr), 0);
   with sockaddr do
@@ -249,7 +249,7 @@ begin
   if lvRet = 0 then
   begin  // 连接成功
     lvFlags := 0;  // 非阻塞模式
-    ioctlsocket(FSocketHandle, FIONBIO, lvFlags);
+    ioctlsocket(FSocketHandle, Longint(FIONBIO), lvFlags);
     Result := true;
   end else
   begin
@@ -271,7 +271,7 @@ begin
     end else
     begin
       lvFlags := 0;  // 非阻塞模式
-      ioctlsocket(FSocketHandle, FIONBIO, lvFlags);
+      ioctlsocket(FSocketHandle, Longint(FIONBIO), lvFlags);
       Result := true;
     end;
 

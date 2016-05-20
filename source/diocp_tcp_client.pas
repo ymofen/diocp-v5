@@ -415,12 +415,15 @@ begin
     if pvASyncWorker.Terminated then Break;
 
     lvContext := TIocpRemoteContext(FList[i]);
-  
-    if lvContext.CanAutoReConnect then
+    if not (lvContext.SocketState in [ssConnecting, ssConnected]) then
     begin
-      if not (lvContext.SocketState in [ssConnecting, ssConnected]) then
+      if lvContext.CanAutoReConnect then
       begin
         lvContext.ConnectASync;
+        lvContext.AddDebugStrings('*[-]执行了重连请求!');
+      end else
+      begin
+        lvContext.AddDebugStrings('*[-]重连时:Check CanAutoReConnect is false!');
       end;
     end;
   end;
