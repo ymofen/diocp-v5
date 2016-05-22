@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
-  ComObj, ComCtrls, utils_safeLogger;
+  ComObj, ComCtrls, utils_safeLogger, System.Actions;
 
 type
   TfrmMain = class(TForm)
@@ -107,7 +107,7 @@ begin
     lvStream := TMemoryStream.Create;
     try
       s := edtMsg.Text;
-      //lvStream.Write(s[1], Length(s));
+      lvStream.Write(s[1], Length(s));
 
       // get all client context to List
       FTcpServer.getOnlineContextList(lvList);
