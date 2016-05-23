@@ -87,6 +87,8 @@ function TransByteSize(pvByte: Int64): string;
 
 function GetRunTimeINfo: string;
 
+function NowString: String;
+
 implementation
 
 uses
@@ -365,6 +367,11 @@ begin
     WSAStart;
     loadExFunctions;
   end;
+end;
+
+function NowString: String;
+begin
+  Result := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', Now);
 end;
 
 initialization

@@ -51,6 +51,13 @@ type
 {$ENDIF}
 
 
+{$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
+
+{$ELSE}
+  MarshaledAString = PAnsiChar;
+{$IFEND >=XE5}
+
+
 {$IFDEF MSWINDOWS}  // Windows平台下面可以使用AnsiString
   URLString = AnsiString;
   URLChar = AnsiChar;

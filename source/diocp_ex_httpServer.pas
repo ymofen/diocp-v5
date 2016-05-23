@@ -1348,7 +1348,7 @@ begin
     except
       on E:Exception do
       begin
-        self.LogMessage('Http逻辑处理异常:%s', [e.Message], 'HTTP_ERR', lgvError);
+        self.LogMessage('Http逻辑处理异常:%s', [e.Message], '', lgvError);
         pvRequest.FReleaseLater := False;
         pvRequest.Response.FInnerResponse.ResponseCode := 500;
         pvRequest.Response.Clear;
@@ -1361,7 +1361,7 @@ begin
   except
     on E:Exception do
     begin
-      self.LogMessage('Http逻辑处理异常:%s', [e.Message], CORE_LOG_FILE, lgvError);
+      self.LogMessage('*Http逻辑处理异常:%s', [e.Message], CORE_LOG_FILE, lgvError);
     end;
   end;
 end;

@@ -2,14 +2,14 @@ unit utils_base64;
 
 interface
 
-{$IF (RTLVersion>=23)}
-{$DEFINE USE_AnsiStrings}
-{$IFEND >=XE2}
+{$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
+  {$DEFINE USE_AnsiStrings}
+{$IFEND >=XE5}
 
 uses
   utils_strings, SysUtils, Classes
 {$IFDEF USE_AnsiStrings}
-  , System.AnsiStrings
+  , System.AnsiStrings     
 {$ENDIF}
 
 {$IFDEF MSWINDOWS}
@@ -18,12 +18,9 @@ uses
     , System.NetEncoding
 {$ENDIF}
   ;
-{$IFDEF UNICODE}
-{$IF (RTLVersion<=23)}
-type
-  MarshaledAString = PAnsiChar;
-{$IFEND >=XE2}
-{$ENDIF}
+
+
+
 
 
 function Base64Encode(pvStream: TStream; CharsPerLine: Integer = 0): string;

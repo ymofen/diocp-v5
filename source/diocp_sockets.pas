@@ -166,8 +166,8 @@ type
     procedure KickOut();
 
     procedure InnerAddToDebugStrings(pvMsg:String); overload;
-    procedure InnerAddToDebugStrings(pvMsg: string; const args: array of const;
-        pvMsgType: string); overload;
+    procedure InnerAddToDebugStrings(pvMsg: string; const args: array of const);
+        overload;
   protected
     /// <summary>
     ///   request recv data
@@ -246,7 +246,7 @@ type
     function LockContext(pvDebugInfo: string; pvObj: TObject): Boolean;
     procedure unLockContext(pvDebugInfo: string; pvObj: TObject);
 
-    procedure AddDebugStrings(pvDebugInfo:String);
+    procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
   public
 
     /// <summary>
@@ -1108,7 +1108,7 @@ begin
     Dec(FReferenceCounter);
     Result := FReferenceCounter;
     
-    InnerAddToDebugStrings(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+    InnerAddToDebugStrings('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]);
 
 
     if FReferenceCounter < 0 then
@@ -1202,7 +1202,8 @@ begin
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
       FOwner.AddToOnlineList(Self);
-      InnerAddToDebugStrings(Format('*(%d),%s', [FReferenceCounter, 'DoConnected:添加到在线列表']));
+      InnerAddToDebugStrings(Format('[%s]*(*):(%d),%s',
+        [NowString, FReferenceCounter, 'DoConnected:添加到在线列表']));
 
 
       if self.LockContext('onConnected', Self) then
@@ -1299,14 +1300,17 @@ end;
 procedure TDiocpCustomContext.InnerCloseContext;
 begin
   Assert(FOwner <> nil);
-  Self.DebugINfo := '进入->InnerCloseContext';
+  AddDebugStrings(Format('*[*][%d]:InnerCloseContext- BEGIN, socketstate:%d',
+         [self.SocketHandle, Ord(FSocketState)]));
 {$IFDEF DEBUG_ON}
   if FReferenceCounter <> 0 then
     FOwner.logMessage('InnerCloseContext FReferenceCounter:%d', [FReferenceCounter],
     CORE_LOG_FILE);
   if not FActive then
   begin
-    FOwner.logMessage('InnerCloseContext FActive is false, socketstate:%d', [Ord(FSocketState)], CORE_LOG_FILE);
+    FOwner.logMessage('[%d]:InnerCloseContext FActive is false, socketstate:%d', [self.SocketHandle, Ord(FSocketState)], CORE_LOG_FILE);
+    AddDebugStrings(Format('*[*][%d]:InnerCloseContext FActive is false, socketstate:%d',
+       [self.SocketHandle, Ord(FSocketState)]));
     FSocketState := ssDisconnected;
     Exit;
   end;
@@ -1343,8 +1347,7 @@ begin
     end;
   finally
     FOwner.RemoveFromOnOnlineList(Self);
-    InnerAddToDebugStrings(Format('*(%d),%s', [FReferenceCounter, 'InnerCloseContext:移除在线列表']));
-
+    AddDebugStrings(Format('*(%d),%s', [FReferenceCounter, 'InnerCloseContext:移除在线列表']));
   end;
 end;
 
@@ -2979,11 +2982,16 @@ begin
 
 end;
 
-procedure TDiocpCustomContext.AddDebugStrings(pvDebugInfo:String);
+procedure TDiocpCustomContext.AddDebugStrings(pvDebugInfo: String;
+    pvAddTimePre: Boolean = true);
+var
+  s:string;
 begin
+  if pvAddTimePre then s := Format('[%s]:%s', [NowString, pvDebugInfo])
+  else s := pvDebugInfo;
   FContextLocker.lock('AddDebugStrings');
   try
-    InnerAddToDebugStrings(pvDebugInfo);
+    InnerAddToDebugStrings(s);
   finally
     FContextLocker.unLock;
   end;
@@ -3014,7 +3022,7 @@ begin
 end;
 
 procedure TDiocpCustomContext.InnerAddToDebugStrings(pvMsg: string; const args:
-    array of const; pvMsgType: string);
+    array of const);
 begin
   InnerAddToDebugStrings(Format(pvMsg, args));
 end;
