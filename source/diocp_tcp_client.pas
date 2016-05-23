@@ -419,11 +419,18 @@ begin
     begin
       if lvContext.CanAutoReConnect then
       begin
-        lvContext.AddDebugStrings('*[*]执行重连请求!');
-        lvContext.ConnectASync; 
+        lvContext.AddDebugStrings('*(*)执行重连请求!');
+        lvContext.ConnectASync;
       end else
       begin
-        lvContext.AddDebugStrings('*[*]重连时:Check CanAutoReConnect is false!');
+        lvContext.AddDebugStrings('*(*)重连时:Check CanAutoReConnect is false!');
+      end;
+    end else
+    begin
+      if lvContext.CheckActivityTimeOut(10000) then
+      begin
+        ;// 应当进行重连
+      
       end;
     end;
   end;

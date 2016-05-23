@@ -61,6 +61,8 @@ type
       
   TDataReleaseType = (dtNone, dtFreeMem, dtDispose);
 
+  TContextArray = array of TDiocpCustomContext;
+
   /// <summary>
   ///   client object
   /// </summary>
@@ -257,6 +259,8 @@ type
     constructor Create; virtual;
 
     destructor Destroy; override;
+
+    function CheckActivityTimeOut(pvTimeOut:Integer): Boolean;
 
 
     
@@ -630,6 +634,8 @@ type
     ///   引用计数
     /// </summary>
     FRefCounter:Integer;
+
+    FDebugStrings:TStrings;
     
   {$IFDEF DEBUG_ON}
     FDebug_SendRequestCounter:Integer;
@@ -742,10 +748,13 @@ type
     /// </summary>
     procedure AddToOnlineList(pvObject: TDiocpCustomContext);
 
+
     /// <summary>
     ///   从在线列表中移除
     /// </summary>
     procedure RemoveFromOnOnlineList(pvObject: TDiocpCustomContext); virtual;
+
+    procedure InnerAddToDebugStrings(pvMsg:String);
 
   public
     /// <summary>
@@ -821,6 +830,19 @@ type
     ///   使用循环检测，如果你有好的方案，欢迎提交您的宝贵意见
     /// </summary>
     function KickOut(pvTimeOut:Cardinal = 60000): Integer;
+
+    function GetTimeOutContexts(var vOutList: TContextArray; pvTimeOut: Cardinal =
+        60000): Integer;
+
+    /// <summary>
+    ///   检测pvContext是否会进行KickOut动作
+    ///   0: 没找到对应的连接
+    ///   1: 已经超时
+    ///   2: 未超时
+    /// </summary>
+    function CheckTimeOutContext(pvContext:TDiocpCustomContext; pvTimeOut:Cardinal
+        = 60000): Integer;
+
     procedure LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel: TLogLevel
         = lgvMessage); overload;
         
@@ -831,6 +853,12 @@ type
     /// </summary>
     property OnSendBufferCompleted: TOnContextBufferEvent read
         FOnSendBufferCompleted write FOnSendBufferCompleted;
+
+
+    
+    procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
+
+    function GetDebugString: String;
   published
 
     /// <summary>
@@ -1558,6 +1586,9 @@ end;
 constructor TDiocpCustom.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+
+  FDebugStrings := TStringList.Create;
+
   FRefCounter := 0;
   CheckWinSocketStart;
 
@@ -1605,7 +1636,25 @@ begin
   FSendRequestPool.Free;
 
   FLocker.Free;
+
+  FDebugStrings.Free;
+  
   inherited Destroy;
+end;
+
+procedure TDiocpCustom.AddDebugStrings(pvDebugInfo: String; pvAddTimePre:
+    Boolean = true);
+var
+  s:string;
+begin
+  if pvAddTimePre then s := Format('[%s]:%s', [NowString, pvDebugInfo])
+  else s := pvDebugInfo;
+  FLocker.lock();
+  try
+    InnerAddToDebugStrings(s);
+  finally
+    FLocker.unLock;
+  end;
 end;
 
 procedure TDiocpCustom.AddToOnlineList(pvObject: TDiocpCustomContext);
@@ -1620,6 +1669,51 @@ begin
   finally
     FLocker.unLock;
   end; 
+end;
+
+function TDiocpCustom.CheckTimeOutContext(pvContext:TDiocpCustomContext;
+    pvTimeOut:Cardinal = 60000): Integer;
+var
+  I:Integer;
+  lvContext:TDiocpCustomContext;
+var
+  lvBucket, lvNextBucket: PDHashData;
+begin
+  Result := 0;
+  self.IncRefCounter;
+  try
+    FLocker.lock('CheckTimeOutContext');
+    try
+      for I := 0 to FOnlineContextList.BucketSize - 1 do
+      begin
+        lvBucket := FOnlineContextList.Buckets[I];
+        while lvBucket<>nil do
+        begin
+          lvNextBucket := lvBucket.Next;
+          if lvBucket.Data <> nil then
+          begin
+            lvContext := TDiocpCustomContext(lvBucket.Data);
+            if lvContext = pvContext then
+            begin
+              if lvContext.CheckActivityTimeOut(pvTimeOut) then
+              begin
+                Result := 1;
+              end else
+              begin
+                Result := 2;
+              end;
+              Break;
+            end;
+          end;
+          lvBucket:= lvNextBucket;
+        end;
+      end;
+    finally
+      FLocker.unLock;
+    end;
+  finally
+    self.DecRefCounter;
+  end;
 end;
 
 procedure TDiocpCustom.DoClientContextError(pvClientContext:
@@ -1830,6 +1924,58 @@ begin
   end;
 end;
 
+function TDiocpCustom.GetDebugString: String;
+begin
+  FLocker.lock();
+  try
+    Result := FDebugStrings.Text;
+  finally
+    FLocker.unLock;
+  end;
+end;
+
+function TDiocpCustom.GetTimeOutContexts(var vOutList: TContextArray;
+    pvTimeOut: Cardinal = 60000): Integer;
+var
+  I, j:Integer;
+  lvContext:TDiocpCustomContext;
+var
+  lvBucket, lvNextBucket: PDHashData;
+begin
+  self.IncRefCounter;
+  try
+    FLocker.lock('GetTimeOutContexts');
+    try
+      j := 0;
+      SetLength(vOutList, FOnlineContextList.Count);
+      for I := 0 to FOnlineContextList.BucketSize - 1 do
+      begin
+        lvBucket := FOnlineContextList.Buckets[I];
+        while lvBucket<>nil do
+        begin
+          lvNextBucket := lvBucket.Next;
+          if lvBucket.Data <> nil then
+          begin
+            lvContext := TDiocpCustomContext(lvBucket.Data);
+            if lvContext.CheckActivityTimeOut(pvTimeOut) then
+            begin
+              vOutList[j] := lvContext;
+              Inc(j);
+            end;
+          end;
+          lvBucket:= lvNextBucket;
+        end;
+      end;
+    finally
+      FLocker.unLock;
+    end;
+
+    Result := j;
+  finally
+    self.DecRefCounter;
+  end;
+end;
+
 function TDiocpCustom.GetOnlineContextCount: Integer;
 begin
   Result := FOnlineContextList.Count;
@@ -1885,6 +2031,12 @@ begin
   Result := InterlockedIncrement(FRefCounter);
 end;
 
+procedure TDiocpCustom.InnerAddToDebugStrings(pvMsg:String);
+begin
+  FDebugStrings.Add(pvMsg);
+  if FDebugStrings.Count > 500 then FDebugStrings.Delete(0);
+end;
+
 function TDiocpCustom.KickOut(pvTimeOut:Cardinal = 60000): Integer;
 var
   lvNowTickCount:Cardinal;
@@ -1910,13 +2062,10 @@ begin
           if lvBucket.Data <> nil then
           begin
             lvContext := TDiocpCustomContext(lvBucket.Data);
-            if lvContext.FLastActivity <> 0 then
+            if lvContext.CheckActivityTimeOut(pvTimeOut) then
             begin
-              if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
-              begin
-                lvKickOutList[j] := lvContext;
-                Inc(j);
-              end;
+              lvKickOutList[j] := lvContext;
+              Inc(j);
             end;
           end;
           lvBucket:= lvNextBucket;
@@ -1929,6 +2078,9 @@ begin
     Result := 0;
     for i := 0 to j - 1 do
     begin
+      {$IFDEF DEBUG}
+      Self.AddDebugStrings(Format('%d, 执行KickOut', [lvKickOutList[i].SocketHandle]));
+      {$ENDIF}
       lvKickOutList[i].KickOut();
       Inc(Result);
     end;
@@ -2247,11 +2399,6 @@ begin
       FContext.RequestDisconnect(
         Format(strRecvEngineOff, [FContext.FSocketHandle])
         , Self);
-//      {$IFDEF DEBUG_ON}
-//      if FOwner.logCanWrite then
-//        FOwner.FSafeLogger.logMessage('TIocpRecvRequest Owner Off', 'DEBUG_', lgvDebug);
-//      {$ENDIF}
-//      FContext.RequestDisconnect('IocpRecvRequest response server enginee is off', Self);
     end else if ErrorCode <> 0 then
     begin
       {$IFDEF DEBUG_ON}
@@ -2263,16 +2410,6 @@ begin
       FContext.RequestDisconnect(
         Format(strRecvError, [FContext.FSocketHandle, FErrorCode])
         ,  Self);
-//
-//    {$IFDEF DEBUG_ON}
-//      if FOwner.logCanWrite then
-//        FOwner.FSafeLogger.logMessage('TIocpRecvRequest response ErrorCode:%d',
-//          [ErrorCode], 'DEBUG_', lgvDebug);
-//    {$ENDIF}
-//
-//      FContext.DoError(ErrorCode);
-//
-//      FContext.RequestDisconnect('IocpRecvRequest response Error',  Self);
     end else if (FBytesTransferred = 0) then
     begin      // no data recvd, socket is break
       {$IFDEF DEBUG_ON}
@@ -2280,25 +2417,20 @@ begin
       {$ENDIF}
       FContext.RequestDisconnect(
         Format(strRecvZero,  [FContext.FSocketHandle]),  Self);
-
-//    {$IFDEF DEBUG_ON}
-//      if FOwner.logCanWrite then
-//        FOwner.FSafeLogger.logMessage('IocpRecvRequest response FBytesTransferred is zero',
-//         [], 'DEBUG_', lgvDebug);
-//    {$ENDIF}
-//      FContext.RequestDisconnect('IocpRecvRequest response FBytesTransferred is zero',  Self);
     end else
     begin
       FContext.DoReceiveData;
     end;
   finally
 
+    // 先投递, 进行引用计数
     if not FContext.FRequestDisconnect then
     begin
       FContext.PostWSARecvRequest;
     end;
 
-    FContext.decReferenceCounter(
+    // 减少计数，可能会触发关闭事件
+    FContext.DecReferenceCounter(
       Format('debugInfo:%s, refcount:%d, TIocpRecvRequest.WSARecvRequest.HandleResponse',
         [FDebugInfo,FOverlapped.refCount]), Self);
 
@@ -3004,6 +3136,11 @@ begin
   FContextLocker.UnLock;
 end;
 
+function TDiocpCustomContext.CheckActivityTimeOut(pvTimeOut:Integer): Boolean;
+begin
+  Result := (FLastActivity <> 0) and (tick_diff(FLastActivity, GetTickCount) > pvTimeOut);
+end;
+
 procedure TDiocpCustomContext.DecRefernece;
 begin
   FContextLocker.lock('DecRefernece');
@@ -3081,7 +3218,7 @@ var
 begin
   InterlockedIncrement(FKickCounter);
 
-  AddDebugStrings(Format('[%d]进入->KickOut:%d', [self.SocketHandle, self.FReferenceCounter]));
+  AddDebugStrings(Format('*(%d):[%d]进入->KickOut', [self.FReferenceCounter, self.SocketHandle]));
 
   pvDebugInfo := '超时主动断开连接';
   pvObj := nil;
@@ -3121,7 +3258,7 @@ begin
     FContextLocker.UnLock;
   end; 
 
-  Self.DebugINfo :=Format('[%d]执行完成->KickOut:%d', [self.SocketHandle, self.FReferenceCounter]);
+  AddDebugStrings(Format('*(%d):%d执行完成->KickOut', [self.FReferenceCounter, self.SocketHandle]));
   if lvCloseContext then
   begin
     InnerCloseContext

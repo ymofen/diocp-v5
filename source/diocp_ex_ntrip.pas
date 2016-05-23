@@ -448,7 +448,7 @@ var
 implementation
 
 uses
-  utils.base64;
+  utils_base64;
 
 procedure TDiocpNtripRequest.Clear;
 begin
@@ -605,7 +605,7 @@ begin
 
     // Base64
     lvValue := P;
-    lvValue := Base64ToStr(lvValue);
+    lvValue := Base64Decode(lvValue);
 
     /// userid:pasword
     P := PChar(lvValue);

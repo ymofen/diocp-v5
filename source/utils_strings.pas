@@ -17,13 +17,15 @@
       2015-09-11 09:08:22
  *)
 
+
+unit utils_strings;
+
+
+interface
+
 {$if CompilerVersion>= 28}    // XE7:28
   {$DEFINE USE_NetEncoding}
 {$ifend}
- 
-unit utils_strings;
-
-interface
 
 uses
   Classes, SysUtils
