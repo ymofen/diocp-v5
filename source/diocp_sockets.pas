@@ -1230,8 +1230,8 @@ begin
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
       FOwner.AddToOnlineList(Self);
-      InnerAddToDebugStrings(Format('[%s]*(*):(%d),%s',
-        [NowString, FReferenceCounter, 'DoConnected:添加到在线列表']));
+      InnerAddToDebugStrings(Format('[%s]:*(%d):(%d:objAddr:%d) %s',
+        [NowString, FReferenceCounter, self.SocketHandle, IntPtr(Self), 'DoConnected:添加到在线列表']));
 
 
       if self.LockContext('onConnected', Self) then
@@ -1328,8 +1328,8 @@ end;
 procedure TDiocpCustomContext.InnerCloseContext;
 begin
   Assert(FOwner <> nil);
-  AddDebugStrings(Format('*[*][%d]:InnerCloseContext- BEGIN, socketstate:%d',
-         [self.SocketHandle, Ord(FSocketState)]));
+  AddDebugStrings(Format('*(%d):(%d:objAddr:%d)->InnerCloseContext- BEGIN, socketstate:%d',
+         [FReferenceCounter, self.SocketHandle, IntPtr(Self), Ord(FSocketState)]));
 {$IFDEF DEBUG_ON}
   if FReferenceCounter <> 0 then
     FOwner.logMessage('InnerCloseContext FReferenceCounter:%d', [FReferenceCounter],
@@ -1374,8 +1374,10 @@ begin
     except
     end;
   finally
+    AddDebugStrings(Format('*(%d):(%d:objAddr:%d)->,%s',
+      [FReferenceCounter, Self.SocketHandle, IntPtr(Self), 'InnerCloseContext:移除在线列表']));
     FOwner.RemoveFromOnOnlineList(Self);
-    AddDebugStrings(Format('*(%d),%s', [FReferenceCounter, 'InnerCloseContext:移除在线列表']));
+
   end;
 end;
 
@@ -1658,17 +1660,21 @@ begin
 end;
 
 procedure TDiocpCustom.AddToOnlineList(pvObject: TDiocpCustomContext);
+var
+  i:Integer;
 begin
   FLocker.lock('AddToOnlineList');
   try
     FOnlineContextList.Add(pvObject.FSocketHandle, pvObject);
-    if DataMoniter <> nil then
-    begin
-      DataMoniter.CalcuMaxOnlineCount(FOnlineContextList.Count);
-    end;
+    i := FOnlineContextList.Count;
   finally
     FLocker.unLock;
-  end; 
+  end;
+
+  if DataMoniter <> nil then
+  begin
+    DataMoniter.CalcuMaxOnlineCount(i);
+  end;
 end;
 
 function TDiocpCustom.CheckTimeOutContext(pvContext:TDiocpCustomContext;
