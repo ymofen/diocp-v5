@@ -31,4 +31,33 @@ object frmMain: TfrmMain
       'mmoLog')
     TabOrder = 1
   end
+  object btnTester2: TButton
+    Left = 200
+    Top = 48
+    Width = 75
+    Height = 25
+    Caption = 'btnTester2'
+    TabOrder = 2
+    OnClick = btnTester2Click
+  end
+  object edtFindAddr: TEdit
+    Left = 200
+    Top = 21
+    Width = 153
+    Height = 21
+    TabOrder = 3
+    Text = '7196336'
+  end
+  object edtKey: TEdit
+    Left = 384
+    Top = 21
+    Width = 121
+    Height = 21
+    TabOrder = 4
+    Text = '500'
+  end
+  object dlgOpen: TOpenDialog
+    Left = 320
+    Top = 200
+  end
 end
