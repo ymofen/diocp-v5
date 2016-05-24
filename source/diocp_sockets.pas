@@ -1982,24 +1982,10 @@ begin
 end;
 
 procedure TDiocpCustom.GetOnlineContextList(pvList:TList);
-var
-  I:Integer;
-  lvBucket: PDHashData;
 begin
   FLocker.lock('getOnlineContextList');
   try
-    for I := 0 to FOnlineContextList.BucketSize - 1 do
-    begin
-      lvBucket := FOnlineContextList.Buckets[I];
-      while lvBucket<>nil do
-      begin
-        if lvBucket.Data <> nil then
-        begin
-           pvList.Add(lvBucket.Data);
-        end;
-        lvBucket:=lvBucket.Next;
-      end;
-    end;
+    FOnlineContextList.GetDatas(pvList);
   finally
     FLocker.unLock;
   end;

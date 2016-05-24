@@ -53,7 +53,7 @@ type
 {$ENDIF}
 
 
-{$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
+{$IF (RTLVersion>=26)}
 
 {$ELSE}
   MarshaledAString = PAnsiChar;
