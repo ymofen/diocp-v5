@@ -1665,8 +1665,16 @@ var
 begin
   FLocker.lock('AddToOnlineList');
   try
+    sfLogger.logMessage(Format('1,%d,%d,%d',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE');
+    AddDebugStrings(Format('1.(%d)FOnlineContextList->Add(%d:%d)',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
     FOnlineContextList.Add(pvObject.FSocketHandle, pvObject);
+    AddDebugStrings(Format('2.(%d)FOnlineContextList->Add(%d:%d)',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
     i := FOnlineContextList.Count;
+    sfLogger.logMessage(Format('2,%d,%d,%d',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE');
   finally
     FLocker.unLock;
   end;
@@ -2144,7 +2152,15 @@ begin
   FLocker.lock('RemoveFromOnOnlineList');
   try
     {$IFDEF DEBUG_ON}
+    sfLogger.logMessage(Format('3,%d,%d,%d',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE');
+    AddDebugStrings(Format('1.(%d)FOnlineContextList->Delete(%d:%d)',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
     lvSucc := FOnlineContextList.DeleteFirst(pvObject.FSocketHandle);
+    AddDebugStrings(Format('2.(%d)FOnlineContextList->Delete(%d:%d)',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
+    sfLogger.logMessage(Format('4,%d,%d,%d',
+      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE'); 
     Assert(lvSucc);
     {$ELSE}
     FOnlineContextList.DeleteFirst(pvObject.FSocketHandle);
