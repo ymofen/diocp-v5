@@ -139,6 +139,7 @@ type
     function Listen(const backlog: Integer = 0): Boolean;
 
     procedure Close(pvShutdown: Boolean = true);
+    procedure DoInitialize;
 
     function IsValidSocketHandle: Boolean;
 
@@ -367,6 +368,11 @@ begin
   FSocketHandle := socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 end;
 
+procedure TRawSocket.DoInitialize;
+begin
+  
+end;
+
 function TRawSocket.Readable(pvTimeOut:Integer): Boolean;
 var
   lvFDSet:fd_set;
@@ -489,6 +495,7 @@ function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut:
     Cardinal): Integer;
 var
   lvTick : Cardinal;
+  r:Integer;
 begin
   lvTick := TThread.GetTickCount;
   while True do
@@ -497,14 +504,19 @@ begin
     begin
       Result := -2;
       Exit;
-    end else  if ReceiveLength > 0 then
+    end;
+
+    r := ReceiveLength;
+    if r > 0 then    
     begin
       Result := recv(FSocketHandle, data, len, 0);
       Exit;
-    end else
+    end else if r = -1 then
     begin
-      Sleep(10);
+      RaiseLastOSError;
     end;
+
+    Sleep(10);
   end;
 end;
 
@@ -571,7 +583,7 @@ begin
   r := ioctlsocket(FSocketHandle, FIONREAD, Cardinal(Result));
   if r = -1 then
   begin
-    Result := 0;
+    Result := -1;
   end;
 end;
 

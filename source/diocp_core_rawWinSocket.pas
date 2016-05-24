@@ -50,6 +50,8 @@ type
     procedure Close(pvShutdown: Boolean = true);
     procedure CreateTcpSocket;
 
+    procedure DoInitialize;
+
     destructor Destroy; override;
 
     /// <summary>
@@ -112,6 +114,8 @@ type
     function ReceiveLength: Integer;
 
     function SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
+
+    function SetSendTimeOut(const pvTimeOut:Cardinal): Integer;
 
     function CancelIO: Boolean;
 
@@ -295,7 +299,7 @@ end;
 procedure TRawSocket.CreateTcpSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;
@@ -318,6 +322,11 @@ destructor TRawSocket.Destroy;
 begin
   CheckDestroyHandle;
   inherited;
+end;
+
+procedure TRawSocket.DoInitialize;
+begin
+  SetNoDelayOption(True);
 end;
 
 procedure TRawSocket.CheckDestroyHandle;
@@ -377,26 +386,40 @@ function TRawSocket.Readable(pvTimeOut:Integer): Boolean;
 var
   lvFDSet:TFDSet;
   lvTime_val: TTimeval;
-//var
-//  lvTick:Cardinal;
+  r:Integer;
 begin
-//  lvTick := GetTickCount;
-//  while (GetTickCount - lvTick) < pvTimeOut do
-//  begin
-//    Result := ReceiveLength > 0;
-//    if Result then
-//    begin
-//      Break;
-//    end;
-//    Sleep(100);
-//  end;
-
   FD_ZERO(lvFDSet);
   _FD_SET(FSocketHandle, lvFDSet);
 
   lvTime_val.tv_sec := pvTimeOut div 1000;
   lvTime_val.tv_usec :=  1000 * (pvTimeOut mod 1000);
-  Result := select(0, @lvFDSet, nil, nil, @lvTime_val) > 0;
+
+
+  //The select function determines the status of one or more sockets, waiting if necessary,
+  //to perform synchronous I/O.
+  //  The select function returns the total number of socket handles that are ready
+  //  and contained in the fd_set structures,
+  //  zero if the time limit expired, or SOCKET_ERROR if an error occurred.
+  //  If the return value is SOCKET_ERROR,
+  //  WSAGetLastError can be used to retrieve a specific error code.
+
+  r := select(0, @lvFDSet, nil, nil, @lvTime_val);
+  if r = 0 then
+  begin
+    Result := False;
+  end else if r = -1 then
+  begin
+    RaiseLastOSError;
+  end else if lvFDSet.fd_count > 0 then
+  begin
+    Result := true;
+  end else if r > 0 then
+  begin
+    Result := True;
+  end else
+  begin
+    Result := False;
+  end;
 end;
 
 function TRawSocket.ReceiveLength: Integer;
@@ -415,6 +438,7 @@ function TRawSocket.RecvBuf(var data; const len: Cardinal; pvTimeOut:
     Cardinal): Integer;
 var
   lvTick : Cardinal;
+  r:Integer;
 begin
   lvTick := GetTickCount;
   while True do
@@ -427,14 +451,19 @@ begin
     begin
       Result := recv(FSocketHandle, data, len, 0);
       Exit;
-    end else if ReceiveLength > 0 then
+    end;
+
+    r := ReceiveLength;
+    if r = -1 then
+    begin
+      RaiseLastOSError;
+    end else if r > 0 then
     begin
       Result := recv(FSocketHandle, data, len, 0);
       Exit;
-    end else
-    begin
-      Sleep(10);
     end;
+
+    Sleep(10);
   end;
 end;
 
@@ -649,6 +678,15 @@ function TRawSocket.SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
 begin
   Result := setsockopt(FSocketHandle,
    SOL_SOCKET, SO_RCVTIMEO, PAnsiChar(@pvTimeOut), SizeOf(Cardinal));
+end;
+
+function TRawSocket.SetSendTimeOut(const pvTimeOut:Cardinal): Integer;
+var
+  nNetTimeout :Cardinal;
+begin
+  nNetTimeout := pvTimeOut;
+  Result := Setsockopt( FSocketHandle,
+             SOL_SOCKET,SO_SNDTIMEO,PAnsiChar(@nNetTimeout), Sizeof(Cardinal));
 end;
 
 function TRawSocket.ShutDown(pvHow: Integer = SD_BOTH): Integer;

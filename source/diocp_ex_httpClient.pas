@@ -254,7 +254,7 @@ begin
   FResponseBody := TMemoryStream.Create;
   FResponseHeader := TStringList.Create;
 
-  FTimeOut := 300000;
+  FTimeOut := 30000;
 
   FURL := TURL.Create;
 
@@ -356,6 +356,16 @@ begin
 
   FRawSocket.CreateTcpSocket;
   try
+    {$IFDEF MSWINDOWS}
+    if FTimeOut > 0 then
+    begin
+      FRawSocket.SetReadTimeOut(FTimeOut);
+      FRawSocket.SetSendTimeOut(FTimeOut);
+    end;
+    {$ENDIF}
+
+    FRawSocket.DoInitialize;
+
     // 进行域名解析
     lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
 
@@ -487,16 +497,12 @@ var
 
 begin
   FHttpBuffer.DoCleanUp;
+{$IFDEF MSWINDOWS}
 
   while True do
   begin
-//    if not FRawSocket.Readable(FTimeOut) then
-//    begin
-//      l := -2;
-//      CheckSocketResult(l);
-//    end;
-    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE, FTimeOut);
-    if l = -1 then CheckSocketResult(l);
+    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
+    CheckSocketResult(l);
     if l = 0 then
     begin
       // 对方被关闭
@@ -509,6 +515,24 @@ begin
       Break;
     end;
   end;
+{$ELSE}
+  while True do
+  begin
+    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE, FTimeOut);
+    CheckSocketResult(l);
+    if l = 0 then
+    begin
+      // 对方被关闭
+      Close;
+      raise Exception.Create('与服务器断开连接！');
+    end;
+    x := DecodeHttp;
+    if x = 1 then
+    begin
+      Break;
+    end;
+  end;
+{$ENDIF}
 
 
 
@@ -568,6 +592,15 @@ begin
 
   FRawSocket.CreateTcpSocket;
   try
+    {$IFDEF MSWINDOWS}
+    if FTimeOut > 0 then
+    begin
+      FRawSocket.SetReadTimeOut(FTimeOut);
+      FRawSocket.SetSendTimeOut(FTimeOut);
+    end;
+    {$ENDIF}
+
+    FRawSocket.DoInitialize;
     // 进行域名解析
     lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
   
@@ -658,7 +691,15 @@ begin
   ResetState;
   FRawSocket.CreateTcpSocket;
   try
-    FRawSocket.SetNoDelayOption(true);
+    FRawSocket.DoInitialize();
+    {$IFDEF MSWINDOWS}
+    if FTimeOut > 0 then
+    begin
+      FRawSocket.SetReadTimeOut(FTimeOut);
+      FRawSocket.SetSendTimeOut(FTimeOut);
+    end;
+    {$ENDIF}
+
     // 进行域名解析
     lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
   
