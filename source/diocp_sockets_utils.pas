@@ -89,6 +89,13 @@ function GetRunTimeINfo: string;
 
 function NowString: String;
 
+/// <summary>
+///   生成一个Diocp的句柄（注意不能跨DLL),否则会重复
+///   线程安全
+///   由于Socket的Handle在关闭后，会重用
+/// </summary>
+function MakeDiocpHandle: THandle;
+
 implementation
 
 uses
@@ -152,6 +159,8 @@ const
 var
   __CheckWinSocketStart: Boolean;
   __startTime:TDateTime;
+
+  __DiocpHandle:Integer;
 
 function GetRunTimeINfo: string;
 var
@@ -374,9 +383,18 @@ begin
   Result := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', Now);
 end;
 
+function MakeDiocpHandle: THandle;
+var
+  v:Integer;
+begin
+  v := InterlockedIncrement(__DiocpHandle);
+  Result := THandle(v);
+end;
+
 initialization
   __CheckWinSocketStart := False;
   __startTime :=  Now();
+  __DiocpHandle := 1;
 
 end.
 

@@ -1697,7 +1697,8 @@ begin
 
   FContextLocker.lock('DoConnected');
   try
-    FSocketHandle := FRawSocket.SocketHandle;
+    FSocketHandle := MakeDiocpHandle;
+    //  FRawSocket.SocketHandle;
     Assert(FOwner <> nil);
     if FActive then
     begin

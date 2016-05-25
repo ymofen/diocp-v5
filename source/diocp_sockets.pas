@@ -1211,8 +1211,9 @@ begin
 
   FContextLocker.lock('DoConnected');
   try
-    
-    FSocketHandle := FRawSocket.SocketHandle;
+    //  FRawSocket.SocketHandle;    
+    FSocketHandle := MakeDiocpHandle;
+
     Assert(FOwner <> nil);
     if FActive then
     begin
@@ -1234,7 +1235,7 @@ begin
         [NowString, FReferenceCounter, self.SocketHandle, IntPtr(Self), 'DoConnected:添加到在线列表']));
 
 
-      if self.LockContext('onConnected', Self) then
+      if self.LockContext('OnConnected', Self) then
       try
         if Assigned(FOwner.FOnContextConnected) then
         begin
@@ -1665,16 +1666,15 @@ var
 begin
   FLocker.lock('AddToOnlineList');
   try
-    sfLogger.logMessage(Format('1,%d,%d,%d',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE');
-    AddDebugStrings(Format('1.(%d)FOnlineContextList->Add(%d:%d)',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
+//  日志可以记录在线列表的添加情况，可以很好的分析问题
+//    sfLogger.logMessage(Format('1,%d,%d,%d,%d,%d',
+//      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject),
+//       IntPtr(pvObject.FRawSocket), pvObject.FRawSocket.SocketHandle]), 'ONLINE');
     FOnlineContextList.Add(pvObject.FSocketHandle, pvObject);
-    AddDebugStrings(Format('2.(%d)FOnlineContextList->Add(%d:%d)',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
     i := FOnlineContextList.Count;
-    sfLogger.logMessage(Format('2,%d,%d,%d',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE');
+//    sfLogger.logMessage(Format('2,%d,%d,%d,%d,%d',
+//      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject),
+//       IntPtr(pvObject.FRawSocket), pvObject.FRawSocket.SocketHandle]), 'ONLINE');
   finally
     FLocker.unLock;
   end;
@@ -2152,15 +2152,15 @@ begin
   FLocker.lock('RemoveFromOnOnlineList');
   try
     {$IFDEF DEBUG_ON}
-    sfLogger.logMessage(Format('3,%d,%d,%d',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE');
-    AddDebugStrings(Format('1.(%d)FOnlineContextList->Delete(%d:%d)',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
+
+//  日志可以记录在线列表的删除情况，可以很好的分析问题
+//    sfLogger.logMessage(Format('3,%d,%d,%d,%d,%d',
+//      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject),
+//       IntPtr(pvObject.FRawSocket), pvObject.FRawSocket.SocketHandle]), 'ONLINE');
     lvSucc := FOnlineContextList.DeleteFirst(pvObject.FSocketHandle);
-    AddDebugStrings(Format('2.(%d)FOnlineContextList->Delete(%d:%d)',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]));
-    sfLogger.logMessage(Format('4,%d,%d,%d',
-      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject)]), 'ONLINE'); 
+//    sfLogger.logMessage(Format('4,%d,%d,%d,%d,%d',
+//      [FOnlineContextList.Count, pvObject.SocketHandle, IntPtr(pvObject),
+//      IntPtr(pvObject.FRawSocket), pvObject.FRawSocket.SocketHandle]), 'ONLINE'); 
     Assert(lvSucc);
     {$ELSE}
     FOnlineContextList.DeleteFirst(pvObject.FSocketHandle);

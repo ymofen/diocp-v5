@@ -30,6 +30,7 @@ type
   private
     FLastDisconnectTime:Cardinal;
     FIsConnecting: Boolean;
+    FBindingHandle:THandle;
 
     FAutoReConnect: Boolean;
     FConnectExRequest: TIocpConnectExRequest;
@@ -39,6 +40,7 @@ type
     function PostConnectRequest: Boolean;
     procedure ReCreateSocket;
     function CanAutoReConnect:Boolean;
+    procedure CheckDestroyBindingHandle;
   protected
     procedure OnConnecteExResponse(pvObject:TObject);
 
@@ -206,6 +208,7 @@ end;
 
 destructor TIocpRemoteContext.Destroy;
 begin
+  CheckDestroyBindingHandle;
   FreeAndNil(FConnectExRequest);
   inherited Destroy;
 end;
@@ -213,6 +216,14 @@ end;
 function TIocpRemoteContext.CanAutoReConnect: Boolean;
 begin
   Result := FAutoReConnect and (Owner.Active) and (not TDiocpTcpClient(Owner).DisableAutoConnect);
+end;
+
+procedure TIocpRemoteContext.CheckDestroyBindingHandle;
+begin
+// 会出现异常
+//  if (FBindingHandle = 0) or (FBindingHandle = INVALID_SOCKET) then Exit;
+//  CloseHandle(FBindingHandle);
+//  FBindingHandle := 0;
 end;
 
 procedure TIocpRemoteContext.Connect;
@@ -362,8 +373,8 @@ begin
   begin
     RaiseLastOSError;
   end;
-
-  Owner.IocpEngine.IocpCore.Bind2IOCPHandle(RawSocket.SocketHandle, 0);
+  CheckDestroyBindingHandle;
+  FBindingHandle := Owner.IocpEngine.IocpCore.Bind2IOCPHandle(RawSocket.SocketHandle, 0);
 end;
 
 procedure TIocpRemoteContext.SetSocketState(pvState: TSocketState);
