@@ -160,5 +160,9 @@ DIOCP-v5 0.0.2
     * 将Socket的初始化工作放在组件创建中
     * StreamCoderDEMO添加DiocpStreamServer工程
     (已经确认编码层(TDiocpCoderTcpServer)有隐患, 请尽量使用TDiocpTcpServer, 编码层使用了iocpTaskManager, utils.buffer(TBufferLink), 目前还没有确定是具体位置)
+
+
+32: 2016-05-25 13:10:49
+   * 解决在线列表BUG，该问题在Win2008SERVER上，在频繁连接断开的应用中，可能会导致在线列表不正确，
       
     
