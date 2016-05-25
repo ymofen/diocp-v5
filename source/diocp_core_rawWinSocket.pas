@@ -388,6 +388,7 @@ var
   lvTime_val: TTimeval;
   r:Integer;
 begin
+  Result := False;
   FD_ZERO(lvFDSet);
   _FD_SET(FSocketHandle, lvFDSet);
 

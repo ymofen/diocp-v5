@@ -18,7 +18,9 @@ interface
 uses
   Classes, diocp_sockets_utils, diocp_core_engine,
   winsock, diocp_winapi_winsock2,
-
+{$if CompilerVersion >= 18}
+  types,
+{$ifend}
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
@@ -107,6 +109,7 @@ type
     FSending: Boolean;
 
     FActive: Boolean;
+    FConnectedCounter: Integer;
 
     FOwner: TDiocpCustom;
 
@@ -313,7 +316,14 @@ type
     property OnSendBufferCompleted: TOnContextBufferEvent read
         FOnSendBufferCompleted write FOnSendBufferCompleted;
 
+    /// <summary>
+    ///   连接成功次数
+    /// </summary>
+    property ConnectedCounter: Integer read FConnectedCounter;
     property DisconnectedCounter: Integer read FDisconnectedCounter;
+
+
+
     property KickCounter: Integer read FKickCounter;
     property LastActivity: Cardinal read FLastActivity;
     property Owner: TDiocpCustom read FOwner write SetOwner;
@@ -1093,6 +1103,7 @@ begin
   FDebugStrings := TStringList.Create;
   FReferenceCounter := 0;
   FDisconnectedCounter := 0;
+  FConnectedCounter := 0;
   FContextLocker := TIocpLocker.Create('contextlocker');
   FAlive := False;
   FRawSocket := TRawSocket.Create();
@@ -1213,6 +1224,8 @@ begin
   try
     //  FRawSocket.SocketHandle;    
     FSocketHandle := MakeDiocpHandle;
+
+    Inc(FConnectedCounter);
 
     Assert(FOwner <> nil);
     if FActive then
@@ -2039,14 +2052,12 @@ end;
 
 function TDiocpCustom.KickOut(pvTimeOut:Cardinal = 60000): Integer;
 var
-  lvNowTickCount:Cardinal;
   I, j:Integer;
   lvKickOutList: array of TDiocpCustomContext;
   lvContext:TDiocpCustomContext;
 var
   lvBucket, lvNextBucket: PDHashData;
 begin
-  lvNowTickCount := GetTickCount;
   self.IncRefCounter;
   try
     FLocker.lock('KickOut');
@@ -3146,7 +3157,7 @@ end;
 
 function TDiocpCustomContext.CheckActivityTimeOut(pvTimeOut:Integer): Boolean;
 begin
-  Result := (FLastActivity <> 0) and (tick_diff(FLastActivity, GetTickCount) > pvTimeOut);
+  Result := (FLastActivity <> 0) and (tick_diff(FLastActivity, GetTickCount) > Cardinal(pvTimeOut));
 end;
 
 procedure TDiocpCustomContext.DecRefernece;

@@ -352,7 +352,7 @@ begin
 
     {$IFDEF MSWINDOWS}
       {$IFDEF USE_AnsiStrings}
-      Result := System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory));
+      Result := String(System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory)));
       {$ELSE}
       Result := StrPas(PAnsiChar(lvBuilder.Memory));
       {$ENDIF}
@@ -464,7 +464,7 @@ begin
 
     {$IFDEF MSWINDOWS}
     {$IFDEF USE_AnsiStrings}
-    Result := System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory));
+    Result := String(System.AnsiStrings.StrPas(PAnsiChar(lvBuilder.Memory)));
     {$ELSE}
     Result := StrPas(PAnsiChar(lvBuilder.Memory));
     {$ENDIF}
