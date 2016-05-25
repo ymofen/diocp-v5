@@ -46,7 +46,7 @@ object frmMain: TfrmMain
     Width = 153
     Height = 21
     TabOrder = 3
-    Text = '7196336'
+    Text = '3524784'
   end
   object edtKey: TEdit
     Left = 384
@@ -54,7 +54,7 @@ object frmMain: TfrmMain
     Width = 121
     Height = 21
     TabOrder = 4
-    Text = '500'
+    Text = '1400'
   end
   object dlgOpen: TOpenDialog
     Left = 320

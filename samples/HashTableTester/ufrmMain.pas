@@ -137,6 +137,10 @@ begin
         if s3 = edtFindAddr.Text then
         begin
           s3 := edtFindAddr.Text;
+          if i = 8403 then
+          begin
+            c3 := 8403;
+          end;
           c4 := i;
         end;
 
@@ -150,7 +154,8 @@ begin
 
     c := StrToInt(edtKey.Text);
 
-    if lvHashTable.FindFirstData(c) <> nil then
+    c4 := IntPtr(lvHashTable.FindFirstData(c));
+    if c4 <> 0 then
     begin
       mmoLog.Lines.Add('found');
     end else
