@@ -61,8 +61,6 @@ type
     procedure CheckSocketResult(pvSocketResult:Integer);
     procedure InnerExecuteRecvResponse();
     procedure InnerExecuteRecvResponseTimeOut;
-    procedure Close;
-
     procedure DoAfterResponse;
     function GetResponseResultCode: Integer;
 
@@ -75,15 +73,11 @@ type
     constructor Create(AOwner: TComponent); override;
     
     destructor Destroy; override;
+    procedure Close;
     procedure Post(pvURL:String);
     procedure Get(pvURL:String);
     procedure DirectPost(pvHost: string; pvPort: Integer; pvBuf: Pointer; len:
         Cardinal);
-
-    /// <summary>
-    ///   关闭Socket，异步操作时，关闭Socket会使正在进行的阻塞操作抛出异常从而中断
-    /// </summary>
-    procedure CloseSocket;
 
     procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
         Boolean);
@@ -343,6 +337,9 @@ end;
 procedure TDiocpHttpClient.Close;
 begin
   FRawSocket.Close();
+  FLastHost := '';
+  FLastPort := 0;
+  FLastActivity := 0;
 end;
 
 procedure TDiocpHttpClient.Get(pvURL: String);
@@ -712,11 +709,6 @@ begin
     lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));
     lvReadL := lvReadL + Cardinal(lvTempL);
   end;
-end;
-
-procedure TDiocpHttpClient.CloseSocket;
-begin
-  self.FRawSocket.Close;
 end;
 
 procedure TDiocpHttpClient.DirectPost(pvHost: string; pvPort: Integer; pvBuf:
