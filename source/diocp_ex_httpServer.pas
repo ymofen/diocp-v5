@@ -321,7 +321,8 @@ type
     
 
     /// <summary>
-    /// 应答完毕，发送会客户端
+    ///   应答完毕，发送会客户端
+    ///   请尽量使用SendResponse和DoResponseEnd来代替
     /// </summary>
     procedure ResponseEnd;
 
@@ -907,6 +908,9 @@ begin
   if FInnerRequest.CheckKeepAlive then
   begin
     FResponse.Header.ForceByName('Connection').AsString := 'keep-alive';
+  end else
+  begin
+    FResponse.Header.ForceByName('Connection').AsString := 'close';
   end;
   
   if pvContentLength = 0 then
