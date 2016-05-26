@@ -75,6 +75,7 @@ type
     FRawHeader: String;
     FContentDataLength: Integer;
     FHttpVersion: String;
+    FHttpVersionValue: Integer;
     FMethod: String;
     FPtrBuffer: PByte;
     FRequestRawURL: string;
@@ -109,6 +110,9 @@ type
     ///   解码状态
     /// </summary>
     FDecodeState: Integer;
+
+    FKeepAlive: Integer;
+    
     function DecodeRequestMethod: Integer;
 
     function DecodeHeader: Integer;
@@ -130,6 +134,8 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+
+    function CheckKeepAlive: Boolean;
 
     /// <summary>
     ///   将Post的原始数据解码，放到参数列表中
@@ -199,6 +205,8 @@ type
     property ContentLength: Int64 read GetContentLength;
     property ContentType: String read GetContentType;
 
+   
+
     property RawCookie: String read GetRawCookie;
     property RequestCookieList: TStrings read GetRequestCookieList write
         FRequestCookieList;
@@ -220,6 +228,8 @@ type
     property RequestFormParams: TDValue read FRequestFormParams;
     property RequestParams: TDValue read FRequestParams;
     property RequestURL: String read FRequestURL;
+
+
   end;
 
   /// <summary>
@@ -873,6 +883,23 @@ begin
   end;
 end;
 
+function THttpRequest.CheckKeepAlive: Boolean;
+var
+  lvConnection:String;
+begin
+  if FKeepAlive = -1 then
+  begin
+    if FHttpVersionValue = 10 then FKeepAlive := 0
+    else if FHttpVersionValue = 11 then  FKeepAlive := 1;
+
+    lvConnection := Headers.GetValueByName('Connection', '');
+    if SameStr(lvConnection, 'keep-alive') then FKeepAlive := 1; 
+    
+    
+  end;
+  Result := FKeepAlive = 1;
+end;
+
 procedure THttpRequest.ContentSaveToFile(pvFile:String);
 begin
   FContentBuilder.SaveToFile(pvFile);
@@ -1007,6 +1034,16 @@ begin
 
     SkipChars(lvPtr, [' ', #9]);
     FHttpVersion := lvPtr;
+
+    if (FHttpVersion = 'HTTP/1.0') then
+    begin
+      FHttpVersionValue := 10;
+    end
+    else
+    begin
+      FHttpVersionValue := 11;
+    end;
+    
   end;
 end;
 
@@ -1198,6 +1235,7 @@ begin
   FRequestParams.Clear;
   FRequestFormParams.Clear;
   FHeaders.Clear;
+  FKeepAlive := -1;
 end;
 
 function THttpRequest.GetContentLength: Int64;

@@ -131,7 +131,7 @@ type
 
 
 
-    FKeepAlive: Boolean;
+    FLastResponseContentLength: Integer;
 
 
     FResponse: TDiocpHttpResponse;
@@ -262,6 +262,8 @@ type
     property HeaderAsMemory: PByte read GetHeaderAsMemory;
     property HeaderDataLength: Integer read GetHeaderDataLength;
 
+    property LastResponseContentLength: Integer read FLastResponseContentLength;
+
 
 
     property RequestAccept: String read GetRequestAccept;
@@ -325,6 +327,12 @@ type
 
 
     /// <summary>
+    ///   本次应答完成, 检测是否需要关闭连接等相应工作
+    /// </summary>
+    procedure DoResponseEnd;
+
+
+    /// <summary>
     ///   直接发送Response.Header和Data数据
     /// </summary>
     procedure SendResponse(pvContentLength: Integer = 0);
@@ -357,6 +365,9 @@ type
     ///   获取响应的数据长度(不包含头信息)
     /// </summary>
     function GetResponseLength: Integer;
+
+
+
 
 
   end;
@@ -676,6 +687,14 @@ begin
   inherited Destroy;
 end;
 
+procedure TDiocpHttpRequest.DoResponseEnd;
+begin
+  if not FInnerRequest.CheckKeepAlive then
+  begin
+    FDiocpContext.PostWSACloseRequest;
+  end;    
+end;
+
 procedure TDiocpHttpRequest.CheckCookieSession;
 begin
   // 对session的处理
@@ -874,7 +893,7 @@ begin
       FResponse.FInnerResponse.ContentBuffer.Length);
   end;
 
-  if not FKeepAlive then
+  if not FInnerRequest.CheckKeepAlive then
   begin
     FDiocpContext.PostWSACloseRequest;
   end;
@@ -885,13 +904,22 @@ var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
+  if FInnerRequest.CheckKeepAlive then
+  begin
+    FResponse.Header.ForceByName('Connection').AsString := 'keep-alive';
+  end;
+  
   if pvContentLength = 0 then
   begin
-    lvFixedHeader := FResponse.EncodeResponseHeader(FResponse.FInnerResponse.ContentBuffer.Length);
+    FLastResponseContentLength := FResponse.FInnerResponse.ContentBuffer.Length;
+    lvFixedHeader := FResponse.EncodeResponseHeader(FLastResponseContentLength);
   end else
   begin
+    FLastResponseContentLength := pvContentLength;
     lvFixedHeader := FResponse.EncodeResponseHeader(pvContentLength);
   end;
+
+
 
 
   if (lvFixedHeader <> '') then
@@ -911,7 +939,7 @@ begin
   if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
   begin
     FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.ContentBuffer.Memory,
-      FResponse.FInnerResponse.ContentBuffer.Length);
+      FLastResponseContentLength);
   end;
 
 end;

@@ -27,10 +27,15 @@ type
 
   TDiocpHttpClient = class(TComponent)
   private
+    FLastActivity:Cardinal;
+    FLastHost:String;
+    FLastPort:Integer;
     FHttpBuffer:THttpBuffer;
     FStringBuilder:TDStringBuilder;
     FRequestHeaderBuilder:TDStringBuilder;
     FCustomeHeader: TStrings;
+    FKeepAlive: Boolean;
+    FKeepAliveTimeOut: Cardinal;
     FURL: TURL;
     FRawSocket: TRawSocket;
     FRequestAccept: String;
@@ -63,6 +68,8 @@ type
 
 
     procedure ResetState;
+
+    function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
   public
     procedure Cleaup;
     constructor Create(AOwner: TComponent); override;
@@ -82,6 +89,18 @@ type
         Boolean);
 
     property CustomeHeader: TStrings read FCustomeHeader;
+
+    /// <summary>
+    ///   是否保持连接状态
+    /// </summary>
+    property KeepAlive: Boolean read FKeepAlive write FKeepAlive;
+
+    /// <summary>
+    ///   超时没有数据交互，下次请求时进行重连
+    ///   KeepAlive时有效
+    /// </summary>
+    property KeepAliveTimeOut: Cardinal read FKeepAliveTimeOut write FKeepAliveTimeOut;
+
     /// <summary>
     ///   请求参数:
     ///    接受数据的编码类型
@@ -126,12 +145,11 @@ type
     /// </summary>
     property ResponseSize: Integer read FResponseSize;
 
+
+    /// <summary>
+    ///   读取和发送超时, 单位ms
+    /// </summary>
     property TimeOut: Integer read FTimeOut write FTimeOut;
-
-
-
-
-
 
 
   end;
@@ -263,6 +281,8 @@ begin
   FResponseHeader.LineBreak := #13#10;
 {$IFEND}
 
+  // 20秒
+  FKeepAliveTimeOut := 20000;
 end;
 
 destructor TDiocpHttpClient.Destroy;
@@ -347,6 +367,11 @@ begin
   end;
   FRequestHeader.Add(Format('Host: %s', [FURL.RawHostStr]));
   
+  if FKeepAlive then
+  begin
+    FRequestHeader.Add('Connection: keep-alive');
+  end;
+  
   if FRawCookie <> '' then
   begin
     FRequestHeader.Add('Cookie:' + FRawCookie);
@@ -354,26 +379,8 @@ begin
   
   FRequestHeader.Add('');                 // 添加一个回车符
 
-  FRawSocket.CreateTcpSocket;
-  try
-    {$IFDEF MSWINDOWS}
-    if FTimeOut > 0 then
-    begin
-      FRawSocket.SetReadTimeOut(FTimeOut);
-      FRawSocket.SetSendTimeOut(FTimeOut);
-    end;
-    {$ENDIF}
-
-    FRawSocket.DoInitialize;
-
-    // 进行域名解析
-    lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
-
-    if not FRawSocket.Connect(lvIpAddr,StrToIntDef(FURL.Port, 80)) then
-    begin
-      RaiseLastOSError;
-    end;
-
+  if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
+  try   
     FStringBuilder.Clear;
     FStringBuilder.Append(FRequestHeader.Text);
     if FCustomeHeader.Count > 0 then
@@ -423,7 +430,7 @@ begin
 
     InnerExecuteRecvResponse();
   finally
-    FRawSocket.Close(False);
+    if not FKeepAlive then self.Close;
   end;
 end;
 
@@ -545,7 +552,8 @@ begin
   end;
 
 
-  DoAfterResponse; 
+  FLastActivity := GetTickCount;
+  DoAfterResponse;
 end;
 
 procedure TDiocpHttpClient.Post(pvURL: String);
@@ -570,6 +578,11 @@ begin
     FRequestHeader.Add(Format('POST %s HTTP/1.1', [FURL.URI + '?' + FURL.ParamStr]));
   end;
 
+  if FKeepAlive then
+  begin
+    FRequestHeader.Add('Connection: keep-alive');
+  end;
+
   if FRawCookie <> '' then
   begin
     FRequestHeader.Add('Cookie:' + FRawCookie);
@@ -590,24 +603,8 @@ begin
 
   //FRequestHeader.Add('');                 // 添加一个回车符
 
-  FRawSocket.CreateTcpSocket;
+  if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
   try
-    {$IFDEF MSWINDOWS}
-    if FTimeOut > 0 then
-    begin
-      FRawSocket.SetReadTimeOut(FTimeOut);
-      FRawSocket.SetSendTimeOut(FTimeOut);
-    end;
-    {$ENDIF}
-
-    FRawSocket.DoInitialize;
-    // 进行域名解析
-    lvIpAddr := FRawSocket.GetIpAddrByName(FURL.Host);
-  
-    if not FRawSocket.Connect(lvIpAddr,StrToIntDef(FURL.Port, 80)) then
-    begin
-      RaiseLastOSError;
-    end;
 
     FRequestHeaderBuilder.Clear;
     FRequestHeaderBuilder.Append(FRequestHeader.Text);
@@ -650,8 +647,48 @@ begin
 
     InnerExecuteRecvResponse();
   finally
-    FRawSocket.Close(False);
+    if not FKeepAlive then self.Close;
   end;
+end;
+
+function TDiocpHttpClient.CheckConnect(pvHost: string; pvPort: Integer):
+    Boolean;
+var
+  lvReConnect:Boolean;
+  lvIpAddr:string;
+begin
+  lvReConnect := (pvHost <> FLastHost) or (pvPort <> FLastPort);
+  lvReConnect := lvReConnect or (tick_diff(FLastActivity, GetTickCount) > FKeepAliveTimeOut);
+
+
+  if lvReConnect then
+  begin
+    FRawSocket.CreateTcpSocket;
+    FRawSocket.DoInitialize();
+
+    {$IFDEF MSWINDOWS}
+    if FTimeOut > 0 then
+    begin
+      FRawSocket.SetReadTimeOut(FTimeOut);
+      FRawSocket.SetSendTimeOut(FTimeOut);
+    end;
+    {$ENDIF}
+
+    // 进行域名解析
+    lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
+  
+    if not FRawSocket.Connect(lvIpAddr, pvPort) then
+    begin
+      RaiseLastOSError;
+    end;
+  end;
+
+  FLastHost := pvHost;
+  FLastPort := pvPort;
+  FLastActivity := GetTickCount;
+
+  Result := True;
+
 end;
 
 procedure TDiocpHttpClient.CheckRecv(buf: Pointer; len: cardinal);
@@ -686,28 +723,10 @@ procedure TDiocpHttpClient.DirectPost(pvHost: string; pvPort: Integer; pvBuf:
     Pointer; len: Cardinal);
 var
   r:Integer;
-  lvIpAddr:string;
 begin
   ResetState;
-  FRawSocket.CreateTcpSocket;
+  if not CheckConnect(pvHost, pvPort) then Exit;
   try
-    FRawSocket.DoInitialize();
-    {$IFDEF MSWINDOWS}
-    if FTimeOut > 0 then
-    begin
-      FRawSocket.SetReadTimeOut(FTimeOut);
-      FRawSocket.SetSendTimeOut(FTimeOut);
-    end;
-    {$ENDIF}
-
-    // 进行域名解析
-    lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
-  
-    if not FRawSocket.Connect(lvIpAddr, pvPort) then
-    begin
-      RaiseLastOSError;
-    end;
-
     r := FRawSocket.SendBuf(pvBuf^, len);
     CheckSocketResult(r);
     if r <> len then
@@ -716,9 +735,12 @@ begin
     end;
 
     InnerExecuteRecvResponse();
+
+
   finally
-    FRawSocket.Close(False);
+    if not FKeepAlive then self.Close;
   end;
+
 end;
 
 procedure TDiocpHttpClient.DoAfterResponse;

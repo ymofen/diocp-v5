@@ -510,6 +510,8 @@ function ParseInt(var S: PChar; var ANum: Int64): Integer;
 function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
 {$ifend}
 
+function GetTickCount: Cardinal;
+
 implementation
 
 
@@ -2046,6 +2048,16 @@ begin
   Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
 {$ENDIF}
 end;
+
+function GetTickCount: Cardinal;
+begin
+  {$IFDEF MSWINDOWS}
+  Result := Windows.GetTickCount;
+  {$ELSE}
+  Result := TThread.GetTickCount;
+  {$ENDIF}
+end;
+
 
 
 initialization
