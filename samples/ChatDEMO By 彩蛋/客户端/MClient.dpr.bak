@@ -1,6 +1,13 @@
 program MClient;
 
 uses
+  EMemLeaks,
+  EResLeaks,
+  EDialogWinAPIMSClassic,
+  EDialogWinAPIEurekaLogDetailed,
+  EDialogWinAPIStepsToReproduce,
+  EDebugExports,
+  ExceptionLog7,
   Forms,
   frm_Client in 'frm_Client.pas' {frmClient},
   frm_Login in 'frm_Login.pas' {frmLogin},

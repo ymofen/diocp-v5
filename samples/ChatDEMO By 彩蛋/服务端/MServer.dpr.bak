@@ -1,6 +1,13 @@
 program MServer;
 
 uses
+  EMemLeaks,
+  EResLeaks,
+  EDialogWinAPIMSClassic,
+  EDialogWinAPIEurekaLogDetailed,
+  EDialogWinAPIStepsToReproduce,
+  EDebugExports,
+  ExceptionLog7,
   Forms,
   frm_Server in 'frm_Server.pas' {Form5},
   frm_dm in 'frm_dm.pas' {dm: TDataModule};

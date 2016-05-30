@@ -7,66 +7,153 @@ uses
   diocp_tcp_server, diocp.session;
 
 type
+  TOfflineInfo = class
+  private
+    FFromUID,
+    FToUID,
+    FMsg: string;
+    FDT: TDateTime;
+  public
+    property FromUID: string read FFromUID write FFromUID;
+    property ToUID: string read FToUID write FToUID;
+    property Msg: string read FMsg write FMsg;
+    property DT: TDateTime read FDT write FDT;
+  end;
+
   TChatSession = class(TSessionItem)
   private
+    /// <summary>
+    /// 会话对应的连接Context
+    /// </summary>
     FContext: TIocpClientContext;
-    //FOwnerTcpServer: TDiocpTcpServer;
-    FData: TSimpleMsgPack;
+
+    /// <summary>
+    /// 会话每次请求的消息包
+    /// </summary>
+    FMsgPack: TSimpleMsgPack;
+
+    /// <summary>
+    /// 会话当前状态
+    /// </summary>
     FState: Integer;
-    FUserID: String;
-    FVerified: Boolean;
+
+    /// <summary>
+    /// 会话对应的用户UserID
+    /// </summary>
+    FUserID: string;
   public
     constructor Create; override;
     destructor Destroy; override;
     /// <summary>
-    ///   对应连接
+    /// 对应的连接Context
     /// </summary>
     property Context: TIocpClientContext read FContext write FContext;
-    property Data: TSimpleMsgPack read FData;
+    property MsgPack: TSimpleMsgPack read FMsgPack;
     /// <summary>
     ///   状态 (0,离线, 1:在线, 2:隐身)
     /// </summary>
     property State: Integer read FState write FState;
-    property UserID: String read FUserID write FUserID;
-    /// <summary>
-    ///   验证状态
-    /// </summary>
-    property Verified: Boolean read FVerified write FVerified;
-    //property OwnerTcpServer: TDiocpTcpServer read FOwnerTcpServer write FOwnerTcpServer;
+    property UserID: string read FUserID write FUserID;
   end;
+
+  /// <summary>
+  /// 用户上线事件
+  /// </summary>
+  TContextLoginNotify = procedure(const AUserID: string) of object;
+
+  /// <summary>
+  /// 用户下线事件
+  /// </summary>
+  TContextLogoutNotify = procedure(const AUserID: string) of object;
+
+  /// <summary>
+  /// 用户发送离线消息事件
+  /// </summary>
+  TSetOfflineMsgNotify = procedure (const AToUserID, AFromUserID, AMsg: string) of object;
+
+  /// <summary>
+  /// 用户获取离线消息事件
+  /// </summary>
+  TGetOfflineMsgNotify = procedure(const AMsgPack: TSimpleMsgPack) of object;
+
+  /// <summary>
+  /// 获取所有用户事件
+  /// </summary>
+  TGetAllUserNotify = procedure (const AMsgPack: TSimpleMsgPack) of object;
 
   TMyClientContext = class(TIOCPCoderClientContext)
   private
+    /// <summary>
+    /// 客户端有数据发送到服务端
+    /// </summary>
+    /// <param name="pvCMDObject"></param>
     procedure ChatExecute(pvCMDObject: TSimpleMsgPack);
 
-    procedure SendCMDObject(pvCMDObject: TSimpleMsgPack; pvContext: TObject);  // 发送消息
-    procedure DispatchCMDObject(pvCMDObject: TSimpleMsgPack);  // 广播
-    procedure ExecuteHeart(pvCMDObject: TSimpleMsgPack);  // 心跳包
-    procedure ExecuteAllUsers(pvCMDObject: TSimpleMsgPack);  // 获取所有在线用户
-    procedure ExecuteLogin(pvCMDObject: TSimpleMsgPack);  // 用户上线
-    procedure ExecuteSendMessage(pvCMDObject: TSimpleMsgPack);  // 发送消息
+    /// <summary>
+    /// 发送消息
+    /// </summary>
+    /// <param name="pvCMDObject">消息包</param>
+    /// <param name="pvContext">客户端Context</param>
+    procedure SendMsgPack(AMsgPack: TSimpleMsgPack; pvContext: TObject);
+
+    /// <summary>
+    /// 分发消息到所有在线用户
+    /// </summary>
+    /// <param name="AMsgPack">消息包</param>
+    procedure DispatchMsgPackToAll(AMsgPack: TSimpleMsgPack);
+
+    /// <summary>
+    /// 心跳包
+    /// </summary>
+    /// <param name="AMsgPack">心跳消息包</param>
+    procedure ExecuteHeart(AMsgPack: TSimpleMsgPack);
+
+    /// <summary>
+    /// 获取所有在线用户
+    /// </summary>
+    /// <param name="AMsgPack">消息包</param>
+    procedure ExecuteAllUser(AMsgPack: TSimpleMsgPack);
+
+    /// <summary>
+    /// 用户上线
+    /// </summary>
+    /// <param name="AMsgPack">上线消息包</param>
+    procedure ExecuteLogin(AMsgPack: TSimpleMsgPack);
+
+    /// <summary>
+    /// 发送消息给指定用户
+    /// </summary>
+    /// <param name="AMsgPackFrom">消息包</param>
+    procedure ExecuteSendMessage(AMsgPackFrom: TSimpleMsgPack);
+
+    /// <summary>
+    /// 获取离线消息
+    /// </summary>
+    /// <param name="AMsgPackFrom">消息包</param>
+    procedure ExecuteOfflineMessage(AMsgPackFrom: TSimpleMsgPack);
   protected
     procedure OnDisconnected; override;
     procedure OnConnected; override;
   public
     /// <summary>
-    /// 数据处理
+    /// 处理客户端传来的数据
     /// </summary>
-    /// <param name="pvObject"> (TObject) </param>
     procedure DoContextAction(const pvObject: TObject); override;
   end;
+
+var
+  ChatSessions: TSessions;
+  OnContextLogin: TContextLoginNotify;
+  OnContextLogout: TContextLogoutNotify;
+  OnGetAllUser: TGetAllUserNotify;
+  OnSetOffLineMsg: TSetOfflineMsgNotify;
+  OnGetOfflineMsg: TGetOfflineMsgNotify;
 
 implementation
 
 uses
   utils_safeLogger;
 
-var
-  ChatSessions: TSessions;
-
-/// <summary>
-///   进行广播
-/// </summary>
 procedure TMyClientContext.ChatExecute(pvCMDObject: TSimpleMsgPack);
 var
   lvCMDIndex:Integer;
@@ -74,8 +161,9 @@ begin
   lvCMDIndex := pvCMDObject.ForcePathObject('cmdIndex').AsInteger;
   case lvCMDIndex of
     0: ExecuteHeart(pvCMDObject);        // 心跳
-    3: ExecuteAllUsers(pvCMDObject);     // 获取所有用户
+    3: ExecuteAllUser(pvCMDObject);     // 获取所有用户
     5: ExecuteSendMessage(pvCMDObject);  // 发送消息
+    7: ExecuteOfflineMessage(pvCMDObject);  // 获取离线消息
     11: ExecuteLogin(pvCMDObject);       // 登陆/上线
   else
     begin
@@ -84,7 +172,7 @@ begin
   end;
 end;
 
-procedure TMyClientContext.DispatchCMDObject(pvCMDObject: TSimpleMsgPack);
+procedure TMyClientContext.DispatchMsgPackToAll(AMsgPack: TSimpleMsgPack);
 var
   lvMS:TMemoryStream;
   i:Integer;
@@ -94,9 +182,9 @@ begin
   lvMS := TMemoryStream.Create;
   lvList := TList.Create;
   try
-    pvCMDObject.EncodeToStream(lvMS);
+    AMsgPack.EncodeToStream(lvMS);
     lvMS.Position := 0;
-
+    // 通知所有在线的客户端有人上线或下线等行为
     Self.Owner.GetOnlineContextList(lvList);
     for i := 0 to lvList.Count - 1 do
     begin
@@ -121,15 +209,17 @@ procedure TMyClientContext.DoContextAction(const pvObject: TObject);
 var
   lvCMDObj: TSimpleMsgPack;
 begin
+  // 此方法已经在 TIOCPCoderClientContext.DoExecuteRequest 中处理了线程同步了
   lvCMDObj := TSimpleMsgPack.Create;
   try
     try
       TMemoryStream(pvObject).Position := 0;
-      lvCMDObj.DecodeFromStream(TMemoryStream(pvObject));
+      lvCMDObj.DecodeFromStream(TMemoryStream(pvObject));  // 解密消息
 
-      ChatExecute(lvCMDObj);
+      ChatExecute(lvCMDObj);  // 根据消息协议类型由对应的事件处理
 
-      if lvCMDObj.O['cmdIndex'] <> nil then
+      // 通知客户端本次调用是否成功
+      if lvCMDObj.O['cmdIndex'] <> nil then  // 或 lvCMDObj.ForcePathObject('cmdIndex').AsString <> ''
       begin
         if lvCMDObj.O['result.code'] = nil then
           lvCMDObj.I['result.code'] := 0;
@@ -149,7 +239,7 @@ begin
     if lvCMDObj.O['cmdIndex'] <> nil then
     begin
       TMemoryStream(pvObject).Clear;
-      lvCMDObj.EncodeToStream(TMemoryStream(pvObject));
+      lvCMDObj.EncodeToStream(TMemoryStream(pvObject));  // 加密消息
       TMemoryStream(pvObject).Position := 0;
       WriteObject(pvObject);  // 添加到SendingQueue回写对象
     end;
@@ -158,45 +248,9 @@ begin
   end;
 end;
 
-/// <summary>
-/// 列出所有用户
-///
-/// </summary>
-/// <param name="pvCMDObject">
-///
-///   请求包:
-///   {
-/// 	   "cmdIndex": 3,
-/// 	   "requestID":"xxx-xx-xx-xx",  // 请求的ID, 不重复的字符串，回应时, 会带回去
-/// 	   "params":
-/// 	    {
-/// 		    "page":1,               // 查询页码(显示第几页数据)
-/// 		  }
-/// 	}
-///
-/// 	响应包:
-///   {
-/// 	   "cmdIndex": 3,
-/// 	   "requestID":"xxx-xx-xx-xx",  // 请求的ID, 不重复的字符串，回应时, 会带回去
-///   	 "result":
-/// 	    {
-/// 		   "code":0,           // 返回码, 0:成功, -1:失败
-/// 		   "msg":"错误信息"
-/// 	    },
-/// 	   "list":
-///       [
-/// 	      {"userid":"邮箱或者电话", "nickname":"昵称", "imageIndex":0, "state":0},
-/// // state:状态(0,离线, 1:在线, 2:隐身)
-/// 		    {"userid":"邮箱或者电话", "nickname":"昵称", "imageIndex":0, "state":0}
-/// 	    ]
-/// 	}
-/// </param>
-procedure TMyClientContext.ExecuteAllUsers(pvCMDObject: TSimpleMsgPack);
+procedure TMyClientContext.ExecuteAllUser(AMsgPack: TSimpleMsgPack);
 var
-  lvSession, lvTempSession: TChatSession;
-  i: Integer;
-  lvItem, lvList:TSimpleMsgPack;
-  lvSessions:TList;
+  lvSession: TChatSession;
 begin
   if Self.LockContext('执行登陆', nil) then
   try
@@ -206,40 +260,14 @@ begin
       raise Exception.Create('未登陆用户!');
     end;
 
-    lvSessions := TList.Create;
-    try
-      // 获取所有在线连接上下文
-      ChatSessions.GetSessionList(lvSessions);
-
-      lvList := pvCMDObject.ForcePathObject('list');
-      for i := 0 to lvSessions.Count - 1 do
-      begin
-        lvTempSession := TChatSession(lvSessions[i]);
-        if lvTempSession <> lvSession then  // 不是当前请求数据的用户
-        begin
-          if lvTempSession.State = 1 then  // 在线
-          begin
-            lvItem := lvList.AddArrayChild;
-            lvItem.Add('userid', lvTempSession.UserID);
-          end;
-        end;
-      end;
-    finally
-      lvSessions.Free;
-    end;
+    if Assigned(OnGetAllUser) then
+      OnGetAllUser(AMsgPack);
   finally
     Self.UnLockContext('执行登陆', nil);
   end;
 end;
 
-/// <summary> 进行心跳
-/// </summary>
-/// <param name="pvCMDObject">
-///   {
-///      "cmdIndex": 0,
-///   }
-/// </param>
-procedure TMyClientContext.ExecuteHeart(pvCMDObject: TSimpleMsgPack);
+procedure TMyClientContext.ExecuteHeart(AMsgPack: TSimpleMsgPack);
 var
   lvSession:TChatSession;
 begin
@@ -248,19 +276,19 @@ begin
     lvSession := TChatSession(Self.Data);
     if lvSession = nil then
     begin
-      pvCMDObject.ForcePathObject('result.msg').AsString := '尚未登陆...';
-      pvCMDObject.ForcePathObject('result.code').AsInteger := -1;
+      AMsgPack.ForcePathObject('result.msg').AsString := '尚未登陆...';
+      AMsgPack.ForcePathObject('result.code').AsInteger := -1;
       Exit;
     end;
 
-    {if lvSession.Context <> Self then
+    if lvSession.Context <> Self then
     begin
-      pvCMDObject.ForcePathObject('result.msg').AsString := '你的帐号已经在其他客户端进行登陆...';
-      pvCMDObject.ForcePathObject('result.code').AsInteger := -1;
+      AMsgPack.ForcePathObject('result.msg').AsString := '你的帐号已经在其他客户端进行登陆...';
+      AMsgPack.ForcePathObject('result.code').AsInteger := -1;
       Exit;
-    end;}
+    end;
 
-    //sfLogger.logMessage(lvSession.UserID + ' 心跳包');
+    {sfLogger.logMessage(lvSession.UserID + ' 心跳包');
 
     if lvSession.Verified then
     begin
@@ -268,51 +296,24 @@ begin
       begin  // 在线
         lvSession.State := 1;
       end;
-    end;
+    end;}
 
     lvSession.DoActivity();
 
-    // 清理，不需要返回客户端
-    pvCMDObject.Clear;
+    AMsgPack.Clear;  // 清理，不需要返回客户端
   finally
     Self.UnLockContext('执行心跳', nil);
   end;
 end;
 
-/// <summary>
-///  用户登陆
-/// </summary>
-/// <param name="pvCMDObject">
-/// 登陆:
-///    请求包:
-///     {
-///       "cmdIndex": 11,
-///       "requestID":"xxx-xx-xx-xx",  // 请求的ID, 不重复的字符串，回应时, 会带回去
-///       "params":
-///       {
-///         "userid":"邮箱或者电话",      // 接收信息ID
-///         "pass":"xxx",                 // 密码base 64位密码
-///       }
-///     }
-///
-/// 	响应包:
-///     {
-///       "cmdIndex": 11,
-///       "requestID":"xxx-xx-xx-xx",  // 请求的ID, 不重复的字符串，回应时, 会带回去
-///       "result":
-///       {
-///         "code":0,           // 返回码, 0:成功, -1:失败, 1:离线请求
-///         "msg":"错误信息"
-///       }
-///     }
-///  </param>
-procedure TMyClientContext.ExecuteLogin(pvCMDObject: TSimpleMsgPack);
+procedure TMyClientContext.ExecuteLogin(AMsgPack: TSimpleMsgPack);
 var
-  lvSession:TChatSession;
-  lvSQL, lvPass, lvUserID:String;
+  lvSession: TChatSession;
+  lvSQL, vUserPaw, lvUserID: String;
   lvCMDObject:TSimpleMsgPack;
 begin
-  lvUserID := pvCMDObject.ForcePathObject('params.userid').AsString;
+  lvUserID := AMsgPack.ForcePathObject('user.id').AsString;  // 登录人UserID
+  vUserPaw := AMsgPack.ForcePathObject('user.paw').AsString;  // 登录人密码
   if lvUserID = '' then
   begin
     raise Exception.Create('缺少指定用户ID');
@@ -327,11 +328,9 @@ begin
   try
     lvSession := TChatSession(ChatSessions.CheckSession(lvUserID));  // 查找会话，如果没有则创建
     lvSession.Context := Self;
-    //lvSession.OwnerTcpServer := Self.Owner;
 
     lvSession.UserID := lvUserID;
     lvSession.State := 1;  // 在线
-    lvSession.Verified := true;  // 已经验证
     Self.Data := lvSession;  // 建立关联关系
 
     sfLogger.logMessage(lvUserID + ' 上线[' + RemoteAddr + ':' + IntToStr(RemotePort) + ']');
@@ -339,132 +338,114 @@ begin
     // 上线通知推送
     lvCMDObject := TSimpleMsgPack.Create;
     try
-      lvCMDObject.ForcePathObject('cmdIndex').AsInteger := 21;
+      lvCMDObject.ForcePathObject('cmdIndex').AsInteger := 21;  // 有人上线
       lvCMDObject.ForcePathObject('userid').AsString := lvUserID;
       lvCMDObject.ForcePathObject('type').AsInteger := 1;  // 上线
       if Self <> nil then
-      begin   // 推送消息
-        DispatchCMDObject(lvCMDObject);
-      end;
+        DispatchMsgPackToAll(lvCMDObject);  // 推送消息，通知所有在线的客户端有人上线了
     finally
       lvCMDObject.Free;
     end;
   finally
     Self.UnLockContext('执行登陆', nil);
   end;
+
+  if Assigned(OnContextLogin) then
+    OnContextLogin(lvUserID);  // 上线
 end;
 
-/// <summary>
-/// 发送信息
-/// </summary>
-/// <param name="pvCMDObject">
-/// 发送信息:
-///   请求包:
-///   {
-///     "cmdIndex": 5,
-///     "requestID":"xxx-xx-xx-xx",  // 请求的ID, 不重复的字符串，回应时, 会带回去
-///     "params":
-///     {
-///       "userid":"邮箱或者电话",      // 接收信息ID
-///       "msg":"要发送的文字"
-/// 		}
-///
-/// 	}
-///
-/// 	响应包:
-///   {
-///     "cmdIndex": 5,
-///     "requestID":"xxx-xx-xx-xx",  // 请求的ID, 不重复的字符串，回应时, 会带回去
-///     "result":
-///     {
-///       "code":0,           // 返回码, 0:成功, -1:失败, 1:离线信息
-///       "msg":"错误信息"
-///     }
-///   }
-///  </param>
-procedure TMyClientContext.ExecuteSendMessage(pvCMDObject: TSimpleMsgPack);
+procedure TMyClientContext.ExecuteOfflineMessage(AMsgPackFrom: TSimpleMsgPack);
 var
-  lvSession, lvSession2:TChatSession;
-  lvSent:Boolean;
-  lvSQL, lvPass, lvUserID, lvUserID2:String;
-  lvItem, lvList, lvSendCMDObject:TSimpleMsgPack;
-  lvSendContext: TIocpClientContext;
+  lvSession: TChatSession;
 begin
-  lvSent := false;
+  if Self.LockContext('获取离线消息', nil) then
+  try
+    lvSession := TChatSession(Self.Data);  // 得到会话
+    if lvSession = nil then
+      raise Exception.Create('未登陆用户!');
+
+    if Assigned(OnGetOfflineMsg) then
+      OnGetOfflineMsg(AMsgPackFrom);
+  finally
+    Self.UnLockContext('获取离线消息', nil);
+  end;
+end;
+
+procedure TMyClientContext.ExecuteSendMessage(AMsgPackFrom: TSimpleMsgPack);
+var
+  vFromSession, vToSession: TChatSession;
+  vFromUserID, vToUserID: string;
+  vMsgPackTo: TSimpleMsgPack;
+  vToContext: TIocpClientContext;
+begin
   if Self.LockContext('发送信息', nil) then
   try
-    lvSession := TChatSession(Self.Data);
-    if lvSession = nil then
-    begin
-      raise Exception.Create('未登陆用户!');
-    end;
+    vFromSession := TChatSession(Self.Data);  // 得到当前Context对应的会话
+    if vFromSession = nil then
+      raise Exception.Create('用户未登陆！');
 
     // 接收用户ID <不指定发送给所有用户>
-    lvUserID2 := pvCMDObject.ForcePathObject('params.userid').AsString;
+    vToUserID := AMsgPackFrom.ForcePathObject('params.userid').AsString;
+    vFromUserID := vFromSession.UserID;  // 请求ID
 
-    // 请求ID
-    lvUserID := lvSession.UserID;
-
-    if lvUserID2 = '' then
-    begin    // 发送给所有用户
-      lvSendCMDObject := TSimpleMsgPack.Create;
+    if vToUserID = '' then  // 发送给所有用户
+    begin
+      vMsgPackTo := TSimpleMsgPack.Create;
       try
-        lvSendCMDObject.ForcePathObject('cmdIndex').AsInteger := 6;
-        lvSendCMDObject.ForcePathObject('userid').AsString := lvUserID;
-        lvSendCMDObject.ForcePathObject('requestID').AsString := pvCMDObject.ForcePathObject('requestID').AsString;
-        lvSendCMDObject.ForcePathObject('msg').AsString :=
-          pvCMDObject.ForcePathObject('params.msg').AsString;
-        DispatchCMDObject(lvSendCMDObject);
+        vMsgPackTo.ForcePathObject('cmdIndex').AsInteger := 6;
+        vMsgPackTo.ForcePathObject('userid').AsString := vFromUserID;
+        vMsgPackTo.ForcePathObject('requestID').AsString := AMsgPackFrom.ForcePathObject('requestID').AsString;
+        vMsgPackTo.ForcePathObject('msg').AsString := AMsgPackFrom.ForcePathObject('params.msg').AsString;
+        DispatchMsgPackToAll(vMsgPackTo);
 
-        sfLogger.logMessage(lvUserID + ' 所有人：' + pvCMDObject.ForcePathObject('params.msg').AsString);
+        sfLogger.logMessage(vFromUserID + ' 对 所有人：' + AMsgPackFrom.ForcePathObject('params.msg').AsString);
       finally
-        lvSendCMDObject.Free;
+        vMsgPackTo.Free;
       end;
     end
-    else
+    else  // 发送到指定用户
     begin
-      // 接收用户
-      lvSession2 := TChatSession(ChatSessions.FindSession(lvUserID2));
-
-      if lvSession2 <> nil then
+      vToSession := TChatSession(ChatSessions.FindSession(vToUserID));
+      if vToSession <> nil then  // 接收用户在线
       begin
-        lvSendContext := lvSession2.Context;
-        if lvSendContext <> nil then
+        vToContext := vToSession.Context;
+        if vToContext <> nil then
         begin
-          if lvSendContext.LockContext('推送信息', nil) then
+          if vToContext.LockContext('推送信息', nil) then
           begin
-            try
-              lvSendCMDObject := TSimpleMsgPack.Create;
+            try  // 组织消息包
+              vMsgPackTo := TSimpleMsgPack.Create;
               try
-                lvSendCMDObject.ForcePathObject('cmdIndex').AsInteger := 6;
-                lvSendCMDObject.ForcePathObject('userid').AsString := lvUserID;
-                lvSendCMDObject.ForcePathObject('requestID').AsString := pvCMDObject.ForcePathObject('requestID').AsString;
-                lvSendCMDObject.ForcePathObject('msg').AsString :=
-                  pvCMDObject.ForcePathObject('params.msg').AsString;
+                vMsgPackTo.ForcePathObject('cmdIndex').AsInteger := 6;
+                vMsgPackTo.ForcePathObject('userid').AsString := vFromUserID;
+                vMsgPackTo.ForcePathObject('requestID').AsString :=
+                  AMsgPackFrom.ForcePathObject('requestID').AsString;
+                vMsgPackTo.ForcePathObject('msg').AsString :=
+                  AMsgPackFrom.ForcePathObject('params.msg').AsString;
 
-                SendCMDObject(lvSendCMDObject, lvSendContext);
-                lvSent := true;
+                SendMsgPack(vMsgPackTo, vToContext);
 
-                sfLogger.logMessage(lvUserID + ' ' + lvUserID2 + '：' + pvCMDObject.ForcePathObject('params.msg').AsString);
+                sfLogger.logMessage(vFromUserID + ' 对' + vToUserID + '：'
+                  + AMsgPackFrom.ForcePathObject('params.msg').AsString);
               finally
-                lvSendCMDObject.Free;
+                vMsgPackTo.Free;
               end;
             finally
-              lvSendContext.UnLockContext('推送信息', nil);
+              vToContext.UnLockContext('推送信息', nil);
             end;
           end;
         end;
-      end;
-
-      if not lvSent then
+      end
+      else  // 接收用户不在线
       begin
-        // 离线信息
-        pvCMDObject.ForcePathObject('result.code').AsInteger := -1;
-        pvCMDObject.ForcePathObject('result.msg').AsString := '用户不在线';
+        AMsgPackFrom.ForcePathObject('result.code').AsInteger := -1;
+        AMsgPackFrom.ForcePathObject('result.msg').AsString := '对方不在线，已留言！';
+        if Assigned(OnSetOfflineMsg) then  // 消息添加到离线消息列表
+          OnSetOfflineMsg(vToUserID, vFromUserID, AMsgPackFrom.ForcePathObject('params.msg').AsString);
       end;
     end;
   finally
-    Self.UnLockContext('执行登陆', nil);
+    Self.UnLockContext('发送信息', nil);
   end;
 end;
 
@@ -477,6 +458,7 @@ procedure TMyClientContext.OnDisconnected;
 var
   lvCMDObject: TSimpleMsgPack;
   lvSession: TChatSession;
+  vUserID: string;
 begin
   lvSession := TChatSession(Self.Data);
   lvCMDObject := TSimpleMsgPack.Create;
@@ -485,22 +467,25 @@ begin
     lvCMDObject.ForcePathObject('userid').AsString := lvSession.UserID;
     lvCMDObject.ForcePathObject('type').AsInteger := 0;  // 离线
     //if (lvSession.OwnerTcpServer <> nil) and (Self <> nil) then  // 推送消息
-    DispatchCMDObject(lvCMDObject);
+    DispatchMsgPackToAll(lvCMDObject);  // 通知所有在线人，我下线了
 
-    sfLogger.logMessage(lvSession.UserID + ' 下线[' + RemoteAddr + ':' + IntToStr(RemotePort) + ']');
-    ChatSessions.RemoveSession(lvSession.UserID);
+    vUserID := lvSession.UserID;
+    sfLogger.logMessage(vUserID + ' 下线[' + RemoteAddr + ':' + IntToStr(RemotePort) + ']');
+    ChatSessions.RemoveSession(vUserID);  // 移除下线客户端对应的会话
+    if Assigned(OnContextLogout) then
+      OnContextLogout(vUserID);  // 下线事件
   finally
     lvCMDObject.Free;
   end;
 end;
 
-procedure TMyClientContext.SendCMDObject(pvCMDObject: TSimpleMsgPack; pvContext: TObject);
+procedure TMyClientContext.SendMsgPack(AMsgPack: TSimpleMsgPack; pvContext: TObject);
 var
   lvMS:TMemoryStream;
 begin
   lvMS := TMemoryStream.Create;
   try
-    pvCMDObject.EncodeToStream(lvMS);
+    AMsgPack.EncodeToStream(lvMS);
     lvMS.Position := 0;
     TIOCPCoderClientContext(pvContext).WriteObject(lvMS);
   finally
@@ -513,12 +498,12 @@ end;
 constructor TChatSession.Create;
 begin
   inherited;
-  FData := TSimpleMsgPack.Create;
+  FMsgPack := TSimpleMsgPack.Create;
 end;
 
 destructor TChatSession.Destroy;
 begin
-  FData.Free;
+  FMsgPack.Free;
   inherited;
 end;
 

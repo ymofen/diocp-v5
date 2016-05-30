@@ -20,7 +20,8 @@
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
-			<DCC_DependencyCheckOutputName>MClient.exe</DCC_DependencyCheckOutputName>
+			<DCC_ExeOutput>..\bin\</DCC_ExeOutput>
+			<DCC_DependencyCheckOutputName>..\bin\MClient.exe</DCC_DependencyCheckOutputName>
 			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
 			<DCC_ImageBase>00400000</DCC_ImageBase>
 			<DCC_Platform>x86</DCC_Platform>
@@ -41,8 +42,13 @@
 				<MainSource>MainSource</MainSource>
 			</DelphiCompile>
 			<DCCReference Include="frm_Client.pas">
-				<Form>Form6</Form>
+				<Form>frmClient</Form>
 			</DCCReference>
+			<DCCReference Include="frm_Login.pas">
+				<Form>frmLogin</Form>
+			</DCCReference>
+			<DCCReference Include="ClientIocpOper.pas"/>
+			<DCCReference Include="locker.pas"/>
 			<BuildConfiguration Include="Base">
 				<Key>Base</Key>
 			</BuildConfiguration>

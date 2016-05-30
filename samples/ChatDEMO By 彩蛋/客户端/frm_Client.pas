@@ -3,151 +3,134 @@ unit frm_Client;
 interface
 
 uses
-  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ExtCtrls,
-  diocp_coder_tcpClient, SimpleMsgPack, diocp_sockets, diocp_task;
+  SysUtils, Classes, Controls, Forms, ComCtrls, Graphics, Dialogs,
+  StdCtrls, ExtCtrls, diocp_task, SimpleMsgPack, locker, diocp_sockets;
 
 type
-  TForm6 = class(TForm)
-    btn1: TButton;
-    lstUsers: TListBox;
-    mmoMsg: TMemo;
+  TfrmClient = class(TForm)
     tmrKeepAlive: TTimer;
-    btn3: TButton;
-    btn4: TButton;
-    edtUserID: TEdit;
+    lvUser: TListView;
+    pnl1: TPanel;
+    pnl2: TPanel;
+    btnSendMsg: TButton;
     edtMsg: TEdit;
-    procedure btn1Click(Sender: TObject);
+    mmoMsg: TMemo;
     procedure FormCreate(Sender: TObject);
-    procedure tmrKeepAliveTimer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure btn3Click(Sender: TObject);
-    procedure btn4Click(Sender: TObject);
-    procedure edtUserIDChange(Sender: TObject);
+    procedure tmrKeepAliveTimer(Sender: TObject);
+    procedure btnSendMsgClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
   private
     { Private declarations }
-    FUserID: string;
-    FCoderTcpClient: TDiocpCoderTcpClient;
-    FDiocpContext: TIocpCoderRemoteContext;
-    FCMDObject: TSimpleMsgPack;
-    FCMDStream: TMemoryStream;
-    //
-    procedure SendCMDObject(pvCMDObject: TSimpleMsgPack);
-    procedure OnRecvObject(pvObject:TObject);
-    procedure OnDisconnected(pvContext: TDiocpCustomContext);
-    procedure KeepAlive;
-    procedure UpdataUser;  // 获取在线用户列表
+    /// <summary>
+    /// UI同步临界区对象
+    /// </summary>
+    FUILocker: TLocker;
+
+    /// <summary>
+    /// 心跳包
+    /// </summary>
+    procedure KeepAliveEx;
+
+    /// <summary>
+    /// 客户端Contextg事件
+    /// </summary>
+    /// <param name="AObject">消息流</param>
+    procedure OnContextActionEx(AObject: TObject);
+
+    /// <summary>
+    /// 刷新用户列表
+    /// </summary>
+    /// <param name="AMsgPack">消息包</param>
+    procedure RefreshUserList(const AMsgPack: TSimpleMsgPack);
+
+    /// <summary>
+    /// 显示获取到的离线消息
+    /// </summary>
+    /// <param name="AMsgPack">离线消息的消息包</param>
+    procedure SetOfflineMsg(const AMsgPack: TSimpleMsgPack);
+
+    /// <summary>
+    /// 客户端断开连接
+    /// </summary>
+    /// <param name="AContext">客户端Context</param>
+    procedure OnDisConnected(AContext: TDiocpCustomContext);
   public
     { Public declarations }
   end;
 
 var
-  Form6: TForm6;
+  frmClient: TfrmClient;
 
 implementation
 
 uses
-  uDIOCPStreamCoder, utils_safeLogger;
+  ClientIocpOper, utils_safeLogger;
 
 {$R *.dfm}
 
-procedure TForm6.btn1Click(Sender: TObject);
-begin
-  if edtUserID.Text = '' then
-  begin
-    ShowMessage('请输入你的姓名！');
-    Exit;
-  end;
-  // 连接
-  FCoderTcpClient.open;
-  if FDiocpContext.Active then
-  begin
-    //sfLogger.logMessage('已经连接到服务器');
-    Exit;
-  end;
-  FDiocpContext.Host := '192.168.1.10';
-  FDiocpContext.Port := 60544;
-  FDiocpContext.Connect;
-  //sfLogger.logMessage('与服务器建立连接成功, 请进行登陆');
-  // 上线
-  if FDiocpContext.Active then
-  begin
-    FCMDObject.Clear;
-    FCMDObject.ForcePathObject('cmdIndex').AsInteger := 11;
-    FCMDObject.ForcePathObject('requestID').AsString := 'login';
-    FCMDObject.ForcePathObject('params.userid').AsString := FUserID;
-    SendCMDObject(FCMDObject);
-  end;
-end;
-
-procedure TForm6.btn3Click(Sender: TObject);
-begin
-  FCMDObject.Clear;
-  FCMDObject.ForcePathObject('cmdIndex').AsInteger := 5;
-  FCMDObject.ForcePathObject('requestID').AsString := 'messageID';
-  FCMDObject.ForcePathObject('params.msg').AsString := edtMsg.Text;
-  SendCMDObject(FCMDObject);
-end;
-
-procedure TForm6.btn4Click(Sender: TObject);
-begin
-  FCMDObject.ForcePathObject('cmdIndex').AsInteger := 5;
-  //FCMDObject.ForcePathObject('userid').AsString := cbbName.Text;
-  FCMDObject.ForcePathObject('params.userid').AsString := lstUsers.Items[lstUsers.ItemIndex];
-  FCMDObject.ForcePathObject('params.msg').AsString := edtMsg.Text;
-  SendCMDObject(FCMDObject);
-end;
-
-procedure TForm6.edtUserIDChange(Sender: TObject);
-begin
-  FUserID := edtUserID.Text;
-end;
-
-procedure TForm6.FormCreate(Sender: TObject);
-begin
-  sfLogger.setAppender(TStringsAppender.Create(mmoMsg.Lines));
-  sfLogger.AppendInMainThread := true;
-
-  FCoderTcpClient := TDiocpCoderTcpClient.Create(Self);
-  FCoderTcpClient.OnContextDisconnected := OnDisconnected;
-
-  FDiocpContext := TIocpCoderRemoteContext(FCoderTcpClient.Add);
-  FDiocpContext.RegisterCoderClass(TIOCPStreamDecoder, TIOCPStreamEncoder);
-  FDiocpContext.OnContextAction := OnRecvObject;
-
-  FCMDObject := TSimpleMsgPack.Create();
-  FCMDStream := TMemoryStream.Create;
-end;
-
-procedure TForm6.FormDestroy(Sender: TObject);
-begin
-  FreeAndNil(FCMDObject);
-  sfLogger.Enable := false;
-  FCoderTcpClient.DisconnectAll;
-  FCoderTcpClient.Free;
-  FCMDStream.Free;
-end;
-
-procedure TForm6.FormShow(Sender: TObject);
-begin
-  FUserID := edtUserID.Text;
-end;
-
-procedure TForm6.OnDisconnected(pvContext: TDiocpCustomContext);
-begin
-  //sfLogger.logMessage('与服务器断开连接...');
-end;
-
-procedure TForm6.OnRecvObject(pvObject: TObject);
+procedure TfrmClient.btnSendMsgClick(Sender: TObject);
 var
-  s:AnsiString;
-  lvStream:TMemoryStream;
-  lvCMDObject:TSimpleMsgPack;
-  lvItem, lvList:TSimpleMsgPack;
-  UserNum,I:Integer;
+  vMsgToID: string;
 begin
-  lvStream := TMemoryStream(pvObject);
+  if DiocpContext.Active then
+  begin
+    if edtMsg.Text <> '' then  // 消息不为空
+    begin
+      if lvUser.ItemIndex < 1 then  // 发给所有人
+        vMsgToID := ''
+      else  // 发给指定接收人
+        vMsgToID := lvUser.Items[lvUser.ItemIndex].Caption;
+      CMD_SendMsg(vMsgToID, edtMsg.Text);  // 请求发送消息
+    end;
+  end
+  else
+  begin
+    ShowMessage('服务端关闭，请重新登录！');
+  end;
+end;
+
+procedure TfrmClient.FormCreate(Sender: TObject);
+begin
+  FUILocker := TLocker.Create('界面操作锁');  // 创建UI同步临界区对象
+  // 设置异步日志记录相关参数
+  sfLogger.setAppender(TStringsAppender.Create(mmoMsg.Lines));
+  sfLogger.AppendInMainThread := True;
+  IocpTaskManager.PostATask(KeepAliveEx, True);  // 添加一个任务并在主线程执行
+
+  DiocpContext.LockContext('客户端初始化', Self);
+  try
+    DiocpContext.OnContextAction := OnContextActionEx;  // 客户端上下文事件
+    DiocpContext.OnDisconnectedEvent := OnDisConnected;
+  finally
+    DiocpContext.UnLockContext('客户端初始化', Self);
+  end;
+end;
+
+procedure TfrmClient.FormDestroy(Sender: TObject);
+begin
+  sfLogger.Enable := False;
+  FUILocker.Free;
+end;
+
+procedure TfrmClient.FormShow(Sender: TObject);
+begin
+  CMD_UpdataUsers(CurUserID);  // 请求所有用户列表
+  CMD_OfflineMessage(CurUserID);  // 请求
+end;
+
+procedure TfrmClient.KeepAliveEx;
+begin
+  tmrKeepAlive.Enabled := true;
+end;
+
+procedure TfrmClient.OnContextActionEx(AObject: TObject);
+var
+  lvStream:TMemoryStream;
+  lvCMDObject: TSimpleMsgPack;
+  lvItem, lvList:TSimpleMsgPack;
+begin
+  lvStream := TMemoryStream(AObject);
   lvCMDObject:= TSimpleMsgPack.Create;
   try
     lvCMDObject.DecodeFromStream(lvStream);
@@ -155,105 +138,120 @@ begin
     if lvCMDObject.ForcePathObject('result.code').AsInteger = -1 then
       sfLogger.logMessage(lvCMDObject.ForcePathObject('result.msg').AsString);
 
-    if lvCMDObject.ForcePathObject('requestID').AsString = 'login' then
+    if lvCMDObject.ForcePathObject('requestID').AsString = 'login' then  // 登录请求的返回数据
     begin
-      UpdataUser;
-      if lvCMDObject.ForcePathObject('result.code').AsInteger = 0 then
+      CMD_UpdataUsers(CurUserID);
+      if lvCMDObject.ForcePathObject('result.code').AsInteger = 0 then  // 发出的请求服务端执行成功
       begin
-        sfLogger.logMessage('登陆成功...');
-        iocpTaskManager.PostATask(KeepAlive, true);
+        sfLogger.logMessage('登录成功...');
+        IocpTaskManager.PostATask(KeepAliveEx, True);
       end;
     end
     else
-    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 21 then
+    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 21 then  // 服务端有人上线的通知
     begin
-       UpdataUser;
+      CMD_UpdataUsers(CurUserID);
       if lvCMDObject.ForcePathObject('type').AsInteger = 0 then
-      begin
-        sfLogger.logMessage(Format('用户[%s]已经下线!', [lvCMDObject.ForcePathObject('userid').AsString]));
-      end
+        sfLogger.logMessage(Format('[%s]下线!', [lvCMDObject.ForcePathObject('userid').AsString]))
       else
-      begin
-        sfLogger.logMessage(Format('用户[%s]上线!', [lvCMDObject.ForcePathObject('userid').AsString]));
-      end;
+        sfLogger.logMessage(Format('[%s]上线!', [lvCMDObject.ForcePathObject('userid').AsString]));
     end
     else
-    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 6 then
-    begin
-      sfLogger.logMessage(Format('用户[%s]私聊对你说:%s',[lvCMDObject.ForcePathObject('userid').AsString, lvCMDObject.ForcePathObject('msg').AsString]));
-    end
+    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 6 then  // 消息是发送人对所有人发送（公告）
+      sfLogger.logMessage(Format('[%s]:%s', [lvCMDObject.ForcePathObject('userid').AsString,
+        lvCMDObject.ForcePathObject('msg').AsString]))
     else
-    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 5 then
+    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 5 then  // 有人发送私聊信息
     begin
       if lvCMDObject.ForcePathObject('result.code').AsInteger = 0 then
       begin
-        sfLogger.logMessage(Format('你说了:%s',
-          [lvCMDObject.ForcePathObject('params.msg').AsString]));
+        sfLogger.logMessage(Format('%s', [lvCMDObject.ForcePathObject('params.msg').AsString]));
       end;
     end
     else
-    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 3 then  // 用户列表
+    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 7 then  // 从服务端获取到离线期间积累的消息
     begin
       if lvCMDObject.ForcePathObject('result.code').AsInteger = 0 then
-      begin
-        UserNum:=lvCMDObject.ForcePathObject('list').Count;
-        for I := 0 to UserNum-1 do
-        begin
-          lstUsers.Clear;
-          lstUsers.Items.Add(lvCMDObject.ForcePathObject('list').Items[i].ForcePathObject('userid').AsString);
-        end;
-//         ShowMessage(lvCMDObject.ForcePathObject('list').Items[0].ForcePathObject('userid').AsString);
-//         ShowMessage(lvCMDObject.ForcePathObject('list').Items[1].ForcePathObject('userid').AsString);
-      end;
+        SetOfflineMsg(lvCMDObject);
     end
     else
-    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 6 then
+    if lvCMDObject.ForcePathObject('cmdIndex').AsInteger = 3 then  // 返回所有用户列表信息
     begin
       if lvCMDObject.ForcePathObject('result.code').AsInteger = 0 then
-      begin
-         mmoMsg.Lines.Add(lvCMDObject.ForcePathObject('userid').AsString+'说：'+
-           lvCMDObject.ForcePathObject('msg').AsString );
-//         ShowMessage(lvCMDObject.ForcePathObject('list').Items[0].ForcePathObject('userid').AsString);
-//         ShowMessage(lvCMDObject.ForcePathObject('list').Items[1].ForcePathObject('userid').AsString);
-      end;
+        RefreshUserList(lvCMDObject);
     end;
   finally
     lvCMDObject.Free;
   end;
 end;
 
-procedure TForm6.SendCMDObject(pvCMDObject: TSimpleMsgPack);
-var
-  lvCMDStream:TMemoryStream;
+procedure TfrmClient.OnDisConnected(AContext: TDiocpCustomContext);
 begin
-  lvCMDStream := TMemoryStream.Create;
+  ShowMessage('服务端关闭，请重新登录！');
+end;
+
+procedure TfrmClient.RefreshUserList(const AMsgPack: TSimpleMsgPack);
+var
+  vUserCount, i: Integer;
+  vListItem: TListItem;
+begin
+  FUILocker.Lock('更新用户列表');
   try
-    pvCMDObject.EncodeToStream(lvCMDStream);
-    FDiocpContext.WriteObject(lvCMDStream);
+    vUserCount := AMsgPack.ForcePathObject('list').Count;  // 用户数
+    lvUser.Clear;
+    if vUserCount = 0 then Exit;
+    vListItem := lvUser.Items.Add;  // 先添加一个所有人的数据便于向所有人发送消息
+    vListItem.Caption := '所有人';
+    // 添加各用户
+    lvUser.Items.BeginUpdate;
+    try
+      for i := 0 to vUserCount - 1 do
+      begin
+        vListItem := lvUser.Items.Add;
+        vListItem.Caption := AMsgPack.ForcePathObject('list').Items[i].ForcePathObject('user.id').AsString;  // 用户ID
+        vListItem.SubItems.Add(AMsgPack.ForcePathObject('list').Items[i].ForcePathObject('user.name').AsString);  // 用户名
+        if AMsgPack.ForcePathObject('list').Items[i].ForcePathObject('user.state').AsInteger = 0 then  // 不在线
+          vListItem.SubItems.Add('离线')
+        else
+          vListItem.SubItems.Add('在线');
+      end;
+    finally
+      lvUser.Items.EndUpdate;
+    end;
   finally
-    lvCMDStream.Free;
+    FUILocker.UnLock;
   end;
 end;
 
-procedure TForm6.tmrKeepAliveTimer(Sender: TObject);
+procedure TfrmClient.SetOfflineMsg(const AMsgPack: TSimpleMsgPack);
+var
+  vMsgCount, i: Integer;
+  vListItem: TListItem;
 begin
-  FCMDObject.Clear;
-  FCMDObject.ForcePathObject('cmdIndex').AsInteger := 0;
-  SendCMDObject(FCMDObject);
+  FUILocker.Lock('获取离线消息');
+  try
+    vMsgCount := AMsgPack.ForcePathObject('list').Count;  // 获取和我相关的离线消息数
+    if vMsgCount = 0 then Exit;
+    mmoMsg.Lines.BeginUpdate;
+    try
+      for i := 0 to vMsgCount - 1 do
+      begin
+        mmoMsg.Lines.Add(Format('[%s] %s:%s',  // 显示各离线消息
+          [FormatDateTime('YYYY-MM-DD hh:mm:ss', AMsgPack.ForcePathObject('list').Items[i].ForcePathObject('dt').AsDateTime),
+          AMsgPack.ForcePathObject('list').Items[i].ForcePathObject('from').AsString,
+          AMsgPack.ForcePathObject('list').Items[i].ForcePathObject('msg').AsString]));
+      end;
+    finally
+      mmoMsg.Lines.EndUpdate;
+    end;
+  finally
+    FUILocker.UnLock;
+  end;
 end;
 
-procedure TForm6.KeepAlive;
+procedure TfrmClient.tmrKeepAliveTimer(Sender: TObject);
 begin
-  tmrKeepAlive.Enabled := true;
-end;
-
-procedure TForm6.UpdataUser;
-begin
-  FCMDObject.Clear;
-  FCMDObject.ForcePathObject('cmdIndex').AsInteger := 3;
-  FCMDObject.ForcePathObject('requestID').AsString := FUserID;
-  FCMDObject.ForcePathObject('params.page').AsString := '1';
-  SendCMDObject(FCMDObject);
+  CMD_KeepAlive;  // 心跳包
 end;
 
 end.

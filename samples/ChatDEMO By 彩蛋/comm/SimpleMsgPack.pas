@@ -125,8 +125,6 @@ type
     property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive;
   end;
 
-
-
   TSimpleMsgPack = class(TObject)
   private
     FParent: TSimpleMsgPack;

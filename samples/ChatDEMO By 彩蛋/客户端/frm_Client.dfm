@@ -1,8 +1,8 @@
-object Form6: TForm6
+object frmClient: TfrmClient
   Left = 0
   Top = 0
   Caption = #23458#25143#31471
-  ClientHeight = 243
+  ClientHeight = 398
   ClientWidth = 740
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -11,71 +11,80 @@ object Form6: TForm6
   Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
+  Position = poScreenCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
-  object btn1: TButton
-    Left = 175
-    Top = 210
-    Width = 75
-    Height = 25
-    Caption = #36830#25509#24182#19978#32447
-    TabOrder = 0
-    OnClick = btn1Click
-  end
-  object lstUsers: TListBox
+  object lvUser: TListView
     Left = 0
     Top = 0
     Width = 161
-    Height = 243
+    Height = 398
     Align = alLeft
-    ItemHeight = 13
+    Columns = <
+      item
+        Caption = #36134#21495
+      end
+      item
+        Caption = #26165#31216
+      end
+      item
+        Caption = #29366#24577
+      end>
+    TabOrder = 0
+    ViewStyle = vsReport
+  end
+  object pnl1: TPanel
+    Left = 161
+    Top = 0
+    Width = 579
+    Height = 398
+    Align = alClient
+    Caption = 'pnl1'
     TabOrder = 1
-  end
-  object mmoMsg: TMemo
-    Left = 167
-    Top = 8
-    Width = 565
-    Height = 153
-    TabOrder = 2
-  end
-  object btn3: TButton
-    Left = 504
-    Top = 210
-    Width = 89
-    Height = 25
-    Caption = #21457#36865#32473#25152#26377#20154
-    TabOrder = 3
-    OnClick = btn3Click
-  end
-  object btn4: TButton
-    Left = 599
-    Top = 210
-    Width = 75
-    Height = 25
-    Caption = #31169#32842
-    TabOrder = 4
-    OnClick = btn4Click
-  end
-  object edtUserID: TEdit
-    Left = 175
-    Top = 183
-    Width = 121
-    Height = 21
-    TabOrder = 5
-    OnChange = edtUserIDChange
-  end
-  object edtMsg: TEdit
-    Left = 368
-    Top = 183
-    Width = 364
-    Height = 21
-    TabOrder = 6
-    Text = #20320#22909#65281
+    object pnl2: TPanel
+      Left = 1
+      Top = 356
+      Width = 577
+      Height = 41
+      Align = alBottom
+      BevelOuter = bvNone
+      Caption = 'pnl2'
+      TabOrder = 0
+      object btnSendMsg: TButton
+        Left = 480
+        Top = 8
+        Width = 89
+        Height = 25
+        Caption = #21457#36865
+        TabOrder = 0
+        OnClick = btnSendMsgClick
+      end
+      object edtMsg: TEdit
+        Left = 14
+        Top = 11
+        Width = 460
+        Height = 21
+        TabOrder = 1
+        Text = #20320#22909#65281
+      end
+    end
+    object mmoMsg: TMemo
+      Left = 1
+      Top = 1
+      Width = 577
+      Height = 355
+      Align = alClient
+      BorderStyle = bsNone
+      Lines.Strings = (
+        #32842#22825#35760#24405#65306)
+      TabOrder = 1
+    end
   end
   object tmrKeepAlive: TTimer
+    Enabled = False
     Interval = 5000
     OnTimer = tmrKeepAliveTimer
     Left = 256

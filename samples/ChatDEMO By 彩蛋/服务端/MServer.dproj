@@ -20,7 +20,8 @@
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
-			<DCC_DependencyCheckOutputName>MServer.exe</DCC_DependencyCheckOutputName>
+			<DCC_ExeOutput>..\bin\</DCC_ExeOutput>
+			<DCC_DependencyCheckOutputName>..\bin\MServer.exe</DCC_DependencyCheckOutputName>
 			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
 			<DCC_ImageBase>00400000</DCC_ImageBase>
 			<DCC_Platform>x86</DCC_Platform>
@@ -42,6 +43,10 @@
 			</DelphiCompile>
 			<DCCReference Include="frm_Server.pas">
 				<Form>Form5</Form>
+			</DCCReference>
+			<DCCReference Include="frm_dm.pas">
+				<Form>dm</Form>
+				<DesignClass>TDataModule</DesignClass>
 			</DCCReference>
 			<BuildConfiguration Include="Base">
 				<Key>Base</Key>
