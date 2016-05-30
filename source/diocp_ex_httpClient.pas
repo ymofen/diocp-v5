@@ -53,6 +53,7 @@ type
     FResponseContentEncoding:String;
     FResponseHeader: TStringList;
     FResponseSize: Integer;
+    FResponseHttpVersionValue: Integer;
     FTimeOut: Integer;
     /// <summary>
     ///  CheckRecv buffer
@@ -61,11 +62,18 @@ type
     procedure CheckSocketResult(pvSocketResult:Integer);
     procedure InnerExecuteRecvResponse();
     procedure InnerExecuteRecvResponseTimeOut;
+    /// <summary>
+    ///   检测是否需要关闭连接
+    /// </summary>
+    procedure CheckCloseConnection;
+
     procedure DoAfterResponse;
     function GetResponseResultCode: Integer;
 
 
     procedure ResetState;
+
+    procedure DecodeFirstLine;
 
     function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
   public
@@ -138,6 +146,15 @@ type
     ///   响应的整个数据长度
     /// </summary>
     property ResponseSize: Integer read FResponseSize;
+
+    /// <summary>
+    ///   响应的Http版本
+    ///   10: HTTP/1.0
+    ///   11: HTTP/1.1
+    /// </summary>
+    property ResponseHttpVersionValue: Integer read FResponseHttpVersionValue;
+
+
 
 
     /// <summary>
@@ -294,6 +311,29 @@ begin
   inherited;
 end;
 
+procedure TDiocpHttpClient.CheckCloseConnection;
+var
+  lvTempStr:String;
+begin
+  lvTempStr := StringsValueOfName(FResponseHeader, 'Connection', [':'], True);
+  if (Length(lvTempStr) = 0) then
+  begin
+    if FResponseHttpVersionValue = 10 then
+    begin    // 10默认关闭
+      self.Close;
+    end;
+  end else if SameStr(lvTempStr, 'close') then
+  begin
+    Self.Close;
+  end else if ResponseResultCode <> 200 then
+  begin     // 200, OK
+    self.Close;
+  end else
+  begin
+    if not FKeepAlive then Close;
+  end;
+end;
+
 procedure TDiocpHttpClient.CheckSocketResult(pvSocketResult: Integer);
 var
   lvErrorCode:Integer;
@@ -427,7 +467,7 @@ begin
 
     InnerExecuteRecvResponse();
   finally
-    if not FKeepAlive then self.Close;
+    CheckCloseConnection;
   end;
 end;
 
@@ -454,6 +494,7 @@ var
       if r = 1 then
       begin
         lvRawHeaderStr := FHttpBuffer.HeaderBuilder.ToRAWString;
+
         FResponseHeader.Text := lvRawHeaderStr;
         FResponseContentType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
         lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
@@ -542,7 +583,6 @@ begin
 
 
   lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
-
   if lvTempStr <> '' then
   begin  
     FRawCookie := lvTempStr;
@@ -644,7 +684,7 @@ begin
 
     InnerExecuteRecvResponse();
   finally
-    if not FKeepAlive then self.Close;
+    CheckCloseConnection;
   end;
 end;
 
@@ -711,6 +751,48 @@ begin
   end;
 end;
 
+procedure TDiocpHttpClient.DecodeFirstLine;
+var
+  lvLine, lvCode:String;
+  lvPtr:PChar;
+begin
+  if FResponseHeader.Count = 0 then
+  begin
+    FResponseResultCode := -1;
+    exit;
+  end;
+  // HTTP/1.1 200 OK
+  lvLine := FResponseHeader[0];
+  lvPtr := PChar(lvLine);
+
+  lvCode := LeftUntil(lvPtr, ['/']);
+  if lvCode <> 'HTTP' then
+  begin
+    FResponseResultCode := -1;
+    Exit;
+  end;
+  SkipChars(lvPtr, [' ', '/']);
+
+  lvCode := LeftUntil(lvPtr, [' ']);
+  if lvCode = '1.0' then
+  begin
+    self.FResponseHttpVersionValue := 10;
+  end else if lvCode = '1.1' then
+  begin
+    self.FResponseHttpVersionValue := 11;
+  end else
+  begin
+    Self.FResponseHttpVersionValue := 11;
+  end;
+
+
+
+  SkipUntil(lvPtr, [' ']);
+  SkipChars(lvPtr, [' ']);
+  lvCode := LeftUntil(lvPtr, [' ']);
+  FResponseResultCode := StrToIntDef(lvCode, -1);
+end;
+
 procedure TDiocpHttpClient.DirectPost(pvHost: string; pvPort: Integer; pvBuf:
     Pointer; len: Cardinal);
 var
@@ -730,14 +812,26 @@ begin
 
 
   finally
-    if not FKeepAlive then self.Close;
+    CheckCloseConnection;
   end;
 
 end;
 
 procedure TDiocpHttpClient.DoAfterResponse;
+var
+  lvCode:Integer;
 begin
-
+  lvCode := ResponseResultCode;
+  if lvCode = 200 then
+  begin
+    ; // OK
+  end else if lvCode= -1 then
+  begin
+    raise Exception.Create(Format('错误的ResponseHttpCode[%d]', [lvCode]));
+  end else
+  begin
+    raise Exception.Create(Format('错误的ResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
+  end;
 end;
 
 function TDiocpHttpClient.GetResponseResultCode: Integer;
@@ -747,20 +841,8 @@ var
 begin
   if FResponseResultCode = 0 then
   begin
-    if FResponseHeader.Count = 0 then
-    begin
-      FResponseResultCode := -1;
-    end else
-    begin
-      // HTTP/1.1 200 OK
-      lvLine := FResponseHeader[0];
-      lvPtr := PChar(lvLine);
-      SkipUntil(lvPtr, [' ']);
-      SkipChars(lvPtr, [' ']);
-      lvCode := LeftUntil(lvPtr, [' ']);
-      FResponseResultCode := StrToIntDef(lvCode, -1);
-    end;                                             
-    
+    DecodeFirstLine();
+
   end;
   Result := FResponseResultCode;
 end;
@@ -847,6 +929,8 @@ procedure TDiocpHttpClient.ResetState;
 begin
   FResponseResultCode := 0;
   FResponseSize := 0;
+  FResponseHttpVersionValue := 0;
+  FResponseHeader.Clear;
 end;
 
 procedure TDiocpHttpClient.SetRequestBodyAsString(pvRequestData: string;

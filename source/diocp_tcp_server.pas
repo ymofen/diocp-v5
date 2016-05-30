@@ -857,6 +857,7 @@ type
     FDataMoniter: TIocpDataMonitor;
 
     FActive: Boolean;
+    FConnectedCount: Integer;
     FDefaultListenAddress: String;
 
 
@@ -1018,6 +1019,10 @@ type
     ///   client connections counter
     /// </summary>
     property ClientCount: Integer read GetClientCount;
+
+    property ConnectedCount: Integer read FConnectedCount;
+
+
     property DataMoniter: TIocpDataMonitor read FDataMoniter;
     property IocpEngine: TIocpEngine read FIocpEngine;
 
@@ -1711,6 +1716,8 @@ begin
       {$ENDIF}
     end else
     begin
+      InterlockedIncrement(FOwner.FConnectedCount);
+
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
 
