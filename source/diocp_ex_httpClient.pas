@@ -27,6 +27,8 @@ type
 
   TDiocpHttpClient = class(TComponent)
   private
+    FCheckThreadSafe: Boolean;
+    FCreatTheadID:THandle;
     FLastActivity:Cardinal;
     FLastHost:String;
     FLastPort:Integer;
@@ -78,6 +80,7 @@ type
     function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
   public
     procedure Cleaup;
+
     constructor Create(AOwner: TComponent); override;
     
     destructor Destroy; override;
@@ -90,6 +93,11 @@ type
     procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
         Boolean);
 
+    /// <summary>
+    ///   是否检测线程安全，只能在创建线程中使用
+    /// </summary>
+    property CheckThreadSafe: Boolean read FCheckThreadSafe write FCheckThreadSafe;
+    
     property CustomeHeader: TStrings read FCustomeHeader;
 
     /// <summary>
@@ -130,8 +138,8 @@ type
 
     property ResponseBody: TMemoryStream read FResponseBody;
     property ResponseResultCode: Integer read GetResponseResultCode;
-    property ResponseHeader: TStringList read FResponseHeader;
 
+    property ResponseHeader: TStringList read FResponseHeader;
     
     
     /// <summary>
@@ -269,6 +277,9 @@ end;
 constructor TDiocpHttpClient.Create(AOwner: TComponent);
 begin
   inherited;
+  FCreatTheadID := GetCurrentThreadID;
+  FCheckThreadSafe := False;
+  
   FHttpBuffer:= THttpBuffer.Create;
   FReponseBuilder := FHttpBuffer.ContentBuilder;
   
@@ -694,6 +705,11 @@ var
   lvReConnect:Boolean;
   lvIpAddr:string;
 begin
+  if (GetCurrentThreadID <> FCreatTheadID) and (FCheckThreadSafe) then
+  begin
+    raise Exception.Create('TDiocpHttpClient::只能在创建线程中发起Http请求(CheckThreadSafe is true)');
+  end;
+  
   lvReConnect := (pvHost <> FLastHost) or (pvPort <> FLastPort);
   lvReConnect := lvReConnect or (tick_diff(FLastActivity, GetTickCount) > FKeepAliveTimeOut);
 

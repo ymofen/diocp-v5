@@ -512,6 +512,8 @@ function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
 
 function GetTickCount: Cardinal;
 
+function GetCurrentThreadID: Cardinal;
+
 implementation
 
 
@@ -2056,6 +2058,15 @@ begin
   {$ELSE}
   Result := TThread.GetTickCount;
   {$ENDIF}
+end;
+
+function GetCurrentThreadID: Cardinal;
+begin
+  {$IFDEF MSWINDOWS}
+    Result := windows.GetCurrentThreadId;
+  {$ELSE}
+    Result := TThread.CurrentThread.ThreadID;
+  {$ENDIF};
 end;
 
 
