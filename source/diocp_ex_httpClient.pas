@@ -303,6 +303,8 @@ begin
   FResponseHeader.LineBreak := #13#10;
 {$IFEND}
 
+  FKeepAlive := True;
+  
   // 20√Î
   FKeepAliveTimeOut := 20000;
 end;
