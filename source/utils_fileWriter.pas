@@ -49,9 +49,9 @@ type
 
     property FilePerSize: Integer read FFilePerSize write SetFilePerSize;
     property FilePreFix: String read FFilePreFix write FFilePreFix;
-
-
   end;
+
+procedure SaveStringToFile(s:String; pvFileName:String);
 
 implementation
 
@@ -111,6 +111,24 @@ begin
       Break;
     end;
   end;
+end;
+
+procedure SaveStringToFile(s:String; pvFileName:String);
+var
+  lvFs:TFileStream;
+  lvBytes:TBytes;
+
+begin
+  lvFs := TFileStream.Create(pvFileName, fmCreate);
+  try
+    // UTF8-BOM
+    //lvFs.Write(#$EF#$BB#$BF, 3);
+    // StringToUtf8Bytes(s, lvBytes);
+    lvBytes := StringToBytes(s);
+    lvFs.Write(lvBytes[0], Length(lvBytes));
+  finally
+    lvFs.Free;
+  end;          
 end;
 
 destructor TSingleFileWriter.Destroy;
