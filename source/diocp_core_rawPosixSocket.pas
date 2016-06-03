@@ -143,6 +143,8 @@ type
 
     function IsValidSocketHandle: Boolean;
 
+    function SocketValid: Boolean;
+
   public
     property SocketHandle: THandle read FSocketHandle;
   end;
@@ -658,6 +660,11 @@ end;
 procedure TRawSocket.SetSocketHandle(pvSocketHandle:THandle);
 begin
   FSocketHandle := pvSocketHandle;
+end;
+
+function TRawSocket.SocketValid: Boolean;
+begin
+  Result := (FSocketHandle <> 0) and (FSocketHandle <> INVALID_HANDLE_VALUE);
 end;
 
 initialization

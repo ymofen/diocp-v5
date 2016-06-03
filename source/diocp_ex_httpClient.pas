@@ -336,7 +336,7 @@ begin
     begin    // 10Ä¬ÈÏ¹Ø±Õ
       self.Close;
     end;
-  end else if SameStr(lvTempStr, 'close') then
+  end else if SameText(lvTempStr, 'close') then
   begin
     Self.Close;
   end else if ResponseResultCode <> 200 then
@@ -716,7 +716,7 @@ begin
   
   lvReConnect := (pvHost <> FLastHost) or (pvPort <> FLastPort);
   lvReConnect := lvReConnect or (tick_diff(FLastActivity, GetTickCount) > FKeepAliveTimeOut);
-
+  lvReConnect := lvReConnect or (not FRawSocket.SocketValid);
 
   if lvReConnect then
   begin

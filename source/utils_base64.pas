@@ -53,9 +53,6 @@ implementation
 type
   Int8    = ShortInt;
 
-  {$if CompilerVersion < 18} //before delphi 2007
-  TBytes = array of Byte;
-  {$ifend}
 
 const
     LineSeparator : array[0..1] of Byte = (13,10);

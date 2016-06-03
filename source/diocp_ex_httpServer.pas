@@ -146,8 +146,8 @@ type
     ///   不创建Session对象
     /// </summary>
     procedure CheckCookieSession;
-    function GetContextLength: Int64;
-    function GetContextType: String;
+    function GetContentLength: Int64;
+    function GetContentType: String;
     function GetContentAsMemory: PByte;
     function GetContentBody: TDBufferBuilder;
     function GetDataAsRawString: RAWString;
@@ -231,9 +231,9 @@ type
 
     procedure ContentSaveToFile(pvFile:String);
 
-    property ContextType: String read GetContextType;
+    property ContentType: String read GetContentType;
 
-    property ContextLength: Int64 read GetContextLength;
+    property ContentLength: Int64 read GetContentLength;
 
 
     /// <summary>
@@ -733,12 +733,12 @@ begin
   FInnerRequest.DecodeURLParam(pvUseUtf8Decode);
 end;
 
-function TDiocpHttpRequest.GetContextLength: Int64;
+function TDiocpHttpRequest.GetContentLength: Int64;
 begin
   Result := FInnerRequest.ContentLength;
 end;
 
-function TDiocpHttpRequest.GetContextType: String;
+function TDiocpHttpRequest.GetContentType: String;
 begin
   Result := FInnerRequest.ContentType;
 end;
@@ -905,12 +905,15 @@ var
   lvFixedHeader: AnsiString;
   len: Integer;
 begin
-  if FInnerRequest.CheckKeepAlive then
+  if FResponse.Header.FindByName('Connection') = nil then
   begin
-    FResponse.Header.ForceByName('Connection').AsString := 'keep-alive';
-  end else
-  begin
-    FResponse.Header.ForceByName('Connection').AsString := 'close';
+    if FInnerRequest.CheckKeepAlive then
+    begin
+      FResponse.Header.ForceByName('Connection').AsString := 'keep-alive';
+    end else
+    begin
+      FResponse.Header.ForceByName('Connection').AsString := 'close';
+    end;
   end;
   
   if pvContentLength = 0 then

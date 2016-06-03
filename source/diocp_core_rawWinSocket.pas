@@ -47,6 +47,7 @@ type
     FSocketHandle: TSocket;
     procedure CheckDestroyHandle;
   public
+    function SocketValid: Boolean;
     procedure Close(pvShutdown: Boolean = true);
     procedure CreateTcpSocket;
 
@@ -693,6 +694,11 @@ end;
 function TRawSocket.ShutDown(pvHow: Integer = SD_BOTH): Integer;
 begin
   Result := diocp_winapi_winsock2.shutdown(FSocketHandle, pvHow);
+end;
+
+function TRawSocket.SocketValid: Boolean;
+begin
+  Result := (FSocketHandle<> 0) and (FSocketHandle <> INVALID_HANDLE_VALUE);
 end;
 
 function TRawSocket.UpdateAcceptContext(pvSocket: TSocket): Boolean;

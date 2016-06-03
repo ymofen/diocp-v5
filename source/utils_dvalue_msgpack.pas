@@ -3,13 +3,16 @@ unit utils_dvalue_msgpack;
 interface
 
 uses
-  utils_dvalue, utils_strings, classes, SysUtils;
+  utils_dvalue, utils_strings, classes, SysUtils, utils_BufferAdapter;
 
 procedure MsgPackEncode(pvInDValue: TDValue; pvOutStream: TStream;
     pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 
 
 procedure MsgPackParseFromStream(pvInStream: TStream; pvOutDValue: TDValue);
+
+procedure MsgPackParseFromBuffer(pvInBuffer:Pointer; pvSize:Integer;
+    pvOutDValue: TDValue);
 
 procedure MsgPackParseFromFile(pvFileName: string; pvOutDValue: TDValue);
 
@@ -1006,6 +1009,19 @@ begin
     lvFileStream.Free;
   end;
   
+end;
+
+procedure MsgPackParseFromBuffer(pvInBuffer:Pointer; pvSize:Integer;
+    pvOutDValue: TDValue);
+var
+  lvStream:TBufferAdapterStream;
+begin
+  lvStream:=TBufferAdapterStream.Create(pvInBuffer, pvSize);
+  try
+    MsgPackParseFromStream(lvStream, pvOutDValue);
+  finally
+    lvStream.Free;    
+  end;
 end;
 
 end.

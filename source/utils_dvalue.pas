@@ -275,12 +275,17 @@ type
     function GetAsStream: TMemoryStream;
     function GetAsUInt: UInt64;
     procedure SetAsUInt(const Value: UInt64);
+    procedure CheckBeforeAddChild(pvType: TDValueObjectType);
   public
     constructor Create(pvType: TDValueObjectType); overload;
 
     constructor Create; overload;
 
     destructor Destroy; override;
+
+
+    function Clone(pvIgnoreValueTypes: TDValueDataTypes = [vdtInterface, vdtObject,
+        vdtPtr]): TDValue;
 
     procedure CloneFrom(pvSource: TDValue; pvIgnoreValueTypes: TDValueDataTypes =
         [vdtInterface, vdtObject, vdtPtr]);
@@ -294,7 +299,7 @@ type
     /// <summary>
     ///   设置节点类型, 类型转换时会丢失数据
     /// </summary>
-    procedure CheckSetNodeType(pvType:TDValueObjectType);
+    function CheckSetNodeType(pvType:TDValueObjectType): TDValue;
 
     function FindByName(pvName:String): TDValue; overload;
 
@@ -333,6 +338,8 @@ type
     /// </summary>
     function Add: TDValue; overload;
 
+
+    function Add(pvName: String; pvType: TDValueObjectType): TDValue; overload;
     function Add(pvName:String): TDValue; overload;
     function Add(pvName:string; pvValue:string): TDValue; overload;
     function Add(pvName:string; pvValue:Integer): TDValue; overload;
@@ -1606,7 +1613,7 @@ end;
 
 function TDValue.Add: TDValue;
 begin
-  CheckSetNodeType(vntObject);
+  CheckBeforeAddChild(vntObject);
   Result := TDValue.Create(vntValue);
   Result.FParent := Self;
   FChildren.Add(Result);
@@ -1658,6 +1665,15 @@ begin
   Result.FParent := Self;
   Result.FName.AsString := pvName;
   Result.AsFloat := pvValue;
+  FChildren.Add(Result);
+end;
+
+function TDValue.Add(pvName: String; pvType: TDValueObjectType): TDValue;
+begin
+  CheckSetNodeType(vntObject);
+  Result := TDValue.Create(pvType);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
   FChildren.Add(Result);
 end;
 
@@ -1724,6 +1740,11 @@ begin
   FValue.BindObject(pvObject, pvFreeAction);
 end;
 
+procedure TDValue.CheckBeforeAddChild(pvType: TDValueObjectType);
+begin
+  if not (FObjectType in [vntObject, vntArray]) then CheckSetNodeType(pvType);
+end;
+
 procedure TDValue.CheckCreateChildren;
 begin
   if not Assigned(FChildren) then
@@ -1752,7 +1773,7 @@ begin
   if Result = nil then raise TDValueException.CreateFmt(SItemNotFound, [pvName]);
 end;
 
-procedure TDValue.CheckSetNodeType(pvType:TDValueObjectType);
+function TDValue.CheckSetNodeType(pvType:TDValueObjectType): TDValue;
 begin
   if pvType <> FObjectType then
   begin
@@ -1772,6 +1793,7 @@ begin
 
     FObjectType := pvType;
   end;
+  Result := Self;
 end;
 
 procedure TDValue.Clear;
@@ -1789,6 +1811,18 @@ begin
     begin
       raise Exception.CreateFmt('%s(%s):%s:%s', [e.ClassName, FLastMsg, lvDebug, e.Message]);
     end;
+  end;
+end;
+
+function TDValue.Clone(pvIgnoreValueTypes: TDValueDataTypes = [vdtInterface,
+    vdtObject, vdtPtr]): TDValue;
+begin
+  Result := TDValue.Create();
+  try
+    Result.CloneFrom(Self, pvIgnoreValueTypes);
+  except
+    Result.Free;
+    raise;
   end;
 end;
 
