@@ -29,6 +29,7 @@ type
   private
     FCheckThreadSafe: Boolean;
     FCreatTheadID:THandle;
+    FLastResponseTick:Cardinal;
     FLastActivity:Cardinal;
     FLastHost:String;
     FLastPort:Integer;
@@ -603,6 +604,7 @@ begin
 
 
   FLastActivity := GetTickCount;
+  FLastResponseTick := GetTickCount;
   DoAfterResponse;
 end;
 
