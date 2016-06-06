@@ -26,6 +26,7 @@ type
 
   TByteTools = class(TObject)
   public
+
      class function varToByteString(const v; len: Cardinal; Split: string = ' '):
          String;
 
@@ -37,6 +38,8 @@ type
      ///  16进制转 二进制
      /// </summary>
      class function HexToBin(pvHexStr:String; buf:Pointer):Integer;
+
+     class function HexStrToBytes(pvHexStr:String): TBytes;
 
      /// <summary>
      ///  16进制字符到二进制
@@ -63,6 +66,9 @@ type
      /// </summary>
      class function swap16(const v):Word;
 
+
+     class function SwapBuff(buf: Pointer; offset, len: Integer): Integer;
+
      /// <summary>
      ///   生成数据校验码
      /// </summary>
@@ -72,11 +78,62 @@ type
      ///  生成数据校验码
      /// </summary>
      class function verifyStream(pvStream:TStream; len:Cardinal): Cardinal;
+
+     /// <summary>
+     ///   文件生成TBytes
+     /// </summary>
+     class function FileToBytes(pvFileName:string): TBytes;
+
+
+     /// <summary>
+     ///   
+     /// </summary>
+     class function GetBitUInt64(pvBuf:Pointer; pvStart, pvLen:Integer): UInt64;
   end;
 
 implementation
 
 
+
+class function TByteTools.FileToBytes(pvFileName:string): TBytes;
+var
+  lvStream:TFileStream;
+begin
+  lvStream := TFileStream.Create(pvFileName, fmOpenRead);
+  try
+    SetLength(Result, lvStream.Size);
+    lvStream.Read(Result[0], lvStream.Size);
+  finally
+    lvStream.Free;
+  end;
+end;
+
+class function TByteTools.GetBitUInt64(pvBuf:Pointer; pvStart, pvLen:Integer): UInt64;
+var
+  lvBytes:TBytes;
+begin
+  Assert(pvLen<=8);
+  SetLength(lvBytes, pvLen);
+  Move(Pointer(IntPtr(pvBuf) + pvStart)^, lvBytes[0], pvLen);
+
+  Result := PInt64(@lvBytes[0])^;
+
+end;
+
+class function TByteTools.HexStrToBytes(pvHexStr:String): TBytes;
+var
+  lvStr:String;
+  l, r:Integer;
+begin
+  lvStr := StringReplace(pvHexStr, ' ', '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #13, '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #10, '', [rfReplaceAll]);
+  l := Length(lvStr);
+  l := l shr 1;
+  SetLength(Result, l);
+  r := HexToBin(lvStr, @Result[0]);
+  Assert(r = l, 'TByteTools.HexStrToBytes');
+end;
 
 class function TByteTools.HexToBin(pvHexStr: String;
   buf: Pointer): Integer;
@@ -157,6 +214,27 @@ begin
   PByte(IntPtr(lvPByte) + 7)^ := byte(v); //1
 end;
 
+class function TByteTools.SwapBuff(buf: Pointer; offset, len: Integer): Integer;
+var
+  lvStart, lvEnd: PByte;
+  lvByte: Byte;
+begin
+  lvStart := PByte(buf);
+  Inc(lvStart, offset);
+  
+  lvEnd := lvStart;
+  Inc(lvEnd, len - 1);
+
+  while IntPtr(lvStart) < IntPtr(lvEnd) do
+  begin
+    lvByte := lvStart^;
+    lvStart^ := lvEnd^;
+    lvEnd^ := lvByte;
+    Inc(lvStart);
+    Dec(lvEnd);
+  end;
+end;
+
 class function TByteTools.varToByteString(const v; len: Cardinal; Split: string
     = ' '): String;
 var
@@ -183,8 +261,7 @@ begin
   begin
     Result := Result + IntToHex(lvSource^, 2) + Split;
     Inc(lvSource);
-  end;
-  
+  end;   
 end;
 
 class function TByteTools.verifyData(const buf; len: Cardinal): Cardinal;

@@ -514,6 +514,9 @@ function GetTickCount: Cardinal;
 
 function GetCurrentThreadID: Cardinal;
 
+function ObjectHexAddr(pvObj:TObject): String;
+function ObjectIntStrAddr(pvObj:TObject): String;
+
 implementation
 
 
@@ -2067,6 +2070,17 @@ begin
   {$ELSE}
     Result := TThread.CurrentThread.ThreadID;
   {$ENDIF};
+end;
+
+function ObjectHexAddr(pvObj:TObject): String;
+begin
+  Result := IntToHex(IntPtr(pvObj), 2);
+  //Result := Format('%.2x',[intPtr(pvObj)]));
+end;
+
+function ObjectIntStrAddr(pvObj:TObject): String;
+begin
+  Result := IntToStr(IntPtr(pvObj));
 end;
 
 

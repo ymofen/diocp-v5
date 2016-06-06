@@ -35,7 +35,7 @@ uses
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
-  , diocp_tcp_server, utils_queues, utils_hashs;
+  , diocp_tcp_server, utils_queues, utils_hashs, diocp_ex_http_common;
 
 
 
@@ -369,6 +369,7 @@ type
   /// </summary>
   TDiocpNtripServer = class(TDiocpTcpServer)
   private
+    FDebugState: Integer;
     FNtripSourcePassword: String;
     FRequestPool: TBaseQueue;
 
@@ -397,10 +398,20 @@ type
     /// </summary>
     procedure GiveBackRequest(pvRequest:TDiocpNtripRequest);
 
+    procedure RemoveNtripSource(pvMountPoint:String; pvContext:TIocpClientContext);
+
+    procedure AddNtripSource(pvMountPoint:String; pvContext:TIocpClientContext);
+
   public
     constructor Create(AOwner: TComponent); override;
 
     destructor Destroy; override;
+
+    function GetNtripSourceList(pvStrings:TStrings): Integer; overload;
+
+    function GetNtripSourceList: String; overload;
+
+    
 
 
 
@@ -408,6 +419,12 @@ type
     ///   根据mountPoint查找NtripSource
     /// </summary>
     function FindNtripSource(pvMountPoint:string):TDiocpNtripClientContext;
+
+
+    /// <summary>
+    ///   调试状态, 0:正常， 1:调试
+    /// </summary>
+    property DebugState: Integer read FDebugState write FDebugState;
 
     /// <summary>
     ///   NtripSourcePassword, 用于NtripSource接入时做认证
@@ -439,6 +456,9 @@ type
         write FOnDiocpNtripRequest; 
   end;
 
+procedure WriteHttpResponse(pvContent: TIocpClientContext; pvResponse: String;
+    pvContextType: String = 'text/html');
+
 var
   // double linebreak;
   __HEAD_END :array[0..3] of Byte;
@@ -449,6 +469,28 @@ implementation
 
 uses
   utils_base64;
+
+procedure WriteHttpResponse(pvContent: TIocpClientContext; pvResponse: String;
+    pvContextType: String = 'text/html');
+var
+  lvResponse:THttpResponse;
+  s:RAWString;
+begin
+  s := pvResponse;
+  //s := StringReplace(s, sLineBreak, '<BR>', [rfReplaceAll]);
+  lvResponse := THttpResponse.Create;
+  try
+    lvResponse.ResponseCode := 200;
+    lvResponse.ContentType := pvContextType;
+    lvResponse.ContentBuffer.AppendRawStr(s);
+    lvResponse.EncodeHeader(lvResponse.ContentBuffer.Length);
+    pvContent.PostWSASendRequest(lvResponse.HeaderBuilder.Memory, lvResponse.HeaderBuilder.Length);
+    pvContent.PostWSASendRequest(lvResponse.ContentBuffer.Memory, lvResponse.ContentBuffer.Length);
+  finally
+    lvResponse.Free;
+  end;
+  // TODO -cMM: WriteHttpResponse default body inserted
+end;
 
 procedure TDiocpNtripRequest.Clear;
 begin
@@ -852,10 +894,13 @@ procedure TDiocpNtripClientContext.OnDisconnected;
 begin
   if ContextMode = ncmNtripSource then
   begin
+
     // 移除
-    TDiocpNtripServer(FOwner).FNtripSources.Lock;
-    TDiocpNtripServer(FOwner).FNtripSources.ValueMap[FMountPoint] := nil;
-    TDiocpNtripServer(FOwner).FNtripSources.unLock;
+    TDiocpNtripServer(FOwner).RemoveNtripSource(FMountPoint, Self);
+
+//    .FNtripSources.Lock;
+//    TDiocpNtripServer(FOwner).FNtripSources.ValueMap[FMountPoint] := nil;
+//    TDiocpNtripServer(FOwner).FNtripSources.unLock;
   end;
 
   inherited;
@@ -927,7 +972,7 @@ begin
         if FNtripRequest.SourceRequestPass <> TDiocpNtripServer(FOwner).FNtripSourcePassword then
         begin
           FNtripRequest.Response.BadPassword;
-          self.RequestDisconnect('NtripSource验证失败', self);
+          self.RequestDisconnect('NtripSource 接入密钥 验证失败', self);
           Exit;
         end else
         begin
@@ -936,10 +981,13 @@ begin
           // 改变装入进入接收数据模式
           FNtripState := hsRecvingSource;
 
-          // 添加到NtripSource对应表中
-          TDiocpNtripServer(FOwner).FNtripSources.Lock;
-          TDiocpNtripServer(FOwner).FNtripSources.ValueMap[FMountPoint] := Self;
-          TDiocpNtripServer(FOwner).FNtripSources.unLock;
+
+          TDiocpNtripServer(FOwner).AddNtripSource(FMountPoint, Self);
+
+//          // 添加到NtripSource对应表中
+//          TDiocpNtripServer(FOwner).FNtripSources.Lock;
+//          TDiocpNtripServer(FOwner).FNtripSources.ValueMap[FMountPoint] := Self;
+//          TDiocpNtripServer(FOwner).FNtripSources.unLock;
 
           // 回应请求
           FNtripRequest.Response.ICY200OK;
@@ -1037,6 +1085,8 @@ begin
   inherited Destroy;
 end;
 
+
+
 procedure TDiocpNtripServer.DoRequest(pvRequest: TDiocpNtripRequest);
 begin
   if Assigned(FOnDiocpNtripRequest) then
@@ -1053,6 +1103,43 @@ begin
   FNtripSources.unLock();
 end;
 
+function TDiocpNtripServer.GetNtripSourceList(pvStrings:TStrings): Integer;
+var
+  lvList:TList;
+  i: Integer;
+begin
+  lvList := TList.Create;
+  try
+    FNtripSources.Lock;
+    try
+      FNtripSources.GetDatas(lvList);
+
+      Result := lvList.Count;
+      for i := 0 to lvList.Count - 1 do
+      begin
+        pvStrings.Add(TDiocpNtripClientContext(lvList[i]).FMountPoint + ',' + IntToStr(IntPtr(lvList[i])));
+      end;
+    finally
+      FNtripSources.unLock();
+    end; 
+  finally
+    lvList.Free;
+  end;
+end;
+
+function TDiocpNtripServer.GetNtripSourceList: String;
+var
+  lvStrs:TStrings;
+begin
+  lvStrs := TStringList.Create;
+  try
+    GetNtripSourceList(lvStrs);
+    Result := lvStrs.Text;
+  finally
+    lvStrs.Free;
+  end;
+end;
+
 function TDiocpNtripServer.GetRequest: TDiocpNtripRequest;
 begin
   Result := TDiocpNtripRequest(FRequestPool.DeQueue);
@@ -1066,6 +1153,67 @@ end;
 procedure TDiocpNtripServer.GiveBackRequest(pvRequest: TDiocpNtripRequest);
 begin
   FRequestPool.EnQueue(pvRequest);
+end;
+
+procedure TDiocpNtripServer.AddNtripSource(pvMountPoint:String;
+    pvContext:TIocpClientContext);
+var
+  lvContext:TIocpClientContext;
+  s:string;
+begin
+  // 添加到NtripSource对应表中
+  FNtripSources.Lock;
+  try
+    lvContext := TIocpClientContext(FNtripSources.ValueMap[pvMountPoint]);
+    FNtripSources.ValueMap[pvMountPoint] := pvContext;
+  finally
+    FNtripSources.unLock;
+  end;
+
+  s := Format('+ NtripSource Bind, %s, %d, %s:%d',
+    [pvMountPoint, IntPtr(pvContext), pvContext.RemoteAddr, pvContext.RemotePort]);
+  AddDebugStrings(s);
+
+  try
+    if (lvContext <> nil) and (lvContext <> pvContext) then
+    begin
+      s := Format('= NtripSource kick out, %s, %d, now:%d',
+        [pvMountPoint, IntPtr(lvContext), IntPtr(pvContext)]);
+      AddDebugStrings(s);
+      lvContext.RequestDisconnect(s);
+    end;
+  except
+  end;
+end;
+
+procedure TDiocpNtripServer.RemoveNtripSource(pvMountPoint:String;
+    pvContext:TIocpClientContext);
+var
+  lvRemove:Boolean;
+  lvContext:TIocpClientContext;
+begin
+  FNtripSources.Lock;
+  try
+    lvContext :=TIocpClientContext(FNtripSources.ValueMap[pvMountPoint]);
+    lvRemove := (lvContext = pvContext);
+    if lvRemove then
+       FNtripSources.ValueMap[pvMountPoint] := nil;
+  finally
+    FNtripSources.unLock;
+  end;
+
+  if FDebugState = 1 then
+  begin
+    if lvRemove then
+    begin
+      AddDebugStrings(Format('- NtripSource, %s, %d, %s:%d',
+      [pvMountPoint, IntPtr(pvContext), pvContext.RemoteAddr, pvContext.RemotePort]));
+    end else
+    begin
+      AddDebugStrings(Format('= NtripSource remove fail, maybe is kick out, %s, %d, %d',
+        [pvMountPoint, IntPtr(pvContext), IntPtr(lvContext)]));
+    end;
+  end;
 end;
 
 

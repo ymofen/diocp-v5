@@ -794,6 +794,8 @@ type
 
   TDiocpTcpServer = class(TComponent)
   private
+    FDebugStrings:TStrings;
+
     FContextDNA : Integer;
     
     FLogger: TSafeLogger;
@@ -931,6 +933,7 @@ type
 
     procedure DoSendBufferCompletedEvent(pvContext: TIocpClientContext; pvBuff:
         Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+    procedure InnerAddToDebugStrings(pvMsg:String);
   public
 
     /// <summary>
@@ -960,6 +963,7 @@ type
     procedure SetMaxSendingQueueSize(pvSize:Integer);
 
     destructor Destroy; override;
+    procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
 
     /// <summary>
     ///   根据SocketHandle在在线列表中查找对应的Context实例
@@ -1007,6 +1011,7 @@ type
     procedure Open;
 
     procedure Close;
+    function GetDebugString: String;
 
     /// <summary>
     ///   
@@ -2077,6 +2082,7 @@ end;
 constructor TDiocpTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FDebugStrings := TStringList.Create;
   CheckWinSocketStart;
   FUseContextPool := true;
   FContextDNA := 0;
@@ -2139,7 +2145,23 @@ begin
   FLogger.Free;
 
   FLocker.Free;
+  FDebugStrings.Free;
   inherited Destroy;
+end;
+
+procedure TDiocpTcpServer.AddDebugStrings(pvDebugInfo: String; pvAddTimePre:
+    Boolean = true);
+var
+  s:string;
+begin
+  if pvAddTimePre then s := Format('[%s]:%s', [NowString, pvDebugInfo])
+  else s := pvDebugInfo;
+  FLocker.lock();
+  try
+    InnerAddToDebugStrings(s);
+  finally
+    FLocker.unLock;
+  end;
 end;
 
 
@@ -2774,6 +2796,16 @@ begin
   end;
 end;
 
+function TDiocpTcpServer.GetDebugString: String;
+begin
+  FLocker.lock();
+  try
+    Result := FDebugStrings.Text;
+  finally
+    FLocker.unLock;
+  end;
+end;
+
 procedure TDiocpTcpServer.GetOnlineContextList(pvList:TList);
 var
   I:Integer;
@@ -2936,6 +2968,12 @@ begin
     lvStrings.Free;
 
   end;
+end;
+
+procedure TDiocpTcpServer.InnerAddToDebugStrings(pvMsg:String);
+begin
+  FDebugStrings.Add(pvMsg);
+  if FDebugStrings.Count > 500 then FDebugStrings.Delete(0);
 end;
 
 procedure TDiocpTcpServer.KickOut(pvTimeOut:Cardinal = 60000);
