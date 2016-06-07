@@ -33,6 +33,13 @@ type
      class function varToHexString(const v; len: Cardinal; Split: string = ' '):
          String;
 
+     /// <summary>
+     ///   转换成2进制的字符串
+     ///   $0F = 00001111
+     /// </summary>
+     class function varToBinaryString(const v; len: Cardinal; Split: string = ' '):
+         String;
+
 
      /// <summary>
      ///  16进制转 二进制
@@ -86,12 +93,25 @@ type
 
 
      /// <summary>
-     ///   
+     ///   从Buffer中截取几个字节后作为UInt64   
      /// </summary>
-     class function GetBitUInt64(pvBuf:Pointer; pvStart, pvLen:Integer): UInt64;
+     class function GetUInt64(pvBuf:Pointer; pvStart, pvLen:Integer): UInt64;
+
+     /// <summary>
+     ///  获取位
+     ///    1 byte = 8 bit
+     ///  bin = $FE $EE
+     ///  GetBitU(bin, 0, 4) = $F
+     ///  GetBitU(bin, 4, 4) = $E
+     ///  GetBitU(bin, 8, 8) = $EE
+     /// </summary>
+     class function GetBitU(pvBuf:Pointer; pvStart:Integer; pvLen:Integer): UInt64;
   end;
 
 implementation
+
+const
+  U1 :UInt64 = 1;
 
 
 
@@ -108,7 +128,29 @@ begin
   end;
 end;
 
-class function TByteTools.GetBitUInt64(pvBuf:Pointer; pvStart, pvLen:Integer): UInt64;
+class function TByteTools.GetBitU(pvBuf:Pointer; pvStart:Integer;
+    pvLen:Integer): UInt64;
+const
+  v :UInt64 = 1;
+var
+  i, j: Integer;
+  b :Byte;
+begin
+//    unsigned int bits=0;
+//    int i;
+//    for (i=pos;i<pos+len;i++) bits=(bits<<1)+((buff[i/8]>>(7-i%8))&1u);
+//    return bits;
+  Result := 0;
+  for i := pvStart to (pvStart + pvLen - 1) do
+  begin
+    b := PByte((IntPtr(pvBuf) +trunc(i / 8)))^;
+    j := (7 - i mod 8);
+    Result := (Result shl 1) + ((b shr j) and v);
+  end;
+end;
+
+class function TByteTools.GetUInt64(pvBuf:Pointer; pvStart, pvLen:Integer):
+    UInt64;
 var
   lvBytes:TBytes;
 begin
@@ -232,6 +274,37 @@ begin
     lvEnd^ := lvByte;
     Inc(lvStart);
     Dec(lvEnd);
+  end;
+end;
+
+class function TByteTools.varToBinaryString(const v; len: Cardinal; Split:
+    string = ' '): String;
+var
+  i, j, l1: Integer;
+  v1, b :Byte;
+  lvBuf:Pointer;
+  lvPtr:PChar;
+begin
+  l1 := Length(Split);
+  SetLength(Result, len * 8 + l1 * len);
+  lvPtr := PChar(Result);
+  lvBuf := @v;
+  for i := 0 to (len * 8 - 1) do
+  begin
+    b := PByte((IntPtr(lvBuf) +trunc(i / 8)))^;
+    j := (7 - i mod 8);
+    v1 := Byte((b shr j) and U1);
+    if v1 = 1 then lvPtr^ := '1' else lvPtr^ :='0';
+    Inc(lvPtr);
+    if (l1 > 0) and (i > 0) and ((i mod 8)=7) then
+    begin
+      {$IFDEF UNICODE}
+      Move(PChar(Split)^, lvPtr^, Length(Split) shl 1);
+      {$ELSE}
+      Move(PChar(Split)^, lvPtr^, Length(Split));
+      {$ENDIF}
+      Inc(lvPtr, length(Split));
+    end;
   end;
 end;
 
