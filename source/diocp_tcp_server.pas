@@ -1784,12 +1784,12 @@ begin
     begin
       if FOwner <> nil then
       begin       
-        FOwner.LogMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+        FOwner.LogMessage(strOnRecvBufferException, [SocketHandle, e.Message], '“Ï≥£', lgvError);
 
         FOwner.DoClientContextError(Self, -1);
       end else
       begin
-        __svrLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message]);
+        __svrLogger.logMessage(strOnRecvBufferException, [SocketHandle, e.Message], '“Ï≥£', lgvError);
       end;
     end;
   end;
@@ -3509,7 +3509,7 @@ begin
     
       // PostWSARecv before decReferenceCounter
       if (not FClientContext.FManulPostWSARecvRequest) and (not FClientContext.FRequestDisconnect) then
-      begin
+      begin                                   
         FClientContext.PostWSARecvRequest;
       end;
 

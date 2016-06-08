@@ -1535,10 +1535,14 @@ begin
 end;
 
 procedure TIocpRequest.SetWorkHintInfo(pvHint:String);
+var
+  lvThreadID:THandle;
 begin
   if FIocpWorker <> nil then
   begin
-    Assert((GetCurrentThreadID() = FWorkerThreadID), '只能在本线线程中执行设置WorkHint信息');
+    lvThreadID := GetCurrentThreadID();
+    Assert(lvThreadID = FWorkerThreadID,
+     Format('(%d,%d)只能在本线程中执行设置线程WorkHint信息', [lvThreadID, FWorkerThreadID]));
     FIocpWorker.SetHintInfo(pvHint);
   end;
 end;

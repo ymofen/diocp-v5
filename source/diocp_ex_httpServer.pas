@@ -723,7 +723,7 @@ procedure TDiocpHttpRequest.CheckThreadIn;
 begin
   if FThreadID <> 0 then
   begin
-    raise Exception.CreateFmt('[%d]当前对象已经被线程[%d]正在使用', [utils_strings.GetCurrentThreadID, FThreadID]);
+    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用', [utils_strings.GetCurrentThreadID, FThreadID]);
   end;
   FThreadID := utils_strings.GetCurrentThreadID;
 end;
@@ -1190,16 +1190,23 @@ begin
      {$IFDEF DIOCP_TASK}
      iocpTaskManager.PostATask(OnExecuteJob, pvRequest);
      {$ELSE}
-     try
-      // 如果需要执行
-      if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
-        FRecvRequest.IocpWorker.checkCoInitializeEx();
-        
-       // 直接触发事件
-       TDiocpHttpServer(FOwner).DoRequest(pvRequest);
-     finally
-       if not pvRequest.FReleaseLater then pvRequest.Close;
-     end;
+      try
+        pvRequest.CheckThreadIn;
+
+        // 如果需要执行
+        if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+          FRecvRequest.IocpWorker.checkCoInitializeEx();
+
+        // 直接触发事件
+        TDiocpHttpServer(FOwner).DoRequest(pvRequest);
+      finally
+        // 归还HttpRequest到池
+        if not pvRequest.FReleaseLater then
+        begin
+          pvRequest.CheckThreadOut;
+          pvRequest.Close;
+        end;
+      end;
      {$ENDIF}
    {$ENDIF}
 end;
@@ -1218,6 +1225,7 @@ begin
      // 连接已经断开, 放弃处理逻辑
      if (FOwner = nil) then Exit;
 
+     lvObj.CheckThreadIn;
 
      // 已经不是当时请求的连接， 放弃处理逻辑
      if lvObj.FContextDNA <> self.ContextDNA then
@@ -1233,7 +1241,12 @@ begin
        self.UnLockContext('HTTP逻辑处理...', Self);
      end;
   finally
-    if not lvObj.FReleaseLater then lvObj.Close;
+    // 归还HttpRequest到池
+    if not lvObj.FReleaseLater then
+    begin
+      lvObj.CheckThreadOut;
+      lvObj.Close;
+    end;
   end;
 end;
 
@@ -1405,6 +1418,7 @@ var
   lvMsg:String;
 begin
   try
+    pvRequest.Connection.SetRecvWorkerHint('进入Http::DoRequest');
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
       try
@@ -1412,11 +1426,14 @@ begin
 
         if Assigned(FOnDiocpHttpRequest) then
         begin
+          pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
           FOnDiocpHttpRequest(pvRequest);
+          pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
         end;
       except
         on E:Exception do
         begin
+          pvRequest.Connection.SetRecvWorkerHint('DoRequest::Exception - 1');
           self.LogMessage('Http逻辑处理异常:%s', [e.Message], '', lgvError);
           pvRequest.FReleaseLater := False;
           pvRequest.Response.FInnerResponse.ResponseCode := 500;
@@ -1425,16 +1442,20 @@ begin
           lvMsg := e.Message;
           lvMsg := StringReplace(lvMsg, sLineBreak, '<BR>', [rfReplaceAll]);
           pvRequest.Response.WriteString(lvMsg);
+          pvRequest.Connection.SetRecvWorkerHint('DoRequest::Exception - 2');
         end;
       end;
     except
       on E:Exception do
       begin
+        pvRequest.Connection.SetRecvWorkerHint('DoRequest::*Exception - 1');
         self.LogMessage('*Http逻辑处理异常:%s', [e.Message], CORE_LOG_FILE, lgvError);
+        pvRequest.Connection.SetRecvWorkerHint('DoRequest::*Exception - 2');
       end;
     end;
   finally
     SetCurrentThreadInfo('结束Http::DoRequest');
+    pvRequest.Connection.SetRecvWorkerHint('DoRequest:: end');
   end;
 end;
 
