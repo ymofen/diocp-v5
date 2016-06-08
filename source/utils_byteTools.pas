@@ -35,7 +35,7 @@ type
 
      /// <summary>
      ///   转换成2进制的字符串
-     ///   $0F = 00001111
+     ///   $0FFF = 00001111 11111111
      /// </summary>
      class function varToBinaryString(const v; len: Cardinal; Split: string = ' '):
          String;
@@ -299,9 +299,9 @@ begin
     if (l1 > 0) and (i > 0) and ((i mod 8)=7) then
     begin
       {$IFDEF UNICODE}
-      Move(PChar(Split)^, lvPtr^, Length(Split) shl 1);
+      Move(PChar(Split)^, lvPtr^, l1 shl 1);
       {$ELSE}
-      Move(PChar(Split)^, lvPtr^, Length(Split));
+      Move(PChar(Split)^, lvPtr^, l1);
       {$ENDIF}
       Inc(lvPtr, length(Split));
     end;
