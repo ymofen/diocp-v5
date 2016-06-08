@@ -28,7 +28,7 @@ interface
 /// 三个编译开关，只能开启一个
 {.$DEFINE INNER_IOCP}     // iocp线程触发事件
 {.$DEFINE  QDAC_QWorker} // 用qworker进行调度触发事件
-{$DEFINE DIOCP_Task}    // 用diocp_task进行调度触发事件
+{.$DEFINE DIOCP_Task}    // 用diocp_task进行调度触发事件
 
 
 uses
@@ -723,7 +723,7 @@ procedure TDiocpHttpRequest.CheckThreadIn;
 begin
   if FThreadID <> 0 then
   begin
-    raise Exception.CreateFmt('当前对象已经被线程[%d]正在使用', [FThreadID]);
+    raise Exception.CreateFmt('[%d]当前对象已经被线程[%d]正在使用', [utils_strings.GetCurrentThreadID, FThreadID]);
   end;
   FThreadID := utils_strings.GetCurrentThreadID;
 end;
