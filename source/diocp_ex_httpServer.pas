@@ -39,7 +39,7 @@ uses
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
   , diocp_tcp_server, utils_queues, utils_hashs, utils_dvalue
   , diocp_ex_http_common
-  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo;
+  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs;
 
 
 
@@ -110,7 +110,11 @@ type
 
   TDiocpHttpRequest = class(TObject)
   private
+    FOwnerPool:TSafeQueue;
+    
+    FLocker:TCriticalSection;
     FThreadID:THandle;
+    FThreadDebugInfo:String;
     
     FReleaseLater:Boolean;
     FReleaseLaterMsg:String;
@@ -123,6 +127,7 @@ type
     ///   投递之前记录DNA，用于做异步任务时，是否取消当前任务
     /// </summary>
     FContextDNA : Integer;
+    FDebugStrings: TStrings;
 
     /// <summary>
     ///   便于在Close时归还回对象池
@@ -170,6 +175,7 @@ type
     function GetRequestURL: String;
     function GetRequestURLParamData: string;
     function GetURLParams: TDValue;
+    procedure InnerAddToDebugStrings(pvMsg:String);
   protected
   public
     constructor Create;
@@ -325,7 +331,10 @@ type
 
     
 
+    procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
     procedure CheckThreadIn;
+
+    procedure CheckThreadSetInfo(pvDebugInfo:string);
 
     procedure CheckThreadOut;
 
@@ -358,6 +367,7 @@ type
     ///  关闭连接
     /// </summary>
     procedure CloseContext;
+    function GetDebugString: String;
 
     /// <summary>
     /// 得到http请求参数
@@ -651,7 +661,15 @@ end;
 
 procedure TDiocpHttpRequest.Close;
 begin
-  if FDiocpHttpServer = nil then exit;
+
+  if FDiocpHttpServer = nil then
+  begin
+    if IsDebugMode then
+    begin
+      Assert(False, 'FDiocpHttpServer is nil');
+    end;
+    exit;
+  end;
 
   FDiocpHttpServer.GiveBackRequest(Self);
 end;
@@ -683,6 +701,8 @@ end;
 constructor TDiocpHttpRequest.Create;
 begin
   inherited Create;
+  FLocker := TCriticalSection.Create;
+  FDebugStrings := TStringList.Create;
   FInnerRequest := THttpRequest.Create;
   FResponse := TDiocpHttpResponse.Create();
 
@@ -692,12 +712,30 @@ end;
 destructor TDiocpHttpRequest.Destroy;
 begin
   FreeAndNil(FResponse);
+  FDebugStrings.Free;
 
   //FreeAndNil(FRequestParamsList); // TODO:释放存放http参数的StringList
 
   FInnerRequest.Free;
 
+  FLocker.Free;
+
   inherited Destroy;
+end;
+
+procedure TDiocpHttpRequest.AddDebugStrings(pvDebugInfo: String; pvAddTimePre:
+    Boolean = true);
+var
+  s:string;
+begin
+  if pvAddTimePre then s := Format('[%s]:%s', [NowString, pvDebugInfo])
+  else s := pvDebugInfo;
+  FLocker.Enter();
+  try
+    InnerAddToDebugStrings(s);
+  finally
+    FLocker.Leave;
+  end;
 end;
 
 procedure TDiocpHttpRequest.DoResponseEnd;
@@ -720,10 +758,14 @@ begin
 end;
 
 procedure TDiocpHttpRequest.CheckThreadIn;
+var
+  s:string;
 begin
   if FThreadID <> 0 then
   begin
-    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用', [utils_strings.GetCurrentThreadID, FThreadID]);
+    s := GetDebugString;
+    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用::%s',
+       [utils_strings.GetCurrentThreadID, FThreadID, s]);
   end;
   FThreadID := utils_strings.GetCurrentThreadID;
 end;
@@ -731,6 +773,21 @@ end;
 procedure TDiocpHttpRequest.CheckThreadOut;
 begin
   FThreadID := 0;  
+end;
+
+procedure TDiocpHttpRequest.CheckThreadSetInfo(pvDebugInfo:string);
+var
+  lvThreadID:THandle;
+  s:string;
+begin
+  lvThreadID := utils_strings.GetCurrentThreadID;
+  if lvThreadID <> FThreadID then
+  begin
+    s := GetDebugString;
+    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用::%s',
+      [utils_strings.GetCurrentThreadID, FThreadID, s]);
+  end;
+  FThreadDebugInfo := pvDebugInfo;
 end;
 
 procedure TDiocpHttpRequest.ContentSaveToFile(pvFile:String);
@@ -798,6 +855,16 @@ end;
 function TDiocpHttpRequest.GetContentDataLength: Integer;
 begin
   Result := FInnerRequest.ContentDataLength;
+end;
+
+function TDiocpHttpRequest.GetDebugString: String;
+begin
+  FLocker.Enter();
+  try
+    Result := FDebugStrings.Text;
+  finally
+    FLocker.Leave;
+  end;
 end;
 
 function TDiocpHttpRequest.GetHeaderAsMemory: PByte;
@@ -893,12 +960,17 @@ begin
   Result := FInnerRequest.URLParams;
 end;
 
+procedure TDiocpHttpRequest.InnerAddToDebugStrings(pvMsg:String);
+begin
+  FDebugStrings.Add(pvMsg);
+  if FDebugStrings.Count > 500 then FDebugStrings.Delete(0);
+end;
+
 procedure TDiocpHttpRequest.ResponseEnd;
 var
   lvFixedHeader: AnsiString;
   len: Integer;
-begin
- 
+begin       
   lvFixedHeader := FResponse.EncodeHeader;
 
   if (lvFixedHeader <> '') then
@@ -1191,6 +1263,8 @@ begin
      iocpTaskManager.PostATask(OnExecuteJob, pvRequest);
      {$ELSE}
       try
+        pvRequest.AddDebugStrings('DoRequest::' + pvRequest.RequestURI);
+
         pvRequest.CheckThreadIn;
 
         // 如果需要执行
@@ -1325,10 +1399,18 @@ begin
     r := FCurrentRequest.FInnerRequest.InputBuffer(lvTmpBuf^);
     if r = -1 then
     begin
-      FCurrentRequest.Response.FInnerResponse.ResponseCode := 400;
-      FCurrentRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
-      FCurrentRequest.ResponseEnd;
-      FCurrentRequest.Close;
+
+      lvTempRequest := FCurrentRequest;
+      try
+        FCurrentRequest := nil;
+        lvTempRequest.Response.FInnerResponse.ResponseCode := 400;
+        lvTempRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
+        lvTempRequest.ResponseEnd;
+      finally
+        lvTempRequest.Close;
+      end;
+
+
       //self.RequestDisconnect('无效的Http请求', self);
       Exit;
     end;
@@ -1474,7 +1556,9 @@ begin
   begin
     Result := TDiocpHttpRequest.Create;
   end;
+  Result.AddDebugStrings('+ GetRequest');
   Result.FDiocpHttpServer := Self;
+  Result.FOwnerPool := FRequestPool;
   Result.Clear;
 end;
 
@@ -1502,8 +1586,19 @@ begin
 end;
 
 procedure TDiocpHttpServer.GiveBackRequest(pvRequest: TDiocpHttpRequest);
+var
+  s:String;
 begin
+  if pvRequest.FDiocpHttpServer = nil then
+  begin
+    s := GetDebugString;
+    Assert(pvRequest.FDiocpHttpServer <> nil,
+      'TDiocpHttpServer.GiveBackRequest::对象重复关闭:' + s);
+  end;
   pvRequest.Clear;
+  pvRequest.AddDebugStrings('- GiveBackRequest');
+  pvRequest.FOwnerPool := nil;
+  pvRequest.FDiocpHttpServer := nil;
   FRequestPool.EnQueue(pvRequest);
 end;
 
