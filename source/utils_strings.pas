@@ -517,6 +517,9 @@ function GetCurrentThreadID: Cardinal;
 function ObjectHexAddr(pvObj:TObject): String;
 function ObjectIntStrAddr(pvObj:TObject): String;
 
+function DateTimeString(pvDateTime:TDateTime): string;
+function NowString: String;
+
 implementation
 
 
@@ -2081,6 +2084,16 @@ end;
 function ObjectIntStrAddr(pvObj:TObject): String;
 begin
   Result := IntToStr(IntPtr(pvObj));
+end;
+
+function DateTimeString(pvDateTime:TDateTime): string;
+begin
+  Result := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvDateTime);
+end;
+
+function NowString: String;
+begin
+  Result := DateTimeString(Now());
 end;
 
 

@@ -110,6 +110,8 @@ type
 
   TDiocpHttpRequest = class(TObject)
   private
+    FThreadID:THandle;
+    
     FReleaseLater:Boolean;
     FReleaseLaterMsg:String;
     
@@ -172,6 +174,10 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+
+
+
+
 
 
 
@@ -271,7 +277,6 @@ type
     property RequestCookies: string read GetRequestCookies;
 
 
-
     /// <summary>
     ///   从头信息解码器出来的Url,包含参数
     ///   URI + 参数
@@ -320,6 +325,10 @@ type
 
     
 
+    procedure CheckThreadIn;
+
+    procedure CheckThreadOut;
+
     /// <summary>
     ///   应答完毕，发送会客户端
     ///   请尽量使用SendResponse和DoResponseEnd来代替
@@ -366,6 +375,9 @@ type
     ///   获取响应的数据长度(不包含头信息)
     /// </summary>
     function GetResponseLength: Integer;
+
+
+
 
 
 
@@ -705,6 +717,20 @@ begin
     FSessionID := SESSIONID + '_' + DeleteChars(CreateClassID, ['-', '{', '}']);
     Response.AddCookie(SESSIONID, FSessionID);
   end;
+end;
+
+procedure TDiocpHttpRequest.CheckThreadIn;
+begin
+  if FThreadID <> 0 then
+  begin
+    raise Exception.CreateFmt('当前对象已经被线程[%d]正在使用', [FThreadID]);
+  end;
+  FThreadID := utils_strings.GetCurrentThreadID;
+end;
+
+procedure TDiocpHttpRequest.CheckThreadOut;
+begin
+  FThreadID := 0;  
 end;
 
 procedure TDiocpHttpRequest.ContentSaveToFile(pvFile:String);
@@ -1218,7 +1244,6 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
 var
   lvObj:TDiocpHttpRequest;
 begin
-  // 无论如何都要归还HttpRequest到池
   lvObj := TDiocpHttpRequest(pvTaskRequest.TaskData);
   try
     // 连接已经断开, 放弃处理逻辑
@@ -1226,6 +1251,8 @@ begin
 
     // 连接已经断开, 放弃处理逻辑
     if (FOwner = nil) then Exit;
+
+    lvObj.CheckThreadIn;
 
     // 如果需要执行
     if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
@@ -1245,7 +1272,12 @@ begin
        self.UnLockContext('HTTP逻辑处理...', Self);
      end;
   finally
-    if not lvObj.FReleaseLater then lvObj.Close;
+    // 归还HttpRequest到池
+    if not lvObj.FReleaseLater then
+    begin
+      lvObj.CheckThreadOut;
+      lvObj.Close;
+    end;
   end;
 
 end;

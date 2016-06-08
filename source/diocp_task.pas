@@ -17,7 +17,7 @@ interface
 
 uses
   diocp_core_engine, SysUtils, utils_queues, Messages, Windows, Classes,
-  SyncObjs, utils_hashs, utils_locker;
+  SyncObjs, utils_hashs, utils_locker, utils_threadinfo;
 
 const
   WM_REQUEST_TASK = WM_USER + 1;
@@ -648,6 +648,7 @@ end;
 procedure TIocpTaskRequest.HandleResponse;
 begin
   try
+    SetCurrentThreadInfo('DiocpTask::HandleResponse-1');
     FStartTime := GetTickCount;
     FEndTime := 0;
     FOwner.incResponseCounter;
@@ -685,9 +686,10 @@ begin
       end;
     end;
     FEndTime := GetTickCount;
-  finally
+  finally 
     CheckFreeData(FTaskData, FFreeType);
     requestPool.EnQueue(Self);
+    SetCurrentThreadInfo('DiocpTask::HandleResponse - finally end');
   end;
 end;
 

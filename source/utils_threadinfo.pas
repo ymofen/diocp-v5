@@ -35,7 +35,8 @@ type
   end;
 
 
-procedure SetCurrentThreadInfo(pvInfo: String); overload;
+procedure SetCurrentThreadInfo(pvInfo: String; pvAddTimePre: Boolean = true);
+    overload;
 procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
     overload;
 procedure BindThreadObject(pvObject: TObject; pvFreeType: Integer = TYPE_NONE);
@@ -112,13 +113,22 @@ begin
   Result := lvInfo;
 end;
 
-procedure SetCurrentThreadInfo(pvInfo: String);
+procedure SetCurrentThreadInfo(pvInfo: String; pvAddTimePre: Boolean = true);
 var
   lvInfo:TThreadInfoObject;
 begin
   try
     lvInfo := GetCurrentInfoObject;
-    if lvInfo <> nil then lvInfo.HintInfo := pvInfo;
+    if lvInfo <> nil then
+    begin
+      if pvAddTimePre then
+      begin
+        lvInfo.HintInfo := Format('[%s]:%s', [NowString, pvInfo]);
+      end else
+      begin
+        lvInfo.HintInfo := pvInfo;
+      end;
+    end;
   except
     on e: Exception do
     begin     // 关闭时可能对象已经被释放了
