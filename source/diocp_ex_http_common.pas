@@ -73,7 +73,7 @@ type
     /// </summary>
     FFlag: Byte;
     FRawHeader: String;
-    FContentDataLength: Integer;
+    FRecvSize: Integer;
     FHttpVersion: String;
     FHttpVersionValue: Integer;
     FMethod: String;
@@ -184,11 +184,6 @@ type
     property ContentBody: TDBufferBuilder read GetContentBody;
 
 
-    
-    /// <summary>
-    ///   数据长度
-    /// </summary>
-    property ContentDataLength: Integer read FContentDataLength;
 
     property HeaderAsMermory: PByte read GetHeaderAsMermory;
     property HeaderAsRAWString: RAWString read GetHeaderAsRAWString;
@@ -204,6 +199,7 @@ type
     
     property ContentLength: Int64 read GetContentLength;
     property ContentType: String read GetContentType;
+    property HttpVersionValue: Integer read FHttpVersionValue;
 
    
 
@@ -1220,7 +1216,7 @@ begin
 
   FRecvBuilder := FHeaderBuilder;
 
-  FContentDataLength := 0;
+  FRecvSize := 0;
   FSectionFlag := 0;
   FFlag := 0;
   FDecodeState := 0;
@@ -1307,7 +1303,7 @@ function THttpRequest.InputBuffer(pvByte:Byte): Integer;
 
   procedure InnerCaseZero;
   begin
-    if FContentDataLength = 7 then
+    if FRecvSize = 7 then
     begin
       if DecodeRequestMethod = -1 then
       begin
@@ -1320,7 +1316,7 @@ function THttpRequest.InputBuffer(pvByte:Byte): Integer;
      Inc(FDecodeState);
     end;
 
-    if (FContentDataLength = MAX_HEADER_BUFFER_SIZE) then
+    if (FRecvSize = MAX_HEADER_BUFFER_SIZE) then
     begin            // 头部数据过长
       FFlag := 0;
       Result := -2;
@@ -1334,10 +1330,11 @@ begin
     FHeaderBuilder.Clear;
     FFlag := 1;
     FEndMatchIndex := 0;
-    FContentDataLength := 0;
+    FRecvSize := 0;
+    FRecvBuilder := FHeaderBuilder;
   end;
 
-  Inc(FContentDataLength);
+  Inc(FRecvSize);
   FRecvBuilder.Append(pvByte);
   Inc(FPtrBuffer);
 
@@ -1368,23 +1365,29 @@ begin
     begin
       if pvByte = 10 then
       begin  // Header
-        FRawHeader := ByteBufferToString(FRecvBuilder.Memory, FContentDataLength);
+        FRawHeader := ByteBufferToString(FRecvBuilder.Memory, FRecvSize);
         if DecodeHeader = -1 then
         begin
           FSectionFlag := 0;
           Result := -1;
           FDecodeState := 0;
+          FFlag := 0;
+          Exit;
         end else
         begin
           FSectionFlag := 1;
           Result := 1;
           Inc(FDecodeState);
+          FRecvBuilder := FContentBuilder;
+          FRecvSize := 0;
+          if FContentLength = 0 then
+          begin            // 完成一个请求
+            FFlag := 0;
+          end;
+          Exit;
         end;
         
-        FRecvBuilder := FContentBuilder;
-        FContentDataLength := 0;
-        FFlag := 0;
-        Exit;
+
       end else
       begin
         FDecodeState := 0;
@@ -1393,7 +1396,7 @@ begin
     end;
     4:  // 接收Content
     begin
-      if FContentLength = FContentDataLength then
+      if FContentLength = FRecvSize then
       begin
         Result := 2;     // ContentAsRAWString
         FFlag := 0;      // 重新开始请求Buffer进行解码
@@ -1620,6 +1623,7 @@ begin
   begin
     FContentBuilder.Clear;
     FHeaderBuilder.Clear;
+    FRecvBuilder := FHeaderBuilder;
     FFlag := 1;
     FRecvSize := 0;
   end;

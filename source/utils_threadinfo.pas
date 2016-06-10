@@ -49,6 +49,8 @@ procedure FinalizeForThreadInfo;
 
 procedure StartRecordThreadInfo(pvInterval: Integer = 10000);
 
+function GetModuleID: String;
+
 
 implementation
 
@@ -69,6 +71,13 @@ var
   __info_list: TDHashTableSafe;
   __worker: TRecordWorker;
   __waitEvent:TEvent;
+
+function GetModuleID: String;
+begin                                                
+  Result := ExtractFileName(GetModuleName(HInstance));
+  //if  then
+  
+end;
 
 function IsDebugMode: Boolean;
 begin
@@ -194,19 +203,18 @@ end;
 
 procedure FinalizeForThreadInfo;
 begin
+  if __worker <> nil then
+  begin
+    __worker.Terminate;
+    __waitEvent.SetEvent;
+    __worker := nil;
+  end;
   if __info_list <> nil then
   begin
     __info_list.FreeAllDataAsObject;
     __info_list.Free;
     __info_list := nil;
   end;
-
-  if __worker <> nil then
-  begin
-    __worker.Terminate;
-    __waitEvent.SetEvent;
-    __worker := nil;
-  end;   
 end;
 
 procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
@@ -233,6 +241,10 @@ begin
     __info_list.UnLock;
   end;
 end;
+
+
+
+
 
 destructor TThreadInfoObject.Destroy;
 begin
@@ -297,7 +309,13 @@ begin
   lvWriter := TSingleFileWriter.Create;
   try
     lvWriter.CacheSize := 0;
-    lvWriter.FilePreFix := '线程_监控_';
+    if HInstance <> MainInstance then
+    begin    
+      lvWriter.FilePreFix := '线程_监控_' + ExtractFileName(GetModuleName(HInstance)) + '_';
+    end else
+    begin
+      lvWriter.FilePreFix := '线程_监控_';
+    end;
     lvWriter.LogMessage('启动时间:' + FormatDateTime('yyyy-mm-dd:HH:nn:ss.zzz', Now));
     while not self.Terminated do
     begin

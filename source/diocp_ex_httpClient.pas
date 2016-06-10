@@ -653,6 +653,11 @@ begin
     FRequestHeader.Add(Format('Accept-Encoding: %s', [FRequestAcceptEncoding]));
   end;
 
+  if FRequestAccept <> '' then
+  begin
+    FRequestHeader.Add(Format('Accept: %s', [FRequestAccept]));
+  end;
+
   //FRequestHeader.Add('');                 // 添加一个回车符
 
   if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then

@@ -241,6 +241,16 @@ type
     /// </summary>
     function GetCookie(pvCookieName:string):String;
 
+    /// <summary>
+    ///   将请求保存到流
+    /// </summary>
+    procedure SaveToStream(pvStream:TStream);
+
+    /// <summary>
+    ///   将请求保存到文件
+    /// </summary>
+    procedure SaveToFile(pvFile:string);
+
     procedure ContentSaveToFile(pvFile:String);
 
     property ContentType: String read GetContentType;
@@ -261,7 +271,7 @@ type
     /// </summary>
     property ContentDataLength: Integer read GetContentDataLength;
 
-    
+
 
 
     /// <summary>
@@ -416,6 +426,8 @@ type
     procedure WriteBuf(pvBuf: Pointer; len: Cardinal);
     procedure WriteString(pvString: string; pvUtf8Convert: Boolean = true);
 
+    function GetResponseHeaderAsString: RAWString;
+
     function AddCookie: TDiocpHttpCookie; overload;
 
     procedure LoadFromFile(pvFile:string);
@@ -426,7 +438,9 @@ type
 
     function EncodeHeader: String;
 
-    function EncodeResponseHeader(pvContentLength: Integer): string;
+    procedure EncodeResponseHeader(pvContentLength: Integer);
+
+    procedure SaveToFile(pvFile:string);
 
     
 
@@ -848,13 +862,12 @@ end;
 
 function TDiocpHttpRequest.GetHttpVersion: Word;
 begin
-  Result := 1;
-  //Result := FInnerRequest.HttpVersion;
+  Result := FInnerRequest.HttpVersionValue;
 end;
 
 function TDiocpHttpRequest.GetContentDataLength: Integer;
 begin
-  Result := FInnerRequest.ContentDataLength;
+  Result := FInnerRequest.ContentBody.Size;
 end;
 
 function TDiocpHttpRequest.GetDebugString: String;
@@ -998,10 +1011,33 @@ begin
   end;
 end;
 
+procedure TDiocpHttpRequest.SaveToFile(pvFile:string);
+var
+  lvFileStream:TFileStream;
+begin
+  lvFileStream := TFileStream.Create(pvFile, fmCreate);
+  try
+    SaveToStream(lvFileStream);  
+  finally
+    lvFileStream.Free;
+  end;
+
+end;
+
+procedure TDiocpHttpRequest.SaveToStream(pvStream:TStream);
+begin
+  pvStream.WriteBuffer(FInnerRequest.HeaderAsMermory^, FInnerRequest.HeaderDataLength);
+  if FInnerRequest.ContentLength > 0 then
+  begin
+    pvStream.WriteBuffer(FInnerRequest.ContentAsMemory^, FInnerRequest.ContentLength);
+  end;
+
+end;
+
 procedure TDiocpHttpRequest.SendResponse(pvContentLength: Integer = 0);
 var
-  lvFixedHeader: AnsiString;
   len: Integer;
+  s:RAWString;
 begin
   if FResponse.Header.FindByName('Connection') = nil then
   begin
@@ -1017,29 +1053,21 @@ begin
   if pvContentLength = 0 then
   begin
     FLastResponseContentLength := FResponse.FInnerResponse.ContentBuffer.Length;
-    lvFixedHeader := FResponse.EncodeResponseHeader(FLastResponseContentLength);
+    FResponse.EncodeResponseHeader(FLastResponseContentLength);
   end else
   begin
     FLastResponseContentLength := pvContentLength;
-    lvFixedHeader := FResponse.EncodeResponseHeader(pvContentLength);
+    FResponse.EncodeResponseHeader(pvContentLength);
   end;
 
-
-
-
-  if (lvFixedHeader <> '') then
-    lvFixedHeader := FixHeader(lvFixedHeader)
-  else
-    lvFixedHeader := lvFixedHeader + HTTPLineBreak;
-
-  // FResponseSize必须准确指定发送的数据包大小
-  // 用于在发送完之后(Owner.TriggerClientSentData)断开客户端连接
-  if lvFixedHeader <> '' then
+  if FResponse.FInnerResponse.HeaderBuilder.Size = 0 then
   begin
-    len := Length(lvFixedHeader);
-    sfLogger.logMessage('response===' + sLineBreak + lvFixedHeader);
-    FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
+    Assert(False, '响应数据为空');
   end;
+  
+  FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.HeaderBuilder.Memory,
+    FResponse.FInnerResponse.HeaderBuilder.Size);
+
 
   if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
   begin
@@ -1111,11 +1139,9 @@ begin
   FInnerResponse.ContentBuffer.Clear;
 end;
 
-function TDiocpHttpResponse.EncodeResponseHeader(pvContentLength: Integer):
-    string;
+procedure TDiocpHttpResponse.EncodeResponseHeader(pvContentLength: Integer);
 begin
   FInnerResponse.EncodeHeader(pvContentLength);
-  Result := FInnerResponse.HeaderBuilder.ToRAWString;
 end;
 
 function TDiocpHttpResponse.GetContentType: String;
@@ -1217,6 +1243,11 @@ begin
   Result := FInnerResponse.ContentBuffer;
 end;
 
+function TDiocpHttpResponse.GetResponseHeaderAsString: RAWString;
+begin
+  Result := FInnerResponse.HeaderBuilder.ToRAWString;
+end;
+
 procedure TDiocpHttpResponse.LoadFromFile(pvFile:string);
 begin
   FInnerResponse.ContentBuffer.LoadFromFile(pvFile);
@@ -1226,6 +1257,20 @@ function TDiocpHttpResponse.LoadFromStream(pvStream: TStream; pvSize: Integer):
     Integer;
 begin
   Result := FInnerResponse.ContentBuffer.CopyFrom(pvStream, pvSize);
+end;
+
+procedure TDiocpHttpResponse.SaveToFile(pvFile:string);
+var
+  lvStream:TFileStream;
+begin
+  lvStream := TFileStream.Create(pvFile, fmCreate);
+  try
+    lvStream.WriteBuffer(FInnerResponse.HeaderBuilder.Memory^, FInnerResponse.HeaderBuilder.Size);
+    lvStream.WriteBuffer(FInnerResponse.ContentBuffer.Memory^, FInnerResponse.ContentBuffer.Size);
+  finally
+    lvStream.Free;
+  end;
+
 end;
 
 procedure TDiocpHttpResponse.ZLibContent;
@@ -1244,7 +1289,7 @@ begin
 end;
 
 procedure TDiocpHttpClientContext.DoCleanUp;
-begin
+begin                                              
   inherited;
   FHttpState := hsCompleted;
   if FCurrentRequest <> nil then
