@@ -189,6 +189,9 @@ resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
   STRING_E_TIMEOUT   = '服务端响应超时';
 
+var
+  __trace_id: Integer;
+
 {$IFDEF POSIX}
 
 {$ELSE}
@@ -329,6 +332,12 @@ procedure TDiocpHttpClient.CheckCloseConnection;
 var
   lvTempStr:String;
 begin
+  if not FKeepAlive then
+  begin
+    self.Close;
+    Exit;
+  end;
+  
   lvTempStr := StringsValueOfName(FResponseHeader, 'Connection', [':'], True);
   if (Length(lvTempStr) = 0) then
   begin
@@ -342,9 +351,6 @@ begin
   end else if ResponseResultCode <> 200 then
   begin     // 200, OK
     self.Close;
-  end else
-  begin
-    if not FKeepAlive then Close;
   end;
 end;
 
@@ -855,6 +861,7 @@ begin
     raise Exception.Create(Format('错误的ResponseHttpCode[%d]', [lvCode]));
   end else
   begin
+    FHttpBuffer.ContentBuilder.SaveToFile('response.dat');
     raise Exception.Create(Format('错误的ResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
   end;
 end;
@@ -965,5 +972,8 @@ begin
   WriteStringToStream(FRequestBody, pvRequestData, pvConvert2Utf8);
 
 end;
+
+initialization
+  __trace_id := 0;
 
 end.

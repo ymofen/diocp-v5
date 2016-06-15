@@ -41,6 +41,7 @@ procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
     overload;
 procedure BindThreadObject(pvObject: TObject; pvFreeType: Integer = TYPE_NONE);
 function GetCurrentThreadBindObject: TObject;
+function GetCurrentThreadHintInfo: String;
 function GetThreadsHintInfo: String;
 procedure ResetThreadHintInfo;
 
@@ -240,6 +241,14 @@ begin
   finally
     __info_list.UnLock;
   end;
+end;
+
+function GetCurrentThreadHintInfo: String;
+var
+  lvInfoObj:TThreadInfoObject;
+begin
+  lvInfoObj := GetCurrentInfoObject;
+  Result := lvInfoObj.GetHintInfo;
 end;
 
 

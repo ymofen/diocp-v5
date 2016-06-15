@@ -469,7 +469,7 @@ function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 
 function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
 
-function StringToUtf8Bytes(pvData:string): TBytes; overload;
+function StringToUtf8Bytes(const pvData: string): TBytes; overload;
 
 function StringToBytes(pvData:String; pvBytes:TBytes): Integer; overload;
 
@@ -480,6 +480,15 @@ function StringToBytes(pvData:string): TBytes; overload;
 /// </summary>
 function BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 function ByteBufferToString(pvBuff:PByte; pvLen:Cardinal): string;
+
+/// <summary>
+///   计算AnsiString字符串的长度(到0截至)
+/// </summary>
+/// <returns>
+///   返回字符串长度，
+///    -1：失败
+/// </returns>
+function AnsiStringLength(pvBuff: Pointer; pvMaxLength: Integer = 0): Integer;
 
 function SpanPointer(const pvStart, pvEnd: PByte): Integer;
 
@@ -1338,7 +1347,7 @@ begin
 {$ENDIF}
 end;
 
-function StringToUtf8Bytes(pvData:string): TBytes; overload;
+function StringToUtf8Bytes(const pvData: string): TBytes;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;
@@ -1348,8 +1357,9 @@ begin
   Result := TEncoding.UTF8.GetBytes(pvData);
 {$ELSE}
   lvRawStr := UTF8Encode(pvData);
-  SetLength(Result, Length(lvRawStr));
+  SetLength(Result, Length(lvRawStr) + 1);
   Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
+  Result[Length(Result) -1 ] := 0;
 {$ENDIF}
 end;
 
@@ -2052,8 +2062,9 @@ begin
   Result := TEncoding.Default.GetBytes(pvData);
 {$ELSE}
   lvRawStr := pvData;
-  SetLength(Result, Length(lvRawStr));
+  SetLength(Result, Length(lvRawStr) + 1);
   Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
+  Result[Length(Result) -1] := 0;
 {$ENDIF}
 end;
 
@@ -2094,6 +2105,34 @@ end;
 function NowString: String;
 begin
   Result := DateTimeString(Now());
+end;
+
+function AnsiStringLength(pvBuff: Pointer; pvMaxLength: Integer = 0): Integer;
+var
+  lvBuf:PByte;
+begin
+  Result := 0;
+  lvBuf := pvBuff;
+  if pvMaxLength > 0 then
+  begin
+    while lvBuf^ <> 0 do
+    begin
+      Inc(Result);
+      Inc(lvBuf);
+      if Result > pvMaxLength then
+      begin
+        Result := -1;
+        Exit;
+      end;
+    end;
+  end else
+  begin
+    while lvBuf^ <> 0 do
+    begin
+      Inc(Result);
+      Inc(lvBuf);
+    end;
+  end;
 end;
 
 

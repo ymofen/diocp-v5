@@ -492,6 +492,8 @@ type
 
     procedure SetAsString(const Value: String);
     procedure SetAsUInt(const Value: UInt64);
+    function GetAsStringW: WideString;
+    procedure SetAsStringW(const Value: WideString);
   public
     procedure CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes: TDValueDataTypes
         = [vdtInterface, vdtObject, vdtPtr]);
@@ -519,6 +521,7 @@ type
 
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
+    property AsStringW:WideString read GetAsStringW write SetAsStringW;
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
     property AsUInt: UInt64 read GetAsUInt write SetAsUInt;
 
@@ -2494,6 +2497,11 @@ begin
   Result := DValueGetAsString(@FRawValue);
 end;
 
+function TDValueItem.GetAsStringW: WideString;
+begin
+  Result := DValueGetAsStringW(@FRawValue);
+end;
+
 function TDValueItem.GetAsUInt: UInt64;
 begin
   Result := DValueGetAsUInt64(@FRawValue);
@@ -2549,6 +2557,11 @@ end;
 procedure TDValueItem.SetAsString(const Value: String);
 begin
   DValueSetAsString(@FRawValue, Value);
+end;
+
+procedure TDValueItem.SetAsStringW(const Value: WideString);
+begin
+
 end;
 
 procedure TDValueItem.SetAsUInt(const Value: UInt64);
