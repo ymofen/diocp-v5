@@ -59,6 +59,7 @@ type
     FPort: Integer;
     FRawSocket: TRawSocket;
     FReadTimeOut: Integer;
+    FSendTimeOut: Integer;
     function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
 
@@ -117,9 +118,17 @@ type
 
 
     /// <summary>
-    ///   unit ms
+    ///   发送超时 unit ms
+    ///   默认30秒(30000ms)
     /// </summary>
     property ReadTimeOut: Integer read FReadTimeOut write FReadTimeOut;
+
+    /// <summary>
+    ///   发送超时 unit ms
+    ///   默认30秒(30000ms)
+    /// </summary>
+    property SendTimeOut: Integer read FSendTimeOut write FSendTimeOut;
+
   end;
 
 implementation
@@ -133,6 +142,7 @@ begin
   inherited Create(AOwner);
   FRawSocket := TRawSocket.Create;
   FReadTimeOut := 30000;
+  FSendTimeOut := 30000;
 end;
 
 destructor TDiocpBlockTcpClient.Destroy;
@@ -224,6 +234,11 @@ begin
       FRawSocket.setReadTimeOut(FReadTimeOut);
     end;
 
+    if FSendTimeOut > 0 then
+    begin
+      FRawSocket.SetSendTimeOut(10000);
+    end;
+
     // 进行域名解析
     lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
 
@@ -235,8 +250,8 @@ begin
   finally
     if not FActive then
     begin
-      FRawSocket.Close(False);    
-    end;                      
+      FRawSocket.Close(False);
+    end;
   end;
 end;
 
@@ -247,15 +262,31 @@ begin
   if FActive then exit;
 
   FRawSocket.createTcpSocket;
-  FRawSocket.setReadTimeOut(FReadTimeOut);
+  try
 
-  // 进行域名解析
-  lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
+    if FReadTimeOut > 0 then
+    begin
+      FRawSocket.setReadTimeOut(FReadTimeOut);
+    end;
 
-  FActive := FRawSocket.ConnectTimeOut(lvIpAddr, FPort, pvMs);
-  if not FActive then
-  begin
-    raise Exception.CreateFmt(strConnectTimeOut, [FHost, FPort]);
+    if FSendTimeOut > 0 then
+    begin
+      FRawSocket.SetSendTimeOut(10000);
+    end;
+
+    // 进行域名解析
+    lvIpAddr := FRawSocket.GetIpAddrByName(FHost);
+
+    FActive := FRawSocket.ConnectTimeOut(lvIpAddr, FPort, pvMs);
+    if not FActive then
+    begin
+      raise Exception.CreateFmt(strConnectTimeOut, [FHost, FPort]);
+    end;
+  finally
+    if not FActive then
+    begin
+      FRawSocket.Close(False);
+    end;
   end;
 
 end;
