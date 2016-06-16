@@ -586,7 +586,9 @@ begin
     vntValue:
     begin
       if not (lvInValue.Value.DataType in pvEncodeObj.IgnoreTypes) then
-        WriteDValueItem(lvInValue.Value, pvStream);
+        WriteDValueItem(lvInValue.Value, pvStream)
+      else
+        WriteNull(pvStream);   // 名称写入了(值也要写一个)
     end;
   end;
   pvEncodeObj.InValue := lvInValue;
