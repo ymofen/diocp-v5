@@ -396,6 +396,8 @@ type
     /// </summary>
     function GetResponseLength: Integer;
 
+    
+
 
 
 
@@ -442,7 +444,6 @@ type
 
     procedure SaveToFile(pvFile:string);
 
-    
 
     /// <summary>
     ///   与客户端建立的连接
@@ -520,6 +521,8 @@ type
   /// </summary>
   TDiocpHttpServer = class(TDiocpTcpServer)
   private
+    FAccessXRequest: Boolean;
+
     FRequestPool: TSafeQueue;
     FSessionObjectPool: TObjectPool;
     FSessionList: TDHashTableSafe;
@@ -578,6 +581,11 @@ type
 
     procedure RegisterSessionClass(pvClass:TDiocpHttpSessionClass);
 
+    /// <summary>
+    ///   允许跨域访问, 设置后，SendRespnose加入响应的响应头
+    /// </summary>
+    property AccessXRequest: Boolean read FAccessXRequest write FAccessXRequest;
+    
     /// <summary>
     ///   获取Session总数
     /// </summary>
@@ -1048,6 +1056,13 @@ begin
     begin
       FResponse.Header.ForceByName('Connection').AsString := 'close';
     end;
+  end;
+
+  if FDiocpHttpServer.FAccessXRequest then
+  begin  // 跨域访问支持
+    FResponse.Header.ForceByName('Access-Control-Allow-Origin').AsString := '*';
+    FResponse.Header.ForceByName('Access-Control-Allow-Methods').AsString := 'POST, GET, OPTIONS, DELETE';
+    FResponse.Header.ForceByName('Access-Control-Allow-Headers').AsString := 'x-requested-with,content-type';
   end;
   
   if pvContentLength = 0 then

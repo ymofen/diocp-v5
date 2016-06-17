@@ -5,6 +5,8 @@
  *
  * 1. android下面DValuelist使用 TList会有出现异常, 使用TList<TDValueObject>正常
  *    2015-11-15 16:08:04(感谢CP46反馈)
+ * 2. SetArraySize, 进行申请的空间清理，避免ClearDValue造成类型混乱，出现内存操作混乱
+ *　　2016-06-17 15:27:49(感谢J反馈)
 *)
 unit utils_dvalue;
 
@@ -871,6 +873,8 @@ begin
 end;
 
 procedure CheckDValueSetArrayLength(ADValue: PDRawValue; ALen: Integer);
+var
+  lvNewPtr:Pointer;
 begin
   CheckDValueSetType(ADValue, vdtArray);
   if ALen > 0 then
@@ -878,6 +882,9 @@ begin
     if ADValue.Value.ArrayLength = 0 then
     begin        // 原有长度为空
       GetMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDRawValue) * ALen);
+
+      // 清理申请的空间
+      FillChar(ADValue.Value.ArrayItemsEntry^, SizeOf(TDRawValue) * ALen, 0);
       ADValue.Value.ArrayLength := ALen;
     end
     else
@@ -885,6 +892,11 @@ begin
       if ALen > ADValue.Value.ArrayLength then
       begin
         ReallocMem(ADValue.Value.ArrayItemsEntry, SizeOf(TDRawValue) * ALen);
+
+        lvNewPtr := Pointer(IntPtr(ADValue.Value.ArrayItemsEntry) + ADValue.Value.ArrayLength * SizeOf(TDRawValue));
+        // 清理新申请的空间
+        FillChar(lvNewPtr^, SizeOf(TDRawValue) * (ALen - ADValue.Value.ArrayLength), 0);
+
         ADValue.Value.ArrayLength := ALen;
       end
       else
