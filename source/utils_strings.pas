@@ -461,7 +461,7 @@ function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
 ///  ×ª»»×Ö·û´®µ½Bytes
 /// </summary>
 function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;overload;
-
+function StringToUtf8Bytes(const pvData: string; pvProcessEndByte: Boolean = false): TBytes; overload;
 /// <summary>
 ///
 /// </summary>
@@ -469,7 +469,7 @@ function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 
 function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
 
-function StringToUtf8Bytes(const pvData: string): TBytes; overload;
+
 
 function StringToBytes(pvData:String; pvBytes:TBytes): Integer; overload;
 
@@ -1330,6 +1330,35 @@ begin
 {$ENDIF}
 end;
 
+function StringToUtf8Bytes(const pvData: string; pvProcessEndByte: Boolean =
+    false): TBytes;
+{$IFNDEF UNICODE}
+var
+  lvRawStr:AnsiString;
+{$ENDIF}
+begin
+{$IFDEF UNICODE}
+  Result := TEncoding.UTF8.GetBytes(pvData);
+  if pvProcessEndByte then
+  begin
+    SetLength(Length(Result) + 1);
+    Result[Length(Result) -1 ] := 0;
+  end;
+{$ELSE}
+  lvRawStr := UTF8Encode(pvData);
+  if pvProcessEndByte then
+  begin
+    SetLength(Result, Length(lvRawStr) + 1);
+    Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
+    Result[Length(Result) -1 ] := 0;
+  end else
+  begin
+    SetLength(Result, Length(lvRawStr));
+    Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
+  end;
+{$ENDIF}
+end;
+
 function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 {$IFNDEF UNICODE}
 var
@@ -1347,21 +1376,7 @@ begin
 {$ENDIF}
 end;
 
-function StringToUtf8Bytes(const pvData: string): TBytes;
-{$IFNDEF UNICODE}
-var
-  lvRawStr:AnsiString;
-{$ENDIF}
-begin
-{$IFDEF UNICODE}
-  Result := TEncoding.UTF8.GetBytes(pvData);
-{$ELSE}
-  lvRawStr := UTF8Encode(pvData);
-  SetLength(Result, Length(lvRawStr) + 1);
-  Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
-  Result[Length(Result) -1 ] := 0;
-{$ENDIF}
-end;
+
 
 function StringToBytes(pvData:String; pvBytes:TBytes): Integer;
 {$IFNDEF UNICODE}
@@ -1377,6 +1392,8 @@ begin
   Result := Length(lvRawStr);
 {$ENDIF}
 end;
+
+
 
 function BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
 {$IFNDEF UNICODE}
