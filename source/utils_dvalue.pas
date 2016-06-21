@@ -278,6 +278,8 @@ type
     function GetAsUInt: UInt64;
     procedure SetAsUInt(const Value: UInt64);
     procedure CheckBeforeAddChild(pvType: TDValueObjectType);
+    function GetAsInterface: IInterface;
+    procedure SetAsInterface(const Value: IInterface);
   public
     constructor Create(pvType: TDValueObjectType); overload;
 
@@ -458,6 +460,8 @@ type
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
+    property AsInterface: IInterface read GetAsInterface write SetAsInterface;
+
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
     property AsUInt: UInt64 read GetAsUInt write SetAsUInt;
 
@@ -827,7 +831,10 @@ begin
       vdtStream:
         FreeObject(TObject(ADValue.Value.AsStream));
       vdtInterface:
+      begin
+        ADValue.Value.AsInterface^ := nil;
         Dispose(ADValue.Value.AsInterface);
+      end;
       vdtObject, vdtPtr:
         ClearPointer;
       vdtArray:
@@ -2022,6 +2029,11 @@ begin
   Result := FValue.GetAsInteger;
 end;
 
+function TDValue.GetAsInterface: IInterface;
+begin
+  Result := FValue.GetAsInterface;
+end;
+
 function TDValue.GetAsObject: TObject;
 begin
   Result := FValue.GetAsObject;  
@@ -2361,6 +2373,11 @@ end;
 procedure TDValue.SetAsInteger(const Value: Int64);
 begin
   FValue.SetAsInteger(Value);
+end;
+
+procedure TDValue.SetAsInterface(const Value: IInterface);
+begin
+  FValue.SetAsInterface(Value);
 end;
 
 procedure TDValue.SetAsString(const Value: String);

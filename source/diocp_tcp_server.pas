@@ -1815,8 +1815,14 @@ end;
 function TIocpClientContext.GetDebugInfo: string;
 begin
   FContextLocker.lock();
-  Result := FDebugInfo;
-  FContextLocker.unLock();  
+  try
+    if Length(FDebugInfo) > 0 then
+      Result := Copy(FDebugInfo, 0, Length(FDebugInfo))
+    else
+      Result := '';
+  finally
+    FContextLocker.unLock();
+  end;
 end;
 
 function TIocpClientContext.GetSendQueueSize: Integer;

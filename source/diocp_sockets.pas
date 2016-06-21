@@ -78,14 +78,14 @@ type
     FSocketHandle : TSocket;
     FContextLocker: TIocpLocker;
     FLastErrorCode:Integer;
-    FDebugINfo: string;
+    FDebugInfo: string;
 
     FSendBytesSize:Int64;
     FRecvBytesSize:Int64;
     FDisconnectedCounter:Integer;
     FKickCounter:Integer;
 
-    procedure SetDebugINfo(const Value: string);
+    procedure SetDebugInfo(const Value: string);
 
   private
 
@@ -163,6 +163,7 @@ type
     ///   释放待发送队列中的发送请求(TSendRequest)
     /// </example>
     procedure CheckReleaseRes;
+    function GetDebugInfo: string;
     procedure InnerCloseContext;
 
 
@@ -297,7 +298,7 @@ type
 
     property Data: Pointer read FData write FData;
 
-    property DebugINfo: string read FDebugINfo write SetDebugINfo;
+    property DebugInfo: string read GetDebugInfo write SetDebugInfo;
 
     function GetDebugStrings: String;
 
@@ -1239,8 +1240,6 @@ begin
       {$ENDIF}
     end else
     begin
-
-
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
       FOwner.AddToOnlineList(Self);
@@ -1522,10 +1521,10 @@ procedure TDiocpCustomContext.RequestDisconnect(pvDebugInfo: string = '';
 var
   lvCloseContext:Boolean;
 begin
-  Self.DebugINfo :=Format('[%d]进入->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
+  Self.DebugInfo :=Format('[%d]进入->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
   if not FActive then
   begin
-    self.DebugINfo := '请求断开时,发现已经断开';
+    self.DebugInfo := '请求断开时,发现已经断开';
     Exit;
   end;
 
@@ -1554,14 +1553,19 @@ begin
   finally
     FContextLocker.UnLock;
   end; 
-  Self.DebugINfo :=Format('[%d]执行完成->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
+  Self.DebugInfo :=Format('[%d]执行完成->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
   
   if lvCloseContext then InnerCloseContext else FRawSocket.Close;
 end;
 
-procedure TDiocpCustomContext.SetDebugINfo(const Value: string);
+procedure TDiocpCustomContext.SetDebugInfo(const Value: string);
 begin
-  FDebugINfo := Value;
+  FContextLocker.lock();
+  try
+    FDebugInfo := Value;
+  finally
+    FContextLocker.unLock;
+  end;
 end;
 
 procedure TDiocpCustomContext.SetOwner(const Value: TDiocpCustom);
@@ -3167,6 +3171,19 @@ begin
   FContextLocker.UnLock;
 end;
 
+function TDiocpCustomContext.GetDebugInfo: string;
+begin
+  FContextLocker.lock();
+  try
+    if Length(FDebugInfo) > 0 then
+      Result := Copy(FDebugInfo, 0, Length(FDebugInfo))
+    else
+      Result := '';
+  finally
+    FContextLocker.unLock;
+  end;
+end;
+
 function TDiocpCustomContext.GetDebugStrings: String;
 begin
   FContextLocker.lock();
@@ -3246,7 +3263,7 @@ begin
   /// 为了记录日志
   if not FActive then
   begin
-    Self.DebugINfo := '请求断开时,发现已经断开';
+    Self.DebugInfo := '请求断开时,发现已经断开';
     Exit;
   end;
 
