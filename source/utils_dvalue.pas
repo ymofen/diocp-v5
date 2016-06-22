@@ -831,10 +831,10 @@ begin
       vdtStream:
         FreeObject(TObject(ADValue.Value.AsStream));
       vdtInterface:
-      begin
-        ADValue.Value.AsInterface^ := nil;
-        Dispose(ADValue.Value.AsInterface);
-      end;
+        begin
+          ADValue.Value.AsInterface^ := nil;
+          Dispose(ADValue.Value.AsInterface);
+        end;
       vdtObject, vdtPtr:
         ClearPointer;
       vdtArray:

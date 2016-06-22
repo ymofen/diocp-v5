@@ -290,6 +290,7 @@ type
     FHeaderBuilder: TDBufferBuilder;
     FContentBuffer: TDBufferBuilder;
     FCookies: TDValue;
+    FResponseID: string;
     FHeaders: TDValue;
     FResponseCode: Word;
     FResponseCodeStr: String;
@@ -306,6 +307,7 @@ type
     property ContentBuffer: TDBufferBuilder read FContentBuffer;
 
     property ContentType: RAWString read GetContentType write SetContentType;
+    property ResponseID: string read FResponseID write FResponseID;
     property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
     property Headers: TDValue read FHeaders;
     property ResponseCode: Word read FResponseCode write FResponseCode;
@@ -333,6 +335,8 @@ type
     procedure DeflateCompressContent;
 
     procedure ZCompressContent;
+
+
   end;
 
   /// <summary>
@@ -818,6 +822,15 @@ begin
   end else if (lvExt = '.html') or (lvExt = '.htm') then
   begin
     Result := 'text/html;charset=UTF-8';
+  end else if (lvExt = '.jpg') or (lvExt = '.jpeg') then
+  begin
+    Result := 'image/jpeg';
+  end else if (lvExt = '.gif') then
+  begin
+    Result := 'image/gif';
+  end else if (lvExt = '.png') then
+  begin
+    Result := 'image/png';
   end else
   begin
     Result := pvDefault;
@@ -1451,6 +1464,7 @@ end;
 
 procedure THttpResponse.DoCleanUp;
 begin
+  FResponseID := '';
   FCookies.Clear;
   FHeaders.Clear;
   FHeaderBuilder.Clear;
@@ -1464,7 +1478,7 @@ begin
   FHeaderBuilder.Clear;
   InnerBuildHeader(FHeaderBuilder);
 
-  FHeaderBuilder.AppendRawStr('Content-Length:').AppendRawStr(IntToStr(pvContentLength)).AppendBreakLineBytes;
+  FHeaderBuilder.AppendRawStr('Content-Length: ').AppendRawStr(IntToStr(pvContentLength)).AppendBreakLineBytes;
   FHeaderBuilder.AppendBreakLineBytes;
 end;
 
@@ -1492,7 +1506,11 @@ var
   lvCode:Word;
 begin
   lvCode := FResponseCode;
-  if lvCode = 0 then lvCode := 200;
+  if lvCode = 0 then
+  begin
+    lvCode := 200;
+    FResponseCode := 200;
+  end;
 
   if FResponseCodeStr <> ''  then
   begin
@@ -1501,24 +1519,26 @@ begin
   begin
     pvBuilder.AppendRawStr('HTTP/1.1 ').AppendRawStr(GetResponseCodeText(lvCode)).AppendBreakLineBytes;
   end;
-  pvBuilder.AppendRawStr('Server: DIOCP-V5/1.1').AppendBreakLineBytes;
+  pvBuilder.AppendRawStr('Server: DIOCP-V5(20160622)/1.1').AppendBreakLineBytes;
+  if Length(FResponseID) > 0 then
+    pvBuilder.Append('responseID: ').Append(FResponseID).AppendBreakLineBytes;
   if GetContentType = '' then
   begin
     if FContentBuffer.Length > 0 then
     begin
-      pvBuilder.AppendRawStr('Content-Type:').AppendRawStr('text/html;charset=UTF-8').AppendBreakLineBytes;
+      pvBuilder.AppendRawStr('Content-Type: ').AppendRawStr('text/html;charset=UTF-8').AppendBreakLineBytes;
     end;
   end;
 
   for i := 0 to FHeaders.Count - 1 do
   begin
     lvItem := FHeaders.Items[i];
-    pvBuilder.AppendRawStr(lvItem.Name.AsString + ':').AppendRawStr(lvItem.Value.AsString).AppendBreakLineBytes;
+    pvBuilder.AppendRawStr(lvItem.Name.AsString).AppendRawStr(': ').AppendRawStr(lvItem.Value.AsString).AppendBreakLineBytes;
   end;
 
   for i := 0 to FCookies.Count - 1 do
   begin
-    pvBuilder.AppendRawStr('Set-Cookie:').AppendRawStr(TDHttpCookie(FCookies[i].AsObject).ToString()).AppendBreakLineBytes;
+    pvBuilder.AppendRawStr('Set-Cookie: ').AppendRawStr(TDHttpCookie(FCookies[i].AsObject).ToString()).AppendBreakLineBytes;
   end;
 end;
 

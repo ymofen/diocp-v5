@@ -418,8 +418,12 @@ type
     function GetContentType: String;
     function GetHeader: TDValue;
     function GetHttpCodeStr: String;
+    function GetResponseCode: Integer;
+    function GetResponseID: string;
     procedure SetContentType(const Value: String);
     procedure SetHttpCodeStr(const Value: String);
+    procedure SetResponseCode(const Value: Integer);
+    procedure SetResponseID(const Value: string);
   public
     procedure Clear;
     procedure ClearContent;
@@ -461,6 +465,12 @@ type
     property Header: TDValue read GetHeader;
 
     property HttpCodeStr: String read GetHttpCodeStr write SetHttpCodeStr;
+    
+    property ResponseCode: Integer read GetResponseCode write SetResponseCode;
+
+    
+
+    property ResponseID: string read GetResponseID write SetResponseID;
 
     procedure RedirectURL(pvURL:String);
 
@@ -479,6 +489,8 @@ type
     procedure SetChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
 
     procedure SetChunkedUtf8(pvStr:string);
+
+    
   end;
 
   /// <summary>
@@ -1013,7 +1025,10 @@ begin
       FResponse.FInnerResponse.ContentBuffer.Length);
   end;
 
-  if not FInnerRequest.CheckKeepAlive then
+  if FResponse.FInnerResponse.ResponseCode <> 200 then
+  begin
+    FDiocpContext.PostWSACloseRequest;
+  end else if not FInnerRequest.CheckKeepAlive then
   begin
     FDiocpContext.PostWSACloseRequest;
   end;
@@ -1049,7 +1064,7 @@ var
 begin
   if FResponse.Header.FindByName('Connection') = nil then
   begin
-    if FInnerRequest.CheckKeepAlive then
+    if (FInnerRequest.CheckKeepAlive) and (FResponse.ResponseCode in [0, 200]) then
     begin
       FResponse.Header.ForceByName('Connection').AsString := 'keep-alive';
     end else
@@ -1258,6 +1273,16 @@ begin
   Result := FInnerResponse.ContentBuffer;
 end;
 
+function TDiocpHttpResponse.GetResponseCode: Integer;
+begin
+  Result := FInnerResponse.ResponseCode;
+end;
+
+function TDiocpHttpResponse.GetResponseID: string;
+begin
+  Result := FInnerResponse.ResponseID;
+end;
+
 function TDiocpHttpResponse.GetResponseHeaderAsString: RAWString;
 begin
   Result := FInnerResponse.HeaderBuilder.ToRAWString;
@@ -1286,6 +1311,16 @@ begin
     lvStream.Free;
   end;
 
+end;
+
+procedure TDiocpHttpResponse.SetResponseCode(const Value: Integer);
+begin
+  FInnerResponse.ResponseCode := Value;
+end;
+
+procedure TDiocpHttpResponse.SetResponseID(const Value: string);
+begin
+  FInnerResponse.ResponseID := Value;
 end;
 
 procedure TDiocpHttpResponse.ZLibContent;
