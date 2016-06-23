@@ -26,14 +26,13 @@ unit diocp_ex_httpServer;
 interface
 
 /// 三个编译开关，只能开启一个
-{.$DEFINE INNER_IOCP}     // iocp线程触发事件
-{.$DEFINE  QDAC_QWorker} // 用qworker进行调度触发事件
-{.$DEFINE DIOCP_Task}    // 用diocp_task进行调度触发事件
+{.$DEFINE INNER_IOCP_PROCESSOR}     // iocp线程触发事件
+{.$DEFINE QDAC_QWorker}   // 用qworker进行调度触发事件
+{$DEFINE DIOCP_Task}     // 用diocp_task进行调度触发事件
 
 
 uses
   Classes, StrUtils, SysUtils, utils_buffer, utils_strings
-
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
@@ -582,6 +581,8 @@ type
     ///   SessionMap删除的时候事件，归还到Session池
     /// </summary>
     procedure OnSessionRemove(pvData:Pointer);
+  protected
+    procedure DoAfterOpen; override;
 
   public
     constructor Create(AOwner: TComponent); override;
@@ -1335,12 +1336,7 @@ end;
 
 procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
 begin
-   {$IFDEF QDAC_QWorker}
-   Workers.Post(OnExecuteJob, pvRequest);
-   {$ELSE}
-     {$IFDEF DIOCP_TASK}
-     iocpTaskManager.PostATask(OnExecuteJob, pvRequest);
-     {$ELSE}
+   {$IFDEF INNER_IOCP_PROCESSOR}
       try
         pvRequest.AddDebugStrings('DoRequest::' + pvRequest.RequestURI);
 
@@ -1360,6 +1356,15 @@ begin
           pvRequest.Close;
         end;
       end;
+   {$ELSE}
+     {$IFDEF QDAC_QWorker}
+     Workers.Post(OnExecuteJob, pvRequest);
+     {$ELSE}
+       {$IFDEF DIOCP_TASK}
+       iocpTaskManager.PostATask(OnExecuteJob, pvRequest);
+       {$ELSE}
+       警告无处理处理逻辑方法，请定义处理宏// {$DEFINE DIOCP_TASK}
+       {$ENDIF}
      {$ENDIF}
    {$ENDIF}
 end;
@@ -1572,6 +1577,18 @@ end;
 procedure TDiocpHttpServer.CheckSessionTimeOut;
 begin
   ;
+end;
+
+procedure TDiocpHttpServer.DoAfterOpen;
+begin
+  inherited;
+  {$IFDEF DEBUG}
+  {$IFDEF CONSOLE}
+    {$IFDEF INNER_IOCP_PROCESSOR}
+      Writeln('[#] 由IOCP线程处理Http请求');
+    {$ENDIF}
+  {$ENDIF}
+  {$ENDIF}
 end;
 
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);

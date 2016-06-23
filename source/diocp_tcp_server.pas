@@ -875,6 +875,7 @@ type
     ///  服务端侦听Socket，用于接受客户端连接
     /// </summary>
     FListenSocket: TRawSocket;
+    FOnAfterOpen: TNotifyEvent;
     FOnContextConnected: TContextNotifyEvent;
     FOnContextDisconnected: TContextNotifyEvent;
 
@@ -919,6 +920,8 @@ type
     ///   归还一个发送请求对象(对象池)
     /// </summary>
     function ReleaseSendRequest(pvObject:TIocpSendRequest): Boolean;
+
+    procedure DoAfterOpen; virtual;
 
   private
     /// <summary>
@@ -1106,6 +1109,10 @@ type
         write FOnSendBufferCompleted;
 
     /// <summary>
+    ///   开启后
+    /// </summary>
+    property OnAfterOpen: TNotifyEvent read FOnAfterOpen write FOnAfterOpen;
+    /// <summary>
     ///   默认侦听的端口
     /// </summary>
     property Port: Integer read FPort write FPort;
@@ -1147,6 +1154,9 @@ type
     /// </summary>
     property OnDataReceived: TOnDataReceived read FOnDataReceived write
         FOnDataReceived;
+
+
+
 
 
 
@@ -2710,6 +2720,9 @@ begin
       FIocpAcceptorMgr.CheckPostRequest;
 
       FActive := True;
+
+      DoAfterOpen;
+      if Assigned(FOnAfterOpen) then FOnAfterOpen(Self);
     end else
     begin
       SafeStop;
@@ -2751,6 +2764,11 @@ begin
   begin
     FDataMoniter := TIocpDataMonitor.Create;
   end;
+end;
+
+procedure TDiocpTcpServer.DoAfterOpen;
+begin
+
 end;
 
 procedure TDiocpTcpServer.DoSendBufferCompletedEvent(pvContext:
