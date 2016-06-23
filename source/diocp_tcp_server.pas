@@ -3328,7 +3328,7 @@ begin
 
     GetPeerINfo();
   end;
-  FOwner.DoAcceptExResponse(Self); 
+  FOwner.DoAcceptExResponse(Self);
 end;
 
 function TIocpAcceptExRequest.PostRequest: Boolean;
@@ -3705,9 +3705,7 @@ begin
     begin                                                       
       FOwner.FDataMoniter.incSentSize(FBytesTransferred);
       FOwner.FDataMoniter.incResponseWSASendCounter;
-    end;
-
-
+    end;   
 
     // 响应完成事件
     lvContext.DoSendRequestRespnonse(Self);

@@ -147,7 +147,7 @@ var
 
     pvRequest.Response.WriteString(Format('原始URL数据:%s<br>', [pvRequest.RequestRawURL]));
     pvRequest.Response.WriteString(Format('原始数据长度:%d<br>', [pvRequest.ContentDataLength]));
-    pvRequest.Response.WriteString(Format('context-length:%d<br>', [pvRequest.ContextLength]));
+    pvRequest.Response.WriteString(Format('content-length:%d<br>', [pvRequest.ContentLength]));
 
 
     lvRawData := pvRequest.ContentAsString;
@@ -193,7 +193,8 @@ begin
     s := JSONEncode(lvDValue);
     lvDValue.Free;
     pvRequest.Response.WriteString(s);
-    pvRequest.ResponseEnd;
+    pvRequest.SendResponse;
+    pvRequest.DoResponseEnd;
     Exit;
   end;
 

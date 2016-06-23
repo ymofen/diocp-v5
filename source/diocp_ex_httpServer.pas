@@ -176,7 +176,6 @@ type
     function GetRequestURLParamData: string;
     function GetURLParams: TDValue;
     procedure InnerAddToDebugStrings(pvMsg:String);
-  protected
   public
     constructor Create;
     destructor Destroy; override;
@@ -348,12 +347,6 @@ type
 
     procedure CheckThreadOut;
 
-    /// <summary>
-    ///   应答完毕，发送会客户端
-    ///   请尽量使用SendResponse和DoResponseEnd来代替
-    /// </summary>
-    procedure ResponseEnd;
-
 
     /// <summary>
     ///   本次应答完成, 检测是否需要关闭连接等相应工作
@@ -395,6 +388,10 @@ type
     ///   获取响应的数据长度(不包含头信息)
     /// </summary>
     function GetResponseLength: Integer;
+    /// <summary>
+    ///   请尽量使用SendResponse和DoResponseEnd来代替
+    /// </summary>
+    procedure ResponseEnd;
 
     
 
@@ -773,11 +770,27 @@ begin
 end;
 
 procedure TDiocpHttpRequest.DoResponseEnd;
+var
+  lvClose:Boolean;
 begin
-  if not FInnerRequest.CheckKeepAlive then
+  lvClose := False;
+  if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
     FDiocpContext.PostWSACloseRequest;
-  end;    
+  end else if not FInnerRequest.CheckKeepAlive then
+  begin
+    FDiocpContext.PostWSACloseRequest;
+  end else if SameText(FResponse.Header.ForceByName('Connection').AsString, 'close') then
+  begin
+    FDiocpContext.PostWSACloseRequest;
+  end;
+
+
+
+
+
+
+
 end;
 
 procedure TDiocpHttpRequest.CheckCookieSession;
@@ -1000,38 +1013,9 @@ begin
 end;
 
 procedure TDiocpHttpRequest.ResponseEnd;
-var
-  lvFixedHeader: AnsiString;
-  len: Integer;
-begin       
-  lvFixedHeader := FResponse.EncodeHeader;
-
-  if (lvFixedHeader <> '') then
-    lvFixedHeader := FixHeader(lvFixedHeader)
-  else
-    lvFixedHeader := lvFixedHeader + HTTPLineBreak;
-
-  // FResponseSize必须准确指定发送的数据包大小
-  // 用于在发送完之后(Owner.TriggerClientSentData)断开客户端连接
-  if lvFixedHeader <> '' then
-  begin
-    len := Length(lvFixedHeader);
-    FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
-  end;
-
-  if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
-  begin
-    FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.ContentBuffer.Memory,
-      FResponse.FInnerResponse.ContentBuffer.Length);
-  end;
-
-  if FResponse.FInnerResponse.ResponseCode <> 200 then
-  begin
-    FDiocpContext.PostWSACloseRequest;
-  end else if not FInnerRequest.CheckKeepAlive then
-  begin
-    FDiocpContext.PostWSACloseRequest;
-  end;
+begin
+  SendResponse();
+  DoResponseEnd;
 end;
 
 procedure TDiocpHttpRequest.SaveToFile(pvFile:string);
