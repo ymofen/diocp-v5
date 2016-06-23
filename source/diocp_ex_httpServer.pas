@@ -1605,7 +1605,7 @@ var
   lvMsg:String;
 begin
   try
-    pvRequest.Connection.SetRecvWorkerHint('进入Http::DoRequest');
+    //pvRequest.Connection.SetRecvWorkerHint('进入Http::DoRequest');
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
       try
@@ -1613,14 +1613,14 @@ begin
 
         if Assigned(FOnDiocpHttpRequest) then
         begin
-          pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
+           // pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
           FOnDiocpHttpRequest(pvRequest);
-          pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
+          //pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
         end;
       except
         on E:Exception do
         begin
-          pvRequest.Connection.SetRecvWorkerHint('DoRequest::Exception - 1');
+          //pvRequest.Connection.SetRecvWorkerHint('DoRequest::Exception - 1');
           self.LogMessage('Http逻辑处理异常:%s', [e.Message], '', lgvError);
           pvRequest.FReleaseLater := False;
           pvRequest.Response.FInnerResponse.ResponseCode := 500;
@@ -1629,20 +1629,20 @@ begin
           lvMsg := e.Message;
           lvMsg := StringReplace(lvMsg, sLineBreak, '<BR>', [rfReplaceAll]);
           pvRequest.Response.WriteString(lvMsg);
-          pvRequest.Connection.SetRecvWorkerHint('DoRequest::Exception - 2');
+          //pvRequest.Connection.SetRecvWorkerHint('DoRequest::Exception - 2');
         end;
       end;
     except
       on E:Exception do
       begin
-        pvRequest.Connection.SetRecvWorkerHint('DoRequest::*Exception - 1');
+        //pvRequest.Connection.SetRecvWorkerHint('DoRequest::*Exception - 1');
         self.LogMessage('*Http逻辑处理异常:%s', [e.Message], CORE_LOG_FILE, lgvError);
-        pvRequest.Connection.SetRecvWorkerHint('DoRequest::*Exception - 2');
+        //pvRequest.Connection.SetRecvWorkerHint('DoRequest::*Exception - 2');
       end;
     end;
   finally
     SetCurrentThreadInfo('结束Http::DoRequest');
-    pvRequest.Connection.SetRecvWorkerHint('DoRequest:: end');
+    //pvRequest.Connection.SetRecvWorkerHint('DoRequest:: end');
   end;
 end;
 
