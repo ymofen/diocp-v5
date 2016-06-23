@@ -1341,7 +1341,7 @@ begin
   Result := TEncoding.UTF8.GetBytes(pvData);
   if pvProcessEndByte then
   begin
-    SetLength(Length(Result) + 1);
+    SetLength(Result, Length(Result) + 1);
     Result[Length(Result) -1 ] := 0;
   end;
 {$ELSE}

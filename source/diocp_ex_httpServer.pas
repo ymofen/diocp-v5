@@ -1584,8 +1584,17 @@ begin
   inherited;
   {$IFDEF DEBUG}
   {$IFDEF CONSOLE}
+  
     {$IFDEF INNER_IOCP_PROCESSOR}
-      Writeln('[#] 由IOCP线程处理Http请求');
+      Writeln('[#] 由DIOCP线程处理Http请求');
+    {$ELSE}
+      {$IFDEF DIOCP_Task}
+        Writeln('[#] 由DIOCP-Task处理Http请求');
+      {$ENDIF}
+
+      {$IFDEF QDAC_QWorker}
+        Writeln('[#] 由QDAC-QWorkers处理Http请求');
+      {$ENDIF}
     {$ENDIF}
   {$ENDIF}
   {$ENDIF}
