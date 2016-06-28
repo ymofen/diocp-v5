@@ -428,7 +428,8 @@ type
   public
     function GetStrValueByName(pvName:string; pvDefault:string): String;
     function GetIntValueByName(pvName: String; pvDefault: Int64): Int64;
-
+    function GetFloatValueByName(pvName: String; pvDefault: Double): Double;
+    
     function GetValueByName(pvName: String; pvDefault: Int64): Int64;overload;
     function GetValueByName(pvName:string; pvDefault:string): String;overload;
     function GetValueByName(pvName:String; pvDefault:Boolean): Boolean; overload;
@@ -455,6 +456,7 @@ type
     // 对Value的访问封装, 可以直接访问Value.AsXXXX
     procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
         faFree);
+
 
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
@@ -2052,6 +2054,20 @@ end;
 function TDValue.GetAsUInt: UInt64;
 begin
   Result := FValue.AsUInt;
+end;
+
+function TDValue.GetFloatValueByName(pvName: String; pvDefault: Double): Double;
+var
+  lvItem:TDValue;
+begin
+  lvItem := FindByName(pvName);
+  if lvItem = nil then
+  begin
+    Result := pvDefault;
+  end else
+  begin
+    Result := lvItem.AsFloat;
+  end;
 end;
 
 function TDValue.GetValueByName(pvName:String; pvDefault:Boolean): Boolean;

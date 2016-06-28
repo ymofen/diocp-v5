@@ -19,6 +19,7 @@ resourcestring
   strRecvResponseErr='[%d]-[%d]响应接收请求时发现请求的引用计数器异常:%d,应该为0';
 
   strSendEngineOff = '[%d]响应发送数据请求时发现IOCP服务关闭';
+  strSendSizeErr   = '[%d]响应发送数据请求时请求发送的字节[%d]与成功发送[%d]的字节不一致';
   strSendErr       = '[%d]响应发送数据请求时出现了错误。错误代码:%d!';
   strSendPostError = '[%d]投递发送数据请求时出现了错误。错误代码:%d';
   strSendZero      = '[%d]投递发送请求数据时遇到0长度数据。进行关闭处理';

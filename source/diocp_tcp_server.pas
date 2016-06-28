@@ -3756,6 +3756,11 @@ begin
            Format(strSendErr, [FClientContext.FSocketHandle, FErrorCode])
             , Self);
       end;
+    end else if FBytesTransferred <> FBytesSize then
+    begin
+      FClientContext.RequestDisconnect(
+        Format(strSendSizeErr, [FClientContext.FSocketHandle, FBytesSize, FBytesTransferred])
+        , Self);
     end else
     begin
       FReponseState := 2;
