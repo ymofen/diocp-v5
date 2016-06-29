@@ -165,6 +165,8 @@ type
     /// </summary>
     procedure GetDatas(pvList:TList);
 
+    procedure GetKeyList(pvList:TStrings);
+
     property Buckets[AIndex: Cardinal]: PDHashData read GetBuckets;
 
     property BucketSize: Cardinal read FBucketSize;
@@ -608,6 +610,22 @@ begin
     while lvBucket<>nil do
     begin
       pvList.Add(lvBucket.Data);
+      lvBucket:=lvBucket.Next;
+    end;
+  end;
+end;
+
+procedure TDHashTable.GetKeyList(pvList:TStrings);
+var
+  I:Integer;
+  lvBucket: PDHashData;
+begin
+  for I := 0 to High(FBuckets) do
+  begin
+    lvBucket := FBuckets[I];
+    while lvBucket<>nil do
+    begin
+      pvList.Add(lvBucket.Key);
       lvBucket:=lvBucket.Next;
     end;
   end;
