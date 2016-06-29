@@ -69,6 +69,7 @@ type
   /// </summary>
   TIocpRequest = class(TObject)
   private
+    FThreadID : THandle;
     FData: Pointer;
 
     FWorkerThreadID:THandle;
@@ -125,6 +126,8 @@ type
     procedure SetWorkHintInfo(pvHint:String);
 
     constructor Create;
+    procedure CheckThreadIn;
+    procedure CheckThreadOut;
 
     property IocpWorker: TIocpWorker read FIocpWorker;
 
@@ -1335,6 +1338,7 @@ end;
 constructor TIocpRequest.Create;
 begin
   inherited Create;
+  FThreadID := 0;
   FOverlapped.iocpRequest := self;
   FOverlapped.refCount := 0;
 end;
@@ -1507,6 +1511,26 @@ begin
   finally
     FLocker.unLock;
   end;
+end;
+
+procedure TIocpRequest.CheckThreadIn;
+begin
+  if FThreadID <> 0 then
+  begin
+    raise Exception.CreateFmt('(%d,%d,%d(%s))当前对象已经被其他线程正在使用',
+       [GetCurrentThreadID, FThreadID, IntPtr(Self), self.ClassName]);
+  end;
+  FThreadID := GetCurrentThreadID;
+end;
+
+procedure TIocpRequest.CheckThreadOut;
+begin
+  if FThreadID= 0 then
+  begin
+    raise Exception.CreateFmt('(%d(%s))请勿重复归还',
+       [IntPtr(Self), self.ClassName]);
+  end;
+  FThreadID := 0;  
 end;
 
 function TIocpRequest.GetStateINfo: String;

@@ -3169,6 +3169,7 @@ begin
       begin
         j := 1;
         lvRequest := GetRequestObject;
+        lvRequest.CheckThreadIn;
         j := 2;
         lvRequest.FClientContext := FOwner.GetClientContext;
         lvRequest.FAcceptorMgr := self;
@@ -3256,6 +3257,9 @@ end;
 
 procedure TIocpAcceptorMgr.ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
 begin
+  pvRequest.CheckThreadOut;
+  pvRequest.FAcceptorMgr := nil;
+  pvRequest.FClientContext := nil;
   FAcceptExRequestPool.EnQueue(pvRequest);
 end;
 
