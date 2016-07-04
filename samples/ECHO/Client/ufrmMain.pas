@@ -6,14 +6,21 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp_tcp_client,
   utils_safeLogger, ComCtrls, diocp_sockets, ExtCtrls, utils_async,
-  utils_BufferPool;
+  utils_BufferPool, utils_fileWriter;
 
 type
   TEchoContext = class(TIocpRemoteContext)
+    FObjectID:Integer;
     FMaxTick:Cardinal;
     FStartTime:TDateTime;
     FLastTick:Cardinal;
     FLastSendTick:Cardinal;
+    FFileWritter: TSingleFileWriter;
+  public
+    procedure OnDisconnected; override;
+  public
+    destructor Destroy; override;
+    procedure WriteRecvData(pvBuf:Pointer; pvLength:Integer);
   end;
 
   TfrmMain = class(TForm)
@@ -52,6 +59,7 @@ type
     chkSendData: TCheckBox;
     mmoOnConnected: TMemo;
     chkIntervalSendData: TCheckBox;
+    chkSaveData: TCheckBox;
     procedure btnClearClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
@@ -66,6 +74,7 @@ type
     procedure chkLogRecvTimeClick(Sender: TObject);
     procedure chkRecvEchoClick(Sender: TObject);
     procedure chkRecvOnLogClick(Sender: TObject);
+    procedure chkSaveDataClick(Sender: TObject);
     procedure chkSendDataClick(Sender: TObject);
     procedure tmrCheckHeartTimer(Sender: TObject);
   private
@@ -75,11 +84,13 @@ type
     FSendDataOnRecv:Boolean;
     FLogRecvInfo:Boolean;
     FRecvOnLog:Boolean;
+    FRecvOnSaveToFile:Boolean;
     FConvertHex:Boolean;
 
     FASyncInvoker:TASyncInvoker;
     FSendInterval: Cardinal;
     FSendDataOnInterval:Boolean;
+
     FFileLogger:TSafeLogger;
     FIocpClientSocket: TDiocpTcpClient;
 
@@ -97,8 +108,6 @@ type
     procedure ReadHistory;
 
   public
-    { Public declarations }
-
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
   end;
@@ -114,6 +123,9 @@ uses
 
 { TfrmMain }
 
+var
+  __SN:Integer;
+
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited;
@@ -123,6 +135,7 @@ begin
   FFileLogger.setAppender(TLogFileAppender.Create(False), true);
   FSendDataOnRecv := chkRecvEcho.Checked;
   FRecvOnLog := chkRecvOnLog.Checked;
+  FRecvOnSaveToFile := chkSaveData.Checked;
   FConvertHex := chkHex.Checked;
   sfLogger.setAppender(TStringsAppender.Create(mmoRecvMessage.Lines));
   sfLogger.AppendInMainThread := true;
@@ -341,6 +354,11 @@ begin
   FRecvOnLog := chkRecvOnLog.Checked;
 end;
 
+procedure TfrmMain.chkSaveDataClick(Sender: TObject);
+begin
+  FRecvOnSaveToFile := chkSaveData.Checked;
+end;
+
 procedure TfrmMain.chkSendDataClick(Sender: TObject);
 begin
   FSendDataOnConnected := chkSendData.Checked;
@@ -417,6 +435,8 @@ procedure TfrmMain.OnContextConnected(pvContext: TDiocpCustomContext);
 var
   s:AnsiString;
 begin
+ 
+
   TEchoContext(pvContext).FStartTime := Now();
   TEchoContext(pvContext).FLastTick := GetTickCount;
   TEchoContext(pvContext).FMaxTick := 0;
@@ -466,9 +486,12 @@ begin
     end;
     if FRecvOnLog then
     begin
-      SetLength(lvStr, len);
-      Move(buf^, PAnsiChar(lvStr)^, len);
+      lvStr := TByteTools.BufShowAsString(buf, len);
       sfLogger.logMessage(lvStr);
+    end;
+    if FRecvOnSaveToFile then
+    begin
+      TEchoContext(pvContext).WriteRecvData(buf, len);
     end;
   end else
   begin
@@ -486,6 +509,7 @@ begin
   edtPort.Text := lvDValue.ForceByName('port').AsString;
   mmoData.Lines.Text := lvDValue.ForceByName('sendText').AsString;
   chkRecvEcho.Checked := lvDValue.ForceByName('chk_recvecho').AsBoolean;
+  chkSaveData.Checked := lvDValue.ForceByName('chk_saveonrecv').AsBoolean;
   chkRecvOnLog.Checked := lvDValue.ForceByName('chk_recvonlog').AsBoolean;
   chkSendData.Checked := lvDValue.ForceByName('chk_send_onconnected').AsBoolean;
 
@@ -507,6 +531,7 @@ begin
 
   FSendDataOnConnected := chkSendData.Checked;
   FRecvOnLog := chkRecvOnLog.Checked;
+  FRecvOnSaveToFile := chkSaveData.Checked;
   FSendDataOnRecv := chkRecvEcho.Checked;
   FConvertHex := chkHex.Checked;
   FLogRecvInfo := chkLogRecvTime.Checked;
@@ -537,6 +562,7 @@ begin
   lvDValue.ForceByName('client_num').AsString := edtCount.Text;
   lvDValue.ForceByName('sendText').AsString := mmoData.Lines.Text;
   lvDValue.ForceByName('chk_recvecho').AsBoolean := chkRecvEcho.Checked;
+  lvDValue.ForceByName('chk_saveonrecv').AsBoolean := chkSaveData.Checked;
   lvDValue.ForceByName('chk_recvonlog').AsBoolean := chkRecvOnLog.Checked;
   lvDValue.ForceByName('chk_send_onconnected').AsBoolean := chkSendData.Checked;
   lvDValue.ForceByName('chk_send_hex').AsBoolean := chkHex.Checked;
@@ -548,6 +574,38 @@ begin
   lvDValue.ForceByName('send_onconnected_data').AsString := mmoOnConnected.Lines.Text;
   JSONWriteToUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
   lvDValue.Free;
+end;
+
+destructor TEchoContext.Destroy;
+begin
+  if FFileWritter <> nil then
+  begin
+    FreeAndNil(FFileWritter);
+  end;
+  inherited Destroy;
+end;
+
+procedure TEchoContext.OnDisconnected;
+begin
+  if FFileWritter <> nil then
+  begin
+    FFileWritter.Flush;
+  end;
+  inherited;
+end;
+
+procedure TEchoContext.WriteRecvData(pvBuf:Pointer; pvLength:Integer);
+begin
+  if FObjectID = 0 then
+  begin
+    FObjectID := InterlockedIncrement(__SN);
+  end;
+  if FFileWritter = nil then
+  begin
+    FFileWritter := TSingleFileWriter.Create;
+    FFileWritter.FilePreFix := Format('recv_%d_', [FObjectID]);
+  end;
+  FFileWritter.WriteBuffer(pvBuf, pvLength);
 end;
 
 end.

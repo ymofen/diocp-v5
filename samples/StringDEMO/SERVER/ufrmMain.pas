@@ -186,6 +186,7 @@ begin
 
   // 可以把一个数据直接写回去
   pvContext.WriteAnsiString(pvDataString);
+  //Sleep(1);
 end;
 
 procedure TfrmMain.tmrKickOutTimer(Sender: TObject);

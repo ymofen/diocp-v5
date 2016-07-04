@@ -289,7 +289,8 @@ end;
 procedure TRawSocket.CreateTcpOverlappedSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := WSASocket(AF_INET,SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED);
+  FSocketHandle := WSASocket(AF_INET,SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+ // FSocketHandle := WSASocket(AF_INET6,SOCK_STREAM, IPPROTO_IPV6, Nil, 0, WSA_FLAG_OVERLAPPED);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;

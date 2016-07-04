@@ -91,6 +91,11 @@ type
      /// </summary>
      class function FileToBytes(pvFileName:string): TBytes;
 
+     /// <summary>
+     ///   buff到字符串,如果buf中为0，替换成?
+     /// </summary>
+     class function BufShowAsString(pvBuf:Pointer; pvBufLength:Integer): String;
+
 
      /// <summary>
      ///   从Buffer中截取几个字节后作为UInt64   
@@ -114,6 +119,35 @@ const
   U1 :UInt64 = 1;
 
 
+
+class function TByteTools.BufShowAsString(pvBuf:Pointer; pvBufLength:Integer):
+    String;
+var
+  lvBytes:TBytes;
+  lvBuf:PByte;
+  i: Integer;
+begin
+  SetLength(lvBytes, pvBufLength + 1);
+  lvBuf := PByte(pvBuf);
+  for i := 0 to pvBufLength - 1 do
+  begin
+    if lvBuf^ = 0 then
+    begin
+      lvBytes[i] := 63;  // ?
+    end else
+    begin
+      lvBytes[i] := lvBuf^;
+    end;
+    Inc(lvBuf);
+  end;
+  lvBytes[pvBufLength] := 0;
+  {$IFDEF MSWINDOWS}
+  Result := PAnsiChar(@lvBytes[0]);
+  {$ELSE}
+  Result := TEncoding.Default.GetString(lvBytes);
+  {$ENDIF}
+
+end;
 
 class function TByteTools.FileToBytes(pvFileName:string): TBytes;
 var

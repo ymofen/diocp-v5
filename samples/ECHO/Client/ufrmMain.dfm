@@ -37,18 +37,10 @@ object frmMain: TfrmMain
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object pnlOpera_Top: TPanel
         Left = 0
         Top = 0
@@ -99,10 +91,6 @@ object frmMain: TfrmMain
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3
@@ -313,6 +301,15 @@ object frmMain: TfrmMain
       Caption = #35760#24405#25509#25910#25968#25454#20449#24687
       TabOrder = 12
       OnClick = chkLogRecvTimeClick
+    end
+    object chkSaveData: TCheckBox
+      Left = 278
+      Top = 56
+      Width = 163
+      Height = 17
+      Caption = #20445#23384#25968#25454
+      TabOrder = 13
+      OnClick = chkSaveDataClick
     end
   end
   object tmrCheckHeart: TTimer
