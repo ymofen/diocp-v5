@@ -58,6 +58,8 @@ type
     FResponseSize: Integer;
     FResponseHttpVersionValue: Integer;
     FTimeOut: Integer;
+    
+    FConnectTimeOut:Integer;
     /// <summary>
     ///  CheckRecv buffer
     /// </summary>
@@ -82,6 +84,8 @@ type
   public
     procedure Cleaup;
 
+    
+
     constructor Create(AOwner: TComponent); override;
     
     destructor Destroy; override;
@@ -98,6 +102,7 @@ type
     ///   是否检测线程安全，只能在创建线程中使用
     /// </summary>
     property CheckThreadSafe: Boolean read FCheckThreadSafe write FCheckThreadSafe;
+    property ConnectTimeOut: Integer read FConnectTimeOut write FConnectTimeOut;
     
     property CustomeHeader: TStrings read FCustomeHeader;
 
@@ -188,6 +193,7 @@ implementation
 resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
   STRING_E_TIMEOUT   = '服务端响应超时';
+  STRING_E_CONNECT_TIMEOUT = '与服务器(%s:%d)建立连接超时';
 
 var
   __trace_id: Integer;
@@ -299,6 +305,7 @@ begin
   FResponseHeader := TStringList.Create;
 
   FTimeOut := 30000;
+  FConnectTimeOut := 10000;
 
   FURL := TURL.Create;
 
@@ -740,15 +747,24 @@ begin
       FRawSocket.SetReadTimeOut(FTimeOut);
       FRawSocket.SetSendTimeOut(FTimeOut);
     end;
+    {$ELSE}
+
     {$ENDIF}
 
     // 进行域名解析
     lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
-  
+
+    {$IFDEF MSWINDOWS}
+    if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
+    begin
+      raise Exception.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+    end;
+    {$ELSE}
     if not FRawSocket.Connect(lvIpAddr, pvPort) then
     begin
       RaiseLastOSError;
     end;
+    {$ENDIF}
   end;
 
   FLastHost := pvHost;

@@ -572,7 +572,7 @@ begin
         SetCurrentThreadInfo('开始进行重连');
         DoAutoReconnect(pvASyncWorker);
         SetCurrentThreadInfo('结束重连过程');
-        Sleep(2000);
+        self.FASyncInvoker.WaitForSleep(2000);
       except
         on e:Exception do
         begin
