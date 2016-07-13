@@ -928,7 +928,7 @@ begin
     try
       if FAddThreadINfo then
       begin
-        if FAddProcessID then
+        if not FAddProcessID then
         begin     // 文件名已经添加了ProcessID
           lvMsg := Format('%s[%s][ThreadID:%d]:%s',
               [FormatDateTime('hh:nn:ss:zzz', pvData.FTime)
