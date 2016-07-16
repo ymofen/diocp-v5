@@ -15,6 +15,73 @@ interface
 uses
   windows, SysUtils, diocp_winapi_winsock2;
 
+
+
+/// IPV6 DEFINE
+type
+  {$EXTERNALSYM IN6_ADDR}
+  IN6_ADDR = record
+    case Integer of
+      0: (s6_bytes: array[0..15] of u_char);
+      1: (s6_words: array[0..7] of u_short);
+  end;
+  {$EXTERNALSYM ADDRESS_FAMILY}
+  ADDRESS_FAMILY = USHORT;
+  {$EXTERNALSYM SCOPE_ID}
+  SCOPE_ID = record
+//    union {
+//        struct {
+//            ULONG Zone : 28;
+//            ULONG Level : 4;
+//        };
+//        ULONG Value;
+//    };
+    Value : ULONG;
+  end;
+  {$EXTERNALSYM PSCOPE_ID}
+  PSCOPE_ID = ^SCOPE_ID;
+
+  {$EXTERNALSYM sockaddr_in6_union}
+  sockaddr_in6_union = record
+    case Integer of
+      0 : (sin6_scope_id : ULONG);     // Set of interfaces for a scope.
+      1 : (sin6_scope_struct : SCOPE_ID);
+  end;
+  {$EXTERNALSYM SOCKADDR_IN6_LH}
+  SOCKADDR_IN6_LH = record
+    sin6_family : ADDRESS_FAMILY; // AF_INET6.
+    sin6_port : USHORT;           // Transport level port number.
+    sin6_flowinfo : ULONG;       // IPv6 flow information.
+    sin6_addr : IN6_ADDR;         // IPv6 address.
+    a : sockaddr_in6_union;
+  end;
+
+  {$EXTERNALSYM PSOCKADDR_IN6_LH}
+  PSOCKADDR_IN6_LH = ^SOCKADDR_IN6_LH;
+  {$EXTERNALSYM SOCKADDR_IN6}
+  SOCKADDR_IN6 = SOCKADDR_IN6_LH;
+  {$NODEFINE TSockAddrIn6}
+  TSockAddrIn6   = SOCKADDR_IN6;
+  {$NODEFINE PSockAddrIn6}
+  PSockAddrIn6   = ^TSockAddrIn6;
+
+
+const
+  {$IFNDEF DOTNET}
+    {$IFDEF USE_VCL_POSIX}
+  DIOCP_PF_INET4 = AF_INET;
+  DIOCP_PF_INET6 = AF_INET6;
+    {$ELSE}
+  DIOCP_PF_INET4 = PF_INET;
+  DIOCP_PF_INET6 = PF_INET6;
+     {$ENDIF}
+  {$ELSE}
+  DIOCP_PF_INET4 = ProtocolFamily.InterNetwork;
+  DIOCP_PF_INET6 = ProtocolFamily.InterNetworkV6;
+  {$ENDIF}
+
+  IPV6_SOCKADDR_SIZE = SizeOf(TSockAddrIn6);
+
 const
   SIO_KEEPALIVE_VALS = IOC_IN or IOC_VENDOR or 4;
 
@@ -28,6 +95,9 @@ const
   SO_UPDATE_ACCEPT_CONTEXT     = $700B;
   {$EXTERNALSYM SO_CONNECT_TIME}
   SO_CONNECT_TIME = $700C;
+
+  IP_V4 = 0;
+  IP_V6 = 1;
 
 type
   TKeepAlive = record
@@ -44,6 +114,7 @@ type
   /// </summary>
   TRawSocket = class(TObject)
   private
+    FIPVersion: Integer;
     FSocketHandle: TSocket;
     procedure CheckDestroyHandle;
   public
@@ -138,7 +209,11 @@ type
 
     function SetNoDelayOption(pvOption:Boolean): Boolean;
 
+    property IPVersion: Integer read FIPVersion write FIPVersion;
+
     property SocketHandle: TSocket read FSocketHandle;
+
+
   end;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
@@ -165,22 +240,35 @@ end;
 
 function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;
 var
-  sockaddr: TSockAddrIn;
+  sockaddr: array[0..127] of byte;
+  lvSize:Integer;
 begin
   FillChar(sockaddr, SizeOf(sockaddr), 0);
-  with sockaddr do
+
+  if FIPVersion = IP_V4 then
   begin
-    sin_family := AF_INET;
-    if pvAddr = '' then
+    with PSockAddrIn(@sockaddr[0])^ do
     begin
-      sin_addr.S_addr := inet_addr(PAnsichar(AnsiString('0.0.0.0')));
-    end else
-    begin
-      sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
+      sin_family := AF_INET;
+      if pvAddr = '' then
+      begin
+        sin_addr.S_addr := inet_addr(PAnsichar(AnsiString('0.0.0.0')));
+      end else
+      begin
+        sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
+      end;
+      sin_port :=  htons(pvPort);
     end;
-    sin_port :=  htons(pvPort);
+    lvSize := SizeOf(TSockAddrIn);
+  end else if FIPVersion = IP_V6 then
+  begin
+    PSockAddrIn6(@sockaddr[0])^.sin6_family := DIOCP_PF_INET6;
+    PSockAddrIn6(@sockaddr[0])^.sin6_port := htons(pvPort);
+    lvSize := SizeOf(TSockAddrIn6);
   end;
-  Result := diocp_winapi_winsock2.Bind(FSocketHandle, TSockAddr(sockaddr), SizeOf(sockaddr)) = 0;
+
+
+  Result := diocp_winapi_winsock2.Bind(FSocketHandle, PSockAddr(@sockaddr[0]), lvSize) = 0;
 end;
 
 function TRawSocket.CancelIO: Boolean;
@@ -279,9 +367,6 @@ begin
       ioctlsocket(FSocketHandle, Longint(FIONBIO), lvFlags);
       Result := true;
     end;
-
-
-
   end;
 
 end;
@@ -289,7 +374,22 @@ end;
 procedure TRawSocket.CreateTcpOverlappedSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := WSASocket(AF_INET,SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+  if FIPVersion = IP_V6 then
+  begin
+    {$IFDEF UNICODE}
+    FSocketHandle := WSASocketW(AF_INET6, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    {$ELSE}
+    FSocketHandle := WSASocketA(AF_INET6, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    {$ENDIF}
+  end else
+  begin
+    {$IFDEF UNICODE}
+    FSocketHandle := WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    {$ELSE}
+    FSocketHandle := WSASocketA(AF_INET,SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    {$ENDIF}
+  end;
+
  // FSocketHandle := WSASocket(AF_INET6,SOCK_STREAM, IPPROTO_IPV6, Nil, 0, WSA_FLAG_OVERLAPPED);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin

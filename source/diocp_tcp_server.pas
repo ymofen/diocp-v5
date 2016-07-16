@@ -80,6 +80,14 @@ type
   TOnDataRequestCompleted = procedure(pvClientContext:TIocpClientContext;
       pvRequest:TIocpRequest) of object;
 
+
+  TSocketBinding = class(TObject)
+  public
+
+    procedure Bind;
+
+  end;
+
   /// <summary>
   ///   远程连接类
   ///   对应客户端的一个连接
@@ -580,7 +588,7 @@ type
     ///       while the addresses are written to the latter part of the buffer.
     ///       This parameter must be specified.
     /// </summary>
-    FAcceptBuffer: array [0.. (SizeOf(TSockAddrIn) + 16) * 2 - 1] of byte;
+    FAcceptBuffer: array [0.. (IPV6_SOCKADDR_SIZE + IPV6_SOCKADDR_SIZE) * 2 - 1] of byte;
 
     FOwner: TDiocpTcpServer;
     FAcceptorMgr:TIocpAcceptorMgr;
@@ -609,17 +617,17 @@ type
   private
     FOwner: TDiocpTcpServer;
 
+    FCount: Integer;
+
     // sendRequest pool
     FAcceptExRequestPool: TBaseQueue;
 
-    // 一投递未响应的AcceptEx对象
+    // 投递未响应的AcceptEx对象
     FList:TList;
     FListenSocket: TRawSocket;
     FLocker: TIocpLocker;
     FMaxRequest:Integer;
     FMinRequest:Integer;
-
-  protected
   public
     constructor Create(AOwner: TDiocpTcpServer; AListenSocket: TRawSocket);
 
@@ -640,6 +648,7 @@ type
     procedure CheckPostRequest;
 
     procedure CancelAllRequest;
+
     /// <summary>
     ///   等待所有连接关闭
     /// </summary>
@@ -794,6 +803,8 @@ type
 
   TDiocpTcpServer = class(TComponent)
   private
+    FListenBinding: TSocketBinding;
+
     FDebugStrings:TStrings;
 
     FContextDNA : Integer;
@@ -806,7 +817,7 @@ type
     FWSARecvBufferSize: cardinal;
     procedure SetWSARecvBufferSize(const Value: cardinal);
 
-    function isDestroying:Boolean;
+    function IsDestroying: Boolean;
     function LogCanWrite: Boolean;
 
     function RequestContextDNA:Integer;
@@ -959,13 +970,13 @@ type
 
 
     constructor Create(AOwner: TComponent); override;
-
+    destructor Destroy; override;
     /// <summary>
     ///   设置允许每个连接允许最大发送队列，超过后不允许再进行投递
     /// </summary>
     procedure SetMaxSendingQueueSize(pvSize:Integer);
 
-    destructor Destroy; override;
+
     procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
 
     /// <summary>
@@ -2098,6 +2109,7 @@ end;
 constructor TDiocpTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FListenBinding := TSocketBinding.Create;
   FDebugStrings := TStringList.Create;
   CheckWinSocketStart;
   FUseContextPool := true;
@@ -2162,6 +2174,7 @@ begin
 
   FLocker.Free;
   FDebugStrings.Free;
+  FListenBinding.Free;
   inherited Destroy;
 end;
 
@@ -2211,7 +2224,7 @@ end;
 
 function TDiocpTcpServer.LogCanWrite: Boolean;
 begin
-  Result := (not isDestroying) and FLogger.Enable;
+  Result := (not IsDestroying) and FLogger.Enable;
 end;
 
 
@@ -2455,7 +2468,7 @@ begin
   Result := FIocpEngine.WorkerCount;
 end;
 
-function TDiocpTcpServer.isDestroying: Boolean;
+function TDiocpTcpServer.IsDestroying: Boolean;
 begin
   Result := FIsDestroying or (csDestroying in self.ComponentState)
 end;
@@ -2681,10 +2694,14 @@ begin
 
       if FDataMoniter <> nil then FDataMoniter.clear;
 
+      FListenSocket.IPVersion := IP_V6;
+
       // 创建侦听的套接字
       FListenSocket.CreateTcpOverlappedSocket;
 
 //       FListenSocket.CreateTcpSocket;
+
+
 
       // 绑定侦听端口
       if not FListenSocket.Bind(FDefaultListenAddress, FPort) then
@@ -3392,6 +3409,7 @@ begin
     end;
   end;
   {$ELSE}
+  FClientContext.FRawSocket.IPVersion := IP_V6;
   FClientContext.FRawSocket.CreateTcpOverlappedSocket;
   {$ENDIF}
   dwBytes := 0;
@@ -3399,14 +3417,27 @@ begin
 
   FClientContext.SetSocketState(ssAccepting);
 
-  lvRet := IocpAcceptEx(FOwner.FListenSocket.SocketHandle
-                , FClientContext.FRawSocket.SocketHandle
-                , @FAcceptBuffer[0]
-                , 0
-                , SizeOf(TSockAddrIn) + 16
-                , SizeOf(TSockAddrIn) + 16
-                , dwBytes
-                , lp);
+  if FClientContext.RawSocket.IPVersion = IP_V6 then
+  begin
+    lvRet := IocpAcceptEx(FOwner.FListenSocket.SocketHandle
+                  , FClientContext.FRawSocket.SocketHandle
+                  , @FAcceptBuffer[0]
+                  , 0
+                  , SizeOf(TSockAddrIn6) + SizeOf(TSockAddrIn6)
+                  , SizeOf(TSockAddrIn6) + SizeOf(TSockAddrIn6)
+                  , dwBytes
+                  , lp);
+  end else
+  begin
+    lvRet := IocpAcceptEx(FOwner.FListenSocket.SocketHandle
+                  , FClientContext.FRawSocket.SocketHandle
+                  , @FAcceptBuffer[0]
+                  , 0
+                  , SizeOf(TSockAddrIn) + 16
+                  , SizeOf(TSockAddrIn) + 16
+                  , dwBytes
+                  , lp);
+  end;
   if not lvRet then
   begin
     lvErrCode := WSAGetLastError;
@@ -4185,6 +4216,11 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TSocketBinding.Bind;
+begin
+  ;
 end;
 
 

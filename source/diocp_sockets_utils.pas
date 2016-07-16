@@ -45,6 +45,10 @@ type
 
   TIocpDisconnectEx = function(const hSocket: TSocket; lpOverlapped: LPWSAOVERLAPPED; const dwFlags: DWORD; const dwReserved: DWORD): BOOL; stdcall;
 
+
+
+
+
 const
   IOCP_RESULT_OK = 0;
   IOCP_RESULT_QUIT = 1;
@@ -332,7 +336,7 @@ begin
     sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
     sin_port := htons(pvPort);
   end;
-  Result := diocp_winapi_winsock2.bind(s, TSockAddr(sockaddr), SizeOf(sockaddr)) = 0;
+  Result := diocp_winapi_winsock2.bind(s, PSockAddr(@sockaddr), SizeOf(sockaddr)) = 0;
 end;
 
 function SetKeepAlive(pvSocket: TSocket; pvKeepAliveTime: Integer = 5000): Boolean;

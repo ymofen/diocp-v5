@@ -2703,7 +2703,8 @@ type
 
 function accept(s: TSocket; addr: PSockAddr; addrlen: PINT): TSocket; stdcall;
 {$EXTERNALSYM accept}
-function bind(s: TSocket; var name: TSockAddr; namelen: Integer): Integer; stdcall;
+//function bind(s: TSocket; var name: TSockAddr; namelen: Integer): Integer; stdcall;
+function bind(s: TSocket; const name: PSOCKADDR; const namelen: Integer): Integer; stdcall;
 {$EXTERNALSYM bind}
 function closesocket(s: TSocket): Integer; stdcall;
 {$EXTERNALSYM closesocket}
