@@ -45,11 +45,34 @@ const
 {$ENDIF}
 
 type
+  TAddrSunB = packed record
+    s_b1, s_b2, s_b3, s_b4: UInt8;
+  end;
+
+  TAddrSunW = packed record
+    s_w1, s_w2: UInt16;
+  end;
+
+  PSockIn4Addr = ^TSockIn4Addr;
+  TSockIn4Addr = packed record
+    case integer of
+        0: (S_un_b: TAddrSunB);
+        1: (S_un_w: TAddrSunW);
+        2: (S_addr: Cardinal);
+  end;
+
+const
+  IP_V4 = 0;
+  IP_V6 = 1;
+
+type
   TSocketState = (ssDisconnected, ssConnected, ssConnecting, ssListening, ssAccepting);
 
   TRawSocket = class(TObject)
   private
-    FSockaddr: sockaddr_in;
+    FIPVersion: Integer;
+    FSockaddr: array[0..127] of Byte;
+    //FSockaddr: sockaddr_in;
     FSocketHandle:THandle;
     procedure CheckDestroyHandle;
   public
@@ -146,11 +169,262 @@ type
     function SocketValid: Boolean;
 
   public
+    property IPVersion: Integer read FIPVersion write FIPVersion;
     property SocketHandle: THandle read FSocketHandle;
   end;
 
+function TranslateStringToTInAddr(const AIP: string; var AInAddr; const AIPVersion: Integer):Boolean;
 
 implementation
+
+
+function MyStrToInt(const S: string; ADefault: Integer): Integer;inline;
+begin
+  Result := StrToIntDef(Trim(S), ADefault);
+end;
+
+function MakeCanonicalIPv6Address(const AAddr: string): string;
+// return an empty string if the address is invalid,
+// for easy checking if its an address or not.
+var
+  p, i: Integer;
+  {$IFDEF BYTE_COMPARE_SETS}
+  dots, colons: Byte;
+  {$ELSE}
+  dots, colons: Integer;
+  {$ENDIF}
+  colonpos: array[1..8] of Integer;
+  dotpos: array[1..3] of Integer;
+  LAddr: string;
+  num: Integer;
+  haddoublecolon: boolean;
+  fillzeros: Integer;
+  lvPtr:PChar;
+begin
+  Result := ''; // error
+  LAddr := AAddr;
+  if Length(LAddr) = 0 then begin
+    Exit;
+  end;
+  if (PChar(LAddr)^=':') then begin
+    LAddr := '0' + LAddr;
+  end;
+  lvPtr := PChar(LAddr);
+  Inc(lvPtr, Length(LAddr)-1);
+  if (lvPtr^=':') then begin
+    LAddr := LAddr + '0';
+  end;
+  dots := 0;
+  colons := 0;
+  lvPtr := PChar(LAddr);
+  for p := 1 to Length(LAddr) do
+  begin
+    case lvPtr^ of
+      '.': begin
+              Inc(dots);
+              if dots < 4 then begin
+                dotpos[dots] := p;
+              end else begin
+                Exit; // error in address
+              end;
+            end;
+      ':': begin
+              Inc(colons);
+              if colons < 8 then begin
+                colonpos[colons] := p;
+              end else begin
+                Exit; // error in address
+              end;
+            end;
+      'a'..'f',
+      'A'..'F':
+        if dots > 0 then
+        begin
+          Exit;
+        end;
+        // allow only decimal stuff within dotted portion, ignore otherwise
+      '0'..'9': ; // do nothing
+    else
+      begin
+        Exit; // error in address
+      end;
+    end; // case
+    Inc(lvPtr);
+  end; // for
+  if not (dots in [0,3]) then begin
+    Exit; // you have to write 0 or 3 dots...
+  end;
+  if dots = 3 then begin
+    if not (colons in [2..6]) then begin
+      Exit; // must not have 7 colons if we have dots
+    end;
+    if colonpos[colons] > dotpos[1] then begin
+      Exit; // x:x:x.x:x:x is not valid
+    end;
+  end else begin
+    if not (colons in [2..7]) then begin
+      Exit; // must at least have two colons
+    end;
+  end;
+
+  // now start :-)
+  num := MyStrToInt('$'+Copy(LAddr, 1, colonpos[1]-1), -1);
+  if (num < 0) or (num > 65535) then begin
+    Exit; // huh? odd number...
+  end;
+  Result := IntToHex(num, 1) + ':';
+
+  haddoublecolon := False;
+  for p := 2 to colons do begin
+    if colonpos[p - 1] = colonpos[p]-1 then begin
+      if haddoublecolon then begin
+        Result := '';
+        Exit; // only a single double-dot allowed!
+      end;
+      haddoublecolon := True;
+      fillzeros := 8 - colons;
+      if dots > 0 then begin
+        Dec(fillzeros);
+      end;
+      for i := 1 to fillzeros do begin
+        Result := Result + '0:'; {do not localize}
+      end;
+    end else begin
+      num := MyStrToInt('$' + Copy(LAddr, colonpos[p - 1] + 1, colonpos[p] - colonpos[p - 1] - 1), -1);
+      if (num < 0) or (num > 65535) then begin
+        Result := '';
+        Exit; // huh? odd number...
+      end;
+      Result := Result + IntToHex(num,1) + ':';
+    end;
+  end; // end of colon separated part
+
+  if dots = 0 then begin
+    num := MyStrToInt('$' + Copy(LAddr, colonpos[colons] + 1, MaxInt), -1);
+    if (num < 0) or (num > 65535) then begin
+      Result := '';
+      Exit; // huh? odd number...
+    end;
+    Result := Result + IntToHex(num,1) + ':';
+  end;
+
+  if dots > 0 then begin
+    num := MyStrToInt(Copy(LAddr, colonpos[colons] + 1, dotpos[1] - colonpos[colons] -1),-1);
+    if (num < 0) or (num > 255) then begin
+      Result := '';
+      Exit;
+    end;
+    Result := Result + IntToHex(num, 2);
+    num := MyStrToInt(Copy(LAddr, dotpos[1]+1, dotpos[2]-dotpos[1]-1),-1);
+    if (num < 0) or (num > 255) then begin
+      Result := '';
+      Exit;
+    end;
+    Result := Result + IntToHex(num, 2) + ':';
+
+    num := MyStrToInt(Copy(LAddr, dotpos[2] + 1, dotpos[3] - dotpos[2] -1),-1);
+    if (num < 0) or (num > 255) then begin
+      Result := '';
+      Exit;
+    end;
+    Result := Result + IntToHex(num, 2);
+    num := MyStrToInt(Copy(LAddr, dotpos[3] + 1, 3), -1);
+    if (num < 0) or (num > 255) then begin
+      Result := '';
+      Exit;
+    end;
+    Result := Result + IntToHex(num, 2) + ':';
+  end;
+  SetLength(Result, Length(Result) - 1);
+end;
+
+function LeftUntil(var p: PChar; pvChars: TSysCharSet; var vLeftStr: string):
+    Integer;
+var
+  lvPTemp: PChar;
+  l:Integer;
+  lvMatched: Byte;
+begin
+  lvMatched := 0;
+  lvPTemp := p;
+  while lvPTemp^ <> #0 do
+  begin
+    if CharInSet(lvPTemp^, pvChars) then
+    begin            // 匹配到
+      lvMatched := 1;
+      Break;
+    end else
+      Inc(lvPTemp);
+  end;
+  if lvMatched = 0 then
+  begin   // 没有匹配到
+    Result := -1;
+  end else
+  begin   // 匹配到
+    l := lvPTemp-P;
+    SetLength(vLeftStr, l);
+    if SizeOf(Char) = 1 then
+    begin
+      Move(P^, PChar(vLeftStr)^, l);
+    end else
+    begin
+      l := l shl 1;
+      Move(P^, PChar(vLeftStr)^, l);
+    end;
+    P := lvPTemp;  // 跳转到新位置
+    Result := 0;
+  end;
+end;
+
+function TranslateStringToTInAddr(const AIP: string; var AInAddr; const AIPVersion: Integer):Boolean;
+var
+  LIP: String;
+  //
+  i:Integer;
+
+  vAddress : array [0..7] of Word;
+
+  lvIPPtr:PChar;
+
+  function __fetch(var lvPtr:PChar; pvChars: TSysCharSet):string;
+  begin
+    LeftUntil(lvPtr, pvChars, Result);
+    Inc(lvPtr);
+  end;
+
+begin
+  Result := false;
+  case AIPVersion of
+    IP_V6:
+    begin
+      // fe80::94fb:cf28:6018:31cb-> FE80:0:0:0:94FB:CF28:6018:31CB
+      LIP := MakeCanonicalIPv6Address(AIP);
+      if Length(LIP) > 0 then
+      begin
+        lvIPPtr := PChar(LIP);
+        for I := 0 to 7 do begin
+          Psockaddr_in6(@AInAddr)^.sin6_addr.s6_addr16[I] :=
+            htons(MyStrToInt('$' + __fetch(lvIPPtr, [':']), 0));
+        end;
+        Result := true;
+      end;
+    end;
+    else
+    begin
+      LIP := AIP;
+      if Length(LIP) > 0 then
+      begin
+        lvIPPtr := PChar(LIP);
+
+        PSockIn4Addr(@AInAddr)^.S_un_b.s_b1 := MyStrToInt(__fetch(lvIPPtr, ['.']), 0);
+        PSockIn4Addr(@AInAddr)^.S_un_b.s_b2 := MyStrToInt(__fetch(lvIPPtr, ['.']), 0);
+        PSockIn4Addr(@AInAddr)^.S_un_b.s_b3 := MyStrToInt(__fetch(lvIPPtr, ['.']), 0);
+        PSockIn4Addr(@AInAddr)^.S_un_b.s_b4 := MyStrToInt(__fetch(lvIPPtr, ['.']), 0);
+        Result := true;
+      end;
+    end;
+  end;
+end;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 begin
@@ -240,17 +514,17 @@ function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;
 var
   s :String;
 begin
-  FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
-  FSockaddr.sin_family := AF_INET;
-  FSockaddr.sin_port := htons(pvPort);
+  FillChar(FSockaddr, SizeOf(FSockaddr), 0);
+  Psockaddr_in(@FSockaddr[0])^.sin_family := AF_INET;
+  Psockaddr_in(@FSockaddr[0])^.sin_port := htons(pvPort);
   s := pvAddr;
   if s = '' then
   begin
     s := '0.0.0.0';
   end;
   // 未测试
-  FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(s)));
-  Result := Posix.SysSocket.Bind(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in))  = 0;
+  Psockaddr_in(@FSockaddr[0])^.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(s)));
+  Result := Posix.SysSocket.Bind(FSocketHandle, Psockaddr(@FSockaddr[0])^, sizeof(sockaddr_in))  = 0;
 end;
 
 procedure TRawSocket.CheckDestroyHandle;
@@ -281,11 +555,26 @@ end;
 
 function TRawSocket.Connect(const pvAddr: string; pvPort: Integer): Boolean;
 begin
-  FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
-  FSockaddr.sin_family := AF_INET;
-  FSockaddr.sin_port := htons(pvPort);
-  FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
-  Result := Posix.SysSocket.Connect(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in))  = 0;
+  if FIPVersion = IP_V6 then
+  begin
+    FillChar(FSockaddr, SizeOf(FSockaddr), 0);
+    Psockaddr_in6(@FSockaddr[0])^.sin6_port := htons(pvPort);
+    Psockaddr_in6(@FSockaddr[0])^.sin6_family := AF_INET6;
+    if not TranslateStringToTInAddr(pvAddr, FSockaddr[0], IP_V6) then
+    begin
+      raise Exception.CreateFmt('非法的IP[%s], 解析失败', [pvAddr]);
+    end;
+
+    Result := Posix.SysSocket.Connect(FSocketHandle,
+      Psockaddr(@FSockaddr[0])^, SizeOf(sockaddr_in6))  = 0;
+  end else
+  begin
+    FillChar(FSockaddr, SizeOf(FSockaddr), 0);
+    Psockaddr_in(@FSockaddr[0])^.sin_family := AF_INET;
+    Psockaddr_in(@FSockaddr[0])^.sin_port := htons(pvPort);
+    Psockaddr_in(@FSockaddr[0])^.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
+    Result := Posix.SysSocket.Connect(FSocketHandle, Psockaddr(@FSockaddr[0])^, sizeof(sockaddr_in))  = 0;
+  end;
 
 end;
 
@@ -307,11 +596,11 @@ begin
   fcntl(FSocketHandle, F_SETFL, lvFlags);
 
   FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
-  FSockaddr.sin_family := AF_INET;
-  FSockaddr.sin_port := htons(pvPort);
+  Psockaddr_in(@FSockaddr[0])^.sin_family := AF_INET;
+  Psockaddr_in(@FSockaddr[0])^.sin_port := htons(pvPort);
 
-  FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
-  lvRet := Posix.SysSocket.Connect(FSocketHandle, sockaddr(FSockaddr), sizeof(sockaddr_in));
+  Psockaddr_in(@FSockaddr[0])^.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
+  lvRet := Posix.SysSocket.Connect(FSocketHandle, Psockaddr(@FSockaddr[0])^, sizeof(sockaddr_in));
   lvErr := GetLastError;
   if lvRet = 0 then
   begin  // 连接成功
@@ -359,7 +648,13 @@ end;
 procedure TRawSocket.CreateTcpSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if FIPVersion = IP_V6 then
+  begin
+    FSocketHandle := socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+  end else
+  begin
+    FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  end;
   if FSocketHandle = INVALID_HANDLE_VALUE then
     RaiseLastOSError;
 end;
@@ -400,7 +695,7 @@ end;
 function TRawSocket.SendBufTo(const data; const len: Integer): Integer;
 begin
 {$IFDEF POSIX}
-  Result := sendto(FSocketHandle, data, len, 0, sockaddr(FSockaddr), sizeof(sockaddr_in));
+  Result := sendto(FSocketHandle, data, len, 0, Psockaddr(@FSockaddr[0])^, sizeof(sockaddr_in));
 {$ELSE}
   Result := sendto(FSocketHandle, data, len, 0, FSockaddr, sizeof(sockaddr_in));
 {$ENDIF}
@@ -640,9 +935,9 @@ end;
 procedure TRawSocket.SetConnectInfo(const pvAddr: string; pvPort: Integer);
 begin
   FillChar(FSockaddr, SizeOf(sockaddr_in), 0);
-  FSockaddr.sin_family := AF_INET;
-  FSockaddr.sin_port := htons(pvPort);
-  FSockaddr.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
+  Psockaddr_in(@FSockaddr[0])^.sin_family := AF_INET;
+  Psockaddr_in(@FSockaddr[0])^.sin_port := htons(pvPort);
+  Psockaddr_in(@FSockaddr[0])^.sin_addr.s_addr :=inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
 end;
 
 function TRawSocket.SetNonBlock(pvBlock:Boolean): Integer;
