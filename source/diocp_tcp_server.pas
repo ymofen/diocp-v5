@@ -45,6 +45,11 @@ const
   CORE_LOG_FILE = 'diocp_core_exception';
   CORE_DEBUG_FILE = 'diocp_core_debug';
 
+  ADDRESS_LENGTH_EX = 18;
+
+  IP_V4 = 0;
+  IP_V6 = 1;
+
 type
   TDiocpTcpServer = class;
   TIocpAcceptorMgr = class;
@@ -81,10 +86,43 @@ type
       pvRequest:TIocpRequest) of object;
 
 
-  TSocketBinding = class(TObject)
+  TDiocpListener = class(TObject)
+  private
+    FAcceptorMgr: TIocpAcceptorMgr;
+    FListenAddress:string;
+    FListenPort: Word;
+    FIPVersion: Integer;
   public
+    constructor Create(AOwnerTcpServer: TDiocpTcpServer);
+    destructor Destroy; override;
+    procedure Start(pvIocpEngine: TIocpEngine);
+    procedure PostAcceptExRequest(pvNum: Integer);
+  end;
 
-    procedure Bind;
+  /// <summary>
+  ///   该类非线程安全，请不要多线程操作一个对象
+  /// </summary>
+  TDiocpListeners = class(TObject)
+  private
+    FList: TList;
+    FOwnerServer:TDiocpTcpServer;
+    procedure Clear;
+  public
+    constructor Create(AOwnerTcpServer: TDiocpTcpServer);
+    destructor Destroy; override;
+
+
+    procedure Bind(const pvBindingAddress: string; const pvPort: Integer;
+        pvIPVersion: Integer = IP_V4; pvClientContextClass: TIocpClientContextClass
+        = nil);
+
+    procedure Close;
+
+    procedure WaitForCancel(pvTimeOut:Integer);
+
+    procedure ClearObjects;
+    procedure PostAcceptExRequest(pvNum: Integer);
+    procedure Start(pvIocpEngine: TIocpEngine);
 
   end;
 
@@ -231,10 +269,15 @@ type
     procedure SetOwner(const Value: TDiocpTcpServer);
     function GetDebugInfo: string;
 
+    /// <summary>
+    ///   归还释放
+    /// </summary>
+    procedure ReleaseBack;
 
   protected
+    FAcceptorMgr:TIocpAcceptorMgr;
 
-    
+
     FOwner: TDiocpTcpServer;
     
     /// <summary>
@@ -588,7 +631,9 @@ type
     ///       while the addresses are written to the latter part of the buffer.
     ///       This parameter must be specified.
     /// </summary>
-    FAcceptBuffer: array [0.. (IPV6_SOCKADDR_SIZE + IPV6_SOCKADDR_SIZE) * 2 - 1] of byte;
+    FAcceptBuffer: array [0.. 127] of byte;
+
+    //FAcceptBufferV4: array [0.. (SizeOf(TSockAddrIn) + 16) * 2 - 1] of byte;
 
     FOwner: TDiocpTcpServer;
     FAcceptorMgr:TIocpAcceptorMgr;
@@ -621,15 +666,25 @@ type
 
     // sendRequest pool
     FAcceptExRequestPool: TBaseQueue;
+    // clientContext pool
+    FContextPool: TBaseQueue;
 
-    // 投递未响应的AcceptEx对象
-    FList:TList;
     FListenSocket: TRawSocket;
     FLocker: TIocpLocker;
     FMaxRequest:Integer;
     FMinRequest:Integer;
+  protected
+    FClientContextClass: TIocpClientContextClass;
+    /// <summary>
+    ///    获取一个连接对象，如果对象池中没有，则会创建一个新的实例
+    /// </summary>
+    function GetClientContext: TIocpClientContext;
+    /// <summary>
+    ///   释放连接对象，归还到对象池
+    /// </summary>
+    function ReleaseClientContext(pvObject:TIocpClientContext): Boolean;
   public
-    constructor Create(AOwner: TDiocpTcpServer; AListenSocket: TRawSocket);
+    constructor Create(AOwner: TDiocpTcpServer);
 
     destructor Destroy; override;
 
@@ -638,27 +693,24 @@ type
     procedure ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
 
     /// <summary>
-    ///   从正在请求的列表中移除
+    ///   检测是否需要投递AcceptEx
     /// </summary>
-    procedure RemoveRequestObject(pvRequest:TIocpAcceptExRequest);
-
+    procedure PostAcceptExRequest(pvNum: Integer); overload;
     /// <summary>
     ///   检测是否需要投递AcceptEx
     /// </summary>
-    procedure CheckPostRequest;
-
-    procedure CancelAllRequest;
+    procedure PostAcceptExRequest; overload;
+    procedure RegisterContextClass(pvContextClass: TIocpClientContextClass);
 
     /// <summary>
     ///   等待所有连接关闭
     /// </summary>
     function WaitForCancel(pvTimeOut: Cardinal): Boolean;
 
+    procedure ClearObjects;
+
     property ListenSocket: TRawSocket read FListenSocket;
 
-    property MaxRequest: Integer read FMaxRequest write FMaxRequest;
-
-    property MinRequest: Integer read FMinRequest write FMinRequest;
 
 
   end;
@@ -803,7 +855,9 @@ type
 
   TDiocpTcpServer = class(TComponent)
   private
-    FListenBinding: TSocketBinding;
+    FListeners: TDiocpListeners;
+
+    FDefaultListener:TDiocpListener;
 
     FDebugStrings:TStrings;
 
@@ -823,8 +877,6 @@ type
     function RequestContextDNA:Integer;
     
   protected
-    FClientContextClass:TIocpClientContextClass;
-
     FIocpSendRequestClass:TIocpSendRequestClass;
 
     procedure SetName(const NewName: TComponentName); override;
@@ -838,16 +890,6 @@ type
     procedure OnCreateClientContext(const context: TIocpClientContext); virtual;
 
     /// <summary>
-    ///    获取一个连接对象，如果对象池中没有，则会创建一个新的实例
-    /// </summary>
-    function GetClientContext: TIocpClientContext;
-
-    /// <summary>
-    ///   释放连接对象，归还到对象池
-    /// </summary>
-    function ReleaseClientContext(pvObject:TIocpClientContext): Boolean;
-
-    /// <summary>
     ///   添加到在先列表中
     /// </summary>
     procedure AddToOnlineList(pvObject:TIocpClientContext);
@@ -857,11 +899,10 @@ type
     /// </summary>
     procedure RemoveFromOnOnlineList(pvObject:TIocpClientContext); virtual;
   private
-    // clientContext pool
-    FContextPool: TBaseQueue;
-
     // sendRequest pool
     FSendRequestPool: TBaseQueue;
+
+    FClientContextClass: TIocpClientContextClass;
 
     // extend data
     FDataPtr: Pointer;
@@ -873,19 +914,10 @@ type
     FConnectedCount: Integer;
     FDefaultListenAddress: String;
 
-
-
-    // acceptEx request mananger
-    FIocpAcceptorMgr:TIocpAcceptorMgr;
-
     FIocpEngine: TIocpEngine;
 
     FKeepAlive: Boolean;
 
-    /// <summary>
-    ///  服务端侦听Socket，用于接受客户端连接
-    /// </summary>
-    FListenSocket: TRawSocket;
     FOnAfterOpen: TNotifyEvent;
     FOnContextConnected: TContextNotifyEvent;
     FOnContextDisconnected: TContextNotifyEvent;
@@ -997,7 +1029,8 @@ type
     /// <summary>
     ///   check clientContext object is valid.
     /// </summary>
-    function checkClientContextValid(const pvClientContext: TIocpClientContext):  Boolean;
+    function CheckClientContextValid(const pvClientContext: TIocpClientContext):
+        Boolean;
 
     /// <summary>
     ///   断开所有在线连接
@@ -1054,7 +1087,9 @@ type
     ///   extend data
     /// </summary>
     property DataPtr: Pointer read FDataPtr write FDataPtr;
-    property IocpAcceptorMgr: TIocpAcceptorMgr read FIocpAcceptorMgr;
+    property Listeners: TDiocpListeners read FListeners;
+
+    //property IocpAcceptorMgr: TIocpAcceptorMgr read FIocpAcceptorMgr;
 
     /// <summary>
     ///   SERVER Locker
@@ -1347,8 +1382,9 @@ begin
     {$ENDIF}
 
     FOwner.RemoveFromOnOnlineList(Self);
-    // 归还到连接上下文池
-    FOwner.ReleaseClientContext(Self);
+
+    ReleaseBack();
+
   end;
 
 end;
@@ -1576,6 +1612,12 @@ begin
   FContextLocker.unLock; 
   
   if lvCloseContext then InnerCloseContext;
+end;
+
+procedure TIocpClientContext.ReleaseBack;
+begin
+  // 归还到连接上下文池
+  FAcceptorMgr.ReleaseClientContext(Self);
 end;
 
 function TIocpClientContext.ReleaseSendRequest(
@@ -2096,7 +2138,8 @@ begin
 
 end;
 
-function TDiocpTcpServer.checkClientContextValid(const pvClientContext: TIocpClientContext): Boolean;
+function TDiocpTcpServer.CheckClientContextValid(const pvClientContext:
+    TIocpClientContext): Boolean;
 begin
   Result := (pvClientContext.FOwner = Self);
 end;
@@ -2109,7 +2152,9 @@ end;
 constructor TDiocpTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FListenBinding := TSocketBinding.Create;
+  FListeners := TDiocpListeners.Create(Self);
+  FDefaultListener := TDiocpListener.Create(Self);
+
   FDebugStrings := TStringList.Create;
   CheckWinSocketStart;
   FUseContextPool := true;
@@ -2121,7 +2166,7 @@ begin
   // 默认不开启心跳选项
   FKeepAlive := False;
   
-  FContextPool := TBaseQueue.Create;
+
   FSendRequestPool := TBaseQueue.Create;
     
   FIocpEngine := TIocpEngine.Create();
@@ -2129,13 +2174,8 @@ begin
 
   FOnlineContextList := TDHashTable.Create(10949);
 
-  FListenSocket := TRawSocket.Create;
 
   FMaxSendingQueueSize := 100;
-
-  FIocpAcceptorMgr := TIocpAcceptorMgr.Create(Self, FListenSocket);
-  FIocpAcceptorMgr.FMaxRequest := 100;
-  FIocpAcceptorMgr.FMinRequest := 30;
 
   // post wsaRecv block size
   FWSARecvBufferSize := 1024 * 4;
@@ -2157,24 +2197,21 @@ begin
 
   if FDataMoniter <> nil then FDataMoniter.Free;
 
-  FContextPool.FreeDataObject;
+
 
   FSendRequestPool.FreeDataObject;
 
-  FListenSocket.Free;
-  FIocpAcceptorMgr.Free;
   FIocpEngine.Free;
 
   FOnlineContextList.Free;
 
-  FContextPool.Free;
   FSendRequestPool.Free;
 
   FLogger.Free;
 
   FLocker.Free;
   FDebugStrings.Free;
-  FListenBinding.Free;
+  FListeners.Free;
   inherited Destroy;
 end;
 
@@ -2313,7 +2350,7 @@ begin
         pvRequest.FClientContext.FRawSocket.Close;
 
         // relase client context object
-        ReleaseClientContext(pvRequest.FClientContext);
+        pvRequest.FClientContext.ReleaseBack;
         pvRequest.FClientContext := nil;
       end else
       begin
@@ -2332,7 +2369,7 @@ begin
       pvRequest.FClientContext.FRawSocket.Close;
 
       // return to pool
-      ReleaseClientContext(pvRequest.FClientContext);
+      pvRequest.FClientContext.ReleaseBack;
       pvRequest.FClientContext := nil;
       {$ENDIF}
     end;
@@ -2344,17 +2381,13 @@ begin
     pvRequest.FClientContext.RawSocket.Close;
    {$ENDIF}
     // 归还到连接上下文池
-    ReleaseClientContext(pvRequest.FClientContext);
+    pvRequest.FClientContext.ReleaseBack;
     pvRequest.FClientContext := nil;
   end;
 
-  // 从正在请求的列表中移除
-  FIocpAcceptorMgr.RemoveRequestObject(pvRequest);
-
-
   if FActive then
   begin
-    FIocpAcceptorMgr.CheckPostRequest;
+    pvRequest.FAcceptorMgr.PostAcceptExRequest;
     //LogMessage('DoAcceptExResponse_END_Active', CORE_DEBUG_FILE);
   end else
   begin
@@ -2412,56 +2445,6 @@ begin
   end;
 end;
 
-function TDiocpTcpServer.GetClientContext: TIocpClientContext;
-begin
-  if not FUseContextPool then
-  begin
-    if FClientContextClass <> nil then
-    begin
-      Result := FClientContextClass.Create;
-      OnCreateClientContext(Result);
-    end else
-    begin
-      Result := TIocpClientContext.Create;
-      OnCreateClientContext(Result);
-    end;
-    if (FDataMoniter <> nil) then
-    begin
-      InterlockedIncrement(FDataMoniter.FContextCreateCounter);
-    end;
-    Result.FSendRequestLink.SetMaxSize(FMaxSendingQueueSize);
-  end else
-  begin
-    Result := TIocpClientContext(FContextPool.DeQueue);
-    if Result = nil then
-    begin
-      if FClientContextClass <> nil then
-      begin
-        Result := FClientContextClass.Create;
-        OnCreateClientContext(Result);
-      end else
-      begin
-        Result := TIocpClientContext.Create;
-        OnCreateClientContext(Result);
-      end;
-      if (FDataMoniter <> nil) then
-      begin
-        InterlockedIncrement(FDataMoniter.FContextCreateCounter);
-      end;
-      Result.FSendRequestLink.SetMaxSize(FMaxSendingQueueSize);
-    end;
-    if (FDataMoniter <> nil) then
-    begin
-      InterlockedIncrement(FDataMoniter.FContextOutCounter);
-    end;
-  end;
-  
-  Result.FAlive := True;
-  Result.DoCleanUp;
-  Result.Owner := Self;
-
-end;
-
 
 function TDiocpTcpServer.GetWorkerCount: Integer;
 begin
@@ -2494,31 +2477,6 @@ procedure TDiocpTcpServer.RegisterSendRequestClass(pvClass:
     TIocpSendRequestClass);
 begin
   FIocpSendRequestClass := pvClass;
-end;
-
-function TDiocpTcpServer.ReleaseClientContext(pvObject:TIocpClientContext):
-    Boolean;
-begin
-  if not FUseContextPool then
-  begin
-    pvObject.Free;
-    Result := true;
-  end else
-  begin
-    if lock_cmp_exchange(True, False, pvObject.FAlive) = true then
-    begin
-      pvObject.DoCleanUp;
-      FContextPool.EnQueue(pvObject);
-      if (FDataMoniter <> nil) then
-      begin
-        InterlockedIncrement(FDataMoniter.FContextReturnCounter);
-      end;
-      Result := true;
-    end else
-    begin
-      Result := false;
-    end;
-  end;
 end;
 
 function TDiocpTcpServer.ReleaseSendRequest(pvObject:TIocpSendRequest): Boolean;
@@ -2627,19 +2585,16 @@ begin
       Assert(False);
     end;
 
-    FActive := false; 
+    FActive := false;
 
-    // Close listen socket
-    FListenSocket.Close;
-
+    FListeners.Close;
 
     DisconnectAll;
 
-
-
     // 等等所有的投递的AcceptEx请求回归
     // 感谢 Xjumping  990669769, 反馈bug
-    FIocpAcceptorMgr.WaitForCancel(12000);
+    FListeners.WaitForCancel(12000);
+
 
     if not WaitForContext(120000) then
     begin  // wait time out
@@ -2667,11 +2622,7 @@ begin
       end;
     end;
 
-    FIocpAcceptorMgr.FAcceptExRequestPool.FreeDataObject;
-    FIocpAcceptorMgr.FAcceptExRequestPool.Clear;
-
-    FContextPool.FreeDataObject;
-    FContextPool.Clear;
+    FListeners.ClearObjects;
 
     FSendRequestPool.FreeDataObject;
     FSendRequestPool.Clear;
@@ -2694,47 +2645,18 @@ begin
 
       if FDataMoniter <> nil then FDataMoniter.clear;
 
-      FListenSocket.IPVersion := IP_V6;
-
-      // 创建侦听的套接字
-      FListenSocket.CreateTcpOverlappedSocket;
-
-//       FListenSocket.CreateTcpSocket;
-
-
-
-      // 绑定侦听端口
-      if not FListenSocket.Bind(FDefaultListenAddress, FPort) then
+      if FListeners.FList.Count = 0 then
       begin
-        try
-          RaiseLastOSError;
-        finally
-          FListenSocket.Close(False);
-        end;
-      end;
-
-      // 开启侦听
-      if not FListenSocket.listen() then
+        FDefaultListener.FListenAddress := FDefaultListenAddress;
+        FDefaultListener.FListenPort := FPort;
+        FDefaultListener.FIPVersion := IP_V4;
+        FDefaultListener.Start(FIocpEngine);
+        FDefaultListener.PostAcceptExRequest(100);
+      end else
       begin
-        try
-          RaiseLastOSError;
-        finally
-          FListenSocket.Close(False);
-        end;
+        FListeners.Start(FIocpEngine);
+        FListeners.PostAcceptExRequest(100);
       end;
-
-      // 将侦听套接字绑定到IOCP句柄
-      if FIocpEngine.IocpCore.Bind2IOCPHandle(FListenSocket.SocketHandle, 0) <= 0 then
-      begin
-        try
-          RaiseLastOSError;
-        finally
-          FListenSocket.Close(False);
-        end;
-      end;
-
-      // post AcceptEx request
-      FIocpAcceptorMgr.CheckPostRequest;
 
       FActive := True;
 
@@ -3146,119 +3068,157 @@ begin
   Result := FOnlineContextList.Count = 0;
 end;
 
-procedure TIocpAcceptorMgr.CancelAllRequest;
-var
-  i:Integer;
-  lvRequest:TIocpAcceptExRequest;
-begin
-  FLocker.lock();
-  try
-    for i := 0 to FList.Count - 1 do
-    begin
-      lvRequest := TIocpAcceptExRequest(FList[i]);
-      lvRequest.FClientContext.RawSocket.CancelIO;
-    end;
-  finally
-    FLocker.unLock;
-  end;
-end;
-
-procedure TIocpAcceptorMgr.CheckPostRequest;
+procedure TIocpAcceptorMgr.PostAcceptExRequest(pvNum: Integer);
 var
   lvRequest:TIocpAcceptExRequest;
   i, j:Integer;
 begin
   j := 0;
   Assert(FOwner <> nil);
-  FLocker.lock;
-  try
-//    FOwner.LogMessage(
-//      Format('list:%d, FMinRequest:%d, FMaxRequest:%d',
-//      [FList.Count, FMinRequest, FMaxRequest]), CORE_DEBUG_FILE);
 
-    if FList.Count > FMinRequest then Exit;
-
-    try
-      i := 0;
-      j := 0;
-      // post request
-      while FList.Count < FMaxRequest do
-      begin
-        j := 1;
-        lvRequest := GetRequestObject;
-        lvRequest.CheckThreadIn;
-        j := 2;
-        lvRequest.FClientContext := FOwner.GetClientContext;
-        lvRequest.FAcceptorMgr := self;
-        j := 3;
-
-        if lvRequest.PostRequest then
-        begin
-          j := 4;
-          FList.Add(lvRequest);
-          if (FOwner.FDataMoniter <> nil) then
-          begin
-            InterlockedIncrement(FOwner.FDataMoniter.FPostWSAAcceptExCounter);
-          end;
-          j := 9;
-        end else
-        begin     // post fail
-          j := 100;
-          Inc(i);
-          try
-            // 出现异常，直接释放Context
-            lvRequest.FClientContext.RawSocket.Close(False);
-            lvRequest.FClientContext.FAlive := false;
-            lvRequest.FClientContext.Free;
-            lvRequest.FClientContext := nil;
-          except
-          end;
-          j := 110;
-          // 归还到对象池
-          ReleaseRequestObject(lvRequest);
-          j := 111;
-
-          if i > 100 then
-          begin    // 投递失败次数大于100 记录日志,本结束投递
-             FOwner.logMessage('TIocpAcceptorMgr.CheckPostRequest errCounter:%d', [i], CORE_LOG_FILE);
-             Break;
-          end;
-          j := 199;
-        end;
-      end;
-    except
-      on E:Exception do
-      begin
-         FOwner.logMessage('TIocpAcceptorMgr.CheckPostRequest(%d) Err:%s', [j, e.Message], CORE_LOG_FILE);
-      end;
-    end;
-  finally
-    FLocker.unLock;
+  for i := 0 to pvNum -1 do
+  begin
+    PostAcceptExRequest();
   end;
+
 end;
 
-constructor TIocpAcceptorMgr.Create(AOwner: TDiocpTcpServer; AListenSocket:
-    TRawSocket);
+procedure TIocpAcceptorMgr.ClearObjects;
+begin
+  FAcceptExRequestPool.FreeDataObject;
+  FAcceptExRequestPool.Clear;
+
+  FContextPool.FreeDataObject;
+  FContextPool.Clear;
+end;
+
+constructor TIocpAcceptorMgr.Create(AOwner: TDiocpTcpServer);
 begin
   inherited Create;
-  FLocker := TIocpLocker.Create();
-  FLocker.Name := 'acceptorLocker';
-  FMaxRequest := 200;
-  FMinRequest := 10;  
-  FList := TList.Create;
+  FContextPool := TBaseQueue.Create;
+  FCount := 0;
   FOwner := AOwner;
-  FListenSocket := AListenSocket;
+  FListenSocket := TRawSocket.Create;
 
   FAcceptExRequestPool := TBaseQueue.Create;
 end;
 
 destructor TIocpAcceptorMgr.Destroy;
 begin
+  FListenSocket.Free;
+
+  FContextPool.FreeDataObject;
+  FContextPool.Free;
+
   FAcceptExRequestPool.FreeDataObject;
-  FList.Free;
-  FLocker.Free;
   FAcceptExRequestPool.Free;
+
   inherited Destroy;
+end;
+
+function TIocpAcceptorMgr.GetClientContext: TIocpClientContext;
+var
+  lvClientClass:TIocpClientContextClass;
+begin
+  if not FOwner.FUseContextPool then
+  begin
+    lvClientClass := FClientContextClass;
+    if lvClientClass = nil then FClientContextClass := FOwner.FClientContextClass;
+    if lvClientClass = nil then FClientContextClass := TIocpClientContext;
+
+    Result := FClientContextClass.Create;
+    Result.FAcceptorMgr := Self;
+    FOwner.OnCreateClientContext(Result);
+    if (FOwner.FDataMoniter <> nil) then
+    begin
+      InterlockedIncrement(FOwner.FDataMoniter.FContextCreateCounter);
+    end;
+    Result.FSendRequestLink.SetMaxSize(FOwner.FMaxSendingQueueSize);
+  end else
+  begin
+    Result := TIocpClientContext(FContextPool.DeQueue);
+    if Result = nil then
+    begin
+      lvClientClass := FClientContextClass;
+      if lvClientClass = nil then FClientContextClass := FOwner.FClientContextClass;
+      if lvClientClass = nil then FClientContextClass := TIocpClientContext;
+
+      Result := FClientContextClass.Create;
+      Result.FAcceptorMgr := Self;
+      FOwner.OnCreateClientContext(Result);
+
+      if (FOwner.FDataMoniter <> nil) then
+      begin
+        InterlockedIncrement(FOwner.FDataMoniter.FContextCreateCounter);
+      end;
+      Result.FSendRequestLink.SetMaxSize(FOwner.FMaxSendingQueueSize);
+    end;
+    if (FOwner.FDataMoniter <> nil) then
+    begin
+      InterlockedIncrement(FOwner.FDataMoniter.FContextOutCounter);
+    end;
+  end;
+
+  Result.FAlive := True;
+  Result.DoCleanUp;
+  Result.Owner := FOwner;
+end;
+
+procedure TIocpAcceptorMgr.PostAcceptExRequest;
+var
+  lvRequest:TIocpAcceptExRequest;
+  i, j:Integer;
+begin
+  j := 0;
+  Assert(FOwner <> nil);
+
+  try
+    i := 0;
+    j := 0;
+    // post request
+
+    j := 1;
+    lvRequest := GetRequestObject;
+    lvRequest.CheckThreadIn;
+    j := 2;
+    lvRequest.FClientContext := GetClientContext;
+    lvRequest.FAcceptorMgr := Self;
+    j := 3;
+
+    if lvRequest.PostRequest then
+    begin
+      j := 4;
+      if (FOwner.FDataMoniter <> nil) then
+      begin
+        InterlockedIncrement(FOwner.FDataMoniter.FPostWSAAcceptExCounter);
+      end;
+      j := 9;
+    end else
+    begin     // post fail
+      j := 100;
+      Inc(i);
+      try
+        // 出现异常，直接释放Context
+        lvRequest.FClientContext.RawSocket.Close(False);
+        lvRequest.FClientContext.FAlive := false;
+        lvRequest.FClientContext.Free;
+        lvRequest.FClientContext := nil;
+      except
+      end;
+      j := 110;
+      // 归还到对象池
+      ReleaseRequestObject(lvRequest);
+      j := 111;
+
+      FOwner.logMessage('TIocpAcceptorMgr.PostAcceptExRequest errCounter:%d', [i], CORE_LOG_FILE);
+      j := 199;
+    end;
+  except
+    on E:Exception do
+    begin
+       FOwner.logMessage('TIocpAcceptorMgr.PostAcceptExRequest(%d) Err:%s', [j, e.Message], CORE_LOG_FILE);
+    end;
+  end;
 end;
 
 function TIocpAcceptorMgr.GetRequestObject: TIocpAcceptExRequest;
@@ -3270,6 +3230,38 @@ begin
     if (FOwner.FDataMoniter <> nil) then
       FOwner.DataMoniter.IncAcceptExObjectCounter;
   end;
+  InterlockedIncrement(FCount);
+end;
+
+procedure TIocpAcceptorMgr.RegisterContextClass(pvContextClass:
+    TIocpClientContextClass);
+begin
+  FClientContextClass := pvContextClass;
+end;
+
+function TIocpAcceptorMgr.ReleaseClientContext(pvObject:TIocpClientContext):
+    Boolean;
+begin
+  if not FOwner.FUseContextPool then
+  begin
+    pvObject.Free;
+    Result := true;
+  end else
+  begin
+    if lock_cmp_exchange(True, False, pvObject.FAlive) = true then
+    begin
+      pvObject.DoCleanUp;
+      FContextPool.EnQueue(pvObject);
+      if (FOwner.FDataMoniter <> nil) then
+      begin
+        InterlockedIncrement(FOwner.FDataMoniter.FContextReturnCounter);
+      end;
+      Result := true;
+    end else
+    begin
+      Result := false;
+    end;
+  end;
 end;
 
 procedure TIocpAcceptorMgr.ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
@@ -3278,16 +3270,7 @@ begin
   pvRequest.FAcceptorMgr := nil;
   pvRequest.FClientContext := nil;
   FAcceptExRequestPool.EnQueue(pvRequest);
-end;
-
-procedure TIocpAcceptorMgr.RemoveRequestObject(pvRequest:TIocpAcceptExRequest);
-begin
-  FLocker.lock;
-  try
-    FList.Remove(pvRequest);
-  finally
-    FLocker.unLock;
-  end;
+  InterlockedDecrement(FCount);
 end;
 
 function TIocpAcceptorMgr.WaitForCancel(pvTimeOut: Cardinal): Boolean;
@@ -3296,8 +3279,7 @@ var
   c:Integer;
 begin
   l := GetTickCount;
-  c := FList.Count;
-  while (c > 0) do
+  while (FCount > 0) do
   begin
     {$IFDEF MSWINDOWS}
     SwitchToThread;
@@ -3314,10 +3296,9 @@ begin
       {$ENDIF}
       Break;
     end;
-    c := FList.Count;
   end;
 
-  Result := FList.Count = 0;
+  Result := FCount = 0;
 end;
 
 constructor TIocpAcceptExRequest.Create(AOwner: TDiocpTcpServer);
@@ -3332,20 +3313,40 @@ var
   remoteAddr: PSockAddr;
   localAddrSize : Integer;
   remoteAddrSize : Integer;
+  lvRemoteAddr:String;
 begin
-  localAddrSize := SizeOf(TSockAddr) + 16;
-  remoteAddrSize := SizeOf(TSockAddr) + 16;
-  IocpGetAcceptExSockaddrs(@FAcceptBuffer[0],
-                        0,
-                        SizeOf(localAddr^) + 16,
-                        SizeOf(remoteAddr^) + 16,
-                        localAddr,
-                        localAddrSize,
-                        remoteAddr,
-                        remoteAddrSize);
+  if self.FAcceptorMgr.FListenSocket.IPVersion = IP_V6 then
+  begin
+    localAddrSize := SizeOf(TSockAddrIn6) + ADDRESS_LENGTH_EX;
+    remoteAddrSize := SizeOf(TSockAddrIn6) + ADDRESS_LENGTH_EX;
+    IocpGetAcceptExSockaddrs(@FAcceptBuffer[0],
+                          0,
+                          SizeOf(TSockAddrIn6) + ADDRESS_LENGTH_EX,
+                          SizeOf(TSockAddrIn6) + ADDRESS_LENGTH_EX,
+                          localAddr,
+                          localAddrSize,
+                          remoteAddr,
+                          remoteAddrSize);
+    //remoteAddr := PSockAddr(@FAcceptBuffer[10]);
 
-  FClientContext.FRemoteAddr := string(inet_ntoa(TSockAddrIn(remoteAddr^).sin_addr));
-  FClientContext.FRemotePort := ntohs(TSockAddrIn(remoteAddr^).sin_port);
+    FClientContext.FRemoteAddr := TranslateTInAddrToString(PSockAddrIn6(remoteAddr).sin6_addr, IP_V6);
+    FClientContext.FRemotePort := ntohs(PSockAddrIn6(remoteAddr).sin6_port);
+  end else
+  begin
+    localAddrSize := SizeOf(TSockAddr) + ADDRESS_LENGTH_EX;
+    remoteAddrSize := SizeOf(TSockAddr) + ADDRESS_LENGTH_EX;
+    IocpGetAcceptExSockaddrs(@FAcceptBuffer[0],
+                          0,
+                          SizeOf(TSockAddrIn) + ADDRESS_LENGTH_EX,
+                          SizeOf(TSockAddrIn) + ADDRESS_LENGTH_EX,
+                          localAddr,
+                          localAddrSize,
+                          remoteAddr,
+                          remoteAddrSize);
+
+    FClientContext.FRemoteAddr := string(inet_ntoa(TSockAddrIn(remoteAddr^).sin_addr));
+    FClientContext.FRemotePort := ntohs(TSockAddrIn(remoteAddr^).sin_port);
+  end;
 end;
 
 procedure TIocpAcceptExRequest.HandleResponse;
@@ -3363,7 +3364,7 @@ begin
     // The socket sAcceptSocket does not inherit the properties of the socket
     //  associated with sListenSocket parameter until SO_UPDATE_ACCEPT_CONTEXT
     //  is set on the socket.
-    FOwner.FListenSocket.UpdateAcceptContext(FClientContext.FRawSocket.SocketHandle);
+    FAcceptorMgr.FListenSocket.UpdateAcceptContext(FClientContext.FRawSocket.SocketHandle);
 
     GetPeerINfo();
   end;
@@ -3379,7 +3380,9 @@ var
   {$IFDEF SOCKET_REUSE}
   lvRetCode:Integer;
   {$ENDIF}
+  lvListenSocket:TRawSocket;
 begin
+  lvListenSocket := FAcceptorMgr.ListenSocket;
   {$IFDEF SOCKET_REUSE}
   if
     (FClientContext.FRawSocket.SocketHandle = INVALID_SOCKET)
@@ -3388,7 +3391,7 @@ begin
   begin
     if (FOwner.FDataMoniter <> nil) then
       FOwner.FDataMoniter.incHandleCreateCounter;
-
+    FClientContext.FRawSocket.IPVersion := lvListenSocket.IPVersion;
     FClientContext.FRawSocket.CreateTcpOverlappedSocket;
 
     lvRetCode := FOwner.IocpEngine.IocpCore.Bind2IOCPHandle(
@@ -3409,7 +3412,7 @@ begin
     end;
   end;
   {$ELSE}
-  FClientContext.FRawSocket.IPVersion := IP_V6;
+  FClientContext.FRawSocket.IPVersion := lvListenSocket.IPVersion;
   FClientContext.FRawSocket.CreateTcpOverlappedSocket;
   {$ENDIF}
   dwBytes := 0;
@@ -3419,22 +3422,22 @@ begin
 
   if FClientContext.RawSocket.IPVersion = IP_V6 then
   begin
-    lvRet := IocpAcceptEx(FOwner.FListenSocket.SocketHandle
+    lvRet := IocpAcceptEx(lvListenSocket.SocketHandle
                   , FClientContext.FRawSocket.SocketHandle
                   , @FAcceptBuffer[0]
                   , 0
-                  , SizeOf(TSockAddrIn6) + SizeOf(TSockAddrIn6)
-                  , SizeOf(TSockAddrIn6) + SizeOf(TSockAddrIn6)
+                  , SizeOf(TSockAddrIn6) + ADDRESS_LENGTH_EX
+                  , SizeOf(TSockAddrIn6) + ADDRESS_LENGTH_EX
                   , dwBytes
                   , lp);
   end else
   begin
-    lvRet := IocpAcceptEx(FOwner.FListenSocket.SocketHandle
+    lvRet := IocpAcceptEx(lvListenSocket.SocketHandle
                   , FClientContext.FRawSocket.SocketHandle
                   , @FAcceptBuffer[0]
                   , 0
-                  , SizeOf(TSockAddrIn) + 16
-                  , SizeOf(TSockAddrIn) + 16
+                  , SizeOf(TSockAddrIn) + ADDRESS_LENGTH_EX
+                  , SizeOf(TSockAddrIn) + ADDRESS_LENGTH_EX
                   , dwBytes
                   , lp);
   end;
@@ -3920,7 +3923,6 @@ begin
     end;
   end else
   begin
-    
     FOwner.releaseSendRequest(Self);
   end;
 end;
@@ -4218,11 +4220,169 @@ begin
   end;
 end;
 
-procedure TSocketBinding.Bind;
+procedure TDiocpListeners.Close;
+var
+  i: Integer;
 begin
-  ;
+  for i := 0 to FList.Count -1 do
+  begin
+    TDiocpListener(FList[i]).FAcceptorMgr.FListenSocket.Close(False);
+  end;
 end;
 
+constructor TDiocpListeners.Create(AOwnerTcpServer: TDiocpTcpServer);
+begin
+  inherited Create;
+  FOwnerServer := AOwnerTcpServer;
+  FList := TList.Create();
+end;
+
+destructor TDiocpListeners.Destroy;
+begin
+  Clear;
+  FreeAndNil(FList);
+  inherited Destroy;
+end;
+
+procedure TDiocpListeners.Bind(const pvBindingAddress: string; const pvPort:
+    Integer; pvIPVersion: Integer = IP_V4; pvClientContextClass:
+    TIocpClientContextClass = nil);
+var
+  lvItem:TDiocpListener;
+  i: Integer;
+begin
+  for i := 0 to FList.Count - 1 do
+  begin
+    lvItem := TDiocpListener(FList[i]);
+    if
+      (SameText(lvItem.FListenAddress, pvBindingAddress))
+      and
+      (lvItem.FListenPort = pvPort)
+      and
+      (lvItem.FIPVersion = pvIPVersion)
+    then
+    begin
+      raise Exception.Create(Format('请不要重复绑定(%s:%d)', [pvBindingAddress,pvPort]));
+    end;
+  end;
+
+  lvItem := TDiocpListener.Create(FOwnerServer);
+  lvItem.FListenAddress := pvBindingAddress;
+  lvItem.FListenPort := pvPort;
+  lvItem.FIPVersion := pvIPVersion;
+  lvItem.FAcceptorMgr.FClientContextClass := pvClientContextClass;
+  FList.Add(lvItem);
+end;
+
+procedure TDiocpListeners.Clear;
+var
+  i: Integer;
+begin
+  for i := 0 to FList.Count -1 do
+  begin
+    TDiocpListener(FList[i]).Free;
+  end;
+  FList.Clear;
+
+end;
+
+procedure TDiocpListeners.ClearObjects;
+var
+  i: Integer;
+begin
+  for i := 0 to FList.Count -1 do
+  begin
+    TDiocpListener(FList[i]).FAcceptorMgr.ClearObjects;
+  end;
+
+end;
+
+procedure TDiocpListeners.PostAcceptExRequest(pvNum: Integer);
+var
+  i: Integer;
+begin
+  for i := 0 to FList.Count -1 do
+  begin
+    TDiocpListener(FList[i]).PostAcceptExRequest(pvNum);
+  end;
+end;
+
+procedure TDiocpListeners.Start(pvIocpEngine: TIocpEngine);
+var
+  i: Integer;
+begin
+  for i := 0 to FList.Count -1 do
+  begin
+    TDiocpListener(FList[i]).Start(pvIocpEngine);
+  end;
+end;
+
+procedure TDiocpListeners.WaitForCancel(pvTimeOut:Integer);
+var
+  i: Integer;
+begin
+  for i := 0 to FList.Count -1 do
+  begin
+    TDiocpListener(FList[i]).FAcceptorMgr.WaitForCancel(pvTimeOut)
+  end;
+end;
+
+constructor TDiocpListener.Create(AOwnerTcpServer: TDiocpTcpServer);
+begin
+  inherited Create;
+  FAcceptorMgr := TIocpAcceptorMgr.Create(AOwnerTcpServer);
+end;
+
+destructor TDiocpListener.Destroy;
+begin
+  FreeAndNil(FAcceptorMgr);
+  inherited Destroy;
+end;
+
+
+procedure TDiocpListener.PostAcceptExRequest(pvNum: Integer);
+begin
+  FAcceptorMgr.PostAcceptExRequest(100);
+end;
+
+procedure TDiocpListener.Start(pvIocpEngine: TIocpEngine);
+var
+  lvListenSocket:TRawSocket;
+begin
+  lvListenSocket := FAcceptorMgr.FListenSocket;
+  lvListenSocket.IPVersion  := FIPVersion;
+  lvListenSocket.CreateTcpOverlappedSocket;
+
+  // 绑定侦听端口
+  if not lvListenSocket.Bind(FListenAddress, FListenPort) then
+  begin
+    try
+      RaiseLastOSError;
+    finally
+      lvListenSocket.Close(False);
+    end;
+  end;
+
+  // 开启侦听
+  if not lvListenSocket.listen() then
+  begin
+    try
+      RaiseLastOSError;
+    finally
+      lvListenSocket.Close(False);
+    end;
+  end;
+
+  // 将侦听套接字绑定到IOCP句柄
+  if pvIocpEngine.IocpCore.Bind2IOCPHandle(lvListenSocket.SocketHandle, 0) <= 0 then
+  begin
+    try
+      RaiseLastOSError;
+    finally
+      lvListenSocket.Close(False);
+    end;
+  end;
+end;
 
 initialization
   __startTime :=  Now();

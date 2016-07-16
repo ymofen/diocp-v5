@@ -65,6 +65,29 @@ type
   {$NODEFINE PSockAddrIn6}
   PSockAddrIn6   = ^TSockAddrIn6;
 
+  TAddrSunB = packed record
+    s_b1, s_b2, s_b3, s_b4: UInt8;
+  end;
+
+  TAddrSunW = packed record
+    s_w1, s_w2: UInt16;
+  end;
+
+  PSockIn4Addr = ^TSockIn4Addr;
+  TSockIn4Addr = packed record
+    case integer of
+        0: (S_un_b: TAddrSunB);
+        1: (S_un_w: TAddrSunW);
+        2: (S_addr: Cardinal);
+  end;
+
+  PSockIn6Addr = ^TSockIn6Addr;
+  TSockIn6Addr = packed record
+    case Integer of
+    0: (s6_addr: packed array [0..16-1] of UInt8);
+    1: (s6_addr16: packed array [0..8-1] of UInt16);
+  end;
+
 
 const
   {$IFNDEF DOTNET}
@@ -218,6 +241,9 @@ type
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
+function TranslateTInAddrToString(const sockaddr; const AIPVersion:
+    Integer): string;
+
 var
   __DebugWSACreateCounter:Integer;
 
@@ -229,6 +255,31 @@ implementation
 
 var
   __WSAStartupDone:Boolean;
+
+function TranslateTInAddrToString(const sockaddr; const AIPVersion:
+    Integer): string;
+var
+  i: Integer;
+begin
+  case AIPVersion of
+    IP_V6:
+      begin
+        Result := '';
+        for i := 0 to 7 do begin
+          Result := Result + IntToHex(ntohs(PSockIn6Addr(@sockaddr).s6_addr16[i]), 1) + ':';
+        end;
+        SetLength(Result, Length(Result)-1);
+      end;
+    else
+      begin
+        Result := IntToStr(PSockIn4Addr(@sockaddr).S_un_b.s_b1) + '.'   {Do not Localize}
+                  + IntToStr(PSockIn4Addr(@sockaddr).S_un_b.s_b2) + '.' {Do not Localize}
+                  + IntToStr(PSockIn4Addr(@sockaddr).S_un_b.s_b3) + '.' {Do not Localize}
+                  + IntToStr(PSockIn4Addr(@sockaddr).S_un_b.s_b4);
+      end;
+
+  end;
+end;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 begin
@@ -383,11 +434,12 @@ begin
     {$ENDIF}
   end else
   begin
-    {$IFDEF UNICODE}
-    FSocketHandle := WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
-    {$ELSE}
-    FSocketHandle := WSASocketA(AF_INET,SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
-    {$ENDIF}
+//    {$IFDEF UNICODE}
+//    FSocketHandle := WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+//    {$ELSE}
+//    FSocketHandle := WSASocketA(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+//    {$ENDIF}
+    FSocketHandle := WSASocket(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED)
   end;
 
  // FSocketHandle := WSASocket(AF_INET6,SOCK_STREAM, IPPROTO_IPV6, Nil, 0, WSA_FLAG_OVERLAPPED);
