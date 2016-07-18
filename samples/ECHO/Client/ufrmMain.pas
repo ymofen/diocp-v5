@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp_tcp_client,
   utils_safeLogger, ComCtrls, diocp_sockets, ExtCtrls, utils_async,
-  utils_BufferPool, utils_fileWriter;
+  utils_BufferPool, utils_fileWriter, diocp_tcp_blockClient;
 
 type
   TEchoContext = class(TIocpRemoteContext)
@@ -60,10 +60,13 @@ type
     mmoOnConnected: TMemo;
     chkIntervalSendData: TCheckBox;
     chkSaveData: TCheckBox;
+    btnEcho: TButton;
+    mmoOperaLog: TMemo;
     procedure btnClearClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnCreateClick(Sender: TObject);
+    procedure btnEchoClick(Sender: TObject);
     procedure btnFill1KClick(Sender: TObject);
     procedure btnSaveHistoryClick(Sender: TObject);
     procedure btnSendObjectClick(Sender: TObject);
@@ -78,6 +81,7 @@ type
     procedure chkSendDataClick(Sender: TObject);
     procedure tmrCheckHeartTimer(Sender: TObject);
   private
+    FBlockTcp:TDiocpBlockTcpClient;
     FSpinLock:Integer;
     
     FSendDataOnConnected:Boolean;
@@ -233,6 +237,51 @@ begin
   finally
     SpinUnLock(FSpinLock);
   end;
+end;
+
+procedure TfrmMain.btnEchoClick(Sender: TObject);
+var
+  t:Cardinal;
+  s:AnsiString;
+  l:Integer;
+  lvRecv:TBytes;
+begin
+  if FBlockTcp = nil then
+  begin
+    FBlockTcp := TDiocpBlockTcpClient.Create(self);
+  end;
+  if FBlockTcp.Host <> edtHost.Text then
+  begin
+    FBlockTcp.Disconnect;
+    FBlockTcp.Host := edtHost.Text;
+  end;
+
+  if FBlockTcp.Port <> StrToInt(edtPort.Text) then
+  begin
+    FBlockTcp.Disconnect;
+    FBlockTcp.Port := StrToInt(edtPort.Text);
+  end;
+
+  if not FBlockTcp.Active then
+  begin
+    t := GetTickCount;
+    FBlockTcp.Connect;
+    t := GetTickCount - t;
+    mmoOperaLog.Lines.Add(Format('连接耗时:%d ms', [t]));
+  end;
+  s := mmoData.Lines.Text;
+  l := Length(s);
+  if l = 0 then Exit;
+  t := GetTickCount;
+  FBlockTcp.SendBuffer(PAnsiChar(s), Length(s));
+  t := GetTickCount - t;
+  mmoOperaLog.Lines.Add(Format('send耗时:%d ms, len:%d', [t, l]));
+
+  SetLength(lvRecv, l);
+  t := GetTickCount;
+  FBlockTcp.recv(@lvRecv[0], l);
+  t := GetTickCount - t;
+  mmoOperaLog.Lines.Add(Format('recv耗时:%d ms, 接收数据长度:%d', [t, l]));
 end;
 
 procedure TfrmMain.btnFill1KClick(Sender: TObject);
@@ -427,7 +476,7 @@ begin
       end;
     end;
 
-    Sleep(1000);
+    FASyncInvoker.WaitForSleep(1000);
   end;
 end;
 

@@ -18,7 +18,7 @@ object frmMain: TfrmMain
     Top = 79
     Width = 844
     Height = 351
-    ActivePage = TabSheet1
+    ActivePage = tsOperator
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -45,13 +45,13 @@ object frmMain: TfrmMain
         Left = 0
         Top = 0
         Width = 836
-        Height = 41
+        Height = 62
         Align = alTop
-        Caption = 'pnlOpera_Top'
         TabOrder = 0
+        ExplicitTop = 3
         object btnSendObject: TButton
-          Left = 100
-          Top = 8
+          Left = 94
+          Top = 34
           Width = 142
           Height = 25
           Caption = #25152#26377#36830#25509#21457#36865#19968#27425#25968#25454
@@ -59,32 +59,55 @@ object frmMain: TfrmMain
           OnClick = btnSendObjectClick
         end
         object btnFill1K: TButton
-          Left = 10
-          Top = 8
+          Left = 4
+          Top = 34
           Width = 75
           Height = 25
           Caption = #22635#20805'1K'#23383#31526
           TabOrder = 1
           OnClick = btnFill1KClick
         end
+        object btnEcho: TButton
+          Left = 4
+          Top = 3
+          Width = 75
+          Height = 25
+          Caption = 'btnEcho'
+          TabOrder = 2
+          OnClick = btnEchoClick
+        end
       end
       object pnlOpera_Send: TPanel
         Left = 0
-        Top = 41
+        Top = 62
         Width = 836
-        Height = 282
+        Height = 261
         Align = alClient
         Caption = 'pnlOpera_Send'
         TabOrder = 1
+        ExplicitTop = 41
+        ExplicitHeight = 282
         object mmoData: TMemo
           Left = 1
           Top = 1
           Width = 834
-          Height = 280
+          Height = 170
           Align = alClient
           Lines.Strings = (
             '0123456789')
           TabOrder = 0
+          ExplicitHeight = 280
+        end
+        object mmoOperaLog: TMemo
+          Left = 1
+          Top = 171
+          Width = 834
+          Height = 89
+          Align = alBottom
+          TabOrder = 1
+          ExplicitLeft = 552
+          ExplicitTop = 104
+          ExplicitWidth = 185
         end
       end
     end
@@ -285,7 +308,7 @@ object frmMain: TfrmMain
       OnClick = chkCheckHeartClick
     end
     object btnSaveHistory: TButton
-      Left = 104
+      Left = 89
       Top = 48
       Width = 75
       Height = 25
