@@ -97,6 +97,8 @@ type
     destructor Destroy; override;
     procedure Start(pvIocpEngine: TIocpEngine);
     procedure PostAcceptExRequest(pvNum: Integer);
+    procedure WaitForCancel(pvTimeOut:Integer);
+    procedure Close;
   end;
 
   /// <summary>
@@ -2212,6 +2214,7 @@ begin
   FLocker.Free;
   FDebugStrings.Free;
   FListeners.Free;
+  FDefaultListener.Free;
   inherited Destroy;
 end;
 
@@ -2588,12 +2591,14 @@ begin
     FActive := false;
 
     FListeners.Close;
+    FDefaultListener.Close;
 
     DisconnectAll;
 
     // 等等所有的投递的AcceptEx请求回归
     // 感谢 Xjumping  990669769, 反馈bug
     FListeners.WaitForCancel(12000);
+    FDefaultListener.WaitForCancel(12000);
 
 
     if not WaitForContext(120000) then
@@ -4327,6 +4332,11 @@ begin
   end;
 end;
 
+procedure TDiocpListener.Close;
+begin
+  FAcceptorMgr.FListenSocket.Close(False);
+end;
+
 constructor TDiocpListener.Create(AOwnerTcpServer: TDiocpTcpServer);
 begin
   inherited Create;
@@ -4382,6 +4392,11 @@ begin
       lvListenSocket.Close(False);
     end;
   end;
+end;
+
+procedure TDiocpListener.WaitForCancel(pvTimeOut: Integer);
+begin
+  FAcceptorMgr.WaitForCancel(pvTimeOut);
 end;
 
 initialization

@@ -101,7 +101,9 @@ end;
 
 destructor TfrmMain.Destroy;
 begin
+  FTcpServer.SafeStop;
   FreeBufferPool(FPool);
+  FTcpServer.Free;
   inherited Destroy;
 end;
 
@@ -319,8 +321,6 @@ procedure TfrmMain.tmrTestTimer(Sender: TObject);
 begin
   actStop.Execute;
 
-  FTcpServer.IocpAcceptorMgr.MinRequest := 1000;
-  FTcpServer.IocpAcceptorMgr.MaxRequest := 2000;
 
   Application.ProcessMessages;
 

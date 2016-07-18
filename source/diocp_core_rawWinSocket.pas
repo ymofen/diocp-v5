@@ -26,7 +26,7 @@ type
       1: (s6_words: array[0..7] of u_short);
   end;
   {$EXTERNALSYM ADDRESS_FAMILY}
-  ADDRESS_FAMILY = USHORT;
+  ADDRESS_FAMILY = u_short;
   {$EXTERNALSYM SCOPE_ID}
   SCOPE_ID = record
 //    union {

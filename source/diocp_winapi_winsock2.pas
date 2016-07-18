@@ -120,8 +120,18 @@ type
   u_int64 = Int64; // unsigned __int64 !! TODO For Delphi 7 ??
   {$EXTERNALSYM u_int64}
 
-
-
+{$if CompilerVersion <= 29}  // XE8
+  {$NODEFINE Int8} // We map 'Shortint' to 'Int8' for C++ above
+  USHORT  = Word;
+  Int8    = ShortInt;
+  Int16   = SmallInt;
+  Int32   = Integer;
+  IntPtr  = NativeInt;
+  UInt8   = Byte;
+  UInt16  = Word;
+  UInt32  = Cardinal;
+  UIntPtr = NativeUInt;
+{$ifend}
 
 // 为了向下兼容(从XE5 winApi.windows中copy)
 // D10.天地弦
