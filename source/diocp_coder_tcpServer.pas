@@ -798,7 +798,7 @@ constructor TDiocpCoderTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FTaskObjectPool := TBaseQueue.Create();
-  FClientContextClass := TIOCPCoderClientContext;
+  RegisterContextClass(TIOCPCoderClientContext);
   
   FIocpSendRequestClass := TDiocpCoderSendRequest;
 end;
