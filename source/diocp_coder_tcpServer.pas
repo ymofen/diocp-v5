@@ -15,8 +15,10 @@ unit diocp_coder_tcpServer;
 
 interface
 
-// call DoContextAction procedure with qworker
-{.$DEFINE QDAC_QWorker}
+/// 三个编译开关，只能开启一个
+{$DEFINE INNER_IOCP_PROCESSOR}     // iocp线程触发事件
+{.$DEFINE QDAC_QWorker}   // 用qworker进行调度触发事件
+{.$DEFINE DIOCP_Task}     // 用diocp_task进行调度触发事件
 
 {$IFDEF DEBUG}
   {$DEFINE DEBUG_ON}
@@ -25,11 +27,8 @@ interface
 uses
   diocp_tcp_server, utils_buffer, SysUtils, Classes,
   diocp_coder_baseObject, utils_queues, utils_locker
-  {$IFDEF QDAC_QWorker}
-    , qworker
-  {$ELSE}
-    , diocp_task
-  {$ENDIF}
+  {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
+  {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
   ;
 
 type
@@ -92,11 +91,13 @@ type
     /// </summary>
     procedure ClearRequestTaskObject();
 
-   {$IFDEF QDAC_QWorker}
+    {$IFDEF QDAC_QWorker}
     procedure OnExecuteJob(pvJob:PQJob);
-   {$ELSE}
+    {$ENDIF}
+    {$IFDEF DIOCP_Task}
     procedure OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
-   {$ENDIF}
+    {$ENDIF}
+    procedure DoInnerJob(pvTaskObject: TDiocpTaskObject);
   protected
     procedure Add2Buffer(buf:PAnsiChar; len:Cardinal);
     procedure ClearRecvedBuffer;
@@ -170,6 +171,7 @@ type
     FLogicWorkerNeedCoInitialize: Boolean;
     FOnContextAction: TOnContextAction;
 
+    procedure DoAfterOpen; override;
     function GetTaskObject:TDiocpTaskObject;
     procedure GiveBackTaskObject(pvObj:TDiocpTaskObject);
   public
@@ -515,6 +517,46 @@ begin
   end; 
 end;
 
+procedure TIOCPCoderClientContext.DoInnerJob(pvTaskObject: TDiocpTaskObject);
+var
+  lvObj:TObject;
+begin
+  // 编码的对象(需要释放)
+  lvObj:= pvTaskObject.FData;
+  try
+    try
+      // 如果需要执行
+      if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
+         Self.FRecvRequest.IocpWorker.checkCoInitializeEx();
+
+      // 执行任务
+      if DoExecuteRequest(pvTaskObject) <> S_OK then
+      begin
+
+      end;
+    except
+      on e:Exception do
+      begin
+        self.Owner.LogMessage(
+          Format('DoInnerJob:%s', [e.Message]), CORE_LOG_FILE);
+      end;
+    end;
+  finally
+    try
+     // 归还到任务池
+     pvTaskObject.Close;
+      // 释放解码对象
+     if lvObj <> nil then FreeAndNil(lvObj);
+    except
+      on e:Exception do
+      begin
+        self.Owner.LogMessage(
+          Format('DoInnerJob::FreeAndNil(pvTaskObject):%s', [e.Message]), CORE_LOG_FILE);
+      end;
+    end;
+  end;
+end;
+
 function TIOCPCoderClientContext.DecodeObject: TObject;
 begin
   Result := TDiocpCoderTcpServer(Owner).FDecoder.Decode(FRecvBuffers, Self);
@@ -583,8 +625,9 @@ begin
 
 
 end;
-{$ELSE}
+{$ENDIF}
 
+{$IFDEF DIOCP_Task}
 procedure TIOCPCoderClientContext.OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
 var
   lvTask:TDiocpTaskObject;
@@ -629,50 +672,7 @@ begin
       except
       end;
     end;
-  end;
-
-//
-//  lvTask := TDiocpTaskObject(pvTaskRequest.TaskData);
-//  lvObj := lvTask.FData;
-//  try
-//    // 连接已经断开
-//    if Owner = nil then Exit;
-//
-//    // 连接已经释放
-//    if Self = nil then Exit;
-//
-//    // 已经不是当初投递的连接
-//    if self.ContextDNA <> lvTask.FContextDNA then Exit;
-//
-//    if self.LockContext('处理逻辑', Self) then
-//    try
-//      try
-//        if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
-//          pvTaskRequest.iocpWorker.checkCoInitializeEx();
-//
-//        // 执行Owner的事件
-//        if Assigned(TDiocpCoderTcpServer(Owner).FOnContextAction) then
-//          TDiocpCoderTcpServer(Owner).FOnContextAction(Self, lvObj);
-//
-//        DoContextAction(lvObj);
-//      except
-//       on E:Exception do
-//        begin
-//          FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
-//        end;
-//      end;
-//    finally
-//      self.UnLockContext('处理逻辑', Self);
-//    end;
-//  finally
-//    // 归还到任务池
-//    lvTask.Close;
-//    try
-//      // 释放解码对象
-//      if lvObj <> nil then FreeAndNil(lvObj);
-//    except
-//    end;
-//  end;
+  end; 
 end;
 {$ENDIF}
 
@@ -709,7 +709,9 @@ begin
       try
         self.StateINfo := '解码成功,准备调用dataReceived进行逻辑处理';
 
-
+        {$IFDEF INNER_IOCP_PROCESSOR}
+        self.DoInnerJob(lvTaskObject);
+        {$ELSE}
         // 加入到请求处理队列
         self.Lock;
         try
@@ -727,6 +729,7 @@ begin
         finally
           self.UnLock();
         end;
+        {$ENDIF}
 
       except
         on E:Exception do
@@ -810,6 +813,27 @@ begin
   FTaskObjectPool.FreeDataObject;
   FTaskObjectPool.Free;
   inherited Destroy;
+end;
+
+procedure TDiocpCoderTcpServer.DoAfterOpen;
+begin
+  inherited;
+  {$IFDEF DEBUG}
+  {$IFDEF CONSOLE}
+  
+    {$IFDEF INNER_IOCP_PROCESSOR}
+      Writeln('[#] 由DIOCP线程处理Http请求');
+    {$ELSE}
+      {$IFDEF DIOCP_Task}
+        Writeln('[#] 由DIOCP-Task处理Http请求');
+      {$ENDIF}
+
+      {$IFDEF QDAC_QWorker}
+        Writeln('[#] 由QDAC-QWorkers处理Http请求');
+      {$ENDIF}
+    {$ENDIF}
+  {$ENDIF}
+  {$ENDIF}
 end;
 
 function TDiocpCoderTcpServer.GetTaskObject: TDiocpTaskObject;

@@ -3128,10 +3128,10 @@ begin
   if not FOwner.FUseContextPool then
   begin
     lvClientClass := FClientContextClass;
-    if lvClientClass = nil then FClientContextClass := FOwner.FClientContextClass;
-    if lvClientClass = nil then FClientContextClass := TIocpClientContext;
+    if lvClientClass = nil then lvClientClass := FOwner.FClientContextClass;
+    if lvClientClass = nil then lvClientClass := TIocpClientContext;
 
-    Result := FClientContextClass.Create;
+    Result := lvClientClass.Create;
     Result.FAcceptorMgr := Self;
     FOwner.OnCreateClientContext(Result);
     if (FOwner.FDataMoniter <> nil) then
@@ -3145,10 +3145,10 @@ begin
     if Result = nil then
     begin
       lvClientClass := FClientContextClass;
-      if lvClientClass = nil then FClientContextClass := FOwner.FClientContextClass;
-      if lvClientClass = nil then FClientContextClass := TIocpClientContext;
+      if lvClientClass = nil then lvClientClass := FOwner.FClientContextClass;
+      if lvClientClass = nil then lvClientClass := TIocpClientContext;
 
-      Result := FClientContextClass.Create;
+      Result := lvClientClass.Create;
       Result.FAcceptorMgr := Self;
       FOwner.OnCreateClientContext(Result);
 
