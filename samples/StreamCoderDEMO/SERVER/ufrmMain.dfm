@@ -25,8 +25,6 @@ object frmMain: TfrmMain
     TabOrder = 0
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitWidth = 673
-      ExplicitHeight = 330
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -36,13 +34,15 @@ object frmMain: TfrmMain
         BevelKind = bkTile
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitWidth = 673
-        ExplicitHeight = 330
       end
     end
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -55,6 +55,10 @@ object frmMain: TfrmMain
     object tsTest: TTabSheet
       Caption = #27979#35797#39029#38754
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
     end
   end
   object pnlTop: TPanel
@@ -65,7 +69,6 @@ object frmMain: TfrmMain
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitWidth = 681
     object edtPort: TEdit
       Left = 9
       Top = 7

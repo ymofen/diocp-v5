@@ -52,3 +52,6 @@ A: Diocp在DEBUG模式下面会记录详细的日志。会记录每个连接断�
 Q: Diocp如何关闭日志记录。
 A: Diocp在DEBUG模式会记录详细日志。可以把DEBUG模式关闭
    D2007工程为例： Project->Options->Directories/Conditionals->Conditional defines 中把DEBUG删除
+   
+Q: 编码层逻辑处理的方式
+A: 编码层默认由接收数据的IOCP线程处理，这样会占用iocp接收网络io的资源，可以通过定义工程宏[QDAC_QWorker]由QWorker来处理逻辑(需要引用QWorkers单元)，[DIOCP_Task]有DiocpTask来处理逻辑(2016-07-19修改)
