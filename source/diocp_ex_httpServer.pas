@@ -38,13 +38,15 @@ uses
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
   , diocp_tcp_server, utils_queues, utils_hashs, utils_dvalue
   , diocp_ex_http_common
-  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs;
+  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
+  utils_BufferPool;
 
 
 
 const
   HTTPLineBreak = #13#10;
   SESSIONID = 'diocp_sid';
+  BLOCK_BUFFER_TAG = 10000;
 
 type
   TDiocpHttpState = (hsCompleted, hsRequest { 接收请求 } , hsRecvingPost { 接收数据 } );
@@ -494,6 +496,7 @@ type
   /// </summary>
   TDiocpHttpClientContext = class(TIocpClientContext)
   private
+    FBlockBuffer: TBlockBuffer;
     FHttpState: TDiocpHttpState;
     FCurrentRequest: TDiocpHttpRequest;
     {$IFDEF QDAC_QWorker}
@@ -505,6 +508,12 @@ type
 
     // 执行事件
     procedure DoRequest(pvRequest:TDiocpHttpRequest);
+
+    procedure OnBlockBufferWrite(pvSender:TObject; pvBuffer:Pointer;
+        pvLength:Integer);
+
+    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag,
+        pvErrorCode: Integer); override;
 
   public
     constructor Create; override;
@@ -520,6 +529,9 @@ type
     /// </summary>
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: Word);
       override;
+
+    procedure WriteResponseBuffer(buf: Pointer; len: Cardinal);
+    procedure FlushResponseBuffer();
   end;
 
 
@@ -529,6 +541,9 @@ type
   /// </summary>
   TDiocpHttpServer = class(TDiocpTcpServer)
   private
+    // 内存池
+    // 目前用与发送
+    FBlockBufferPool:PBufferPool;
     FAccessXRequest: Boolean;
 
     FRequestPool: TSafeQueue;
@@ -583,7 +598,11 @@ type
     procedure OnSessionRemove(pvData:Pointer);
   protected
     procedure DoAfterOpen; override;
-
+    /// <summary>
+    ///   当创建新的连接对象时会调用的函数
+    ///   可以在这里面做一些初始化
+    /// </summary>
+    procedure OnCreateClientContext(const context: TIocpClientContext); override;
   public
     constructor Create(AOwner: TComponent); override;
 
@@ -595,6 +614,11 @@ type
     ///   允许跨域访问, 设置后，SendRespnose加入响应的响应头
     /// </summary>
     property AccessXRequest: Boolean read FAccessXRequest write FAccessXRequest;
+
+    /// <summary>
+    ///   内存池
+    /// </summary>
+    property BlockBufferPool: PBufferPool read FBlockBufferPool;
     
     /// <summary>
     ///   获取Session总数
@@ -774,6 +798,8 @@ procedure TDiocpHttpRequest.DoResponseEnd;
 var
   lvClose:Boolean;
 begin
+  FDiocpContext.FlushResponseBuffer;
+  
   lvClose := False;
   if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
@@ -1079,22 +1105,31 @@ begin
   begin
     Assert(False, '响应数据为空');
   end;
-  
-  FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.HeaderBuilder.Memory,
+
+  FDiocpContext.WriteResponseBuffer(FResponse.FInnerResponse.HeaderBuilder.Memory,
     FResponse.FInnerResponse.HeaderBuilder.Size);
-
-
   if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
   begin
-    FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.ContentBuffer.Memory,
+    FDiocpContext.WriteResponseBuffer(FResponse.FInnerResponse.ContentBuffer.Memory,
       FLastResponseContentLength);
   end;
+
+//  FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.HeaderBuilder.Memory,
+//    FResponse.FInnerResponse.HeaderBuilder.Size);
+
+//  if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
+//  begin
+//    FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.ContentBuffer.Memory,
+//      FLastResponseContentLength);
+//  end;
 
 end;
 
 procedure TDiocpHttpRequest.SendResponseBuffer(pvBuffer:PByte; pvLen:Cardinal);
 begin
-  FDiocpContext.PostWSASendRequest(pvBuffer, pvLen);
+  FDiocpContext.WriteResponseBuffer(FResponse.FInnerResponse.HeaderBuilder.Memory,
+    FResponse.FInnerResponse.HeaderBuilder.Size);
+  //FDiocpContext.PostWSASendRequest(pvBuffer, pvLen);
 end;
 
 procedure TDiocpHttpRequest.SetReleaseLater(pvMsg:String);
@@ -1316,10 +1351,13 @@ end;
 constructor TDiocpHttpClientContext.Create;
 begin
   inherited Create;
+  FBlockBuffer := TBlockBuffer.Create(nil);
+  FBlockBuffer.OnBufferWrite := OnBlockBufferWrite;
 end;
 
 destructor TDiocpHttpClientContext.Destroy;
 begin
+  FBlockBuffer.Free;
   inherited Destroy;
 end;
 
@@ -1332,6 +1370,7 @@ begin
     FCurrentRequest.Close;
     FCurrentRequest := nil;
   end;
+  FBlockBuffer.FlushBuffer;
 end;
 
 procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
@@ -1367,6 +1406,29 @@ begin
        {$ENDIF}
      {$ENDIF}
    {$ENDIF}
+end;
+
+procedure TDiocpHttpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
+    Cardinal; pvBufferTag, pvErrorCode: Integer);
+begin
+  inherited;
+  if pvBufferTag = BLOCK_BUFFER_TAG then
+  begin
+    ReleaseRef(pvBuffer)
+  end;   
+end;
+
+procedure TDiocpHttpClientContext.FlushResponseBuffer;
+begin
+  FBlockBuffer.FlushBuffer;
+end;
+
+procedure TDiocpHttpClientContext.OnBlockBufferWrite(pvSender:TObject;
+    pvBuffer:Pointer; pvLength:Integer);
+begin
+  if not Self.Active then Exit;
+  AddRef(pvBuffer);
+  Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, BLOCK_BUFFER_TAG);
 end;
 
 {$IFDEF QDAC_QWorker}
@@ -1549,6 +1611,12 @@ begin
   end;
 end;
 
+procedure TDiocpHttpClientContext.WriteResponseBuffer(buf: Pointer; len:
+    Cardinal);
+begin
+  FBlockBuffer.Append(buf, len);
+end;
+
 { TDiocpHttpServer }
 
 constructor TDiocpHttpServer.Create(AOwner: TComponent);
@@ -1562,6 +1630,9 @@ begin
   KeepAlive := false;
   RegisterContextClass(TDiocpHttpClientContext);
   RegisterSessionClass(TDiocpHttpDValueSession);
+
+  // 100K, 每次投递100k
+  FBlockBufferPool := newBufferPool(1024 * 100);
 end;
 
 destructor TDiocpHttpServer.Destroy;
@@ -1575,6 +1646,7 @@ begin
 
   FSessionObjectPool.WaitFor(10000);
   FSessionObjectPool.Free;
+  FreeBufferPool(FBlockBufferPool);
   inherited;
 end;
 
@@ -1586,6 +1658,7 @@ end;
 procedure TDiocpHttpServer.DoAfterOpen;
 begin
   inherited;
+
   {$IFDEF DEBUG}
   {$IFDEF CONSOLE}
   
@@ -1709,6 +1782,13 @@ begin
   pvRequest.FOwnerPool := nil;
   pvRequest.FDiocpHttpServer := nil;
   FRequestPool.EnQueue(pvRequest);
+end;
+
+procedure TDiocpHttpServer.OnCreateClientContext(const context:
+    TIocpClientContext);
+begin
+  inherited;
+  TDiocpHttpClientContext(context).FBlockBuffer.SetBufferPool(Self.FBlockBufferPool);
 end;
 
 function TDiocpHttpServer.OnCreateSessionObject: TObject;

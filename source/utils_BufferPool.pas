@@ -85,6 +85,7 @@ type
     procedure CheckBlockBuffer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
   public
     constructor Create(ABufferPool: PBufferPool);
+    procedure SetBufferPool(ABufferPool: PBufferPool);
     procedure Append(pvBuffer:Pointer; pvLength:Integer);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     destructor Destroy; override;
     procedure FlushBuffer();
@@ -572,8 +573,7 @@ end;
 constructor TBlockBuffer.Create(ABufferPool: PBufferPool);
 begin
   inherited Create;
-  FBufferPool := ABufferPool;
-  FBlockSize := FBufferPool.FBlockSize;
+  SetBufferPool(ABufferPool);
 end;
 
 destructor TBlockBuffer.Destroy;
@@ -601,6 +601,19 @@ begin
   finally
     FBuffer := nil;
   end;
+end;
+
+procedure TBlockBuffer.SetBufferPool(ABufferPool: PBufferPool);
+begin
+  FBufferPool := ABufferPool;
+  if FBufferPool <> nil then
+  begin
+    FBlockSize := FBufferPool.FBlockSize;
+  end else
+  begin
+    FBlockSize := 0;
+  end;
+  FBuffer := nil;
 end;
 
 procedure TBlockBuffer.CheckBlockBuffer;

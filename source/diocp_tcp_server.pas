@@ -353,6 +353,9 @@ type
 
     procedure SetSocketState(pvState:TSocketState); virtual;
 
+    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag,
+        pvErrorCode: Integer); virtual;
+
     procedure RecordWorkerStartTick;
     procedure RecordWorkerEndTick;
   public
@@ -979,7 +982,7 @@ type
 
     procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
 
-    procedure DoSendBufferCompletedEvent(pvContext: TIocpClientContext; pvBuff:
+    procedure DoSendBufferCompletedEvent(pvContext: TIocpClientContext; pvBuffer:
         Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
     procedure InnerAddToDebugStrings(pvMsg:String);
   public
@@ -1860,6 +1863,12 @@ begin
   end;
 end;
 
+procedure TIocpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
+    Cardinal; pvBufferTag, pvErrorCode: Integer);
+begin
+  
+end;
+
 procedure TIocpClientContext.DoSendRequestCompleted(pvRequest:
     TIocpSendRequest);
 begin
@@ -2716,13 +2725,25 @@ begin
 end;
 
 procedure TDiocpTcpServer.DoSendBufferCompletedEvent(pvContext:
-    TIocpClientContext; pvBuff: Pointer; len: Cardinal; pvBufferTag,
+    TIocpClientContext; pvBuffer: Pointer; len: Cardinal; pvBufferTag,
     pvErrorCode: Integer);
 begin
+  if pvContext <> nil then
+  begin
+    try
+      pvContext.DoSendBufferCompleted(pvBuffer, len, pvBufferTag, pvErrorCode);
+    except
+      on e:Exception do
+      begin
+        LogMessage('pvContext.DoSendBufferCompleted error:' + e.Message, '', lgvError);
+      end;
+    end;
+  end;
+
   if Assigned(FOnSendBufferCompleted) then
   begin
     try
-      FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvErrorCode);
+      FOnSendBufferCompleted(pvContext, pvBuffer, len, pvBufferTag, pvErrorCode);
     except
       on e:Exception do
       begin
