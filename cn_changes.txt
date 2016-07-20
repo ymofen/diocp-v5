@@ -159,7 +159,9 @@ DIOCP-v5 0.0.2
 31: 2016-01-22 21:52:03
     * 将Socket的初始化工作放在组件创建中
     * StreamCoderDEMO添加DiocpStreamServer工程
-    (已经确认编码层(TDiocpCoderTcpServer)有隐患, 请尽量使用TDiocpTcpServer, 编码层使用了iocpTaskManager, utils.buffer(TBufferLink), 目前还没有确定是具体位置)
+    (已经确认编码层(TDiocpCoderTcpServer)有隐患, 请尽量使用TDiocpTcpServer, 编码层使用了iocpTaskManager, utils.buffer(TBufferLink), 目前还没有确定是具体位置, 
+     解决方法：请参考DiocpStreamServer。
+    )
 
 
 32: 2016-05-25 13:10:49
