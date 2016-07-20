@@ -66,6 +66,9 @@ function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
 function GetTickCount: Cardinal;
 
+function WaitForExpect(var v: Integer; pvExcept: Integer = 0; pvTimeOut:
+    Integer = 120000): Boolean;
+
 {$IF RTLVersion<24}
 function AtomicCmpExchange(var Target: Integer; Value: Integer;
   Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
@@ -163,6 +166,19 @@ begin
   {$ELSE}
   Result := TThread.GetTickCount;
   {$ENDIF}
+end;
+
+function WaitForExpect(var v: Integer; pvExcept: Integer = 0; pvTimeOut:
+    Integer = 120000): Boolean;
+var
+  t:Cardinal;
+begin
+  t := GetTickCount;
+  while (v <> pvExcept) and ((GetTickCount - t) < pvTimeOut) do
+  begin
+    Sleep(10);
+  end;        
+  Result := v = pvExcept;
 end;
 
 constructor TASyncWorker.Create(AOnAsyncEvent: TOnASyncEvent);

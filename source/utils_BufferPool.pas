@@ -8,7 +8,7 @@ unit utils_BufferPool;
 
 interface
 
-{.$DEFINE USE_SPINLOCK}
+{$DEFINE USE_SPINLOCK}
 
 uses
   SyncObjs, SysUtils
@@ -67,6 +67,26 @@ type
     data_free_type:Byte; // 0,
   end;
 
+  TBufferNotifyEvent = procedure(pvSender: TObject; pvBuffer: Pointer; pvLength:
+      Integer) of object;
+  TBlockBuffer = class(TObject)
+  private
+    FBlockSize: Integer;
+    FSize:Integer;
+    FPosition:Integer;
+    FBuffer: Pointer;
+    FBufferPtr:PByte;
+    FBufferPool: PBufferPool;
+    FOnBufferWrite: TBufferNotifyEvent;
+    procedure CheckBlockBuffer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+  public
+    constructor Create(ABufferPool: PBufferPool);
+    procedure Append(pvBuffer:Pointer; pvLength:Integer);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+    destructor Destroy; override;
+    procedure FlushBuffer();
+    property OnBufferWrite: TBufferNotifyEvent read FOnBufferWrite write FOnBufferWrite;
+  end;
+
 const
   BLOCK_SIZE = SizeOf(TBufferBlock);
 
@@ -81,6 +101,7 @@ function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
 procedure FreeBufferPool(buffPool:PBufferPool);
 
 function GetBuffer(ABuffPool:PBufferPool): PByte;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+procedure FreeBuffer(pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean=True);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 function AddRef(pvBuffer:PByte): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
@@ -309,7 +330,7 @@ end;
 /// <summary>
 ///  释放内存块到Owner的列表中
 /// </summary>
-procedure FreeBuffer(pvBufBlock:PBufferBlock); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+procedure InnerFreeBuffer(pvBufBlock:PBufferBlock);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 var
   lvBuffer:PBufferBlock;
   lvOwner:PBufferPool;
@@ -488,7 +509,7 @@ function ReleaseRef(pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
     Integer; overload;
 var
   lvBuffer:PByte;
-  lvBlock:PBufferBlock; 
+  lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_SIZE);
@@ -500,11 +521,99 @@ begin
   begin
     if pvReleaseAttachDataAtEnd then
       ReleaseAttachData(lvBlock);
-    FreeBuffer(lvBlock);
+    InnerFreeBuffer(lvBlock);
   end else
   begin
     Assert(Result > 0, 'DBuffer error release');
   end;
+end;
+
+procedure FreeBuffer(pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean);
+var
+  lvBuffer:PByte;
+  lvBlock:PBufferBlock;
+begin
+  lvBuffer := pvBuffer;
+  Dec(lvBuffer, BLOCK_SIZE);
+  lvBlock := PBufferBlock(lvBuffer);
+  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+  {$IFDEF DEBUG}
+  Assert(lvBlock.refcounter = 0, Format('DBufferBlock:: buffer is in use, refcount:%d', [lvBlock.refcounter]));
+  {$ENDIF}
+  if pvReleaseAttachDataAtEnd then
+    ReleaseAttachData(lvBlock);
+  InnerFreeBuffer(lvBlock);
+end;
+
+procedure TBlockBuffer.Append(pvBuffer: Pointer; pvLength: Integer);
+var
+  r, l, s:Integer;
+  lvBuff:PByte;
+begin  
+  lvBuff := PByte(pvBuffer);
+  r := pvLength;
+  while r > 0 do
+  begin
+    CheckBlockBuffer;
+    if FPosition + r > FBlockSize then l := FBlockSize - FPosition else l := r;
+
+    Move(lvBuff^, FBufferPtr^, l);
+    Dec(r, l);
+    Inc(lvBuff, l);
+    Inc(FBufferPtr, l);
+    Inc(FPosition, l);
+    Inc(FSize, l);
+    if FPosition = FBlockSize then
+    begin
+      FlushBuffer;
+    end;     
+  end;
+end;
+
+constructor TBlockBuffer.Create(ABufferPool: PBufferPool);
+begin
+  inherited Create;
+  FBufferPool := ABufferPool;
+  FBlockSize := FBufferPool.FBlockSize;
+end;
+
+destructor TBlockBuffer.Destroy;
+begin
+  FlushBuffer;
+  inherited Destroy;
+end;
+
+procedure TBlockBuffer.FlushBuffer;
+begin
+  if FBuffer = nil then Exit;
+  try                        
+    if (Assigned(FOnBufferWrite) and (FSize > 0)) then
+    begin
+      AddRef(FBuffer);
+      try
+        FOnBufferWrite(self, FBuffer, FSize);
+      finally
+        ReleaseRef(FBuffer);
+      end;
+    end else
+    begin
+      if FBuffer <> nil then FreeBuffer(FBuffer);
+    end;
+  finally
+    FBuffer := nil;
+  end;
+end;
+
+procedure TBlockBuffer.CheckBlockBuffer;
+begin
+  if FBuffer = nil then
+  begin
+    FBuffer := GetBuffer(FBufferPool);
+    FBufferPtr := PByte(FBuffer);
+    FPosition := 0;
+    FSize := 0;
+  end;
+  
 end;
 
 
