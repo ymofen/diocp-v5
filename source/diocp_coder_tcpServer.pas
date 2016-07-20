@@ -537,7 +537,7 @@ begin
     except
       on e:Exception do
       begin
-        self.Owner.LogMessage(
+        sfLogger.LogMessage(
           Format('DoInnerJob:%s', [e.Message]), CORE_LOG_FILE);
       end;
     end;
@@ -602,15 +602,24 @@ begin
       self.UnLock;
     end;
 
+
     lvObj := lvTask.FData;
     try
       try
+        // 如果需要执行
+        if TDiocpCoderTcpServer(FOwner).LogicWorkerNeedCoInitialize then
+          pvJob.Worker.ComNeeded();
+          
         // 执行任务
         if DoExecuteRequest(lvTask) <> S_OK then
         begin
           Break;
         end;
       except
+        on E:Exception do
+        begin
+          Self.LogMessage('1-OnExecuteJob Err:%s', [e.Message], CORE_LOG_FILE);
+        end;
       end;
     finally
       // 归还到任务池
@@ -619,6 +628,10 @@ begin
         // 释放解码对象
         if lvObj <> nil then FreeAndNil(lvObj);
       except
+        on E:Exception do
+        begin
+          Self.LogMessage('1-OnExecuteJob Err:%s', [e.Message], CORE_LOG_FILE);
+        end;
       end;
     end;
   end;
@@ -661,7 +674,11 @@ begin
         begin
           Break;
         end;
-      except          
+      except
+        on E:Exception do
+        begin
+          Self.LogMessage('1-OnExecuteJob Err:%s', [e.Message], CORE_LOG_FILE);
+        end;
       end;
     finally
       // 归还到任务池
@@ -670,6 +687,10 @@ begin
         // 释放解码对象
         if lvObj <> nil then FreeAndNil(lvObj);
       except
+        on E:Exception do
+        begin
+          Self.LogMessage('2-OnExecuteJob Err:%s', [e.Message], CORE_LOG_FILE);
+        end;
       end;
     end;
   end; 

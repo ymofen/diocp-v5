@@ -76,8 +76,11 @@ function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inli
 function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 {$IFEND <XE5}
 
+function GetCPUCount: Integer;
 
 implementation
+
+
 
 {$IF RTLVersion < 18}
 function InterlockedIncrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedIncrement';
@@ -94,6 +97,23 @@ function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; o
 {$IFEND <D2007}
 
 
+function GetCPUCount: Integer;
+{$IFDEF MSWINDOWS}
+var
+  si: SYSTEM_INFO;
+{$ENDIF}
+begin
+  {$IFDEF MSWINDOWS}
+  GetSystemInfo(si);
+  Result := si.dwNumberOfProcessors;
+  {$ELSE}// Linux,MacOS,iOS,Andriod{POSIX}
+  {$IFDEF POSIX}
+  Result := sysconf(_SC_NPROCESSORS_ONLN);
+  {$ELSE}// unkown system, default 1
+  Result := 1;
+  {$ENDIF !POSIX}
+  {$ENDIF !MSWINDOWS}
+end;
 
 {$IF RTLVersion<24}
 function AtomicCmpExchange(var Target: Integer; Value: Integer;

@@ -10,6 +10,10 @@ interface
 
 {$DEFINE USE_SPINLOCK}
 
+/// 如果不进行sleep会跑满cpu。
+/// spinlock 交换失败时会执行sleep
+{$DEFINE SPINLOCK_SLEEP}
+
 uses
   SyncObjs, SysUtils
   {$IFDEF MSWINDOWS}
@@ -143,7 +147,6 @@ function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inli
 
 procedure SpinLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
 procedure SpinLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
-procedure SpinUnLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
 procedure SpinUnLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
 
 
@@ -197,7 +200,9 @@ begin
 //    {$ELSE}
 //      TThread.Yield;
 //    {$ENDIF}
+    {$IFDEF SPINLOCK_SLEEP}
     Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+    {$ENDIF}
   end;
 end;
 
@@ -205,24 +210,18 @@ procedure SpinLock(var Target:Integer);
 begin
   while AtomicCmpExchange(Target, 1, 0) <> 0 do
   begin
+    {$IFDEF SPINLOCK_SLEEP}
     Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+    {$ENDIF}
   end;
 end;
 
-procedure SpinUnLock(var Target:Integer; var WaitCounter:Integer);
-begin
-  while AtomicCmpExchange(Target, 0, 1) <> 1 do
-  begin
-    AtomicIncrement(WaitCounter);
-    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
-  end;
-end;
 
-procedure SpinUnLock(var Target:Integer); 
+procedure SpinUnLock(var Target:Integer);
 begin
-  while AtomicCmpExchange(Target, 0, 1) <> 1 do
+  if AtomicCmpExchange(Target, 0, 1) <> 1 then
   begin
-    Sleep(1);
+    Assert(False, 'SpinUnLock::AtomicCmpExchange(Target, 0, 1) <> 1');
   end;
 end;
 

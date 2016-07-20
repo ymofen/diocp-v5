@@ -1385,6 +1385,10 @@ begin
 
      lvObj.CheckThreadIn;
 
+      // 如果需要执行
+      if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+        pvJob.Worker.ComNeeded();
+
      // 已经不是当时请求的连接， 放弃处理逻辑
      if lvObj.FContextDNA <> self.ContextDNA then
      begin
