@@ -8,7 +8,33 @@ uses
   Windows,
   {$ELSE}
   {$ENDIF}
-  Classes, SysUtils, SyncObjs, utils_dvalue;
+  Classes, SysUtils, SyncObjs, utils_dvalue, utils_BufferPool;
+
+const
+  MAX_THREADID_VALUE = 65535;
+
+type
+  TPointerNotifyProc = procedure(const sender:Pointer; const v:Pointer);
+
+  PThreadVarRecord = ^TThreadVarRecord;
+  TThreadVarRecord = record
+    FVar:Pointer;
+    FReleaseCallBack:TPointerNotifyProc;
+    FLastActivity:Cardinal;
+  end;
+
+  PThreadVars = ^TThreadVars;
+  TThreadVars = record
+    FVarArray:array[1..MAX_THREADID_VALUE] of PThreadVarRecord;
+    FListLocker:Integer;
+    FList:TDHashTable;
+  end;
+
+function NewThreadVars: PThreadVars;
+procedure DisposeThreadVars(const p_thread_vars:PThreadVars);
+function GetCurrentThreadVar(const p_thread_vars: PThreadVars): Pointer;
+procedure SetCurrentThreadVar(const p_thread_vars: PThreadVars; const v:
+    Pointer; pvReleaseCallBack: TPointerNotifyProc);
 
 
 function GetCurrentThreadDValue: TDValue;
@@ -16,8 +42,6 @@ procedure ResetThreadVars;
 
 procedure InitalizeForThreadVars;
 procedure FinalizeForThreadVars;
-
-
 
 
 implementation
@@ -96,6 +120,94 @@ begin
   finally
     __info_list.UnLock;
   end;
+end;
+
+function NewThreadVars: PThreadVars;
+begin
+  New(Result);
+  Result.FList := TDHashTable.Create;
+  Result.FListLocker := 0;
+end;
+
+procedure DisposeThreadVars(const p_thread_vars:PThreadVars);
+begin
+  DisposeThreadVars(p_thread_vars);
+end;
+
+procedure InnerReleaseVar(const p_thread_vars: PThreadVars; const
+    p_thread_varrecord: PThreadVarRecord);
+begin
+  if p_thread_varrecord.FVar <> nil then
+  begin
+    p_thread_varrecord.FReleaseCallBack(p_thread_vars, p_thread_varrecord.FVar);
+    p_thread_varrecord.FVar := nil;
+  end;
+end;
+
+function GetCurrentThreadVar(const p_thread_vars: PThreadVars): Pointer;
+var
+  lvThreadID:Cardinal;
+  lvPVar:PThreadVarRecord;
+begin
+  lvThreadID := GetCurrentThreadId;
+  if lvThreadID > MAX_THREADID_VALUE then
+  begin
+    SpinLock(p_thread_vars.FListLocker);
+    try
+      lvPVar := p_thread_vars.FList.Values[lvThreadID];       
+    finally
+      SpinUnLock(p_thread_vars.FListLocker);
+    end;
+  end else
+  begin
+    lvPVar := p_thread_vars.FVarArray[lvThreadID];
+  end;
+  if lvPVar <> nil then
+  begin
+    Result := lvPVar.FVar;
+    lvPVar.FLastActivity := GetTickCount;
+  end else
+  begin
+    Result := nil;
+  end;
+end;
+
+procedure SetCurrentThreadVar(const p_thread_vars: PThreadVars; const v:
+    Pointer; pvReleaseCallBack: TPointerNotifyProc);
+var
+  lvThreadID:Cardinal;
+  lvPVar:PThreadVarRecord;
+  procedure innerProcessVar();
+  begin
+    if lvPVar = nil then
+    begin
+      New(lvPVar);
+      p_thread_vars.FList.Values[lvThreadID] := lvPVar;
+      lvPVar.FVar := v;
+    end else
+    begin
+      InnerReleaseVar(p_thread_vars, lvPVar);
+    end;
+    lvPVar.FLastActivity := GetTickCount;
+  end;
+begin
+  lvThreadID := GetCurrentThreadId;
+  if lvThreadID > MAX_THREADID_VALUE then
+  begin
+    SpinLock(p_thread_vars.FListLocker);
+    try
+      lvPVar := p_thread_vars.FList.Values[lvThreadID];
+      innerProcessVar;
+    finally
+      SpinUnLock(p_thread_vars.FListLocker);
+    end;
+  end else
+  begin
+    lvPVar := p_thread_vars.FVarArray[lvThreadID];
+    innerProcessVar;
+  end;
+
+
 end;
 
 
