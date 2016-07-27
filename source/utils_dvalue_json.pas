@@ -23,6 +23,17 @@ type
     FLastValue: String;
   end;
 
+  PJsonBuffer = ^TJsonBuffer;
+  TJsonBuffer = record
+    FBuffer:TStream;
+    FLevel:Integer;
+    FState:Integer;  // 0 search begin, 1, search end, 2: String, 3: escape
+    FBeginChr: array [0..32] of Byte;
+    FEndChr: array [0..32] of Byte;
+    FStringEndChr:Byte;
+
+  end;
+
 function JSONParser(s: string; pvDValue: TDValue): Integer;
 function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
     true; pvExceptValueTypes: TDValueDataTypes = [vdtInterface, vdtObject,
@@ -30,6 +41,9 @@ function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
 
 function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
 procedure JSONWriteToUtf8NoBOMFile(pvFile:string; pvDValue:TDValue);
+
+function InputJsonBuffer(const jsonBuffer:PJsonBuffer; pvByte:Integer): Integer;
+procedure ResetJsonBuffer(const jsonBuffer:PJsonBuffer);
 
 
     
@@ -755,6 +769,112 @@ var
 begin
   s := JSONEncode(pvDValue, False, True);
   WriteStringToUtf8NoBOMFile(pvFile, s);
+end;
+
+function InputJsonBuffer(const jsonBuffer:PJsonBuffer; pvByte:Integer): Integer;
+begin
+  Result := 0;
+  if jsonBuffer.FState = 0 then
+  begin
+    if pvByte = Ord('{') then
+    begin
+      jsonBuffer.FBeginChr[jsonBuffer.FLevel] := pvByte;
+      jsonBuffer.FEndChr[jsonBuffer.FLevel] := Ord('}');
+      Inc(jsonBuffer.FLevel);
+      jsonBuffer.FState := 1;
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      Exit;
+    end;
+    if pvByte = Ord('[') then
+    begin
+      jsonBuffer.FBeginChr[jsonBuffer.FLevel] := pvByte;
+      jsonBuffer.FEndChr[jsonBuffer.FLevel] := Ord(']');
+      Inc(jsonBuffer.FLevel);
+      jsonBuffer.FState := 1;
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      Exit;
+    end;
+  end else if jsonBuffer.FState = 1 then
+  begin       //
+    if pvByte = Ord('"') then
+    begin
+      jsonBuffer.FState := 2;   // string
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      jsonBuffer.FStringEndChr := Ord('"');
+      Exit;
+    end;
+
+    if pvByte = Ord('''') then
+    begin
+      jsonBuffer.FState := 2;   // string
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      jsonBuffer.FStringEndChr := Ord('''');
+      Exit;
+    end;
+
+    //
+    if pvByte = Ord('{') then
+    begin
+      jsonBuffer.FBeginChr[jsonBuffer.FLevel] := pvByte;
+      jsonBuffer.FEndChr[jsonBuffer.FLevel] := Ord('}');
+      Inc(jsonBuffer.FLevel);
+      jsonBuffer.FState := 1;
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      Exit;
+    end;
+    if pvByte = Ord('[') then
+    begin
+      jsonBuffer.FBeginChr[jsonBuffer.FLevel] := pvByte;
+      jsonBuffer.FEndChr[jsonBuffer.FLevel] := Ord(']');
+      Inc(jsonBuffer.FLevel);
+      jsonBuffer.FState := 1;
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      Exit;
+    end;
+
+    if pvByte = jsonBuffer.FEndChr[jsonBuffer.FLevel] then
+    begin
+      Inc(jsonBuffer.FLevel);
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      if jsonBuffer.FLevel = 0 then
+      begin    // 成功
+        Result := 1;
+      end;
+      Exit;
+    end;
+    
+
+    jsonBuffer.FBuffer.Write(pvByte, 1);
+  end else if jsonBuffer.FState = 2 then
+  begin
+    if pvByte = jsonBuffer.FStringEndChr then
+    begin
+      jsonBuffer.FState := 1;   // string
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      jsonBuffer.FStringEndChr := Ord('"');
+      Exit;
+    end;
+
+    if pvByte = Ord('\') then
+    begin       // 转义符
+      jsonBuffer.FState := 3;   // escape
+      jsonBuffer.FBuffer.Write(pvByte, 1);
+      Exit;
+    end;
+  end else if jsonBuffer.FState = 3 then
+  begin
+    jsonBuffer.FState := 2;   // escape
+    jsonBuffer.FBuffer.Write(pvByte, 1);
+  end else
+  begin
+    Assert(False, 'impossiable');
+  end;
+end;
+
+procedure ResetJsonBuffer(const jsonBuffer:PJsonBuffer);
+begin
+  jsonBuffer.FLevel := 0;
+  jsonBuffer.FState := 0;
 end;
 
 end.
