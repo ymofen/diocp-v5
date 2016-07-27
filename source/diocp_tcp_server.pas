@@ -1380,6 +1380,11 @@ begin
         DoDisconnected;
       end;
     except
+      on e:Exception do
+      begin
+        sfLogger.LogMessage(
+          Format('InnerCloseContext:%s', [e.Message]), CORE_LOG_FILE);
+      end;
     end;
   finally
     {$IFDEF DEBUG_ON}
@@ -1559,7 +1564,8 @@ begin
     begin
       FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
         [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
-      Assert(FReferenceCounter >=0);
+      Assert(FReferenceCounter >=0,Format('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
+        [FReferenceCounter, FDebugStrings.Text]));
     end else
     begin
       FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
@@ -1756,8 +1762,8 @@ begin
   {$ENDIF}
   if IsDebugMode then
   begin
-    Assert(FReferenceCounter = 0);
-    Assert(not FActive);
+    Assert(FReferenceCounter = 0, Format('TIocpClientContext.DoCleanUp::FReferenceCounter=%d', [FReferenceCounter]));
+    Assert(not FActive, 'DoCleanUp::Context is active');
   end;
 
 
@@ -1801,14 +1807,19 @@ begin
 
       if self.LockContext('onConnected', Self) then
       try
-        if Assigned(FOwner.FOnContextConnected) then
-        begin
-          FOwner.FOnContextConnected(Self);
-        end;
-
         try
+          if Assigned(FOwner.FOnContextConnected) then
+          begin
+            FOwner.FOnContextConnected(Self);
+          end;
+
           OnConnected();
         except
+          on e:Exception do
+          begin
+            sfLogger.LogMessage(
+              Format('DoConnected:%s', [e.Message]), CORE_LOG_FILE);
+          end;
         end;
 
         PostWSARecvRequest;
@@ -2464,8 +2475,8 @@ begin
 end;
 
 function TDiocpTcpServer.IsDestroying: Boolean;
-begin
-  Result := FIsDestroying or (csDestroying in self.ComponentState)
+begin                       // 线程不安全？
+  Result := FIsDestroying;  // or (csDestroying in self.ComponentState)
 end;
 
 procedure TDiocpTcpServer.OnCreateClientContext(const context:

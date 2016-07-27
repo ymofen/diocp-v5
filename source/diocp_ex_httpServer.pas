@@ -1554,7 +1554,7 @@ begin
       try
         FCurrentRequest := nil;
         lvTempRequest.Response.FInnerResponse.ResponseCode := 400;
-        lvTempRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
+        //lvTempRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
         lvTempRequest.ResponseEnd;
       finally
         lvTempRequest.Close;

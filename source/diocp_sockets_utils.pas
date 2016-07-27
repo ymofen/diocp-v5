@@ -100,6 +100,10 @@ function NowString: String;
 /// </summary>
 function MakeDiocpHandle: THandle;
 
+function WSocket_Synchronized_ResolveHost(InAddr: AnsiString): TInAddr;
+
+function WSocketIsDottedIP(const S: AnsiString): Boolean;
+
 implementation
 
 uses
@@ -231,6 +235,8 @@ asm
         lock    cmpxchg[r8], dl
 {$endif}
 end;
+
+
 
 function GetQueuedCompletionStatus; external kernel32 name 'GetQueuedCompletionStatus';
 
@@ -393,6 +399,98 @@ var
 begin
   v := InterlockedIncrement(__DiocpHandle);
   Result := THandle(v);
+end;
+
+{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+{ Check for a valid numeric dotted IP address such as 192.161.65.25         }
+{ Accept leading and trailing spaces.                                       }
+
+function WSocketIsDottedIP(const S: AnsiString): Boolean;
+var
+  I: Integer;
+  DotCount: Integer;
+  NumVal: Integer;
+begin
+  Result := False;
+  DotCount := 0;
+  NumVal := 0;
+  I := 1;
+
+  { Skip leading spaces }
+  while (I <= Length(S)) and (S[I] = ' ') do
+    Inc(I);
+  { Can't begin with a dot }
+  if (I <= Length(S)) and (S[I] = '.') then
+    Exit;
+  { Scan full AnsiString }
+  while I <= Length(S) do
+  begin
+    if S[I] = '.' then
+    begin
+      Inc(DotCount);
+      if (DotCount > 3) or (NumVal > 255) then
+        Exit;
+      NumVal := 0;
+      { A dot must be followed by a digit }
+      if (I >= Length(S)) or (not (AnsiChar(S[I + 1]) in ['0'..'9'])) then
+        Exit;
+    end
+    else if AnsiChar(S[I]) in ['0'..'9'] then
+      NumVal := NumVal * 10 + Ord(S[I]) - Ord('0')
+    else
+    begin
+      { Not a digit nor a dot. Accept spaces until end of AnsiString }
+      while (I <= Length(S)) and (S[I] = ' ') do
+        Inc(I);
+      if I <= Length(S) then
+        Exit; { Not a space, do not accept }
+      break; { Only spaces, accept        }
+    end;
+    Inc(I);
+  end;
+  { We must have exactly 3 dots }
+  if (DotCount <> 3) or (NumVal > 255) then
+    Exit;
+  Result := True;
+end;
+
+function WSocket_Synchronized_ResolveHost(InAddr: AnsiString): TInAddr;
+var
+  Phe: PHostEnt;
+  IPAddr: u_long;
+begin
+  if InAddr = '' then
+    {  raise ESocketException.Create('WSocketResolveHost: ''' + InAddr + ''' Invalid Hostname.'); }
+    raise Exception.Create('Winsock Resolve Host: ''' + string(InAddr) + ''' Invalid Hostname.'); { V5.26 }
+
+  if WSocketIsDottedIP(InAddr) then
+  begin
+    { Address is a dotted numeric address like 192.161.124.32 }
+    IPAddr := inet_addr(PAnsiChar(InAddr));
+
+    if IPAddr = u_long(INADDR_NONE) then
+    begin
+      if InAddr = '255.255.255.255' then
+      begin
+        Result.s_addr := u_long(INADDR_BROADCAST);
+        Exit;
+      end;
+      {     raise ESocketException.Create('WSocketResolveHost: ''' + InAddr + ''' Invalid IP address.');  }
+      raise Exception.Create('Winsock Resolve Host: ''' + string(InAddr) + ''' Invalid IP address.'); { V5.26 }
+    end;
+    Result.s_addr := IPAddr;
+    Exit;
+  end;
+
+  { Address is a hostname }
+  Phe := GetHostByName(PAnsiChar(InAddr));
+  if Phe = nil then
+    //raise Exception.Create('Winsock Resolve Host: Cannot convert host address ''' + InAddr + '''');
+    Result.S_addr := u_long(INADDR_NONE)
+  else
+    Result.s_addr := PInAddr(Phe^.h_addr_list^)^.s_addr;
+
+  //Result :=string(inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^));
 end;
 
 initialization

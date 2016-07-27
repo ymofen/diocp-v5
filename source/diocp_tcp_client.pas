@@ -133,11 +133,13 @@ type
   public
     /// <summary>
     ///   清理Add创建的所有连接
+    ///   (*)非线程安全, 多线程并发可能会造成内存混乱
     /// </summary>
     procedure ClearContexts;
 
     /// <summary>
     ///   添加一个连对象
+    ///   (*)非线程安全, 多线程并发可能会造成内存混乱
     /// </summary>
     function Add: TIocpRemoteContext;
 
@@ -402,7 +404,10 @@ begin
 {$ENDIF}
   FASyncInvoker := TASyncInvoker.Create;
 
-  DisableAutoConnect := False;
+  // 自动重连
+  SetDisableAutoConnect(False);
+  // 确认开启线程
+  Sleep(0);
 end;
 
 destructor TDiocpTcpClient.Destroy;

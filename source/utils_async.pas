@@ -227,6 +227,7 @@ begin
   FStopEvent := TEvent.Create(nil, True, True, '');
   FWaitEvent := TEvent.Create(nil, True, true, '');
   FTerminated := true;
+  FStopEvent.SetEvent;
 end;
 
 destructor TASyncInvoker.Destroy;
@@ -238,6 +239,7 @@ end;
 
 procedure TASyncInvoker.InnerASync(pvWorker:TASyncWorker);
 begin
+  FStopEvent.ResetEvent;
   FOnAsyncEvent(pvWorker);
   FStopEvent.SetEvent;
   FWorker := nil;
@@ -248,7 +250,6 @@ procedure TASyncInvoker.Start(pvASyncEvent: TOnASyncEvent; pvData: Pointer =
     nil; pvDataObject: TObject = nil);
 begin
   FTerminated := False;
-  FStopEvent.ResetEvent;
   FOnAsyncEvent := pvASyncEvent;
   FWorker := ASyncInvoke(InnerASync, pvData, pvDataObject);
 end;
