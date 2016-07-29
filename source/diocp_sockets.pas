@@ -1687,8 +1687,9 @@ begin
 
   FDebugStrings.Free;
 
-  FContextPool.FreeDataObject;
   FContextPool.Free;
+
+  FASyncInvoker.Free;
   
   inherited Destroy;
 end;
@@ -3451,7 +3452,7 @@ begin
   begin
     Assert(FObjectAlive=True, '请勿重复进行归还池操作');
     Self.FObjectAlive := False;
-    FOwnePool.EnQueueObject(Self);
+    FOwnePool.EnQueueObject(Self, raObjectFree);
   end;
 end;
 
