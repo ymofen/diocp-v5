@@ -45,6 +45,8 @@ resourcestring
 
   strEngineIsOff = '[%s]IOCP引擎未启动,请确保IOCP引擎开启!';
 
+  strListenFail  = '侦听(%s:%d)时出现异常:%s';
+
 
 
   //strContextCloseErr = '

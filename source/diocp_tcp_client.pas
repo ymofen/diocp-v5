@@ -23,7 +23,7 @@ uses
   , utils_async
   , utils_fileWriter
   , utils_threadinfo
-  , utils_buffer;
+  , utils_buffer, utils_queues;
 
 type
   TIocpRemoteContext = class(TDiocpCustomContext)
@@ -110,15 +110,17 @@ type
     function GetCount: Integer;
     function GetItems(pvIndex: Integer): TIocpRemoteContext;
   private
-    FASyncInvoker:TASyncInvoker;
     FDisableAutoConnect: Boolean;
+    FAutoConnectTick:Cardinal;
 
   private
     /// <summary>
     ///  检测使用重新连接 ,单线程使用，仅供DoAutoReconnect调用
     /// </summary>
     procedure DoAutoReconnect(pvASyncWorker:TASyncWorker);
-    procedure OnASyncWork(pvASyncWorker:TASyncWorker);
+  protected
+    procedure DoASyncWork(pvFileWritter: TSingleFileWriter; pvASyncWorker:
+        TASyncWorker); override;
     procedure SetDisableAutoConnect(const Value: Boolean);
   private
   {$IFDEF UNICODE}
@@ -127,6 +129,8 @@ type
     FList: TObjectList;
   {$ENDIF}
   protected
+    procedure DoAfterOpen;override;
+    procedure DoAfterClose; override; 
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -402,23 +406,31 @@ begin
 {$ELSE}
   FList := TObjectList.Create();
 {$ENDIF}
-  FASyncInvoker := TASyncInvoker.Create;
+
+  FContextClass := TIocpRemoteContext;
 
   // 自动重连
   SetDisableAutoConnect(False);
-  // 确认开启线程
-  Sleep(0);
 end;
 
 destructor TDiocpTcpClient.Destroy;
 begin
-  FASyncInvoker.Terminate;
-  FASyncInvoker.WaitForStop;
   Close;
   FList.Clear;
   FList.Free;
-  FASyncInvoker.Free;
   inherited Destroy;
+end;
+
+procedure TDiocpTcpClient.DoAfterOpen;
+begin
+  inherited;
+
+end;
+
+procedure TDiocpTcpClient.DoAfterClose;
+begin
+  inherited;
+
 end;
 
 procedure TDiocpTcpClient.DoAutoReconnect(pvASyncWorker:TASyncWorker);
@@ -561,36 +573,12 @@ begin
   end;
 end;
 
-procedure TDiocpTcpClient.OnASyncWork(pvASyncWorker: TASyncWorker);
-var
-  lvFileWriter: TSingleFileWriter;  
+procedure TDiocpTcpClient.DoASyncWork(pvFileWritter: TSingleFileWriter;
+    pvASyncWorker: TASyncWorker);
 begin
-  lvFileWriter := TSingleFileWriter.Create;
-  try
-    lvFileWriter.FilePreFix := self.Name + '_ASync_';
-    {$IFDEF DEBUG}
-    lvFileWriter.LogMessage('启动时间:' + FormatDateTime('yyyy-mm-dd:HH:nn:ss.zzz', Now));
-    {$ENDIF}
-    while not pvASyncWorker.Terminated do
-    begin
-      try
-        SetCurrentThreadInfo('开始进行重连');
-        DoAutoReconnect(pvASyncWorker);
-        SetCurrentThreadInfo('结束重连过程');
-        self.FASyncInvoker.WaitForSleep(2000);
-      except
-        on e:Exception do
-        begin
-          lvFileWriter.LogMessage('ERR:' + e.Message);
-        end;  
-      end;
-    end;
-  finally
-    {$IFDEF DEBUG}
-    lvFileWriter.LogMessage('停止时间:' + FormatDateTime('yyyy-mm-dd:HH:nn:ss.zzz', Now));
-    {$ENDIF}
-    lvFileWriter.Flush;    
-    lvFileWriter.Free;
+  if tick_diff(FAutoConnectTick, GetTickCount) > 10000 then
+  begin
+    DoAutoReconnect(pvASyncWorker);
   end;
 end;
 
@@ -599,17 +587,6 @@ begin
   if Value <> FDisableAutoConnect then
   begin
     FDisableAutoConnect := Value;
-    if FDisableAutoConnect then
-    begin
-      FASyncInvoker.Terminate;
-      FASyncInvoker.WaitForStop;
-    end;
-  end;
-
-  if not FDisableAutoConnect then
-  begin
-    if FASyncInvoker.Terminated then
-      FASyncInvoker.Start(OnASyncWork);
   end;
 end;
 
