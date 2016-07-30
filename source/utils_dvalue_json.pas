@@ -832,9 +832,9 @@ begin
       Exit;
     end;
 
-    if pvByte = jsonBuffer.FEndChr[jsonBuffer.FLevel] then
+    if pvByte = jsonBuffer.FEndChr[jsonBuffer.FLevel - 1] then
     begin
-      Inc(jsonBuffer.FLevel);
+      Dec(jsonBuffer.FLevel);
       jsonBuffer.FBuffer.Write(pvByte, 1);
       if jsonBuffer.FLevel = 0 then
       begin    // ³É¹¦
@@ -851,7 +851,6 @@ begin
     begin
       jsonBuffer.FState := 1;   // string
       jsonBuffer.FBuffer.Write(pvByte, 1);
-      jsonBuffer.FStringEndChr := Ord('"');
       Exit;
     end;
 
@@ -861,6 +860,7 @@ begin
       jsonBuffer.FBuffer.Write(pvByte, 1);
       Exit;
     end;
+    jsonBuffer.FBuffer.Write(pvByte, 1);
   end else if jsonBuffer.FState = 3 then
   begin
     jsonBuffer.FState := 2;   // escape
