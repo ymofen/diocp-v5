@@ -24,7 +24,7 @@ uses
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
-  utils_queues, utils_locker;
+  utils_queues, utils_locker, utils_async, utils_fileWriter;
 
 const
   CORE_LOG_FILE = 'diocp_core_exception';
@@ -70,6 +70,9 @@ type
   /// </summary>
   TDiocpCustomContext = class(TObject)
   private
+    // 如果使用池，关闭后将会回归到池中
+    FOwnePool:TSafeQueue;
+    
     // 最后交互数据的时间点
     FLastActivity: Cardinal;
 
@@ -97,7 +100,7 @@ type
     procedure DecReferenceCounterAndRequestDisconnect(pvDebugInfo: string; pvObj:TObject);
 
   private
-    FAlive:Boolean;
+    FObjectAlive: Boolean;
 
     // link
     FPre:TDiocpCustomContext;
@@ -174,6 +177,7 @@ type
     procedure InnerAddToDebugStrings(pvMsg:String); overload;
     procedure InnerAddToDebugStrings(pvMsg: string; const args: array of const);
         overload;
+    procedure ReleaseBack;
   protected
     /// <summary>
     ///   request recv data
@@ -646,6 +650,10 @@ type
     /// </summary>
     FRefCounter:Integer;
 
+    FContextPool: TSafeQueue;
+
+    FASyncInvoker:TASyncInvoker;
+
     FDebugStrings:TStrings;
     
   {$IFDEF DEBUG_ON}
@@ -656,8 +664,8 @@ type
     FWSARecvBufferSize: Cardinal;
     procedure SetWSARecvBufferSize(const Value: Cardinal);
 
-    function isDestroying:Boolean;
-    function logCanWrite:Boolean;
+    function IsDestroying: Boolean;
+    function LogCanWrite: Boolean;
 
   protected
     FContextClass:TIocpContextClass;
@@ -766,8 +774,20 @@ type
     procedure RemoveFromOnOnlineList(pvObject: TDiocpCustomContext); virtual;
 
     procedure InnerAddToDebugStrings(pvMsg:String);
+    procedure OnASyncWork(pvASyncWorker:TASyncWorker);
+  protected
+    procedure DoASyncWork(pvFileWritter: TSingleFileWriter; pvASyncWorker:
+        TASyncWorker); virtual;
+  protected
+    procedure DoAfterOpen;virtual;
+    procedure DoAfterClose;virtual;
 
   public
+    /// <summary>
+    ///   从池中获取一个连接对象
+    /// </summary>
+    function GetContextFromPool: TDiocpCustomContext;
+
     /// <summary>
     ///   原子操作添加引用计数(一定要有对应的DecRefCounter);
     ///   目的: 阻止释放连接
@@ -808,6 +828,8 @@ type
     ///   请求断开所有连接，会立刻返回。
     /// </summary>
     procedure DisconnectAll;
+
+
     
     procedure Open;
 
@@ -1106,7 +1128,7 @@ begin
   FDisconnectedCounter := 0;
   FConnectedCounter := 0;
   FContextLocker := TIocpLocker.Create('contextlocker');
-  FAlive := False;
+  FObjectAlive := False;
   FRawSocket := TRawSocket.Create();
   FActive := false;
   FSendRequestLink := TIocpRequestSingleLink.Create(10);
@@ -1391,6 +1413,8 @@ begin
       [FReferenceCounter, Self.SocketHandle, IntPtr(Self), 'InnerCloseContext:移除在线列表']));
     FOwner.RemoveFromOnOnlineList(Self);
 
+    // 尝试归还到池
+    ReleaseBack;        
   end;
 end;
 
@@ -1607,6 +1631,10 @@ constructor TDiocpCustom.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
 
+  FContextPool := TSafeQueue.Create;
+
+  FASyncInvoker := TASyncInvoker.Create;
+  
   FDebugStrings := TStringList.Create;
 
   FRefCounter := 0;
@@ -1658,6 +1686,10 @@ begin
   FLocker.Free;
 
   FDebugStrings.Free;
+
+  FContextPool.Free;
+
+  FASyncInvoker.Free;
   
   inherited Destroy;
 end;
@@ -1747,6 +1779,16 @@ begin
   end;
 end;
 
+procedure TDiocpCustom.DoAfterClose;
+begin
+  
+end;
+
+procedure TDiocpCustom.DoAfterOpen;
+begin
+
+end;
+
 procedure TDiocpCustom.DoClientContextError(pvClientContext:
     TDiocpCustomContext; pvErrorCode: Integer);
 begin
@@ -1774,14 +1816,14 @@ begin
   Result := FIocpEngine.WorkerCount;
 end;
 
-function TDiocpCustom.isDestroying: Boolean;
+function TDiocpCustom.IsDestroying: Boolean;
 begin
-  Result := FIsDestroying or (csDestroying in self.ComponentState);
+  Result := FIsDestroying;  // or (csDestroying in self.ComponentState);
 end;
 
-function TDiocpCustom.logCanWrite: Boolean;
+function TDiocpCustom.LogCanWrite: Boolean;
 begin
-  Result := (not isDestroying) and __diocp_logger.Enable;
+  Result := (not IsDestroying) and __diocp_logger.Enable;
 end;
 
 
@@ -1793,9 +1835,13 @@ begin
   if FDataMoniter <> nil then FDataMoniter.clear;
 
   // engine start
-  FIocpEngine.checkStart;
+  FIocpEngine.CheckStart;
 
-  FActive := True;    
+  FActive := True;
+
+  FASyncInvoker.Start(OnASyncWork);
+
+  DoAfterOpen;   
 end;
 
 procedure TDiocpCustom.RegisterContextClass(pvContextClass: TIocpContextClass);
@@ -1850,13 +1896,19 @@ end;
 procedure TDiocpCustom.Close;
 begin
   FActive := false;
+  
+  FASyncInvoker.Terminate;
 
   DisconnectAll;
 
   WaitForContext(30000);
 
+  FASyncInvoker.WaitForStop;
+
   // engine Stop
-  FIocpEngine.safeStop;
+  FIocpEngine.SafeStop;
+
+  DoAfterClose;
 end;
 
 procedure TDiocpCustom.SetActive(pvActive:Boolean);
@@ -2110,7 +2162,7 @@ end;
 procedure TDiocpCustom.LogMessage(pvMsg: string; pvMsgType: string = '';
     pvLevel: TLogLevel = lgvMessage);
 begin
-  if logCanWrite then
+  if LogCanWrite then
   begin
     if pvMsgType <> '' then
     begin
@@ -2125,7 +2177,7 @@ end;
 procedure TDiocpCustom.logMessage(pvMsg: string; const args: array of const;
     pvMsgType: string; pvLevel: TLogLevel);
 begin
-  if logCanWrite then
+  if LogCanWrite then
   begin
     if pvMsgType <> '' then
     begin
@@ -2136,6 +2188,55 @@ begin
     end;
 
   end;  
+end;
+
+procedure TDiocpCustom.OnASyncWork(pvASyncWorker: TASyncWorker);
+var
+  lvFileWriter: TSingleFileWriter;  
+begin
+  lvFileWriter := TSingleFileWriter.Create;
+  try
+    lvFileWriter.FilePreFix := self.Name + '_监控_';
+    {$IFDEF DEBUG}
+    lvFileWriter.LogMessage('启动时间:' + FormatDateTime('yyyy-mm-dd:HH:nn:ss.zzz', Now));
+    {$ENDIF}
+    while not pvASyncWorker.Terminated do
+    begin
+      try
+        DoASyncWork(lvFileWriter, pvASyncWorker);
+        self.FASyncInvoker.WaitForSleep(100);
+      except
+        on e:Exception do
+        begin
+          lvFileWriter.LogMessage('ERR:' + e.Message);
+        end;  
+      end;
+    end;
+  finally
+    {$IFDEF DEBUG}
+    lvFileWriter.LogMessage('停止时间:' + FormatDateTime('yyyy-mm-dd:HH:nn:ss.zzz', Now));
+    {$ENDIF}
+    lvFileWriter.Flush;    
+    lvFileWriter.Free;
+  end;
+end;
+
+procedure TDiocpCustom.DoASyncWork(pvFileWritter: TSingleFileWriter;
+    pvASyncWorker: TASyncWorker);
+begin
+  
+end;
+
+function TDiocpCustom.GetContextFromPool: TDiocpCustomContext;
+begin
+  Result := TDiocpCustomContext(FContextPool.DeQueueObject);
+  if Result = nil then
+  begin
+    Result := CreateContext;
+    Result.Owner := Self;
+  end;
+  Result.FOwnePool := FContextPool;
+  Result.FObjectAlive := True;
 end;
 
 procedure TDiocpCustom.OnCreateContext(const context: TDiocpCustomContext);
@@ -2225,7 +2326,7 @@ begin
     if GetTickCount - l > pvTimeOut then
     begin
       {$IFDEF DEBUG_ON}
-       if logCanWrite then
+       if LogCanWrite then
         logMessage('WaitForContext End Current num:%d', [c], CORE_LOG_FILE);
       {$ENDIF}
       Break;
@@ -3342,6 +3443,16 @@ begin
         self.DecReferenceCounter('PostWSASendRequest', Self);
       end;
     end;
+  end;
+end;
+
+procedure TDiocpCustomContext.ReleaseBack;
+begin
+  if FOwnePool <> nil then
+  begin
+    Assert(FObjectAlive=True, '请勿重复进行归还池操作');
+    Self.FObjectAlive := False;
+    FOwnePool.EnQueueObject(Self, raObjectFree);
   end;
 end;
 

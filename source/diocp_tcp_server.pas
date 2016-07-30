@@ -2677,6 +2677,7 @@ begin
         FDefaultListener.FIPVersion := IP_V4;
         FDefaultListener.Start(FIocpEngine);
         FDefaultListener.PostAcceptExRequest(100);
+
       end else
       begin
         FListeners.Start(FIocpEngine);
@@ -4391,37 +4392,44 @@ procedure TDiocpListener.Start(pvIocpEngine: TIocpEngine);
 var
   lvListenSocket:TRawSocket;
 begin
-  lvListenSocket := FAcceptorMgr.FListenSocket;
-  lvListenSocket.IPVersion  := FIPVersion;
-  lvListenSocket.CreateTcpOverlappedSocket;
+  try
+    lvListenSocket := FAcceptorMgr.FListenSocket;
+    lvListenSocket.IPVersion  := FIPVersion;
+    lvListenSocket.CreateTcpOverlappedSocket;
 
-  // °ó¶¨ÕìÌý¶Ë¿Ú
-  if not lvListenSocket.Bind(FListenAddress, FListenPort) then
-  begin
-    try
-      RaiseLastOSError;
-    finally
-      lvListenSocket.Close(False);
+    // °ó¶¨ÕìÌý¶Ë¿Ú
+    if not lvListenSocket.Bind(FListenAddress, FListenPort) then
+    begin
+      try
+        RaiseLastOSError;
+      finally
+        lvListenSocket.Close(False);
+      end;
     end;
-  end;
 
-  // ¿ªÆôÕìÌý
-  if not lvListenSocket.listen() then
-  begin
-    try
-      RaiseLastOSError;
-    finally
-      lvListenSocket.Close(False);
+    // ¿ªÆôÕìÌý
+    if not lvListenSocket.listen() then
+    begin
+      try
+        RaiseLastOSError;
+      finally
+        lvListenSocket.Close(False);
+      end;
     end;
-  end;
 
-  // ½«ÕìÌýÌ×½Ó×Ö°ó¶¨µ½IOCP¾ä±ú
-  if pvIocpEngine.IocpCore.Bind2IOCPHandle(lvListenSocket.SocketHandle, 0) <= 0 then
-  begin
-    try
-      RaiseLastOSError;
-    finally
-      lvListenSocket.Close(False);
+    // ½«ÕìÌýÌ×½Ó×Ö°ó¶¨µ½IOCP¾ä±ú
+    if pvIocpEngine.IocpCore.Bind2IOCPHandle(lvListenSocket.SocketHandle, 0) <= 0 then
+    begin
+      try
+        RaiseLastOSError;
+      finally
+        lvListenSocket.Close(False);
+      end;
+    end;
+  except
+    on E:Exception do
+    begin
+       Raise Exception.Create(Format(strListenFail, [FListenAddress, FListenPort, e.Message]));
     end;
   end;
 end;

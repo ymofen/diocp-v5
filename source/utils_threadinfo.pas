@@ -35,8 +35,8 @@ type
   end;
 
 
-procedure SetCurrentThreadInfo(pvInfo: String; pvAddTimePre: Boolean = true);
-    overload;
+procedure SetCurrentThreadInfo(const pvInfo: String; pvAddTimePre: Boolean =
+    true); overload;
 procedure SetCurrentThreadInfo(pvFmtMsg: string; const args: array of const);
     overload;
 procedure BindThreadObject(pvObject: TObject; pvFreeType: Integer = TYPE_NONE);
@@ -123,7 +123,8 @@ begin
   Result := lvInfo;
 end;
 
-procedure SetCurrentThreadInfo(pvInfo: String; pvAddTimePre: Boolean = true);
+procedure SetCurrentThreadInfo(const pvInfo: String; pvAddTimePre: Boolean =
+    true);
 var
   lvInfo:TThreadInfoObject;
 begin
