@@ -201,6 +201,8 @@ type
     function SelectSocket(vReadReady, vWriteReady, vExceptFlag: PBoolean;
         pvTimeOut: Integer = 0): Integer;
 
+    function SetSendBufferLength(const len:Integer): Integer;
+    function SetRecvBufferLength(const len:Integer): Integer;
     function Readable(pvTimeOut:Integer): Boolean;
 
     /// <summary>
@@ -833,6 +835,16 @@ function TRawSocket.SetReadTimeOut(const pvTimeOut: Cardinal): Integer;
 begin
   Result := setsockopt(FSocketHandle,
    SOL_SOCKET, SO_RCVTIMEO, PAnsiChar(@pvTimeOut), SizeOf(Cardinal));
+end;
+
+function TRawSocket.SetRecvBufferLength(const len:Integer): Integer;
+begin
+  Result := setsockopt(FSocketHandle,SOL_SOCKET,SO_RCVBUF,PAnsiChar(@len),sizeof(Integer));
+end;
+
+function TRawSocket.SetSendBufferLength(const len:Integer): Integer;
+begin
+  Result := setsockopt(FSocketHandle,SOL_SOCKET,SO_SNDBUF,PAnsiChar(@len),sizeof(Integer));
 end;
 
 function TRawSocket.SetSendTimeOut(const pvTimeOut:Cardinal): Integer;

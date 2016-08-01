@@ -708,6 +708,8 @@ begin
     FRawSocket.DoInitialize();
 
     {$IFDEF MSWINDOWS}
+//    FRawSocket.SetSendBufferLength(BLOCK_SIZE);
+//    FRawSocket.SetRecvBufferLength(BLOCK_SIZE);
     if FTimeOut > 0 then
     begin
       FRawSocket.SetReadTimeOut(FTimeOut);
