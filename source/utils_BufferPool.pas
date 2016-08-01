@@ -89,6 +89,7 @@ type
     procedure Append(pvBuffer:Pointer; pvLength:Integer);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     destructor Destroy; override;
     procedure FlushBuffer();
+    procedure ClearBuffer();
     property OnBufferWrite: TBufferNotifyEvent read FOnBufferWrite write FOnBufferWrite;
   end;
 
@@ -632,5 +633,15 @@ end;
 
 
 
+
+procedure TBlockBuffer.ClearBuffer;
+begin
+  if FBuffer = nil then Exit;
+  try                        
+    if FBuffer <> nil then FreeBuffer(FBuffer);
+  finally
+    FBuffer := nil;
+  end;  
+end;
 
 end.

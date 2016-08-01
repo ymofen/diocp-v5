@@ -11,7 +11,7 @@ uses
   , diocp_winapi_winsock2
   , SysConst
   {$ENDIF}
-  , SysUtils, utils_URL, utils_strings, diocp_ex_http_common;
+  , SysUtils, utils_URL, utils_strings, diocp_ex_http_common, utils_BufferPool;
 
 
 
@@ -27,6 +27,7 @@ type
 
   TDiocpHttpClient = class(TComponent)
   private
+    FBufferWriter:TBlockBuffer;
     FCheckThreadSafe: Boolean;
     FCreatTheadID:THandle;
     FLastResponseTick:Cardinal;
@@ -81,6 +82,8 @@ type
     procedure DecodeFirstLine;
 
     function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
+    procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
+        Integer);
   public
     procedure Cleaup;
 
@@ -189,6 +192,8 @@ function ReadStringFromStream(pvStream: TStream; pvIsUtf8Raw:Boolean): String;
 implementation
 
 { TDiocpHttpClient }
+const
+  BLOCK_SIZE = 1024 * 50;
 
 resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
@@ -197,6 +202,7 @@ resourcestring
 
 var
   __trace_id: Integer;
+  __writeBufferPool: PBufferPool;
 
 {$IFDEF POSIX}
 
@@ -287,6 +293,8 @@ end;
 constructor TDiocpHttpClient.Create(AOwner: TComponent);
 begin
   inherited;
+  FBufferWriter := TBlockBuffer.Create(__writeBufferPool);
+  FBufferWriter.OnBufferWrite := OnBufferWrite;
   FCreatTheadID := GetCurrentThreadID;
   FCheckThreadSafe := False;
   
@@ -332,6 +340,7 @@ begin
   FStringBuilder.Free;
   FRequestHeaderBuilder.Free;
   FHttpBuffer.Free;
+  FBufferWriter.Free;
   inherited;
 end;
 
@@ -444,7 +453,8 @@ begin
   FRequestHeader.Add('');                 // 添加一个回车符
 
   if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
-  try   
+  try
+    FBufferWriter.ClearBuffer;
     FStringBuilder.Clear;
     FStringBuilder.Append(FRequestHeader.Text);
     if FCustomeHeader.Count > 0 then
@@ -455,43 +465,13 @@ begin
   {$IFDEF UNICODE}
     lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
     len := Length(lvRawHeader);
-    r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
-    CheckSocketResult(r);
-    if r <> len then
-    begin
-      raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-    end;
+    FBufferWriter.Append(@lvRawHeader[0], len);
   {$ELSE}
     lvRawHeader := FStringBuilder.ToString();
     len := Length(lvRawHeader);
-    r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
-    CheckSocketResult(r);
-    if r <> len then
-    begin
-      raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-    end;
+    FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
   {$ENDIF}
-  //
-  //{$IFDEF UNICODE}
-  //  lvRawHeader := TEncoding.Default.GetBytes(FRequestHeader.Text);
-  //  len := Length(lvRawHeader);
-  //  r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
-  //  CheckSocketResult(r);
-  //  if r <> len then
-  //  begin
-  //    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-  //  end;
-  //{$ELSE}
-  //  lvRawHeader := FRequestHeader.Text;
-  //  len := Length(lvRawHeader);
-  //  r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
-  //  CheckSocketResult(r);
-  //  if r <> len then
-  //  begin
-  //    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-  //  end;
-  //{$ENDIF}
-
+    FBufferWriter.FlushBuffer;
     InnerExecuteRecvResponse();
   finally
     CheckCloseConnection;
@@ -499,8 +479,6 @@ begin
 end;
 
 procedure TDiocpHttpClient.InnerExecuteRecvResponse;
-const
-  BLOCK_SIZE = 2048;
 var
   lvRawHeader, lvBytes:TBytes;
   x, l:Integer;
@@ -675,6 +653,7 @@ begin
 
   if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
   try
+    FBufferWriter.ClearBuffer;
 
     FRequestHeaderBuilder.Clear;
     FRequestHeaderBuilder.Append(FRequestHeader.Text);
@@ -686,34 +665,21 @@ begin
   {$IFDEF UNICODE}
     lvRawHeader := TEncoding.Default.GetBytes(FRequestHeaderBuilder.ToString());
     len := Length(lvRawHeader);
-    r := FRawSocket.SendBuf(PByte(lvRawHeader)^, len);
-    CheckSocketResult(r);
-    if r <> len then
-    begin
-      raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-    end;
+    FBufferWriter.Append(PByte(@lvRawHeader[0]), len);
   {$ELSE}
     lvRawHeader := FRequestHeaderBuilder.ToString();
     len := Length(lvRawHeader);
-    r := FRawSocket.SendBuf(PAnsiChar(lvRawHeader)^, len);
-    CheckSocketResult(r);
-    if r <> len then
-    begin
-      raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-    end;
+    FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
   {$ENDIF}
 
     // 发送请求数据体
     if FRequestBody.Size > 0 then
     begin
       len := FRequestBody.Size;
-      r := FRawSocket.SendBuf(FRequestBody.Memory^, len);
-      CheckSocketResult(r);
-      if r <> len then
-      begin
-        raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
-      end;
+      FBufferWriter.Append(FRequestBody.Memory, len);
     end;
+
+    FBufferWriter.FlushBuffer;
 
     InnerExecuteRecvResponse();
   finally
@@ -973,6 +939,19 @@ begin
   DoAfterResponse; 
 end;
 
+procedure TDiocpHttpClient.OnBufferWrite(pvSender: TObject; pvBuffer: Pointer;
+    pvLength: Integer);
+var
+  r:Integer;
+begin
+  r := FRawSocket.SendBuf(pvBuffer^, pvLength);
+  CheckSocketResult(r);
+  if r <> pvLength then
+  begin
+    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
+  end;
+end;
+
 procedure TDiocpHttpClient.ResetState;
 begin
   FResponseResultCode := 0;
@@ -991,5 +970,10 @@ end;
 
 initialization
   __trace_id := 0;
+  __writeBufferPool := NewBufferPool(BLOCK_SIZE);
+
+finalization
+  FreeBufferPool(__writeBufferPool);
+
 
 end.
