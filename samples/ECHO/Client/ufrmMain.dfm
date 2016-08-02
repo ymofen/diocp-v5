@@ -18,7 +18,7 @@ object frmMain: TfrmMain
     Top = 79
     Width = 844
     Height = 351
-    ActivePage = tsOperator
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -37,6 +37,10 @@ object frmMain: TfrmMain
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316
@@ -48,7 +52,6 @@ object frmMain: TfrmMain
         Height = 62
         Align = alTop
         TabOrder = 0
-        ExplicitTop = 3
         object btnSendObject: TButton
           Left = 94
           Top = 34
@@ -85,8 +88,6 @@ object frmMain: TfrmMain
         Align = alClient
         Caption = 'pnlOpera_Send'
         TabOrder = 1
-        ExplicitTop = 41
-        ExplicitHeight = 282
         object mmoData: TMemo
           Left = 1
           Top = 1
@@ -96,7 +97,6 @@ object frmMain: TfrmMain
           Lines.Strings = (
             '0123456789')
           TabOrder = 0
-          ExplicitHeight = 280
         end
         object mmoOperaLog: TMemo
           Left = 1
@@ -105,15 +105,16 @@ object frmMain: TfrmMain
           Height = 89
           Align = alBottom
           TabOrder = 1
-          ExplicitLeft = 552
-          ExplicitTop = 104
-          ExplicitWidth = 185
         end
       end
     end
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3

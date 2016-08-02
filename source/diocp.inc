@@ -16,3 +16,7 @@
 
 {$IFEND RTLVersion}
 
+{$if CompilerVersion < 15}  // <D7
+{.$DEFINE D6} 
+{$ifend}
+

@@ -170,6 +170,17 @@ var
 
   __DiocpHandle:Integer;
 
+{$if CompilerVersion < 15}  // <D7
+const
+  HoursPerDay   = 24;
+  MinsPerHour   = 60;
+  SecsPerMin    = 60;
+  MSecsPerSec   = 1000;
+  MinsPerDay    = HoursPerDay * MinsPerHour;
+  SecsPerDay    = MinsPerDay * SecsPerMin;
+  MSecsPerDay   = SecsPerDay * MSecsPerSec;
+{$ifend}
+
 function GetRunTimeINfo: string;
 var
   lvMSec, lvRemain: Int64;

@@ -120,6 +120,11 @@ type
   u_int64 = Int64; // unsigned __int64 !! TODO For Delphi 7 ??
   {$EXTERNALSYM u_int64}
 
+{$if CompilerVersion < 18}
+  NativeInt = Integer;
+  NativeUInt = Cardinal;
+{$ifend}
+
 {$if CompilerVersion <= 29}  // XE8
   {$NODEFINE Int8} // We map 'Shortint' to 'Int8' for C++ above
   USHORT  = Word;
