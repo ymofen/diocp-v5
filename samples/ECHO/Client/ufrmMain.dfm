@@ -2,8 +2,8 @@ object frmMain: TfrmMain
   Left = 0
   Top = 0
   Caption = 'diocpv5 echo client'
-  ClientHeight = 430
-  ClientWidth = 844
+  ClientHeight = 616
+  ClientWidth = 923
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -13,45 +13,45 @@ object frmMain: TfrmMain
   OldCreateOrder = False
   PixelsPerInch = 96
   TextHeight = 13
+  object spllog: TSplitter
+    Left = 0
+    Top = 437
+    Width = 923
+    Height = 3
+    Cursor = crVSplit
+    Align = alBottom
+    ExplicitTop = 105
+    ExplicitWidth = 335
+  end
   object PageControl1: TPageControl
     Left = 0
-    Top = 79
-    Width = 844
-    Height = 351
-    ActivePage = TabSheet1
+    Top = 105
+    Width = 923
+    Height = 332
+    ActivePage = tsMonitor
     Align = alClient
     TabOrder = 0
-    object TabSheet1: TTabSheet
-      Caption = #26085#24535
-      object mmoRecvMessage: TMemo
-        Left = 0
-        Top = 0
-        Width = 836
-        Height = 323
-        Align = alClient
-        Lines.Strings = (
-          'iocp tcp client demo')
-        TabOrder = 0
-      end
-    end
+    ExplicitWidth = 844
+    ExplicitHeight = 335
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ExplicitWidth = 836
+      ExplicitHeight = 323
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
+      ExplicitWidth = 836
+      ExplicitHeight = 323
       object pnlOpera_Top: TPanel
         Left = 0
         Top = 0
-        Width = 836
+        Width = 915
         Height = 62
         Align = alTop
         TabOrder = 0
+        ExplicitWidth = 836
         object btnSendObject: TButton
           Left = 94
           Top = 34
@@ -83,47 +83,53 @@ object frmMain: TfrmMain
       object pnlOpera_Send: TPanel
         Left = 0
         Top = 62
-        Width = 836
-        Height = 261
+        Width = 915
+        Height = 242
         Align = alClient
         Caption = 'pnlOpera_Send'
         TabOrder = 1
+        ExplicitWidth = 836
+        ExplicitHeight = 261
         object mmoData: TMemo
           Left = 1
           Top = 1
-          Width = 834
-          Height = 170
+          Width = 913
+          Height = 151
           Align = alClient
           Lines.Strings = (
             '0123456789')
           TabOrder = 0
+          ExplicitWidth = 834
+          ExplicitHeight = 170
         end
         object mmoOperaLog: TMemo
           Left = 1
-          Top = 171
-          Width = 834
+          Top = 152
+          Width = 913
           Height = 89
           Align = alBottom
           TabOrder = 1
+          ExplicitLeft = 0
+          ExplicitTop = 154
+          ExplicitWidth = 834
         end
       end
     end
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ExplicitWidth = 836
+      ExplicitHeight = 323
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3
         Top = 3
-        Width = 830
+        Width = 909
         Height = 152
         Align = alTop
         Caption = #25104#21151#24314#31435#36830#25509
         TabOrder = 0
+        ExplicitWidth = 830
         object chkSendData: TCheckBox
           Left = 88
           Top = 0
@@ -139,31 +145,35 @@ object frmMain: TfrmMain
           AlignWithMargins = True
           Left = 5
           Top = 18
-          Width = 820
+          Width = 899
           Height = 129
           Align = alClient
           Lines.Strings = (
             '0123456789')
           TabOrder = 1
+          ExplicitWidth = 820
         end
       end
       object grpInterval: TGroupBox
         AlignWithMargins = True
         Left = 3
         Top = 161
-        Width = 830
-        Height = 159
+        Width = 909
+        Height = 140
         Align = alClient
         Caption = #38388#38548
         TabOrder = 1
+        ExplicitWidth = 830
+        ExplicitHeight = 159
         object pnlIntervalTop: TPanel
           Left = 2
           Top = 15
-          Width = 826
+          Width = 905
           Height = 35
           Align = alTop
           BevelOuter = bvNone
           TabOrder = 0
+          ExplicitWidth = 826
           object edtInterval: TEdit
             Left = 3
             Top = 7
@@ -186,12 +196,14 @@ object frmMain: TfrmMain
           AlignWithMargins = True
           Left = 5
           Top = 53
-          Width = 820
-          Height = 101
+          Width = 899
+          Height = 82
           Align = alClient
           Lines.Strings = (
             'mmoIntervalData')
           TabOrder = 1
+          ExplicitWidth = 820
+          ExplicitHeight = 101
         end
         object chkIntervalSendData: TCheckBox
           Left = 88
@@ -208,10 +220,12 @@ object frmMain: TfrmMain
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 844
-    Height = 79
+    Width = 923
+    Height = 105
     Align = alTop
+    BevelOuter = bvNone
     TabOrder = 1
+    ExplicitWidth = 844
     object btnConnect: TButton
       Left = 278
       Top = 8
@@ -223,7 +237,7 @@ object frmMain: TfrmMain
     end
     object edtHost: TEdit
       Left = 8
-      Top = 13
+      Top = 10
       Width = 121
       Height = 21
       TabOrder = 1
@@ -231,7 +245,7 @@ object frmMain: TfrmMain
     end
     object edtPort: TEdit
       Left = 156
-      Top = 13
+      Top = 10
       Width = 100
       Height = 21
       TabOrder = 2
@@ -273,8 +287,8 @@ object frmMain: TfrmMain
       OnClick = chkRecvEchoClick
     end
     object chkRecvOnLog: TCheckBox
-      Left = 471
-      Top = 39
+      Left = 447
+      Top = 37
       Width = 156
       Height = 17
       Caption = #25910#21040#21518#26174#31034#25968#25454
@@ -283,7 +297,7 @@ object frmMain: TfrmMain
     end
     object btnClear: TButton
       Left = 8
-      Top = 48
+      Top = 74
       Width = 75
       Height = 25
       Caption = #28165#31354#26085#24535
@@ -291,7 +305,7 @@ object frmMain: TfrmMain
       OnClick = btnClearClick
     end
     object chkHex: TCheckBox
-      Left = 471
+      Left = 447
       Top = 60
       Width = 97
       Height = 17
@@ -300,8 +314,8 @@ object frmMain: TfrmMain
       OnClick = chkHexClick
     end
     object chkCheckHeart: TCheckBox
-      Left = 600
-      Top = 56
+      Left = 584
+      Top = 60
       Width = 169
       Height = 17
       Caption = #24515#36339#26816#27979#20851#38381#27515#38142#25509
@@ -309,8 +323,8 @@ object frmMain: TfrmMain
       OnClick = chkCheckHeartClick
     end
     object btnSaveHistory: TButton
-      Left = 89
-      Top = 48
+      Left = 8
+      Top = 37
       Width = 75
       Height = 25
       Caption = #20445#23384#37197#32622
@@ -318,8 +332,8 @@ object frmMain: TfrmMain
       OnClick = btnSaveHistoryClick
     end
     object chkLogRecvTime: TCheckBox
-      Left = 600
-      Top = 39
+      Left = 584
+      Top = 37
       Width = 147
       Height = 17
       Caption = #35760#24405#25509#25910#25968#25454#20449#24687
@@ -328,12 +342,63 @@ object frmMain: TfrmMain
     end
     object chkSaveData: TCheckBox
       Left = 278
-      Top = 56
+      Top = 60
       Width = 163
       Height = 17
       Caption = #20445#23384#25968#25454
       TabOrder = 13
       OnClick = chkSaveDataClick
+    end
+    object chkAutoReconnect: TCheckBox
+      Left = 278
+      Top = 83
+      Width = 97
+      Height = 17
+      Caption = #33258#21160#37325#36830
+      TabOrder = 14
+      OnClick = chkAutoReconnectClick
+    end
+    object chkRandomDisconnect: TCheckBox
+      Left = 447
+      Top = 83
+      Width = 123
+      Height = 17
+      Caption = #38543#26426#26029#32447
+      TabOrder = 15
+      OnClick = chkRandomDisconnectClick
+    end
+    object btnReadConfig: TButton
+      Left = 89
+      Top = 37
+      Width = 75
+      Height = 25
+      Caption = #25171#24320#37197#32622
+      TabOrder = 16
+      OnClick = btnReadConfigClick
+    end
+  end
+  object pnlLog: TPanel
+    Left = 0
+    Top = 440
+    Width = 923
+    Height = 176
+    Align = alBottom
+    Caption = 'pnlLog'
+    TabOrder = 2
+    ExplicitWidth = 844
+    object mmoRecvMessage: TMemo
+      Left = 1
+      Top = 1
+      Width = 921
+      Height = 174
+      Align = alClient
+      Lines.Strings = (
+        'iocp tcp client demo')
+      TabOrder = 0
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 836
+      ExplicitHeight = 307
     end
   end
   object tmrCheckHeart: TTimer
@@ -341,5 +406,15 @@ object frmMain: TfrmMain
     OnTimer = tmrCheckHeartTimer
     Left = 432
     Top = 384
+  end
+  object dlgOpen: TOpenDialog
+    Filter = 'echo'#37197#32622'(*.diocp.config)|*.diocp.config'
+    Left = 8
+    Top = 232
+  end
+  object dlgSave: TSaveDialog
+    Filter = 'echo'#37197#32622'(*.diocp.config)|*.diocp.config'
+    Left = 40
+    Top = 232
   end
 end

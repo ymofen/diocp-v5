@@ -16,8 +16,10 @@ type
     FLastTick:Cardinal;
     FLastSendTick:Cardinal;
     FFileWritter: TSingleFileWriter;
+    FNextDisconnect:Cardinal;
   public
     procedure OnDisconnected; override;
+    procedure DoRandomDisconnect;
   public
     destructor Destroy; override;
     procedure WriteRecvData(pvBuf:Pointer; pvLength:Integer);
@@ -25,7 +27,6 @@ type
 
   TfrmMain = class(TForm)
     PageControl1: TPageControl;
-    TabSheet1: TTabSheet;
     tsMonitor: TTabSheet;
     mmoRecvMessage: TMemo;
     tsOperator: TTabSheet;
@@ -62,19 +63,29 @@ type
     chkSaveData: TCheckBox;
     btnEcho: TButton;
     mmoOperaLog: TMemo;
+    chkAutoReconnect: TCheckBox;
+    chkRandomDisconnect: TCheckBox;
+    dlgOpen: TOpenDialog;
+    dlgSave: TSaveDialog;
+    pnlLog: TPanel;
+    spllog: TSplitter;
+    btnReadConfig: TButton;
     procedure btnClearClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnCreateClick(Sender: TObject);
     procedure btnEchoClick(Sender: TObject);
     procedure btnFill1KClick(Sender: TObject);
+    procedure btnReadConfigClick(Sender: TObject);
     procedure btnSaveHistoryClick(Sender: TObject);
     procedure btnSendObjectClick(Sender: TObject);
     procedure btnSetIntervalClick(Sender: TObject);
+    procedure chkAutoReconnectClick(Sender: TObject);
     procedure chkCheckHeartClick(Sender: TObject);
     procedure chkHexClick(Sender: TObject);
     procedure chkIntervalSendDataClick(Sender: TObject);
     procedure chkLogRecvTimeClick(Sender: TObject);
+    procedure chkRandomDisconnectClick(Sender: TObject);
     procedure chkRecvEchoClick(Sender: TObject);
     procedure chkRecvOnLogClick(Sender: TObject);
     procedure chkSaveDataClick(Sender: TObject);
@@ -90,6 +101,9 @@ type
     FRecvOnLog:Boolean;
     FRecvOnSaveToFile:Boolean;
     FConvertHex:Boolean;
+    FRandomeDisconnect:Boolean;
+    FAutoReconnect:Boolean;
+
 
     FASyncInvoker:TASyncInvoker;
     FSendInterval: Cardinal;
@@ -107,9 +121,11 @@ type
 
     procedure OnASyncWork(pvASyncWorker:TASyncWorker);
 
-    procedure WriteHistory;
+    procedure OnASyncCycle(pvContext:TDiocpCustomContext);
 
-    procedure ReadHistory;
+    procedure WriteHistory(pvFileName: string);
+
+    procedure ReadHistory(pvFileName: string);
 
   public
     constructor Create(AOwner: TComponent); override;
@@ -129,10 +145,14 @@ uses
 
 var
   __SN:Integer;
+  __defaultFile:string;
+
+
 
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited;
+  __defaultFile := ChangeFileExt(ParamStr(0), '.history.json');
   FASyncInvoker := TASyncInvoker.Create;
   FASyncInvoker.Start(OnASyncWork);
   FFileLogger := TSafeLogger.Create;
@@ -151,7 +171,7 @@ begin
   FIocpClientSocket.RegisterContextClass(TEchoContext);
   TFMMonitor.createAsChild(tsMonitor, FIocpClientSocket);
 
-  ReadHistory;
+  ReadHistory(__defaultFile);
 
 end;
 
@@ -197,13 +217,12 @@ var
 begin
   SpinLock(FSpinLock);
   try
-    FIocpClientSocket.open;
-
+    FIocpClientSocket.Open; 
     lvClient := FIocpClientSocket.Add;
     lvClient.Host := edtHost.Text;
     lvClient.Port := StrToInt(edtPort.Text);
-    lvClient.AutoReConnect := true;
     lvClient.ConnectASync;
+    lvClient.OnASyncCycle := OnASyncCycle;
   finally
     SpinUnLock(FSpinLock);
   end;
@@ -222,14 +241,14 @@ begin
   chkRecvOnLog.Checked := StrToInt(edtCount.Text) < 10;
   SpinLock(FSpinLock);
   try
-    FIocpClientSocket.open;
+    FIocpClientSocket.Open;
 
     for i := 1 to StrToInt(edtCount.Text) do
     begin
       lvClient := FIocpClientSocket.Add;
       lvClient.Host := edtHost.Text;
       lvClient.Port := StrToInt(edtPort.Text);
-      lvClient.AutoReConnect := true;
+      lvClient.OnASyncCycle := OnASyncCycle;
       lvClient.connectASync;
     end;
 
@@ -293,9 +312,20 @@ begin
   mmoData.Lines.Text :=  s;
 end;
 
+procedure TfrmMain.btnReadConfigClick(Sender: TObject);
+begin
+  if dlgOpen.Execute then
+  begin
+    ReadHistory(dlgOpen.FileName);
+  end;
+end;
+
 procedure TfrmMain.btnSaveHistoryClick(Sender: TObject);
 begin
-  WriteHistory;
+  if dlgSave.Execute then
+  begin
+    WriteHistory(dlgSave.FileName);
+  end;
 end;
 
 procedure TfrmMain.btnSendObjectClick(Sender: TObject);
@@ -318,6 +348,11 @@ begin
   lvInterval := StrToIntDef(edtInterval.Text, 0) * 1000;
   if lvInterval <=0 then raise Exception.Create('必须设定大于0的值');
   FSendInterval := lvInterval;
+end;
+
+procedure TfrmMain.chkAutoReconnectClick(Sender: TObject);
+begin
+  FAutoReconnect := chkAutoReconnect.Checked;
 end;
 
 procedure TfrmMain.chkCheckHeartClick(Sender: TObject);
@@ -393,6 +428,11 @@ begin
   FLogRecvInfo := chkLogRecvTime.Checked;
 end;
 
+procedure TfrmMain.chkRandomDisconnectClick(Sender: TObject);
+begin
+  FRandomeDisconnect := chkRandomDisconnect.Checked;
+end;
+
 procedure TfrmMain.chkRecvEchoClick(Sender: TObject);
 begin
   FSendDataOnRecv := chkRecvEcho.Checked;
@@ -438,6 +478,21 @@ begin
     pvConentxt.PostWSASendRequest(PAnsiChar(s), Length(s));
   end;
 
+end;
+
+procedure TfrmMain.OnASyncCycle(pvContext: TDiocpCustomContext);
+begin
+  if FAutoReconnect then
+  begin
+    if pvContext.CheckActivityTimeOut(10000) then
+      TIocpRemoteContext(pvContext).CheckDoReConnect;
+  end;
+
+  if FRandomeDisconnect then
+  begin
+    TEchoContext(pvContext).DoRandomDisconnect;
+  end;
+  
 end;
 
 procedure TfrmMain.OnASyncWork(pvASyncWorker:TASyncWorker);
@@ -548,12 +603,12 @@ begin
   end;
 end;
 
-procedure TfrmMain.ReadHistory;
+procedure TfrmMain.ReadHistory(pvFileName: string);
 var
   lvDValue:TDValue;
 begin
   lvDValue := TDValue.Create();
-  JSONParseFromUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
+  JSONParseFromUtf8NoBOMFile(pvFileName, lvDVAlue);
   edtHost.Text := lvDValue.ForceByName('host').AsString;
   edtPort.Text := lvDValue.ForceByName('port').AsString;
   mmoData.Lines.Text := lvDValue.ForceByName('sendText').AsString;
@@ -571,6 +626,9 @@ begin
   chkLogRecvTime.Checked := lvDValue.ForceByName('chk_LogRecvInfo').AsBoolean;
 
   chkIntervalSendData.Checked := lvDValue.ForceByName('chk_send_oninterval').AsBoolean;
+  chkAutoReconnect.Checked := lvDValue.ForceByName('chk_autoconnect').AsBoolean;
+  chkRandomDisconnect.Checked := lvDValue.ForceByName('chk_randomdisonnect').AsBoolean;
+
   edtInterval.Text := IntToStr(lvDValue.ForceByName('send_interval').AsInteger);
   mmoIntervalData.Lines.Text := lvDValue.ForceByName('send_interval_data').AsString;
   mmoOnConnected.Lines.Text := lvDValue.ForceByName('send_onconnected_data').AsString;
@@ -584,6 +642,8 @@ begin
   FSendDataOnRecv := chkRecvEcho.Checked;
   FConvertHex := chkHex.Checked;
   FLogRecvInfo := chkLogRecvTime.Checked;
+  FRandomeDisconnect := chkRandomDisconnect.Checked;
+  FAutoReconnect := chkAutoReconnect.Checked;
   FSendInterval := StrToIntDef(edtInterval.Text, 0) * 1000;
 end;
 
@@ -601,7 +661,7 @@ begin
   end;
 end;
 
-procedure TfrmMain.WriteHistory;
+procedure TfrmMain.WriteHistory(pvFileName: string);
 var
   lvDValue:TDValue;
 begin
@@ -618,10 +678,14 @@ begin
   lvDValue.ForceByName('chk_checkheart').AsBoolean := chkCheckHeart.Checked;
   lvDValue.ForceByName('chk_LogRecvInfo').AsBoolean := chkLogRecvTime.Checked;
   lvDValue.ForceByName('chk_send_oninterval').AsBoolean := chkIntervalSendData.Checked;
+  lvDValue.ForceByName('chk_autoconnect').AsBoolean := chkAutoReconnect.Checked;
+  lvDValue.ForceByName('chk_randomdisonnect').AsBoolean := chkRandomDisconnect.Checked;
+
   lvDValue.ForceByName('send_interval').AsInteger := StrToIntDef(edtInterval.Text, 0);
   lvDValue.ForceByName('send_interval_data').AsString := mmoIntervalData.Lines.Text;
   lvDValue.ForceByName('send_onconnected_data').AsString := mmoOnConnected.Lines.Text;
-  JSONWriteToUtf8NoBOMFile(ChangeFileExt(ParamStr(0), '.history.json'), lvDVAlue);
+
+  JSONWriteToUtf8NoBOMFile(pvFileName, lvDVAlue);
   lvDValue.Free;
 end;
 
@@ -632,6 +696,26 @@ begin
     FreeAndNil(FFileWritter);
   end;
   inherited Destroy;
+end;
+
+procedure TEchoContext.DoRandomDisconnect;
+  procedure doRandom();
+  var
+    t:Integer;
+  begin
+    Randomize;
+    t :=  Random(60);
+    // 60秒随机断线一次
+    FNextDisconnect := GetTickCount + (t * 1000);
+  end;
+begin
+  if FNextDisconnect = 0 then doRandom;
+
+  if tick_diff(FNextDisconnect, GetTickCount) > 0 then
+  begin
+    self.RequestDisconnect('随机断线', Self);
+    doRandom;
+  end;
 end;
 
 procedure TEchoContext.OnDisconnected;

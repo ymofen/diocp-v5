@@ -27,6 +27,8 @@ type
     lblSentSize: TLabel;
     lblSendQueue: TLabel;
     Label8: TLabel;
+    lblDisconnect: TLabel;
+    lblDisconnectCounter: TLabel;
     procedure lblWorkerCountClick(Sender: TObject);
     procedure tmrReaderTimer(Sender: TObject);
     procedure refreshState;
@@ -166,6 +168,8 @@ begin
     );
 
   lblOnlineCounter.Caption := Format('%d', [FIocpSocket.OnlineContextCount]);
+  
+  lblDisconnectCounter.Caption := Format('%d', [FIocpSocket.DataMoniter.DisconnectCounter]);
 
   lblWorkerCount.Caption := Format('%d', [FIocpSocket.WorkerCount]);
 
