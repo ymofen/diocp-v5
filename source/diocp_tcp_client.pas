@@ -23,7 +23,7 @@ uses
   , utils_async
   , utils_fileWriter
   , utils_threadinfo
-  , utils_buffer, utils_queues;
+  , utils_buffer, utils_queues, SyncObjs;
 
 type
   TIocpRemoteContext = class(TDiocpCustomContext)
@@ -36,6 +36,7 @@ type
     FConnectExRequest: TIocpConnectExRequest;
 
     FHost: String;
+    FOnASyncCycle: TNotifyContextEvent;
     FPort: Integer;
     function PostConnectRequest: Boolean;
     procedure ReCreateSocket;
@@ -53,6 +54,14 @@ type
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
 
   public
+    /// <summary>
+    ///   进行重连连接，
+    ///   如果符合要求
+    ///     1. 已经断线
+    ///   则进行重连
+    /// </summary>
+    procedure CheckDoReConnect;
+
     constructor Create; override;
     destructor Destroy; override;
     /// <summary>
@@ -75,8 +84,23 @@ type
     /// </summary>
     property AutoReConnect: Boolean read FAutoReConnect write FAutoReConnect;
 
+    /// <summary>
+    ///   由ASync线程, 循环执行
+    /// </summary>
+    property OnASyncCycle: TNotifyContextEvent read FOnASyncCycle write FOnASyncCycle;
+
     property Host: String read FHost write FHost;
+
+
+
     property Port: Integer read FPort write FPort;
+
+
+
+
+
+
+
   end;
 
   TDiocpExRemoteContext = class(TIocpRemoteContext)
@@ -116,8 +140,15 @@ type
   private
     /// <summary>
     ///  检测使用重新连接 ,单线程使用，仅供DoAutoReconnect调用
+    ///    间隔最少5秒以上
     /// </summary>
     procedure DoAutoReconnect(pvASyncWorker:TASyncWorker);
+
+    /// <summary>
+    ///    检测使用重新连接 ,单线程使用，仅供DoASyncCycle调用
+    ///    间隔最少5秒以上
+    /// </summary>
+    procedure DoASyncCycle(pvASyncWorker:TASyncWorker);
   protected
     procedure DoASyncWork(pvFileWritter: TSingleFileWriter; pvASyncWorker:
         TASyncWorker); override;
@@ -128,6 +159,7 @@ type
   {$ELSE}
     FList: TObjectList;
   {$ENDIF}
+    FListLocker: TCriticalSection;
   protected
     procedure DoAfterOpen;override;
     procedure DoAfterClose; override; 
@@ -137,13 +169,11 @@ type
   public
     /// <summary>
     ///   清理Add创建的所有连接
-    ///   (*)非线程安全, 多线程并发可能会造成内存混乱
     /// </summary>
     procedure ClearContexts;
 
     /// <summary>
     ///   添加一个连对象
-    ///   (*)非线程安全, 多线程并发可能会造成内存混乱
     /// </summary>
     function Add: TIocpRemoteContext;
 
@@ -230,6 +260,21 @@ begin
 //  if (FBindingHandle = 0) or (FBindingHandle = INVALID_SOCKET) then Exit;
 //  CloseHandle(FBindingHandle);
 //  FBindingHandle := 0;
+end;
+
+procedure TIocpRemoteContext.CheckDoReConnect;
+begin
+  if not (SocketState in [ssConnecting, ssConnected]) then
+  begin
+    if Owner.Active then
+    begin
+      AddDebugStrings('*(*)执行重连请求!');
+      ConnectASync;
+    end else
+    begin
+      AddDebugStrings('*(*)CheckDoReConnect::Check Owner is deactive!');
+    end;
+  end;
 end;
 
 procedure TIocpRemoteContext.Connect;
@@ -395,7 +440,12 @@ end;
 
 procedure TDiocpTcpClient.ClearContexts;
 begin
-  FList.Clear;
+  FListLocker.Enter;
+  try
+    FList.Clear;
+  finally
+    FListLocker.Leave;
+  end;
 end;
 
 constructor TDiocpTcpClient.Create(AOwner: TComponent);
@@ -406,6 +456,8 @@ begin
 {$ELSE}
   FList := TObjectList.Create();
 {$ENDIF}
+
+  FListLocker := TCriticalSection.Create;
 
   FContextClass := TIocpRemoteContext;
 
@@ -418,6 +470,7 @@ begin
   Close;
   FList.Clear;
   FList.Free;
+  FListLocker.Free;
   inherited Destroy;
 end;
 
@@ -438,43 +491,39 @@ var
   i: Integer;
   lvContext:TIocpRemoteContext;
 begin
-  for i := 0 to FList.Count - 1 do
-  begin
-    if pvASyncWorker.Terminated then Break;
+  FListLocker.Enter;
+  try
+    for i := 0 to FList.Count - 1 do
+    begin
+      if pvASyncWorker.Terminated then Break;
 
-    lvContext := TIocpRemoteContext(FList[i]);
-    if not (lvContext.SocketState in [ssConnecting, ssConnected]) then
-    begin
-      if lvContext.CanAutoReConnect then
+      lvContext := TIocpRemoteContext(FList[i]);
+      if lvContext.FAutoReConnect and lvContext.CheckActivityTimeOut(10000) then
       begin
-        lvContext.AddDebugStrings('*(*)执行重连请求!');
-        lvContext.ConnectASync;
-      end else
-      begin
-        lvContext.AddDebugStrings('*(*)重连时:Check CanAutoReConnect is false!');
-      end;
-    end else
-    begin
-      if lvContext.CheckActivityTimeOut(10000) then
-      begin
-        ;// 应当进行重连
-      
+        lvContext.CheckDoReConnect;
       end;
     end;
+  finally
+    FListLocker.Leave;
   end;
 end;
 
 function TDiocpTcpClient.Add: TIocpRemoteContext;
 begin
-  if FContextClass = nil then
-  begin
-    Result := TIocpRemoteContext.Create;
-  end else
-  begin
-    Result := TIocpRemoteContext(FContextClass.Create());
+  FListLocker.Enter;
+  try
+    if FContextClass = nil then
+    begin
+      Result := TIocpRemoteContext.Create;
+    end else
+    begin
+      Result := TIocpRemoteContext(FContextClass.Create());
+    end;
+    Result.Owner := Self;
+    FList.Add(Result);
+  finally
+    FListLocker.Leave;
   end;
-  Result.Owner := Self;
-  FList.Add(Result);
 end;
 
 function TDiocpTcpClient.CheckContext(pvContext:TObject): TIocpRemoteContext;
@@ -576,9 +625,36 @@ end;
 procedure TDiocpTcpClient.DoASyncWork(pvFileWritter: TSingleFileWriter;
     pvASyncWorker: TASyncWorker);
 begin
-  if tick_diff(FAutoConnectTick, GetTickCount) > 10000 then
+  if tick_diff(FAutoConnectTick, GetTickCount) > 5000 then
   begin
-    DoAutoReconnect(pvASyncWorker);
+    if not self.DisableAutoConnect then
+    begin
+      DoAutoReconnect(pvASyncWorker);
+    end;
+    DoASyncCycle(pvASyncWorker);
+    FAutoConnectTick := GetTickCount;
+  end;
+end;
+
+procedure TDiocpTcpClient.DoASyncCycle(pvASyncWorker:TASyncWorker);
+var
+  i: Integer;
+  lvContext:TIocpRemoteContext;
+begin
+  FListLocker.Enter;
+  try
+    for i := 0 to FList.Count - 1 do
+    begin
+      if pvASyncWorker.Terminated then Break;
+
+      lvContext := TIocpRemoteContext(FList[i]);
+      if Assigned(lvContext.FOnASyncCycle) then
+      begin
+        lvContext.FOnASyncCycle(lvContext);
+      end;
+    end;
+  finally
+    FListLocker.Leave;
   end;
 end;
 

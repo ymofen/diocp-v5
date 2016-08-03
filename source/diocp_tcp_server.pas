@@ -2648,6 +2648,7 @@ begin
     end;
 
     FListeners.ClearObjects;
+    FDefaultListener.FAcceptorMgr.ClearObjects;
 
     FSendRequestPool.FreeDataObject;
     FSendRequestPool.Clear;

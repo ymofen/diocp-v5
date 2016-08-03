@@ -304,6 +304,7 @@ type
 
     property DebugInfo: string read GetDebugInfo write SetDebugInfo;
 
+    function CheckActivityTimeOutEx(pvTimeOut:Integer): Boolean;
     function GetDebugStrings: String;
 
     property OnConnectedEvent: TNotifyContextEvent read FOnConnectedEvent write
@@ -548,6 +549,7 @@ type
   /// </summary>
   TIocpDataMonitor = class(TObject)
   private
+    FDisconnectCounter: Integer;
     FSentSize:Int64;
     FRecvSize:Int64;
     FPostWSASendSize: Int64;
@@ -597,6 +599,7 @@ type
     procedure incPushSendQueueCounter;
     procedure incPostSendObjectCounter();
     procedure incResponseSendObjectCounter();
+    procedure incDisconnectCounter;
   public
     constructor Create;
     destructor Destroy; override;
@@ -616,6 +619,11 @@ type
     ///  记录当前信息
     /// </summary>
     procedure SpeedCalcuStart;
+
+    /// <summary>
+    ///   断线次数
+    /// </summary>
+    property DisconnectCounter: Integer read FDisconnectCounter;
 
     property MaxOnlineCount: Integer read FMaxOnlineCount;
     property PushSendQueueCounter: Integer read FPushSendQueueCounter;
@@ -640,6 +648,7 @@ type
     property SentSize: Int64 read FSentSize;
     property Speed_WSARecvResponse: Int64 read FSpeed_WSARecvResponse;
     property Speed_WSASendResponse: Int64 read FSpeed_WSASendResponse;
+
   end;
 
 
@@ -1397,6 +1406,12 @@ begin
 
       // 
       OnDisconnected;
+
+      if (FOwner<> nil) and (FOwner.FDataMoniter <> nil) then
+      begin
+        FOwner.DataMoniter.incDisconnectCounter;
+      end;
+
 
       if Assigned(FOnDisconnectedEvent) then FOnDisconnectedEvent(Self);
 
@@ -2948,6 +2963,11 @@ begin
   if pvOnlineCount > FMaxOnlineCount then FMaxOnlineCount := pvOnlineCount;
 end;
 
+procedure TIocpDataMonitor.incDisconnectCounter;
+begin
+  InterlockedIncrement(FDisconnectCounter);
+end;
+
 procedure TIocpDataMonitor.incPushSendQueueCounter;
 begin
   InterlockedIncrement(FPushSendQueueCounter);
@@ -3261,6 +3281,11 @@ begin
 end;
 
 function TDiocpCustomContext.CheckActivityTimeOut(pvTimeOut:Integer): Boolean;
+begin
+  Result := (tick_diff(FLastActivity, GetTickCount) > Cardinal(pvTimeOut));
+end;
+
+function TDiocpCustomContext.CheckActivityTimeOutEx(pvTimeOut:Integer): Boolean;
 begin
   Result := (FLastActivity <> 0) and (tick_diff(FLastActivity, GetTickCount) > Cardinal(pvTimeOut));
 end;

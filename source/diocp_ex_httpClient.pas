@@ -450,7 +450,6 @@ begin
     FRequestHeader.Add('Cookie:' + FRawCookie);
   end;
   
-  FRequestHeader.Add('');                 // 添加一个回车符
 
   if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
   try
@@ -461,7 +460,7 @@ begin
     begin
       FStringBuilder.Append(FCustomeHeader.Text);
     end;
-    FStringBuilder.Append(FStringBuilder.LineBreak);
+    FStringBuilder.Append(FStringBuilder.LineBreak);   // 最后添加一个回车符
   {$IFDEF UNICODE}
     lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
     len := Length(lvRawHeader);
@@ -647,9 +646,7 @@ begin
   if FRequestAccept <> '' then
   begin
     FRequestHeader.Add(Format('Accept: %s', [FRequestAccept]));
-  end;
-
-  //FRequestHeader.Add('');                 // 添加一个回车符
+  end;  
 
   if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
   try
@@ -661,7 +658,7 @@ begin
     begin
       FRequestHeaderBuilder.Append(FCustomeHeader.Text);
     end;
-    FRequestHeaderBuilder.Append(FRequestHeaderBuilder.LineBreak);
+    FRequestHeaderBuilder.Append(FRequestHeaderBuilder.LineBreak);  // 最后添加一个回车符
   {$IFDEF UNICODE}
     lvRawHeader := TEncoding.Default.GetBytes(FRequestHeaderBuilder.ToString());
     len := Length(lvRawHeader);
