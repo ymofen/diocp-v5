@@ -31,19 +31,13 @@ object frmMain: TfrmMain
     ActivePage = tsMonitor
     Align = alClient
     TabOrder = 0
-    ExplicitWidth = 844
-    ExplicitHeight = 335
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
       ImageIndex = 1
-      ExplicitWidth = 836
-      ExplicitHeight = 323
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
-      ExplicitWidth = 836
-      ExplicitHeight = 323
       object pnlOpera_Top: TPanel
         Left = 0
         Top = 0
@@ -51,7 +45,6 @@ object frmMain: TfrmMain
         Height = 62
         Align = alTop
         TabOrder = 0
-        ExplicitWidth = 836
         object btnSendObject: TButton
           Left = 94
           Top = 34
@@ -88,8 +81,6 @@ object frmMain: TfrmMain
         Align = alClient
         Caption = 'pnlOpera_Send'
         TabOrder = 1
-        ExplicitWidth = 836
-        ExplicitHeight = 261
         object mmoData: TMemo
           Left = 1
           Top = 1
@@ -99,8 +90,6 @@ object frmMain: TfrmMain
           Lines.Strings = (
             '0123456789')
           TabOrder = 0
-          ExplicitWidth = 834
-          ExplicitHeight = 170
         end
         object mmoOperaLog: TMemo
           Left = 1
@@ -109,17 +98,12 @@ object frmMain: TfrmMain
           Height = 89
           Align = alBottom
           TabOrder = 1
-          ExplicitLeft = 0
-          ExplicitTop = 154
-          ExplicitWidth = 834
         end
       end
     end
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
-      ExplicitWidth = 836
-      ExplicitHeight = 323
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3
@@ -129,7 +113,6 @@ object frmMain: TfrmMain
         Align = alTop
         Caption = #25104#21151#24314#31435#36830#25509
         TabOrder = 0
-        ExplicitWidth = 830
         object chkSendData: TCheckBox
           Left = 88
           Top = 0
@@ -151,7 +134,6 @@ object frmMain: TfrmMain
           Lines.Strings = (
             '0123456789')
           TabOrder = 1
-          ExplicitWidth = 820
         end
       end
       object grpInterval: TGroupBox
@@ -163,8 +145,6 @@ object frmMain: TfrmMain
         Align = alClient
         Caption = #38388#38548
         TabOrder = 1
-        ExplicitWidth = 830
-        ExplicitHeight = 159
         object pnlIntervalTop: TPanel
           Left = 2
           Top = 15
@@ -173,7 +153,6 @@ object frmMain: TfrmMain
           Align = alTop
           BevelOuter = bvNone
           TabOrder = 0
-          ExplicitWidth = 826
           object edtInterval: TEdit
             Left = 3
             Top = 7
@@ -202,8 +181,6 @@ object frmMain: TfrmMain
           Lines.Strings = (
             'mmoIntervalData')
           TabOrder = 1
-          ExplicitWidth = 820
-          ExplicitHeight = 101
         end
         object chkIntervalSendData: TCheckBox
           Left = 88
@@ -225,7 +202,6 @@ object frmMain: TfrmMain
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitWidth = 844
     object btnConnect: TButton
       Left = 278
       Top = 8
@@ -385,7 +361,6 @@ object frmMain: TfrmMain
     Align = alBottom
     Caption = 'pnlLog'
     TabOrder = 2
-    ExplicitWidth = 844
     object mmoRecvMessage: TMemo
       Left = 1
       Top = 1
@@ -395,10 +370,6 @@ object frmMain: TfrmMain
       Lines.Strings = (
         'iocp tcp client demo')
       TabOrder = 0
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 836
-      ExplicitHeight = 307
     end
   end
   object tmrCheckHeart: TTimer
@@ -413,6 +384,7 @@ object frmMain: TfrmMain
     Top = 232
   end
   object dlgSave: TSaveDialog
+    DefaultExt = '*.diocp.config'
     Filter = 'echo'#37197#32622'(*.diocp.config)|*.diocp.config'
     Left = 40
     Top = 232

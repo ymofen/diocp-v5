@@ -38,6 +38,7 @@ type
     chkEcho: TCheckBox;
     chkShowInMemo: TCheckBox;
     chkSaveToFile: TCheckBox;
+    chkUseContextPool: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
@@ -116,6 +117,7 @@ begin
   begin
     btnOpen.Action := actOpen;
   end;
+  chkUseContextPool.Enabled := not FTcpServer.Active;
 end;
 
 procedure TfrmMain.actOpenExecute(Sender: TObject);
@@ -123,6 +125,7 @@ begin
   FTcpServer.WorkerCount := StrToInt(edtThread.Text);
   FTcpServer.Port := StrToInt(edtPort.Text);
   FTcpServer.OnDataReceived := self.OnRecvBuffer;
+  FTcpServer.UseContextPool := chkUseContextPool.Checked;
   FTcpServer.Active := true;
   RefreshState;
 end;

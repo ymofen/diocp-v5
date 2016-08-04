@@ -17,41 +17,48 @@ object frmMain: TfrmMain
   TextHeight = 13
   object pgcMain: TPageControl
     Left = 0
-    Top = 59
+    Top = 91
     Width = 812
-    Height = 396
+    Height = 364
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
+    ExplicitTop = 59
+    ExplicitHeight = 396
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
+      ExplicitHeight = 368
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
         Width = 804
-        Height = 368
+        Height = 336
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
+        ExplicitHeight = 368
       end
     end
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitHeight = 368
       object mmoLog: TMemo
         Left = 0
         Top = 0
         Width = 804
-        Height = 368
+        Height = 336
         Align = alClient
         Lines.Strings = (
           'mmoLog')
         TabOrder = 0
+        ExplicitHeight = 368
       end
     end
     object tsOperator: TTabSheet
       Caption = #27979#35797#25805#20316
       ImageIndex = 2
+      ExplicitHeight = 368
       object mmoPushData: TMemo
         Left = 3
         Top = 16
@@ -75,7 +82,7 @@ object frmMain: TfrmMain
     Left = 0
     Top = 0
     Width = 812
-    Height = 59
+    Height = 91
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
@@ -193,6 +200,16 @@ object frmMain: TfrmMain
       Height = 17
       Caption = #20445#23384#21040#25991#20214
       TabOrder = 12
+    end
+    object chkUseContextPool: TCheckBox
+      Left = 142
+      Top = 59
+      Width = 103
+      Height = 17
+      Caption = #20351#29992'ContextPool'
+      Checked = True
+      State = cbChecked
+      TabOrder = 13
     end
   end
   object actlstMain: TActionList
