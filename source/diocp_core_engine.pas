@@ -86,6 +86,7 @@ type
     
     FOnResponse: TNotifyEvent;
     FOnResponseDone: TNotifyEvent;
+    FDestroyOnResponseEnd: Boolean;
     FTag: Integer;
   protected
     FResponding: Boolean;
@@ -152,7 +153,18 @@ type
     /// </summary>
     property Data: Pointer read FData write FData;
 
+
+    /// <summary>
+    ///   在响应完成后释放掉
+    ///   (RecvRequest和Content绑定在一起,避免RecvQuest提前释放)
+    /// </summary>
+    property DestroyOnResponseEnd: Boolean read FDestroyOnResponseEnd write
+        FDestroyOnResponseEnd;
+
     property Tag: Integer read FTag write FTag;
+
+
+
 
 
   end;
@@ -754,8 +766,6 @@ begin
             begin
               lvTempRequest.HandleResponse();
             end;
-            lvTempRequest.FRespondEndTime := Now();
-            lvTempRequest.FResponding := false;
           except
             on E:Exception do
             begin                          
@@ -765,12 +775,25 @@ begin
         finally
           FLastResponseEnd := Now();
           try
-            if Assigned(lvTempRequest.OnResponseDone) then
+            try
+              if Assigned(lvTempRequest.OnResponseDone) then
+              begin
+                lvTempRequest.FOnResponseDone(lvTempRequest);
+              end else
+              begin
+                lvTempRequest.ResponseDone();
+              end;
+            except
+              on E:Exception do
+              begin
+                FIocpCore.HandleException(lvTempRequest, E);
+              end;
+            end;
+            lvTempRequest.FRespondEndTime := Now();
+            lvTempRequest.FResponding := false; 
+            if lvTempRequest.FDestroyOnResponseEnd then
             begin
-              lvTempRequest.FOnResponseDone(lvTempRequest);
-            end else
-            begin
-              lvTempRequest.ResponseDone();
+              lvTempRequest.Free;
             end;
           except
             on E:Exception do
@@ -1341,6 +1364,7 @@ begin
   FThreadID := 0;
   FOverlapped.iocpRequest := self;
   FOverlapped.refCount := 0;
+  FDestroyOnResponseEnd := false;
 end;
 
 constructor TIocpRequestSingleLink.Create(pvMaxSize: Integer = 1024);

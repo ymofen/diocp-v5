@@ -1715,7 +1715,16 @@ begin
   FRawSocket.Close;
   FRawSocket.Free;
 
-  FRecvRequest.Free;
+
+  if FRecvRequest.Responding then
+  begin
+    // 正在响应，不进行释放
+    FRecvRequest.DestroyOnResponseEnd := true;
+  end else
+  begin
+    FRecvRequest.FClientContext := nil;
+    FRecvRequest.Free;
+  end;
   
   if IsDebugMode then
   begin
