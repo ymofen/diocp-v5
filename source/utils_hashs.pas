@@ -47,8 +47,10 @@ type
   TOnDataCompare = function(P1,P2:Pointer): Integer of object;
   TOnDHashDataNotify = procedure(pvData:PDHashData) of object;
   TOnDHashDataNotifyEx = procedure(pvData: PDHashData; pvParamData: Pointer) of object;
+  TOnDHashDataNotify = procedure(pvData:PDHashData);
   TOnDataNotify = procedure(pvData:Pointer) of object;
 {$ENDIF}
+  TPointerNotifyProc = procedure(const sender:Pointer; const v:Pointer);
 
 
   TDHashTable = class(TObject)
@@ -92,6 +94,13 @@ type
     ///    循环每一个数据进行回调
     /// </summary>
     procedure ForEach(pvCallback:TOnDHashDataNotify);overload;
+
+    /// <summary>
+    ///    循环每一个数据进行回调
+    /// </summary>
+    procedure ForEach(pvCallback:TPointerNotifyProc); overload;
+
+
 
     /// <summary>
     ///   循环每一个数据, 带一个扩展的参数数据进行回调
@@ -596,6 +605,23 @@ begin
       Break;
     end;
     lvCurrData:=lvCurrData.Next;
+  end;
+end;
+
+procedure TDHashTable.ForEach(pvCallback:TPointerNotifyProc);
+var
+  I:Integer;
+  lvBucket: PDHashData;
+begin
+  Assert(Assigned(pvCallback));
+  for I := 0 to High(FBuckets) do
+  begin
+    lvBucket := FBuckets[I];
+    while lvBucket<>nil do
+    begin
+      pvCallback(lvBucket, lvBucket.Data);
+      lvBucket:=lvBucket.Next;
+    end;
   end;
 end;
 

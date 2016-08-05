@@ -17,13 +17,15 @@ type
   TPointerNotifyProc = procedure(const sender:Pointer; const v:Pointer);
 
   PThreadVarRecord = ^TThreadVarRecord;
+  PThreadVars = ^TThreadVars;
+
   TThreadVarRecord = record
     FVar:Pointer;
     FReleaseCallBack:TPointerNotifyProc;
     FLastActivity:Cardinal;
-  end;
-
-  PThreadVars = ^TThreadVars;
+    FOwner:PThreadVars;
+  end;                 
+    
   TThreadVars = record
     FVarArray:array[1..MAX_THREADID_VALUE] of PThreadVarRecord;
     FListLocker:Integer;
@@ -35,6 +37,13 @@ procedure DisposeThreadVars(const p_thread_vars:PThreadVars);
 function GetCurrentThreadVar(const p_thread_vars: PThreadVars): Pointer;
 procedure SetCurrentThreadVar(const p_thread_vars: PThreadVars; const v:
     Pointer; pvReleaseCallBack: TPointerNotifyProc);
+procedure BindObjectAsThreadVar(const p_thread_vars: PThreadVars; const pvObj:
+    TObject; pvOwnObject: Boolean);
+
+
+procedure CallBack_AsFreeObject(const sender:Pointer; const v:Pointer);
+procedure CallBack_AsFreeMem(const sender:Pointer; const v:Pointer);
+procedure CallBack_AsDisposeMem(const sender:Pointer; const v:Pointer);
 
 
 function GetCurrentThreadDValue: TDValue;
@@ -44,12 +53,62 @@ procedure InitalizeForThreadVars;
 procedure FinalizeForThreadVars;
 
 
+
+
 implementation
 
 
 var
   __info_list: TDHashTableSafe;
   __waitEvent:TEvent;
+
+
+procedure CallBack_ForHashTableCleanUp(const sender:Pointer; const v:Pointer);
+var
+  lvPVar:PThreadVarRecord;
+begin
+  lvPVar := PDHashData(sender).Data;
+  if (Assigned(lvPVar) and Assigned(lvPVar.FReleaseCallBack)) then
+  begin
+    lvPVar.FReleaseCallBack(lvPVar.FOwner, lvPVar.FVar);
+  end; 
+  Dispose(lvPVar);
+  PDHashData(sender).Data := nil; 
+end;
+
+/// <summary>
+///   清理线程变量数据。
+///   非线程安全
+/// </summary>
+procedure InnerCleanUpThreadVars(const p_thread_vars:PThreadVars);
+var
+  i:Integer;
+  lvPVar:PThreadVarRecord;
+begin    
+  for i := Low(p_thread_vars.FVarArray) to High(p_thread_vars.FVarArray) do
+  begin
+    lvPVar := p_thread_vars.FVarArray[i];
+    if (Assigned(lvPVar) and Assigned(lvPVar.FReleaseCallBack)) then
+    begin
+      lvPVar.FReleaseCallBack(p_thread_vars, lvPVar.FVar);
+    end;
+    Dispose(lvPVar);
+    p_thread_vars.FVarArray[i] := nil;
+  end;  
+
+  p_thread_vars.FList.ForEach(CallBack_ForHashTableCleanUp); 
+    
+end;
+
+procedure CallBack_AsFreeObject(const sender:Pointer; const v:Pointer);
+begin
+  FreeObject(TObject(v));
+end;
+
+procedure CallBack_AsFreeMem(const sender:Pointer; const v:Pointer);
+begin
+  FreeMem(v);  
+end;
 
 function IsDebugMode: Boolean;
 begin
@@ -131,7 +190,8 @@ end;
 
 procedure DisposeThreadVars(const p_thread_vars:PThreadVars);
 begin
-  DisposeThreadVars(p_thread_vars);
+  InnerCleanUpThreadVars(p_thread_vars);
+  Dispose(p_thread_vars);
 end;
 
 procedure InnerReleaseVar(const p_thread_vars: PThreadVars; const
@@ -183,6 +243,7 @@ var
     begin
       New(lvPVar);
       p_thread_vars.FList.Values[lvThreadID] := lvPVar;
+      lvPVar.FOwner := p_thread_vars;
       lvPVar.FVar := v;
     end else
     begin
@@ -206,9 +267,31 @@ begin
     lvPVar := p_thread_vars.FVarArray[lvThreadID];
     innerProcessVar;
   end;
-
-
 end;
+
+procedure BindObjectAsThreadVar(const p_thread_vars: PThreadVars; const pvObj:
+    TObject; pvOwnObject: Boolean);
+begin
+  {$IFDEF AUTOREFCOUNT}
+  AObject.__ObjAdd;
+  {$ELSE}
+
+  {$ENDIF}  
+  if pvOwnObject then
+  begin
+    SetCurrentThreadVar(p_thread_vars, pvObj, CallBack_AsFreeObject);
+  end else
+  begin
+    SetCurrentThreadVar(p_thread_vars, pvObj, nil);   
+  end;
+end;
+
+procedure CallBack_AsDisposeMem(const sender:Pointer; const v:Pointer);
+begin
+  Dispose(v);    
+end;
+
+
 
 
 initialization
