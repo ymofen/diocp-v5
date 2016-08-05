@@ -26,9 +26,9 @@ unit diocp_ex_httpServer;
 interface
 
 /// 三个编译开关，只能开启一个
-{.$DEFINE INNER_IOCP_PROCESSOR}     // iocp线程触发事件
+{$DEFINE INNER_IOCP_PROCESSOR}     // iocp线程触发事件
 {.$DEFINE QDAC_QWorker}   // 用qworker进行调度触发事件
-{$DEFINE DIOCP_Task}     // 用diocp_task进行调度触发事件
+{.$DEFINE DIOCP_Task}     // 用diocp_task进行调度触发事件
 
 
 uses
@@ -38,8 +38,7 @@ uses
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
   , diocp_tcp_server, utils_queues, utils_hashs, utils_dvalue
   , diocp_ex_http_common
-  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
-  utils_BufferPool;
+  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs, utils_BufferPool;
 
 
 
@@ -179,13 +178,7 @@ type
     procedure InnerAddToDebugStrings(pvMsg:String);
   public
     constructor Create;
-    destructor Destroy; override;
-
-
-
-
-
-
+    destructor Destroy; override;   
 
     /// <summary>
     ///   设置Request暂时不进行释放
@@ -496,6 +489,10 @@ type
   /// </summary>
   TDiocpHttpClientContext = class(TIocpClientContext)
   private
+
+    /// <summary>
+    ///   必须单线程操作
+    /// </summary>
     FBlockBuffer: TBlockBuffer;
     FHttpState: TDiocpHttpState;
     FCurrentRequest: TDiocpHttpRequest;
@@ -541,10 +538,14 @@ type
   /// </summary>
   TDiocpHttpServer = class(TDiocpTcpServer)
   private
+    FRequestObjCounter:Integer;
+    FSessionObjCounter:Integer;
+    
     // 内存池
     // 目前用与发送
     FBlockBufferPool:PBufferPool;
     FAccessXRequest: Boolean;
+    FDisableSession: Boolean;
 
     FRequestPool: TSafeQueue;
     FSessionObjectPool: TObjectPool;
@@ -598,6 +599,8 @@ type
     procedure OnSessionRemove(pvData:Pointer);
   protected
     procedure DoAfterOpen; override;
+    procedure DoAfterClose;override;
+
     /// <summary>
     ///   当创建新的连接对象时会调用的函数
     ///   可以在这里面做一些初始化
@@ -619,6 +622,7 @@ type
     ///   内存池
     /// </summary>
     property BlockBufferPool: PBufferPool read FBlockBufferPool;
+    property RequestObjCounter: Integer read FRequestObjCounter;
     
     /// <summary>
     ///   获取Session总数
@@ -645,6 +649,12 @@ type
     procedure CheckSessionTimeOut;
 
   published
+
+    /// <summary>
+    ///   禁用Session
+    /// </summary>
+    property DisableSession: Boolean read FDisableSession write FDisableSession;
+
     /// <summary>
     ///   处理逻辑线程执行逻辑前执行CoInitalize
     /// </summary>
@@ -652,6 +662,8 @@ type
         write FLogicWorkerNeedCoInitialize;
         
     property SessionTimeOut: Integer read FSessionTimeOut write FSessionTimeOut;
+
+
 
 
   end;
@@ -799,7 +811,7 @@ var
   lvClose:Boolean;
 begin
   FDiocpContext.FlushResponseBuffer;
-  
+
   lvClose := False;
   if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
@@ -811,17 +823,17 @@ begin
   begin
     FDiocpContext.PostWSACloseRequest;
   end;
-
-
-
-
-
-
-
+  
+  Self.Clear;
 end;
 
 procedure TDiocpHttpRequest.CheckCookieSession;
 begin
+  if TDiocpHttpServer(Connection.Owner).FDisableSession then
+  begin
+    raise Exception.Create('Session已经被禁用！');
+  end;
+
   // 对session的处理
   FSessionID := GetCookie(SESSIONID);
   if FSessionID = '' then
@@ -1370,7 +1382,9 @@ begin
     FCurrentRequest.Close;
     FCurrentRequest := nil;
   end;
+  FBlockBuffer.CheckThreadNone;
   FBlockBuffer.FlushBuffer;
+
 end;
 
 procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
@@ -1410,25 +1424,34 @@ end;
 
 procedure TDiocpHttpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
     Cardinal; pvBufferTag, pvErrorCode: Integer);
+var
+  r:Integer;
 begin
   inherited;
   if pvBufferTag = BLOCK_BUFFER_TAG then
   begin
-    ReleaseRef(pvBuffer)
+    r := ReleaseRef(pvBuffer);
+    Assert(r = 0, Format('r:%d', [r]));
   end;   
 end;
 
 procedure TDiocpHttpClientContext.FlushResponseBuffer;
 begin
+  //FBlockBuffer.CheckIsCurrentThread;
   FBlockBuffer.FlushBuffer;
 end;
 
 procedure TDiocpHttpClientContext.OnBlockBufferWrite(pvSender:TObject;
     pvBuffer:Pointer; pvLength:Integer);
+var
+  r :Integer;
 begin
   if not Self.Active then Exit;
-  AddRef(pvBuffer);
-  Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, BLOCK_BUFFER_TAG);
+  r := AddRef(pvBuffer);
+  if not Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, BLOCK_BUFFER_TAG) then
+  begin
+    ReleaseRef(pvBuffer);
+  end;
 end;
 
 {$IFDEF QDAC_QWorker}
@@ -1465,10 +1488,10 @@ begin
        self.UnLockContext('HTTP逻辑处理...', Self);
      end;
   finally
+    lvObj.CheckThreadOut;
     // 归还HttpRequest到池
     if not lvObj.FReleaseLater then
     begin
-      lvObj.CheckThreadOut;
       lvObj.Close;
     end;
   end;
@@ -1509,6 +1532,7 @@ begin
        self.UnLockContext('HTTP逻辑处理...', Self);
      end;
   finally
+    lvObj.CheckThreadOut;
     // 归还HttpRequest到池
     if not lvObj.FReleaseLater then
     begin
@@ -1614,6 +1638,7 @@ end;
 procedure TDiocpHttpClientContext.WriteResponseBuffer(buf: Pointer; len:
     Cardinal);
 begin
+ // FBlockBuffer.CheckIsCurrentThread;
   FBlockBuffer.Append(buf, len);
 end;
 
@@ -1655,9 +1680,22 @@ begin
   ;
 end;
 
+procedure TDiocpHttpServer.DoAfterClose;
+begin
+  inherited DoAfterClose;
+  FRequestPool.FreeDataObject;
+  FRequestPool.Clear;
+  FRequestObjCounter := 0;
+
+  /// 只需要清理，清理时会归还到Session对象池
+  FSessionList.Clear;
+  FSessionObjectPool.WaitFor(10000);
+  FSessionObjectPool.Clear;
+end;
+
 procedure TDiocpHttpServer.DoAfterOpen;
 begin
-  inherited;
+  inherited DoAfterOpen;
 
   {$IFDEF DEBUG}
   {$IFDEF CONSOLE}
@@ -1682,17 +1720,15 @@ var
   lvMsg:String;
 begin
   try
-    //pvRequest.Connection.SetRecvWorkerHint('进入Http::DoRequest');
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
       try
-        pvRequest.CheckCookieSession;
+        if not FDisableSession then
+          pvRequest.CheckCookieSession;
 
         if Assigned(FOnDiocpHttpRequest) then
         begin
-           // pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
           FOnDiocpHttpRequest(pvRequest);
-          //pvRequest.Connection.SetRecvWorkerHint('DoRequest::FOnDiocpHttpRequest - 1');
         end;
       except
         on E:Exception do
@@ -1737,7 +1773,9 @@ begin
   if Result = nil then
   begin
     Result := TDiocpHttpRequest.Create;
+    InterlockedIncrement(FRequestObjCounter);
   end;
+  Assert(Result.FThreadID = 0, 'request is using');
   Result.AddDebugStrings('+ GetRequest');
   Result.FDiocpHttpServer := Self;
   Result.FOwnerPool := FRequestPool;
@@ -1826,8 +1864,7 @@ begin
     if lvSession <> nil then
     begin
       // 会触发OnSessionRemove, 归还对应的对象到池
-      Result := FSessionList.Remove(pvSessionID);
-
+      Result := FSessionList.Remove(pvSessionID); 
     end else
     begin
       Result := false;

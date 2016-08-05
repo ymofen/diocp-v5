@@ -15,7 +15,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
-  utils_dvalue_json;
+  utils_dvalue_json, utils_BufferPool, QWorker;
 
 type
   TfrmMain = class(TForm)
@@ -27,8 +27,6 @@ type
     btnDisconectAll: TButton;
     pgcMain: TPageControl;
     TabSheet1: TTabSheet;
-    tsLog: TTabSheet;
-    mmoLog: TMemo;
     pnlMonitor: TPanel;
     btnGetWorkerState: TButton;
     btnFindContext: TButton;
@@ -41,17 +39,23 @@ type
     btnURLDecode: TButton;
     btnURLEncode: TButton;
     btnCompress: TButton;
+    btnInfo: TButton;
+    mmoLog: TMemo;
+    chkUseSession: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
+    procedure btnInfoClick(Sender: TObject);
     procedure btnCompressClick(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
     procedure btnURLDecodeClick(Sender: TObject);
     procedure btnURLEncodeClick(Sender: TObject);
+    procedure chkUseSessionClick(Sender: TObject);
     procedure tmrHeartTimer(Sender: TObject);
   private
     iCounter:Integer;
+    FChkSession:Boolean;
     FTcpServer: TDiocpHttpServer;
     procedure refreshState;
 
@@ -76,7 +80,7 @@ uses
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FTcpServer := TDiocpHttpServer.Create(Self);
+  FTcpServer := TDiocpHttpServer.Create(nil);
   FTcpServer.Name := 'HttpSVR';
   FTcpServer.SetMaxSendingQueueSize(10000);
   FTcpServer.createDataMonitor;
@@ -186,6 +190,7 @@ begin
   if pvRequest.RequestURI = '/json' then
   begin
     pvRequest.Response.ContentType := 'text/json';
+    //s := '{"ab":"1111111111111111111111111111111111111111111111111111111111111111111"}';
     lvDValue := TDValue.Create;
     lvDValue.ForceByName('title').AsString := 'DIOCP-V5 Http 服务演示';
     lvDValue.ForceByName('author').AsString := 'D10.天地弦';
@@ -218,7 +223,7 @@ begin
 
 //  if pvRequest.RequestURI = '/favicon.ico' then
 //  begin
-//    // Context Type                        返回的是UTF-8的编码
+//    // Context Type                        
 //    pvRequest.Response.ContentType := 'application/oct stream;
 //    pvRequest.Response.SetChunkedStart;
 //    pvRequest.Response.SetChunkedUtf8('Chunked编码测试1<BR>');
@@ -248,16 +253,6 @@ begin
   {$ENDIF}
 
 
-
-//  SetLength(lvBytes, pvRequest.RawPostData.Size);
-//  pvRequest.RawPostData.Position := 0;
-//  pvRequest.RawPostData.Read(lvBytes[0], pvRequest.RawPostData.Size);
-//  s :=  TEncoding.UTF8.GetString(lvBytes);
-//  sfLogger.logMessage(s);
-
-
-  //sfLogger.logMessage(UTF8Decode(pvRequest.GetRequestParam('param')));
-
   // 输出客户端IP信息
   pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,
     pvRequest.Connection.RemotePort]));
@@ -268,16 +263,20 @@ begin
   pvRequest.Response.WriteString('=======================================<br>');
 
 
-  lvSession := TDiocpSimpleMsgPackSession(pvRequest.GetSession);
-  if pvRequest.RequestURI = '/login' then
-  begin
-    lvSession.MsgPack.B['login'] := true;
-    pvRequest.Response.WriteString('登陆成功<br>');
-    WriteNormalPage();
-  end else if (not lvSession.MsgPack.B['login']) then
-  begin
-    WriteLoginForm();
-  end else if pvRequest.RequestURI = '/diocp-v5' then
+  if FChkSession then
+  begin 
+    lvSession := TDiocpSimpleMsgPackSession(pvRequest.GetSession);
+    if pvRequest.RequestURI = '/login' then
+    begin
+      lvSession.MsgPack.B['login'] := true;
+      pvRequest.Response.WriteString('登陆成功<br>');
+      WriteNormalPage();
+    end else if (not lvSession.MsgPack.B['login']) then
+    begin
+      WriteLoginForm();
+    end;
+  end;
+  if pvRequest.RequestURI = '/diocp-v5' then
   begin  // 输出diocp运行信息
     Sleep(1000);
     pvRequest.Response.WriteString('DIOCP运行信息<br>');
@@ -324,26 +323,14 @@ begin
     WriteNormalPage();
   end;
 
-
-//  if Pos('deflate',pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
-//  begin
-//    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'deflate';
-//    pvRequest.Response.DeflateCompressContent;
-//  end else if Pos('gzip', pvRequest.Header.GetValueByName('Accept-Encoding', '')) >= 0 then
-//  begin
-//    pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'gzip';
-//    pvRequest.Response.GZipContent;
-//  end;
-
   // 应答完毕，发送会客户端
   pvRequest.ResponseEnd;
-
-  //pvRequest.CloseContext;
 end;
 
 destructor TfrmMain.Destroy;
 begin
   FTcpServer.SafeStop();
+  FTcpServer.Free;
   inherited Destroy;
 end;
 
@@ -361,7 +348,9 @@ end;
 procedure TfrmMain.actOpenExecute(Sender: TObject);
 begin
   FTcpServer.Port := StrToInt(edtPort.Text);
+  //FTcpServer.UseContextPool := False;
   FTcpServer.Active := true;
+  FTcpServer.DisableSession := not chkUseSession.Checked;
   refreshState;
   tmrHeart.Enabled := true;
 end;
@@ -370,6 +359,22 @@ procedure TfrmMain.actStopExecute(Sender: TObject);
 begin
   FTcpServer.safeStop;
   refreshState;
+end;
+
+procedure TfrmMain.btnInfoClick(Sender: TObject);
+var
+  s:string;
+  r:Integer;
+begin
+  s :=Format('get:%d, put:%d, addRef:%d, releaseRef:%d, size:%d',
+    [FTcpServer.BlockBufferPool.FGet, FTcpServer.BlockBufferPool.FPut, FTcpServer.BlockBufferPool.FAddRef,
+    FTcpServer.BlockBufferPool.FReleaseRef, FTcpServer.BlockBufferPool.FSize]);
+  r := CheckBufferBounds(FTcpServer.BlockBufferPool);
+  s := s + sLineBreak + Format('池中共有:%d个内存块, 可能[%d]个内存块写入越界的情况', [FTcpServer.BlockBufferPool.FSize, r]);
+  sfLogger.logMessage(s);
+  sfLogger.logMessage(Format('HttpRequest:%d, Session Counter:%d', [FTcpServer.RequestObjCounter, FTcpServer.SessionCount]));
+
+  
 end;
 
 procedure TfrmMain.btnCompressClick(Sender: TObject);
@@ -400,8 +405,6 @@ begin
   //GZDecompressBufferBuilder(lvBuilder);
   //ShowMessage(lvBuilder.ToRAWString);
   lvBuilder.Free;
-
-  pgcMain.ActivePage := tsLog;
 
 end;
 
@@ -445,9 +448,15 @@ begin
   mmoURLOutput.Lines.Text := diocp_ex_http_common.URLEncode(mmoURLInput.Lines.Text);
 end;
 
+procedure TfrmMain.chkUseSessionClick(Sender: TObject);
+begin
+  FChkSession := chkUseSession.Checked;
+end;
+
 procedure TfrmMain.tmrHeartTimer(Sender: TObject);
 begin
   FTcpServer.KickOut();
+  FTcpServer.CheckSessionTimeOut;
 end;
 
 

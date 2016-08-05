@@ -23,11 +23,8 @@ object frmMain: TfrmMain
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
-    ExplicitTop = 59
-    ExplicitHeight = 396
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitHeight = 368
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -36,13 +33,11 @@ object frmMain: TfrmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitHeight = 368
       end
     end
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
-      ExplicitHeight = 368
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -52,13 +47,11 @@ object frmMain: TfrmMain
         Lines.Strings = (
           'mmoLog')
         TabOrder = 0
-        ExplicitHeight = 368
       end
     end
     object tsOperator: TTabSheet
       Caption = #27979#35797#25805#20316
       ImageIndex = 2
-      ExplicitHeight = 368
       object mmoPushData: TMemo
         Left = 3
         Top = 16
@@ -153,8 +146,6 @@ object frmMain: TfrmMain
       Width = 97
       Height = 17
       Caption = #35760#24405#35814#32454#26085#24535
-      Checked = True
-      State = cbChecked
       TabOrder = 7
       OnClick = chkLogDetailsClick
     end
@@ -184,6 +175,7 @@ object frmMain: TfrmMain
       Checked = True
       State = cbChecked
       TabOrder = 10
+      OnClick = chkEchoClick
     end
     object chkShowInMemo: TCheckBox
       Left = 359
@@ -192,6 +184,7 @@ object frmMain: TfrmMain
       Height = 17
       Caption = #26174#31034#25968#25454
       TabOrder = 11
+      OnClick = chkShowInMemoClick
     end
     object chkSaveToFile: TCheckBox
       Left = 462
@@ -200,6 +193,7 @@ object frmMain: TfrmMain
       Height = 17
       Caption = #20445#23384#21040#25991#20214
       TabOrder = 12
+      OnClick = chkSaveToFileClick
     end
     object chkUseContextPool: TCheckBox
       Left = 142
@@ -210,6 +204,15 @@ object frmMain: TfrmMain
       Checked = True
       State = cbChecked
       TabOrder = 13
+    end
+    object chkUseBufferPool: TCheckBox
+      Left = 256
+      Top = 59
+      Width = 97
+      Height = 17
+      Caption = #20351#29992#20869#23384#27744
+      TabOrder = 14
+      OnClick = chkUseBufferPoolClick
     end
   end
   object actlstMain: TActionList

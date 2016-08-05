@@ -3,8 +3,8 @@ object frmMain: TfrmMain
   Top = 275
   BorderIcons = [biSystemMenu]
   Caption = 'diocp-v5 http server'
-  ClientHeight = 453
-  ClientWidth = 722
+  ClientHeight = 561
+  ClientWidth = 856
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,47 +17,36 @@ object frmMain: TfrmMain
   TextHeight = 13
   object pgcMain: TPageControl
     Left = 0
-    Top = 41
-    Width = 722
-    Height = 412
+    Top = 62
+    Width = 856
+    Height = 330
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
+    ExplicitTop = 41
+    ExplicitWidth = 722
+    ExplicitHeight = 412
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
+      ExplicitWidth = 714
+      ExplicitHeight = 384
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
-        Width = 714
-        Height = 384
+        Width = 848
+        Height = 302
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-      end
-    end
-    object tsLog: TTabSheet
-      Caption = #26085#24535
-      ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
-      object mmoLog: TMemo
-        Left = 0
-        Top = 0
-        Width = 714
-        Height = 384
-        Align = alClient
-        TabOrder = 0
+        ExplicitWidth = 714
+        ExplicitHeight = 384
       end
     end
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 653
-      ExplicitHeight = 318
+      ExplicitWidth = 714
+      ExplicitHeight = 384
       object btnCompress: TButton
         Left = 3
         Top = 3
@@ -67,14 +56,21 @@ object frmMain: TfrmMain
         TabOrder = 0
         OnClick = btnCompressClick
       end
+      object btnInfo: TButton
+        Left = 3
+        Top = 64
+        Width = 75
+        Height = 25
+        Caption = #23545#35937#20449#24687
+        TabOrder = 1
+        OnClick = btnInfoClick
+      end
     end
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ExplicitWidth = 714
+      ExplicitHeight = 384
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -114,8 +110,8 @@ object frmMain: TfrmMain
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 722
-    Height = 41
+    Width = 856
+    Height = 62
     Align = alTop
     TabOrder = 1
     object edtPort: TEdit
@@ -161,6 +157,23 @@ object frmMain: TfrmMain
       TabOrder = 4
       OnClick = btnFindContextClick
     end
+    object chkUseSession: TCheckBox
+      Left = 142
+      Top = 39
+      Width = 97
+      Height = 17
+      Caption = #35775#38382'Session'
+      TabOrder = 5
+      OnClick = chkUseSessionClick
+    end
+  end
+  object mmoLog: TMemo
+    Left = 0
+    Top = 392
+    Width = 856
+    Height = 169
+    Align = alBottom
+    TabOrder = 2
   end
   object actlstMain: TActionList
     Left = 560

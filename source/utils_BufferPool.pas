@@ -14,6 +14,9 @@ interface
 /// spinlock 交换失败时会执行sleep
 {$DEFINE SPINLOCK_SLEEP}
 
+/// 使用内存池
+{.$DEFINE USE_MEM_POOL}
+
 uses
   SyncObjs, SysUtils
   {$IFDEF MSWINDOWS}
@@ -69,6 +72,8 @@ type
     owner: PBufferPool;
     data: Pointer;
     data_free_type:Byte; // 0,
+
+    __debug_flag:Byte;
   end;
 
   TBufferNotifyEvent = procedure(pvSender: TObject; pvBuffer: Pointer; pvLength:
@@ -76,6 +81,7 @@ type
   TBlockBuffer = class(TObject)
   private
     FBlockSize: Integer;
+    FThreadID: THandle;
     FSize:Integer;
     FPosition:Integer;
     FBuffer: Pointer;
@@ -88,6 +94,10 @@ type
     procedure SetBufferPool(ABufferPool: PBufferPool);
     procedure Append(pvBuffer:Pointer; pvLength:Integer);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     destructor Destroy; override;
+    procedure CheckThreadIn;
+    procedure CheckThreadOut;
+    procedure CheckThreadNone;
+    procedure CheckIsCurrentThread;
     procedure FlushBuffer();
     procedure ClearBuffer();
     property OnBufferWrite: TBufferNotifyEvent read FOnBufferWrite write FOnBufferWrite;
@@ -170,6 +180,15 @@ begin
 {$ELSE}
   AObject.Free;
 {$ENDIF}
+end;
+
+function GetCurrentThreadID: Cardinal;
+begin
+  {$IFDEF MSWINDOWS}
+    Result := windows.GetCurrentThreadId;
+  {$ELSE}
+    Result := TThread.CurrentThread.ThreadID;
+  {$ENDIF};
 end;
 
 procedure ReleaseAttachData(pvBlock:PBufferBlock); {$IFDEF HAVE_INLINE} inline;{$ENDIF} 
@@ -289,6 +308,7 @@ function GetBuffer(ABuffPool:PBufferPool): PByte;
 var
   lvBuffer:PBufferBlock;
 begin
+  {$IFDEF USE_MEM_POOL}
   {$IFDEF USE_SPINLOCK}
   SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
   {$ELSE}
@@ -301,6 +321,9 @@ begin
   SpinUnLock(ABuffPool.FSpinLock);
   {$ELSE}
   ABuffPool.FLocker.Leave;
+  {$ENDIF}
+  {$ELSE}
+  lvBuffer := nil;
   {$ENDIF}
 
 
@@ -316,13 +339,17 @@ begin
     lvBuffer := PBufferBlock(Result);
     lvBuffer.owner := ABuffPool;
     lvBuffer.flag := block_flag;
+    lvBuffer.__debug_flag := 0;
 
 
     AtomicIncrement(ABuffPool.FSize);
   end else
   begin
     Result := PByte(lvBuffer);
-  end;     
+    Assert(lvBuffer.__debug_flag = 0, '多线程抢占， 混乱');
+  end;
+
+  lvBuffer.__debug_flag := 1;
 
   Inc(Result, BLOCK_SIZE);
   AtomicIncrement(ABuffPool.FGet);
@@ -336,7 +363,11 @@ var
   lvBuffer:PBufferBlock;
   lvOwner:PBufferPool;
 begin
+  Assert(pvBufBlock.__debug_flag <> 0, '多次归还');
+  pvBufBlock.__debug_flag := 0;
+
   lvOwner := pvBufBlock.owner;
+  {$IFDEF USE_MEM_POOL}
   {$IFDEF USE_SPINLOCK}
   SpinLock(lvOwner.FSpinLock, lvOwner.FLockWaitCounter);
   {$ELSE}
@@ -349,6 +380,10 @@ begin
   SpinUnLock(lvOwner.FSpinLock);
   {$ELSE}
   lvOwner.FLocker.Leave;
+  {$ENDIF}
+  {$ELSE}
+  FreeMem(pvBufBlock);
+  AtomicDecrement(lvOwner.FSize);
   {$ENDIF}
   AtomicIncrement(lvOwner.FPut);
 end;
@@ -567,7 +602,10 @@ begin
     if FPosition = FBlockSize then
     begin
       FlushBuffer;
-    end;     
+    end else if FPosition > FBlockSize then
+    begin
+      FlushBuffer;
+    end;
   end;
 end;
 
@@ -584,17 +622,14 @@ begin
 end;
 
 procedure TBlockBuffer.FlushBuffer;
+var
+  r:Integer;
 begin
   if FBuffer = nil then Exit;
-  try                        
+  try
     if (Assigned(FOnBufferWrite) and (FSize > 0)) then
     begin
-      AddRef(FBuffer);
-      try
-        FOnBufferWrite(self, FBuffer, FSize);
-      finally
-        ReleaseRef(FBuffer);
-      end;
+      FOnBufferWrite(self, FBuffer, FSize);
     end else
     begin
       if FBuffer <> nil then FreeBuffer(FBuffer);
@@ -627,6 +662,39 @@ begin
     FSize := 0;
   end;
   
+end;
+
+procedure TBlockBuffer.CheckIsCurrentThread;
+begin
+  if FThreadID <> GetCurrentThreadID then
+  begin
+    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用',
+       [GetCurrentThreadID, FThreadID]);
+  end;
+end;
+
+procedure TBlockBuffer.CheckThreadIn;
+begin
+  if FThreadID <> 0 then
+  begin
+    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用',
+       [GetCurrentThreadID, FThreadID]);
+  end;
+  FThreadID := GetCurrentThreadID;
+end;
+
+procedure TBlockBuffer.CheckThreadNone;
+begin
+  if FThreadID <> 0 then
+  begin
+    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用',
+       [GetCurrentThreadID, FThreadID]);
+  end;  
+end;
+
+procedure TBlockBuffer.CheckThreadOut;
+begin
+  FThreadID := 0;  
 end;
 
 

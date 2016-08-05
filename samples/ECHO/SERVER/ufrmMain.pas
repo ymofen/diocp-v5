@@ -39,6 +39,7 @@ type
     chkShowInMemo: TCheckBox;
     chkSaveToFile: TCheckBox;
     chkUseContextPool: TCheckBox;
+    chkUseBufferPool: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
@@ -48,14 +49,23 @@ type
     procedure btnPoolInfoClick(Sender: TObject);
     procedure btnPostWSACloseClick(Sender: TObject);
     procedure btnReOpenTestClick(Sender: TObject);
+    procedure chkEchoClick(Sender: TObject);
     procedure chkLogDetailsClick(Sender: TObject);
+    procedure chkSaveToFileClick(Sender: TObject);
+    procedure chkShowInMemoClick(Sender: TObject);
+    procedure chkUseBufferPoolClick(Sender: TObject);
     procedure tmrInfoTimer(Sender: TObject);
     procedure tmrKickOutTimer(Sender: TObject);
     procedure tmrTestTimer(Sender: TObject);
   private
     iCounter:Integer;
+    FChkUseBufferPool:Boolean;
+    FChkEcho:Boolean;
+    FChkShowInMemo:Boolean;
+    FChkSaveToFile:Boolean;
     FTcpServer: TDiocpTcpServer;
     FPool:PBufferPool;
+    procedure ReadState;
     procedure RefreshState;
     procedure OnRecvBuffer(pvClientContext:TIocpClientContext; buf:Pointer;
         len:cardinal; errCode:Integer);
@@ -98,6 +108,7 @@ begin
   FTcpServer.OnContextDisconnected := OnDisconnected;
   FPool := NewBufferPool(FTcpServer.WSARecvBufferSize);
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
+  ReadState;
 end;
 
 destructor TfrmMain.Destroy;
@@ -118,6 +129,8 @@ begin
     btnOpen.Action := actOpen;
   end;
   chkUseContextPool.Enabled := not FTcpServer.Active;
+  edtPort.Enabled := not FTcpServer.Active;
+  edtThread.Enabled := not FTcpServer.Active;
 end;
 
 procedure TfrmMain.actOpenExecute(Sender: TObject);
@@ -224,6 +237,8 @@ begin
   tmrTest.Enabled := not tmrTest.Enabled;
 end;
 
+
+
 procedure TfrmMain.chkLogDetailsClick(Sender: TObject);
 begin
   if chkLogDetails.Checked then
@@ -233,6 +248,26 @@ begin
   begin
     FTcpServer.Logger.LogFilter := [lgvError];     // 只记录致命错误
   end;
+end;
+
+procedure TfrmMain.chkEchoClick(Sender: TObject);
+begin
+  ReadState;
+end;
+
+procedure TfrmMain.chkSaveToFileClick(Sender: TObject);
+begin
+  ReadState;
+end;
+
+procedure TfrmMain.chkShowInMemoClick(Sender: TObject);
+begin
+  ReadState;
+end;
+
+procedure TfrmMain.chkUseBufferPoolClick(Sender: TObject);
+begin
+  ReadState;
 end;
 
 procedure TfrmMain.OnAccept(pvSocket: THandle; pvAddr: String; pvPort: Integer;
@@ -260,30 +295,34 @@ var
   lvBuff:PByte;
   lvFileWriter:TSingleFileWriter;
 begin
-  if errCode = 0 then
-  begin
-    if chkShowInMemo.Checked then
+    if FChkShowInMemo then
     begin
       //   如果客户端发送的为字符串，可以用下面代码进行显示
       SetLength(s, len);
       Move(buf^, s[1], len);
       sfLogger.logMessage(s);
     end;
-    if chkEcho.Checked then
+    if FChkEcho then
     begin
+      if FChkUseBufferPool then
+      begin
 
-      lvBuff := GetBuffer(FPool);
+        lvBuff := GetBuffer(FPool);
 
-      Move(buf^, lvBuff^, len);
+        Move(buf^, lvBuff^, len);
 
-      //
-      AddRef(lvBuff);
+        //
+        AddRef(lvBuff);
 
 
-      pvClientContext.PostWSASendRequest(lvBuff, len, dtNone, 1);
+        pvClientContext.PostWSASendRequest(lvBuff, len, dtNone, 1);
+      end else
+      begin
+        pvClientContext.PostWSASendRequest(buf, len);      
+      end;
     end;
 
-    if chkSaveToFile.Checked then
+    if FChkShowInMemo then
     begin
       lvFileWriter := TSingleFileWriter(pvClientContext.Data);
       if lvFileWriter = nil then
@@ -296,11 +335,6 @@ begin
 
       lvFileWriter.WriteBuffer(buf, len);
     end;
-
-  end else
-  begin
-    pvClientContext.RequestDisconnect;
-  end;
 end;
 
 procedure TfrmMain.OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff:
@@ -308,6 +342,14 @@ procedure TfrmMain.OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff:
 begin
   if pvBufferTag = 1 then
     ReleaseRef(pvBuff);
+end;
+
+procedure TfrmMain.ReadState;
+begin
+  FChkEcho := chkEcho.Checked;
+  FChkShowInMemo := chkShowInMemo.Checked;
+  FChkUseBufferPool := chkUseBufferPool.Checked;
+  FChkSaveToFile := chkSaveToFile.Checked;
 end;
 
 procedure TfrmMain.tmrInfoTimer(Sender: TObject);

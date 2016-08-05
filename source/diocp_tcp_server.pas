@@ -37,7 +37,7 @@ uses
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
-  utils_queues, utils_locker;
+  utils_queues, utils_locker, utils_strings;
 
 const
   SOCKET_HASH_SIZE = $FFFF;
@@ -136,6 +136,8 @@ type
   private
     // 当前建立的连接套接字句柄
     FSocketHandle:TSocket;
+
+    FCheckThreadId: THandle;
 
     // 最后交互数据的时间点
     FLastActivity: Cardinal;
@@ -376,6 +378,8 @@ type
 
     constructor Create; virtual;
     destructor Destroy; override;
+    procedure CheckThreadIn;
+    procedure CheckThreadOut;
 
     procedure DoDisconnect;
 
@@ -970,6 +974,8 @@ type
     function ReleaseSendRequest(pvObject:TIocpSendRequest): Boolean;
 
     procedure DoAfterOpen; virtual;
+
+    procedure DoAfterClose; virtual;
 
   private
     /// <summary>
@@ -1741,6 +1747,22 @@ begin
   inherited Destroy;
 end;
 
+procedure TIocpClientContext.CheckThreadIn;
+begin
+  if FCheckThreadId <> 0 then
+  begin
+    //s := GetDebugString;
+    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用',
+       [utils_strings.GetCurrentThreadID, FCheckThreadId]);
+  end;
+  FCheckThreadId := utils_strings.GetCurrentThreadID;
+end;
+
+procedure TIocpClientContext.CheckThreadOut;
+begin
+  FCheckThreadId := 0;
+end;
+
 function TIocpClientContext.CheckWorkingTick: Cardinal;
 begin
   Result := 0;
@@ -1997,6 +2019,10 @@ begin
     Result := FSendRequestLink.Push(pvSendRequest);
     if Result then
     begin
+      if (FOwner<> nil) and (FOwner.FDataMoniter <> nil) then
+      begin
+        FOwner.FDataMoniter.incPushSendQueueCounter;
+      end;
       if not FSending then
       begin
         FSending := true;
@@ -2017,10 +2043,7 @@ begin
 
   if lvStart then
   begin      // start send work
-    if (FOwner<> nil) and (FOwner.FDataMoniter <> nil) then
-    begin
-      FOwner.FDataMoniter.incPushSendQueueCounter;
-    end;
+
     CheckNextSendRequest;
   end;
 end;
@@ -2665,7 +2688,7 @@ begin
     // engine stop
     FIocpEngine.SafeStop();
 
-
+    DoAfterClose;
   end; 
 end;
 
@@ -2739,6 +2762,11 @@ begin
   begin
     FDataMoniter := TIocpDataMonitor.Create;
   end;
+end;
+
+procedure TDiocpTcpServer.DoAfterClose;
+begin
+  
 end;
 
 procedure TDiocpTcpServer.DoAfterOpen;
@@ -3863,8 +3891,6 @@ begin
       FClientContext.DoSendRequestCompleted(Self);
 
       FClientContext.PostNextSendRequest;
-
-
     end;
   finally
 //    if FClientContext = nil then
@@ -3872,7 +3898,8 @@ begin
 //      Assert(False);
 //      FReponseState := lvResponseState;
 //    end;
-    lvContext.DecReferenceCounter('TIocpSendRequest.WSASendRequest.Response', Self);
+    // response done中 Dec
+
   end;
 end;
 
@@ -3960,6 +3987,8 @@ begin
 end;
 
 procedure TIocpSendRequest.ResponseDone;
+var
+  lvContext:TIocpClientContext;
 begin
   inherited;
   if FOwner = nil then
@@ -3971,7 +4000,12 @@ begin
     end;
   end else
   begin
-    FOwner.releaseSendRequest(Self);
+    lvContext := FClientContext;
+    try
+      FOwner.ReleaseSendRequest(Self);
+    finally
+      lvContext.DecReferenceCounter('TIocpSendRequest.WSASendRequest.Response Done', Self);
+    end;
   end;
 end;
 

@@ -35,6 +35,11 @@ type
     constructor Create(AOnCreateObjectEvent: TOnCreateObjectEvent);
 
     destructor Destroy; override;
+
+    /// <summary>
+    ///   清理对象，非线程安全
+    /// </summary>
+    procedure Clear;
     
     /// <summary>
     ///   等待所有对象归还
@@ -123,6 +128,14 @@ begin
   except
     ;
   end;
+end;
+
+procedure TObjectPool.Clear;
+begin
+  FUsingCount := 0;
+  FCount := 0;
+  FObjectList.FreeDataObject;
+  FObjectList.Clear;
 end;
 
 constructor TObjectPool.Create(AOnCreateObjectEvent: TOnCreateObjectEvent);
