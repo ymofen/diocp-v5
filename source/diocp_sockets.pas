@@ -598,6 +598,7 @@ type
 
     procedure incPushSendQueueCounter;
     procedure incPostSendObjectCounter();
+    procedure IncSendRequestCreateCounter;
     procedure incResponseSendObjectCounter();
     procedure incDisconnectCounter;
   public
@@ -2101,6 +2102,8 @@ begin
     begin
       Result := TIocpSendRequest.Create;
     end;
+    if (FDataMoniter <> nil) then
+      FDataMoniter.IncSendRequestCreateCounter;
   end;
   Result.FAlive := true;
   Result.DoCleanup;
@@ -2219,7 +2222,7 @@ begin
     begin
       try
         DoASyncWork(lvFileWriter, pvASyncWorker);
-        self.FASyncInvoker.WaitForSleep(100);
+        self.FASyncInvoker.WaitForSleep(5000);
       except
         on e:Exception do
         begin
@@ -3021,6 +3024,11 @@ end;
 procedure TIocpDataMonitor.incResponseWSASendCounter;
 begin
   InterlockedIncrement(FResponseWSASendCounter);
+end;
+
+procedure TIocpDataMonitor.IncSendRequestCreateCounter;
+begin
+  InterlockedIncrement(FSendRequestCreateCounter);   
 end;
 
 procedure TIocpDataMonitor.incSentSize(pvSize:Cardinal);

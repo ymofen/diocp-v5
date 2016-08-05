@@ -235,6 +235,10 @@ type
 
 var
   sfLogger:TSafeLogger;
+
+  // 未处理的数量
+  __logCounter : Integer;
+
   __ProcessIDStr :String;
   __GetThreadStackFunc: TThreadStackFunc;
 
@@ -438,6 +442,7 @@ begin
   begin
     lvPData :=TLogDataObject(FDataQueue.DeQueueObject);
     if lvPData = nil then Break;
+    InterlockedDecrement(__logCounter);
 
     __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
   end;
@@ -480,18 +485,15 @@ begin
   begin
     lvPData :=TLogDataObject(FDataQueue.DeQueueObject);
     if lvPData = nil then Break;
+    InterlockedDecrement(__logCounter);
 
-    //if not FDataQueue.DeQueue(Pointer(lvPData)) then Break;
-    if lvPData <> nil then
-    begin
-      try
-        FDebugData := lvPData;
-        ExecuteLogData(lvPData);
-      except
-        IncErrorCounter;
-      end;
-      __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+    try
+      FDebugData := lvPData;
+      ExecuteLogData(lvPData);
+    except
+      IncErrorCounter;
     end;
+    __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
   end;
 end;
 
@@ -617,8 +619,18 @@ begin
       lvPData.FMsg := pvMsg;
       lvPData.FMsgType := pvMsgType;
       SetCurrentThreadInfo(Name +  ':logMessage START - 2.0');
+
+      InterlockedIncrement(__logCounter);
+      
       // dataQueue只引用对象
       FDataQueue.EnQueueObject(lvPData, raNone);
+
+      {$IFDEF CONSOLE}
+      if __logCounter > 50000 then
+      begin
+        Writeln('警告::日志处理器过慢,堆积严重');
+      end;
+      {$ENDIF}
 
       SetCurrentThreadInfo(Name +  ':logMessage START - 3.0');
     {$IFDEF MSWINDOWS}
@@ -781,6 +793,7 @@ begin
               if lvPData <> nil then
               begin
                 try
+                  InterlockedDecrement(__logCounter);
                   FSafeLogger.FDebugData := lvPData;
                   SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataStart');
                   ExecuteLogData(lvPData);
@@ -1031,6 +1044,7 @@ begin
 end;
 
 initialization
+  __logCounter := 0;
   __ProcessIDStr := IntToStr(GetCurrentProcessId);
   __GetThreadStackFunc := nil;
   __dataObjectPool := TBaseQueue.Create;
