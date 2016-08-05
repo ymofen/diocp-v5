@@ -47,7 +47,6 @@ type
   TOnDataCompare = function(P1,P2:Pointer): Integer of object;
   TOnDHashDataNotify = procedure(pvData:PDHashData) of object;
   TOnDHashDataNotifyEx = procedure(pvData: PDHashData; pvParamData: Pointer) of object;
-  TOnDHashDataNotify = procedure(pvData:PDHashData);
   TOnDataNotify = procedure(pvData:Pointer) of object;
 {$ENDIF}
   TPointerNotifyProc = procedure(const sender:Pointer; const v:Pointer);
