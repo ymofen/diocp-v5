@@ -2002,7 +2002,8 @@ begin
         Inc(SearchStart);
       end;
       if FHasFound then
-         Break;
+         Break
+      else Result := -1; // 感谢[杭州]军  444356747反馈
       if BlockIndex = 0 then
         HasRead := BlockSize - FReadPosition
       else Inc(HasRead,BlockSize);

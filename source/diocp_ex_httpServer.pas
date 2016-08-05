@@ -32,7 +32,7 @@ interface
 
 
 uses
-  Classes, StrUtils, SysUtils, utils_buffer, utils_strings 
+  Classes, StrUtils, SysUtils, utils_strings 
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
