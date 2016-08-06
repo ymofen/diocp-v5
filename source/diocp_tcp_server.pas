@@ -1348,8 +1348,18 @@ end;
 
 
 procedure TIocpClientContext.InnerCloseContext;
+var
+  s:String;
 begin
-  Assert(FOwner <> nil);
+  if FOwner = nil then
+  begin
+    s := FDebugStrings.Text;
+    s := Format('当前对象已经失去Owner:%s',
+       [s]);
+    sfLogger.logMessage(s, 'core_debug', lgvWarning);
+    Assert(FOwner <> nil);
+  end;
+
 
 {$IFDEF WRITE_LOG}
   if FReferenceCounter <> 0 then

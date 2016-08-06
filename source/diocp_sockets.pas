@@ -858,6 +858,7 @@ type
     /// </summary>
     function WaitForContext(pvTimeOut: Cardinal): Boolean;
 
+    property ContextPool: TSafeQueue read FContextPool;
     /// <summary>
     ///   client connections counter
     /// </summary>
@@ -902,6 +903,7 @@ type
     procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
 
     function GetDebugString: String;
+
   published
 
     /// <summary>
@@ -1159,7 +1161,15 @@ begin
   FRawSocket.close;
   FRawSocket.Free;
 
-  FRecvRequest.Free;
+  if FRecvRequest.Responding then
+  begin
+    // 正在响应，不进行释放
+    FRecvRequest.DestroyOnResponseEnd := true;
+  end else
+  begin
+    FRecvRequest.FContext := nil;
+    FRecvRequest.Free;
+  end;
 
 
   Assert(FSendRequestLink.Count = 0);

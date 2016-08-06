@@ -242,14 +242,15 @@ var
     if lvPVar = nil then
     begin
       New(lvPVar);
-      p_thread_vars.FList.Values[lvThreadID] := lvPVar;
       lvPVar.FOwner := p_thread_vars;
       lvPVar.FVar := v;
     end else
     begin
+      // 清理原有对象
       InnerReleaseVar(p_thread_vars, lvPVar);
     end;
     lvPVar.FLastActivity := GetTickCount;
+    lvPVar.FReleaseCallBack := pvReleaseCallBack;
   end;
 begin
   lvThreadID := GetCurrentThreadId;
@@ -258,14 +259,28 @@ begin
     SpinLock(p_thread_vars.FListLocker);
     try
       lvPVar := p_thread_vars.FList.Values[lvThreadID];
-      innerProcessVar;
+      if lvPVar = nil then
+      begin
+        innerProcessVar;
+        p_thread_vars.FList.Values[lvThreadID] := lvPVar;
+      end else
+      begin
+        innerProcessVar;
+      end;
     finally
       SpinUnLock(p_thread_vars.FListLocker);
     end;
   end else
   begin
     lvPVar := p_thread_vars.FVarArray[lvThreadID];
-    innerProcessVar;
+    if lvPVar = nil then
+    begin
+      innerProcessVar;
+      p_thread_vars.FVarArray[lvThreadID] := lvPVar;
+    end else
+    begin
+      innerProcessVar;
+    end;
   end;
 end;
 
