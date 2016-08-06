@@ -15,7 +15,7 @@ interface
 {$DEFINE SPINLOCK_SLEEP}
 
 /// Ê¹ÓÃÄÚ´æ³Ø
-{.$DEFINE USE_MEM_POOL}
+{$DEFINE USE_MEM_POOL}
 
 uses
   SyncObjs, SysUtils
@@ -384,6 +384,7 @@ begin
   lvOwner.FLocker.Leave;
   {$ENDIF}
   {$ELSE}
+  ReleaseAttachData(pvBufBlock);
   FreeMem(pvBufBlock);
   AtomicDecrement(lvOwner.FSize);
   {$ENDIF}
