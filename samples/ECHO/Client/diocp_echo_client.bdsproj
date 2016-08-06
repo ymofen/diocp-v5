@@ -163,8 +163,8 @@
 			<VersionInfo Name="Special">False</VersionInfo>
 			<VersionInfo Name="Private">False</VersionInfo>
 			<VersionInfo Name="DLL">False</VersionInfo>
-			<VersionInfo Name="Locale">2052</VersionInfo>
-			<VersionInfo Name="CodePage">936</VersionInfo>
+			<VersionInfo Name="Locale">1033</VersionInfo>
+			<VersionInfo Name="CodePage">1252</VersionInfo>
 		</VersionInfo>
 		<VersionInfoKeys>
 			<VersionInfoKeys Name="CompanyName"></VersionInfoKeys>

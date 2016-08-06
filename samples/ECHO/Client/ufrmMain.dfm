@@ -28,7 +28,7 @@ object frmMain: TfrmMain
     Top = 105
     Width = 923
     Height = 332
-    ActivePage = tsMonitor
+    ActivePage = tsOperator
     Align = alClient
     TabOrder = 0
     object tsMonitor: TTabSheet
@@ -71,6 +71,15 @@ object frmMain: TfrmMain
           Caption = 'btnEcho'
           TabOrder = 2
           OnClick = btnEchoClick
+        end
+        object btnInfo: TButton
+          Left = 274
+          Top = 31
+          Width = 75
+          Height = 25
+          Caption = 'btnInfo'
+          TabOrder = 3
+          OnClick = btnInfoClick
         end
       end
       object pnlOpera_Send: TPanel

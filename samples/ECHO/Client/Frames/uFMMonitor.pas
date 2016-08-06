@@ -150,8 +150,9 @@ begin
     );
     
     
-  lblSendQueue.Caption := Format('push/pop/complted:%d, %d, %d',
+  lblSendQueue.Caption := Format('create/push/pop/complted:%d, %d, %d, %d',
      [
+       FIocpSocket.DataMoniter.SendRequestCreateCounter,
        FIocpSocket.DataMoniter.PushSendQueueCounter,
        FIocpSocket.DataMoniter.PostSendObjectCounter,
        FIocpSocket.DataMoniter.ResponseSendObjectCounter

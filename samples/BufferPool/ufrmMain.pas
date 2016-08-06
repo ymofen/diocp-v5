@@ -28,6 +28,8 @@ type
     btnBlockBufferTester: TButton;
     Label1: TLabel;
     Label2: TLabel;
+    btnAttachObject: TButton;
+    procedure btnAttachObjectClick(Sender: TObject);
     procedure btnBlockBufferTesterClick(Sender: TObject);
     procedure btnSimpleBlockBufferClick(Sender: TObject);
     procedure btnCheckBoundsClick(Sender: TObject);
@@ -76,6 +78,20 @@ destructor TForm1.Destroy;
 begin
   FinalizeForThreadInfo;
   inherited Destroy;
+end;
+
+procedure TForm1.btnAttachObjectClick(Sender: TObject);
+var
+  lvObj:TStrings;
+  lvBuff:PByte;
+begin
+  if FPool = nil then raise Exception.Create('«Îœ»≥ı ºªØFPool');
+  lvObj := TStringList.Create;
+  lvObj.Add('ok');
+  lvBuff := GetBuffer(FPool);
+  AttachData(lvBuff, lvObj, FREE_TYPE_OBJECTFREE);
+  AddRef(lvBuff);
+  ReleaseRef(lvBuff, False);
 end;
 
 procedure TForm1.btnBlockBufferTesterClick(Sender: TObject);

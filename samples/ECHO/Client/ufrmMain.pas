@@ -70,12 +70,14 @@ type
     pnlLog: TPanel;
     spllog: TSplitter;
     btnReadConfig: TButton;
+    btnInfo: TButton;
     procedure btnClearClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnCreateClick(Sender: TObject);
     procedure btnEchoClick(Sender: TObject);
     procedure btnFill1KClick(Sender: TObject);
+    procedure btnInfoClick(Sender: TObject);
     procedure btnReadConfigClick(Sender: TObject);
     procedure btnSaveHistoryClick(Sender: TObject);
     procedure btnSendObjectClick(Sender: TObject);
@@ -169,6 +171,7 @@ begin
   FIocpClientSocket.OnContextConnected := OnContextConnected;
   FIocpClientSocket.OnReceivedBuffer := OnRecvdBuffer;
   FIocpClientSocket.RegisterContextClass(TEchoContext);
+  FIocpClientSocket.DisableAutoConnect := True;
   TFMMonitor.createAsChild(tsMonitor, FIocpClientSocket);
 
   ReadHistory(__defaultFile);
@@ -310,6 +313,11 @@ begin
   SetLength(s, 1024);
   FillChar(PAnsiChar(s)^, 1024, 'a');
   mmoData.Lines.Text :=  s;
+end;
+
+procedure TfrmMain.btnInfoClick(Sender: TObject);
+begin
+  mmoOperaLog.Lines.Add(Format('剩余未处理log对象:%d', [__logCounter])) ;
 end;
 
 procedure TfrmMain.btnReadConfigClick(Sender: TObject);

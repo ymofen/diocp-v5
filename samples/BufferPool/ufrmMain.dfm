@@ -23,10 +23,6 @@ object Form1: TForm1
     Lines.Strings = (
       'mmoLog')
     TabOrder = 0
-    ExplicitLeft = 8
-    ExplicitTop = 232
-    ExplicitWidth = 864
-    ExplicitHeight = 201
   end
   object pnlTop: TPanel
     Left = 0
@@ -35,8 +31,6 @@ object Form1: TForm1
     Height = 153
     Align = alTop
     TabOrder = 1
-    ExplicitLeft = -64
-    ExplicitTop = -6
     object Label1: TLabel
       Left = 368
       Top = 15
@@ -183,6 +177,15 @@ object Form1: TForm1
       Caption = 'btnBlockBufferTester'
       TabOrder = 14
       OnClick = btnBlockBufferTesterClick
+    end
+    object btnAttachObject: TButton
+      Left = 312
+      Top = 122
+      Width = 129
+      Height = 25
+      Caption = 'btnAttachObject'
+      TabOrder = 15
+      OnClick = btnAttachObjectClick
     end
   end
 end

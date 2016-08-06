@@ -25,9 +25,11 @@ uses
 
   {$ENDIF};
 
+{$IFNDEF DEBUG}     // INLINE²»ºÃµ÷ÊÔ
 {$IF defined(FPC) or (RTLVersion>=18))}
   {$DEFINE HAVE_INLINE}
 {$IFEND HAVE_INLINE}
+{$ENDIF}
 
 const
   block_flag :Word = $1DFB;

@@ -11,7 +11,7 @@ uses
 {$R *.res}
 
 begin
-  {$IF CompilerVersion> 18}
+  {$IF CompilerVersion >= 18}
   ReportMemoryLeaksOnShutdown := true;
   {$IFEND}
   Application.Initialize;
