@@ -563,7 +563,7 @@ begin
     InnerFreeBuffer(lvBlock);
   end else
   begin
-    Assert(Result > 0, 'DBuffer error release');
+    Assert(Result < 0, 'DBuffer error release');
   end;
 end;
 

@@ -1424,14 +1424,12 @@ end;
 
 procedure TDiocpHttpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
     Cardinal; pvBufferTag, pvErrorCode: Integer);
-var
-  r:Integer;
 begin
   inherited;
   if pvBufferTag = BLOCK_BUFFER_TAG then
   begin
-    r := ReleaseRef(pvBuffer);
-    Assert(r = 0, Format('r:%d', [r]));
+    ReleaseRef(pvBuffer);
+    //Assert(r = 0, Format('r:%d', [r]));
   end;   
 end;
 
