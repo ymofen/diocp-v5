@@ -561,9 +561,9 @@ begin
     if pvReleaseAttachDataAtEnd then
       ReleaseAttachData(lvBlock);
     InnerFreeBuffer(lvBlock);
-  end else
-  begin
-    Assert(Result < 0, 'DBuffer error release');
+  end else if Result < 0 then
+  begin          // error(不能小于0，如果小于0，则出现了严重问题)
+    Assert(Result >= 0, 'DBuffer error release');
   end;
 end;
 
