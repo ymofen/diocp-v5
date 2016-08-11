@@ -561,9 +561,9 @@ begin
     if pvReleaseAttachDataAtEnd then
       ReleaseAttachData(lvBlock);
     InnerFreeBuffer(lvBlock);
-  end else
-  begin
-    Assert(Result > 0, 'DBuffer error release');
+  end else if Result < 0 then
+  begin          // error(不能小于0，如果小于0，则出现了严重问题)
+    Assert(Result >= 0, 'DBuffer error release');
   end;
 end;
 
@@ -632,7 +632,12 @@ begin
   try
     if (Assigned(FOnBufferWrite) and (FSize > 0)) then
     begin
-      FOnBufferWrite(self, FBuffer, FSize);
+      AddRef(FBuffer);    // 避免事件中使用计算器时，不释放buf
+      try
+        FOnBufferWrite(self, FBuffer, FSize);
+      finally
+        ReleaseRef(FBuffer);
+      end;
     end else
     begin
       if FBuffer <> nil then FreeBuffer(FBuffer);
