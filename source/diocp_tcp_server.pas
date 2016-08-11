@@ -37,7 +37,7 @@ uses
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
-  utils_queues, utils_locker, utils_strings;
+  utils_queues, utils_locker, utils_strings, utils_threadinfo, utils_BufferPool;
 
 const
   SOCKET_HASH_SIZE = $FFFF;
@@ -204,6 +204,8 @@ type
   private
     FAlive:Boolean;
 
+    FInnerLockerFlag: Integer;
+
     /// 开始工作时间
     FWorkerStartTick:Cardinal;
 
@@ -337,9 +339,10 @@ type
 
     procedure AddDebugString(pvString:string);
 
-
+    procedure InnerLock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+    procedure InnerUnLock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     procedure Lock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
-    procedure UnLock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+    procedure UnLock;
   protected
     procedure DoConnected;
 
@@ -1415,6 +1418,11 @@ begin
 
 end;
 
+procedure TIocpClientContext.InnerLock;
+begin
+  SpinLock(FInnerLockerFlag);
+end;
+
 procedure TIocpClientContext.lock;
 begin
   FContextLocker.lock();
@@ -1443,7 +1451,7 @@ var
 begin
   Assert(FOwner <> nil);
 
-  FContextLocker.lock();
+  InnerLock;
   try
     lvRequest := TIocpSendRequest(FSendRequestLink.Pop);
     if lvRequest = nil then
@@ -1452,7 +1460,7 @@ begin
       exit;
     end;
   finally
-    FContextLocker.unLock;
+    InnerUnLock;
   end;
 
   if lvRequest <> nil then
@@ -1533,20 +1541,23 @@ end;
 function TIocpClientContext.IncReferenceCounter(pvDebugInfo: string; pvObj:
     TObject): Boolean;
 begin
-  FContextLocker.lock('IncReferenceCounter');
-  if (not Active) or FRequestDisconnect then
-  begin
-    Result := false;
-  end else
-  begin
-    Inc(FReferenceCounter);
-    {$IFDEF DEBUG_ON}
-    AddDebugString(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-    {$ENDIF}
+  InnerLock;
+  try
+    if (not Active) or FRequestDisconnect then
+    begin
+      Result := false;
+    end else
+    begin
+      Inc(FReferenceCounter);
+      {$IFDEF DEBUG_ON}
+      AddDebugString(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+      {$ENDIF}
 
-    Result := true;
+      Result := true;
+    end;
+  finally
+    InnerUnLock;
   end;
-  FContextLocker.unLock;
 end;
 
 
@@ -1566,35 +1577,37 @@ begin
   begin
     Assert(False);
   end;
-  FContextLocker.lock('DecReferenceCounter');
-  Dec(FReferenceCounter);
-  Result := FReferenceCounter;
-  {$IFDEF DEBUG_ON}
-  AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
-  {$ENDIF}
-
-  if FReferenceCounter < 0 then
-  begin  // 小于0，不正常情况
+  InnerLock;
+  try
+    Dec(FReferenceCounter);
+    Result := FReferenceCounter;
     {$IFDEF DEBUG_ON}
-    if IsDebugMode then
-    begin
-      FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
-        [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
-      Assert(FReferenceCounter >=0,Format('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
-        [FReferenceCounter, FDebugStrings.Text]));
-    end else
-    begin
-      FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
-          [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
-    end;
+    AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     {$ENDIF}
-    FReferenceCounter :=0;
+
+    if FReferenceCounter < 0 then
+    begin  // 小于0，不正常情况
+      {$IFDEF DEBUG_ON}
+      if IsDebugMode then
+      begin
+        FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
+          [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
+        Assert(FReferenceCounter >=0,Format('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
+          [FReferenceCounter, FDebugStrings.Text]));
+      end else
+      begin
+        FOwner.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s',
+            [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
+      end;
+      {$ENDIF}
+      FReferenceCounter :=0;
+    end;
+    if FReferenceCounter = 0 then
+      if FRequestDisconnect then lvCloseContext := true;
+  finally
+    InnerUnLock;
   end;
-  if FReferenceCounter = 0 then
-    if FRequestDisconnect then lvCloseContext := true;
-    
-  FContextLocker.unLock; 
-  
+
   if lvCloseContext then InnerCloseContext;
 end;
 
@@ -1605,38 +1618,41 @@ var
 begin
   lvCloseContext := false;
 
-  FContextLocker.lock('DecReferenceCounter');
+  InnerLock;
+  try
 
-{$IFDEF WRITE_LOG}
-  FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID);
-{$ENDIF}
-
-
-  FRequestDisconnect := true;
-  Dec(FReferenceCounter);
-  
-  {$IFDEF DEBUG_ON}
-  AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+  {$IFDEF WRITE_LOG}
+    FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID);
   {$ENDIF}
 
-  if FReferenceCounter < 0 then
-  begin
+
+    FRequestDisconnect := true;
+    Dec(FReferenceCounter);
+  
     {$IFDEF DEBUG_ON}
-    if IsDebugMode then
-    begin
-      Assert(FReferenceCounter >=0);
-    end else
-    begin
-      FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, DebugInfo:%s',
-          [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
-    end;
+    AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     {$ENDIF}
-    FReferenceCounter :=0;
-  end;
-  if FReferenceCounter = 0 then
-    lvCloseContext := true;
+
+    if FReferenceCounter < 0 then
+    begin
+      {$IFDEF DEBUG_ON}
+      if IsDebugMode then
+      begin
+        Assert(FReferenceCounter >=0);
+      end else
+      begin
+        FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, DebugInfo:%s',
+            [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
+      end;
+      {$ENDIF}
+      FReferenceCounter :=0;
+    end;
+    if FReferenceCounter = 0 then
+      lvCloseContext := true;
     
-  FContextLocker.unLock; 
+  finally
+    InnerUnLock;
+  end;
   
   if lvCloseContext then InnerCloseContext;
 end;
@@ -1940,14 +1956,14 @@ end;
 
 function TIocpClientContext.GetDebugInfo: string;
 begin
-  FContextLocker.lock();
+  InnerLock;
   try
     if Length(FDebugInfo) > 0 then
       Result := Copy(FDebugInfo, 0, Length(FDebugInfo))
     else
       Result := '';
   finally
-    FContextLocker.unLock();
+    InnerUnLock;
   end;
 end;
 
@@ -2024,7 +2040,7 @@ var
   lvStart:Boolean;
 begin
   lvStart := false;
-  FContextLocker.lock();
+  InnerLock;
   try
     Result := FSendRequestLink.Push(pvSendRequest);
     if Result then
@@ -2040,7 +2056,7 @@ begin
       end;
     end;
   finally
-    FContextLocker.unLock;
+    InnerUnLock;
   end;
 
   {$IFDEF WRITE_LOG}
@@ -2056,6 +2072,11 @@ begin
 
     CheckNextSendRequest;
   end;
+end;
+
+procedure TIocpClientContext.InnerUnLock;
+begin
+  SpinUnLock(FInnerLockerFlag);
 end;
 
 procedure TIocpClientContext.SetRecvWorkerHint(pvFmtMsg: string; const args:
@@ -2151,9 +2172,12 @@ end;
 
 procedure TIocpClientContext.SetDebugInfo(const Value: string);
 begin
-  FContextLocker.lock();
-  FDebugInfo := Value;
-  FContextLocker.unLock();
+  InnerLock;
+  try
+    FDebugInfo := Value;
+  finally
+    InnerUnLock;
+  end;
 end;
 
 procedure TIocpClientContext.SetOwner(const Value: TDiocpTcpServer);
@@ -2180,7 +2204,7 @@ begin
 //  end;
 end;
 
-procedure TIocpClientContext.unLock;
+procedure TIocpClientContext.UnLock;
 begin
   FContextLocker.unLock;
 end;
@@ -2829,7 +2853,9 @@ begin
   lvList := TList.Create;
   try
     Result := '';
+    //SetCurrentThreadInfo('GetContextWorkingInfo::- 0');
     GetOnlineContextList(lvList);
+    //SetCurrentThreadInfo('GetContextWorkingInfo::- 0.1');
     for i := 0 to lvList.Count - 1 do
     begin
       lvContext := TIocpClientContext(lvList[i]);
@@ -2840,6 +2866,7 @@ begin
           [lvContext.RemoteAddr, lvContext.RemotePort, lvUseTime, lvContext.DebugInfo]) + sLineBreak;
       end;
     end;
+    //SetCurrentThreadInfo('GetContextWorkingInfo::- end');
   finally
     lvList.Free;
   end;
