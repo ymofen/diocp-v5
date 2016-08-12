@@ -2,7 +2,7 @@ object FMMonitor: TFMMonitor
   Left = 0
   Top = 0
   Width = 515
-  Height = 315
+  Height = 334
   TabOrder = 0
   object lblServerStateCaption: TLabel
     Left = 16
@@ -52,49 +52,49 @@ object FMMonitor: TFMMonitor
   end
   object lblAcceptExCaption: TLabel
     Left = 16
-    Top = 189
+    Top = 206
     Width = 48
     Height = 13
     Caption = 'acceptex:'
   end
   object lblAcceptEx: TLabel
     Left = 112
-    Top = 189
+    Top = 206
     Width = 55
     Height = 13
     Caption = 'lblAcceptEx'
   end
   object lblOnlineCounter: TLabel
-    Left = 112
-    Top = 233
+    Left = 376
+    Top = 144
     Width = 79
     Height = 13
     Caption = 'lblOnlineCounter'
   end
   object lblOnlineCaption: TLabel
-    Left = 16
-    Top = 233
+    Left = 318
+    Top = 144
     Width = 32
     Height = 13
     Caption = 'online:'
   end
   object lblRunTimeINfo: TLabel
-    Left = 112
-    Top = 276
+    Left = 113
+    Top = 247
     Width = 72
     Height = 13
     Caption = 'lblRunTimeINfo'
   end
   object lblWorkersCaption: TLabel
-    Left = 16
-    Top = 254
+    Left = 318
+    Top = 164
     Width = 38
     Height = 13
     Caption = 'workers'
   end
   object lblWorkerCount: TLabel
-    Left = 112
-    Top = 254
+    Left = 376
+    Top = 164
     Width = 79
     Height = 13
     Cursor = crHandPoint
@@ -109,8 +109,8 @@ object FMMonitor: TFMMonitor
     OnClick = lblWorkerCountClick
   end
   object lblRunTimeCaption: TLabel
-    Left = 16
-    Top = 276
+    Left = 17
+    Top = 247
     Width = 43
     Height = 13
     Caption = 'run time:'
@@ -145,49 +145,49 @@ object FMMonitor: TFMMonitor
   end
   object lblSocketHandle: TLabel
     Left = 112
-    Top = 168
+    Top = 185
     Width = 75
     Height = 13
     Caption = 'lblSocketHandle'
   end
   object lblSocketHandleCaption: TLabel
     Left = 16
-    Top = 167
+    Top = 184
     Width = 68
     Height = 13
     Caption = 'Socket Handle'
   end
   object lblContextInfo: TLabel
     Left = 112
-    Top = 211
+    Top = 228
     Width = 69
     Height = 13
     Caption = 'lblContextInfo'
   end
   object lblContextInfoCaption: TLabel
     Left = 16
-    Top = 211
+    Top = 228
     Width = 62
     Height = 13
     Caption = 'context info:'
   end
   object lblSendRequest: TLabel
     Left = 111
-    Top = 146
+    Top = 144
     Width = 74
     Height = 13
     Caption = 'lblSendRequest'
   end
   object lblSendRequestCaption: TLabel
     Left = 16
-    Top = 146
+    Top = 144
     Width = 63
     Height = 13
     Caption = 'sendRequest'
   end
   object lblPCInfo: TLabel
-    Left = 112
-    Top = 297
+    Left = 113
+    Top = 268
     Width = 43
     Height = 13
     Caption = 'lblPCInfo'
@@ -212,6 +212,20 @@ object FMMonitor: TFMMonitor
     Width = 72
     Height = 13
     Caption = 'lblFirstRunTime'
+  end
+  object lblRecvRequest: TLabel
+    Left = 111
+    Top = 164
+    Width = 74
+    Height = 13
+    Caption = 'lblRecvRequest'
+  end
+  object lblRecvRequestCaption: TLabel
+    Left = 16
+    Top = 164
+    Width = 61
+    Height = 13
+    Caption = 'recvRequest'
   end
   object tmrReader: TTimer
     Enabled = False

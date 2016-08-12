@@ -38,6 +38,8 @@ type
     lblPCInfo: TLabel;
     lblDEBUG_ON: TLabel;
     lblFirstRunTime: TLabel;
+    lblRecvRequest: TLabel;
+    lblRecvRequestCaption: TLabel;
     procedure lblRecvCaptionDblClick(Sender: TObject);
     procedure lblWorkerCountClick(Sender: TObject);
     procedure tmrReaderTimer(Sender: TObject);
@@ -62,6 +64,8 @@ resourcestring
   strSend_Caption  = '发送信息';
   strSendQueue_Caption    = '发送队列';
   strSendRequest_Caption  = '发送请求对象';
+  strRecvRequest_Caption  = '接收请求对象';
+
   strSocketHandle_Caption = '套接字句柄';
   strAcceptEx_Caption     = 'AcceptEx信息';
   strContext_Caption      = '连接信息';
@@ -79,6 +83,7 @@ resourcestring
   strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
   strSendQueue_Info    = '压入/弹出/完成/终止:%d, %d, %d, %d';//push/pop/complted/abort:%d, %d, %d, %d
   strSendRequest_Info  = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
+  strRecvRequest_Info  = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
   strAcceptEx_Info     = '创建:%d, 投递:%d, 回应:%d';      //'post:%d, response:%d'
   strSocketHandle_Info = '创建:%d, 销毁:%d';  //'create:%d, destroy:%d'
   strContext_Info      = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
@@ -133,6 +138,7 @@ begin
   lblSendCaption.Caption := strSend_Caption;
   lblSendingQueueCaption.Caption := strSendQueue_Caption;
   lblSendRequestCaption.Caption := strSendRequest_Caption;
+  lblRecvRequestCaption.Caption := strRecvRequest_Caption;
   lblRunTimeCaption.Caption := strRunTime_Caption;
   lblAcceptExCaption.Caption := strAcceptEx_Caption;
   lblOnlineCaption.Caption := strOnline_Caption;
@@ -238,6 +244,14 @@ begin
        FIocpTcpServer.DataMoniter.SendRequestCreateCounter,
        FIocpTcpServer.DataMoniter.SendRequestOutCounter,
        FIocpTcpServer.DataMoniter.SendRequestReturnCounter
+     ]
+    );
+
+   lblRecvRequest.Caption := Format(strRecvRequest_Info,
+     [
+       FIocpTcpServer.DataMoniter.RecvRequestCreateCounter,
+       FIocpTcpServer.DataMoniter.RecvRequestOutCounter,
+       FIocpTcpServer.DataMoniter.RecvRequestReturnCounter
      ]
     );
 

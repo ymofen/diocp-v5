@@ -20,16 +20,11 @@ object frmMain: TfrmMain
     Top = 62
     Width = 856
     Height = 330
-    ActivePage = TabSheet1
+    ActivePage = tsTester
     Align = alClient
     TabOrder = 0
-    ExplicitTop = 41
-    ExplicitWidth = 722
-    ExplicitHeight = 412
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitWidth = 714
-      ExplicitHeight = 384
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -38,15 +33,11 @@ object frmMain: TfrmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitWidth = 714
-        ExplicitHeight = 384
       end
     end
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      ExplicitWidth = 714
-      ExplicitHeight = 384
       object btnCompress: TButton
         Left = 3
         Top = 3
@@ -69,8 +60,6 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitWidth = 714
-      ExplicitHeight = 384
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -165,6 +154,16 @@ object frmMain: TfrmMain
       Caption = #35775#38382'Session'
       TabOrder = 5
       OnClick = chkUseSessionClick
+    end
+    object chkUsePool: TCheckBox
+      Left = 248
+      Top = 40
+      Width = 97
+      Height = 17
+      Caption = #20351#29992#23545#35937#27744
+      Checked = True
+      State = cbChecked
+      TabOrder = 6
     end
   end
   object mmoLog: TMemo

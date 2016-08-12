@@ -15,7 +15,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
-  utils_dvalue_json, utils_BufferPool, QWorker;
+  utils_dvalue_json, utils_BufferPool, QWorker, diocp_tcp_server;
 
 type
   TfrmMain = class(TForm)
@@ -42,6 +42,7 @@ type
     btnInfo: TButton;
     mmoLog: TMemo;
     chkUseSession: TCheckBox;
+    chkUsePool: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnInfoClick(Sender: TObject);
@@ -91,6 +92,7 @@ begin
   
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
   sfLogger.AppendInMainThread := true;
+  //sfLogger.LogFilter := [lgvError, lgvWarning];
 end;
 
 procedure TfrmMain.OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
@@ -187,6 +189,11 @@ var
   lvDValue:TDValue;
 
 begin
+//  pvRequest.Response.ResponseCode := 404;
+//  pvRequest.SendResponse();
+//  pvRequest.DoResponseEnd;
+//  Exit;
+
   if pvRequest.RequestURI = '/json' then
   begin
     pvRequest.Response.ContentType := 'text/json';
@@ -343,12 +350,14 @@ begin
   begin
     btnOpen.Action := actOpen;
   end;
+
+  chkUsePool.Enabled := not FTcpServer.Active;
 end;
 
 procedure TfrmMain.actOpenExecute(Sender: TObject);
 begin
   FTcpServer.Port := StrToInt(edtPort.Text);
-  //FTcpServer.UseContextPool := False;
+  FTcpServer.UseObjectPool := chkUsePool.Checked;
   FTcpServer.Active := true;
   FTcpServer.DisableSession := not chkUseSession.Checked;
   refreshState;
@@ -372,7 +381,7 @@ begin
   r := CheckBufferBounds(FTcpServer.BlockBufferPool);
   s := s + sLineBreak + Format('池中共有:%d个内存块, 可能[%d]个内存块写入越界的情况', [FTcpServer.BlockBufferPool.FSize, r]);
   sfLogger.logMessage(s);
-  sfLogger.logMessage(Format('HttpRequest:%d, Session Counter:%d', [FTcpServer.RequestObjCounter, FTcpServer.SessionCount]));
+  sfLogger.logMessage(FTcpServer.GetPrintDebugInfo);
 
   
 end;

@@ -26,9 +26,9 @@ unit diocp_ex_httpServer;
 interface
 
 /// 三个编译开关，只能开启一个
-{$DEFINE INNER_IOCP_PROCESSOR}     // iocp线程触发事件
+{.$DEFINE INNER_IOCP_PROCESSOR}     // iocp线程触发事件
 {.$DEFINE QDAC_QWorker}   // 用qworker进行调度触发事件
-{.$DEFINE DIOCP_Task}     // 用diocp_task进行调度触发事件
+{$DEFINE DIOCP_Task}     // 用diocp_task进行调度触发事件
 
 
 uses
@@ -110,6 +110,7 @@ type
 
   TDiocpHttpRequest = class(TObject)
   private
+    __free_flag:Integer;
     FOwnerPool:TSafeQueue;
     
     FLocker:TCriticalSection;
@@ -539,6 +540,8 @@ type
   TDiocpHttpServer = class(TDiocpTcpServer)
   private
     FRequestObjCounter:Integer;
+    FRequestObjOutCounter:Integer;
+    FRequestObjReturnCounter:Integer;
     FSessionObjCounter:Integer;
     
     // 内存池
@@ -571,7 +574,7 @@ type
     /// <summary>
     ///   从池中获取一个对象
     /// </summary>
-    function GetRequest: TDiocpHttpRequest;
+    function GetHttpRequest: TDiocpHttpRequest;
 
     /// <summary>
     ///   还回一个对象
@@ -648,6 +651,8 @@ type
     /// </summary>
     procedure CheckSessionTimeOut;
 
+    function GetPrintDebugInfo: string;
+
   published
 
     /// <summary>
@@ -660,8 +665,10 @@ type
     /// </summary>
     property LogicWorkerNeedCoInitialize: Boolean read FLogicWorkerNeedCoInitialize
         write FLogicWorkerNeedCoInitialize;
-        
+
     property SessionTimeOut: Integer read FSessionTimeOut write FSessionTimeOut;
+
+
 
 
 
@@ -787,6 +794,8 @@ begin
   FInnerRequest.Free;
 
   FLocker.Free;
+
+  __free_flag := -1;
 
   inherited Destroy;
 end;
@@ -1397,7 +1406,7 @@ begin
 
         // 如果需要执行
         if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
-          FRecvRequest.IocpWorker.checkCoInitializeEx();
+          CurrRecvRequest.IocpWorker.checkCoInitializeEx();
 
         // 直接触发事件
         TDiocpHttpServer(FOwner).DoRequest(pvRequest);
@@ -1534,7 +1543,7 @@ begin
     // 归还HttpRequest到池
     if not lvObj.FReleaseLater then
     begin
-      lvObj.CheckThreadOut;
+      //lvObj.CheckThreadOut;
       lvObj.Close;
     end;
   end;
@@ -1559,7 +1568,7 @@ begin
   begin
     if FCurrentRequest = nil then
     begin
-      FCurrentRequest := TDiocpHttpServer(Owner).GetRequest;
+      FCurrentRequest := TDiocpHttpServer(Owner).GetHttpRequest;
       FCurrentRequest.FDiocpContext := self;
       FCurrentRequest.Response.FDiocpContext := self;
       FCurrentRequest.Clear;
@@ -1684,6 +1693,8 @@ begin
   FRequestPool.FreeDataObject;
   FRequestPool.Clear;
   FRequestObjCounter := 0;
+  FRequestObjOutCounter := 0;
+  FRequestObjReturnCounter := 0;
 
   /// 只需要清理，清理时会归还到Session对象池
   FSessionList.Clear;
@@ -1765,19 +1776,37 @@ begin
   end;
 end;
 
-function TDiocpHttpServer.GetRequest: TDiocpHttpRequest;
+function TDiocpHttpServer.GetPrintDebugInfo: string;
 begin
-  Result := TDiocpHttpRequest(FRequestPool.DeQueue);
-  if Result = nil then
+  Result := Format('Session obj:%d, httpRequest(size/out/back):%d/%d/%d, BlockBuffer(size/put/get):%d/%d/%d',
+     [Self.FSessionObjCounter,
+      FRequestObjCounter, FRequestObjOutCounter, FRequestObjReturnCounter,
+     self.FBlockBufferPool.FSize, self.FBlockBufferPool.FPut, self.FBlockBufferPool.FGet]);
+end;
+
+function TDiocpHttpServer.GetHttpRequest: TDiocpHttpRequest;
+begin
+  if UseObjectPool then
+  begin
+    Result := TDiocpHttpRequest(FRequestPool.DeQueue);
+    if Result = nil then
+    begin
+      Result := TDiocpHttpRequest.Create;
+      InterlockedIncrement(FRequestObjCounter);
+    end;
+    Assert(Result.FThreadID = 0, 'request is using');
+    Result.AddDebugStrings('+ GetHttpRequest');
+    Result.FDiocpHttpServer := Self;
+    Result.FOwnerPool := FRequestPool;
+    Result.Clear;
+  end else
   begin
     Result := TDiocpHttpRequest.Create;
+    Result.FDiocpHttpServer := Self;
+    Result.Clear;
     InterlockedIncrement(FRequestObjCounter);
   end;
-  Assert(Result.FThreadID = 0, 'request is using');
-  Result.AddDebugStrings('+ GetRequest');
-  Result.FDiocpHttpServer := Self;
-  Result.FOwnerPool := FRequestPool;
-  Result.Clear;
+  InterlockedIncrement(FRequestObjOutCounter);
 end;
 
 function TDiocpHttpServer.GetSession(pvSessionID:string): TDiocpHttpSession;
@@ -1813,11 +1842,20 @@ begin
     Assert(pvRequest.FDiocpHttpServer <> nil,
       'TDiocpHttpServer.GiveBackRequest::对象重复关闭:' + s);
   end;
-  pvRequest.Clear;
-  pvRequest.AddDebugStrings('- GiveBackRequest');
-  pvRequest.FOwnerPool := nil;
-  pvRequest.FDiocpHttpServer := nil;
-  FRequestPool.EnQueue(pvRequest);
+
+  if UseObjectPool then
+  begin
+    pvRequest.Clear;
+    pvRequest.AddDebugStrings('- GiveBackRequest');
+    pvRequest.FOwnerPool := nil;
+    pvRequest.FDiocpHttpServer := nil;
+
+    FRequestPool.EnQueue(pvRequest);
+  end else
+  begin
+    pvRequest.Free;  
+  end;
+  InterlockedIncrement(FRequestObjReturnCounter);
 end;
 
 procedure TDiocpHttpServer.OnCreateClientContext(const context:

@@ -132,9 +132,9 @@
 			<Directories Name="UnitOutputDir"></Directories>
 			<Directories Name="PackageDLLOutputDir"></Directories>
 			<Directories Name="PackageDCPOutputDir"></Directories>
-			<Directories Name="SearchPath"></Directories>
+			<Directories Name="SearchPath">$(BDS)\lib\Debug;$(BDS)\Lib\Debug\Indy10</Directories>
 			<Directories Name="Packages"></Directories>
-			<Directories Name="Conditionals"></Directories>
+			<Directories Name="Conditionals">DEBUG</Directories>
 			<Directories Name="DebugSourceDirs"></Directories>
 			<Directories Name="UsePackages">False</Directories>
 		</Directories>

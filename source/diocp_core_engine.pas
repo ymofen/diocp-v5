@@ -69,6 +69,8 @@ type
   /// </summary>
   TIocpRequest = class(TObject)
   private
+    __free_flag:Integer;
+    FPostCounter:Integer;    
     FThreadID : THandle;
     FData: Pointer;
 
@@ -86,7 +88,6 @@ type
     
     FOnResponse: TNotifyEvent;
     FOnResponseDone: TNotifyEvent;
-    FDestroyOnResponseEnd: Boolean;
     FTag: Integer;
   protected
     FResponding: Boolean;
@@ -127,6 +128,8 @@ type
     procedure SetWorkHintInfo(pvHint:String);
 
     constructor Create;
+
+    destructor Destroy; override;
     procedure CheckThreadIn;
     procedure CheckThreadOut;
 
@@ -153,13 +156,6 @@ type
     /// </summary>
     property Data: Pointer read FData write FData;
 
-
-    /// <summary>
-    ///   在响应完成后释放掉
-    ///   (RecvRequest和Content绑定在一起,避免RecvQuest提前释放)
-    /// </summary>
-    property DestroyOnResponseEnd: Boolean read FDestroyOnResponseEnd write
-        FDestroyOnResponseEnd;
 
     property Tag: Integer read FTag write FTag;
 
@@ -742,6 +738,10 @@ begin
         lvTempRequest := lpOverlapped.iocpRequest;
         FLastRequest := lvTempRequest;
         try
+          if lvTempRequest.__free_flag > 0 then
+          begin
+            Assert(false, 'error');
+          end;
           if FLastRequest = nil then
           begin
             Assert(FLastRequest<>NIL);
@@ -776,24 +776,20 @@ begin
           FLastResponseEnd := Now();
           try
             try
+              lvTempRequest.FRespondEndTime := Now();
+              lvTempRequest.FResponding := false;
               if Assigned(lvTempRequest.OnResponseDone) then
               begin
                 lvTempRequest.FOnResponseDone(lvTempRequest);
               end else
               begin
-                lvTempRequest.ResponseDone();
+                lvTempRequest.ResponseDone();   // done后有可能回归到池或者释放 之后请不要进行操作
               end;
             except
               on E:Exception do
               begin
                 FIocpCore.HandleException(lvTempRequest, E);
               end;
-            end;
-            lvTempRequest.FRespondEndTime := Now();
-            lvTempRequest.FResponding := false; 
-            if lvTempRequest.FDestroyOnResponseEnd then
-            begin
-              lvTempRequest.Free;
             end;
           except
             on E:Exception do
@@ -1364,7 +1360,16 @@ begin
   FThreadID := 0;
   FOverlapped.iocpRequest := self;
   FOverlapped.refCount := 0;
-  FDestroyOnResponseEnd := false;
+end;
+
+destructor TIocpRequest.Destroy;
+begin
+  if __free_flag = -1 then
+  begin
+    Assert(__free_flag = 0);
+  end;
+  __free_flag := -1;
+  inherited;
 end;
 
 constructor TIocpRequestSingleLink.Create(pvMaxSize: Integer = 1024);

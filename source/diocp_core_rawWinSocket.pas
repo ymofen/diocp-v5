@@ -318,6 +318,10 @@ begin
     PSockAddrIn6(@sockaddr[0])^.sin6_family := DIOCP_PF_INET6;
     PSockAddrIn6(@sockaddr[0])^.sin6_port := htons(pvPort);
     lvSize := SizeOf(TSockAddrIn6);
+  end else
+  begin
+    lvSize := 0;
+    Assert(false,  'unkonw ip protecol');
   end;
 
 

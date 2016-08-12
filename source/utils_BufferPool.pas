@@ -586,7 +586,7 @@ end;
 
 procedure TBlockBuffer.Append(pvBuffer: Pointer; pvLength: Integer);
 var
-  r, l, s:Integer;
+  l, r:Integer;
   lvBuff:PByte;
 begin  
   lvBuff := PByte(pvBuffer);
@@ -625,8 +625,6 @@ begin
 end;
 
 procedure TBlockBuffer.FlushBuffer;
-var
-  r:Integer;
 begin
   if FBuffer = nil then Exit;
   try
