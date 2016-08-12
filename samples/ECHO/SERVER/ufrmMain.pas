@@ -138,7 +138,7 @@ begin
   FTcpServer.WorkerCount := StrToInt(edtThread.Text);
   FTcpServer.Port := StrToInt(edtPort.Text);
   FTcpServer.OnDataReceived := self.OnRecvBuffer;
-  FTcpServer.UseContextPool := chkUseContextPool.Checked;
+  FTcpServer.UseObjectPool := chkUseContextPool.Checked;
   FTcpServer.Active := true;
   RefreshState;
 end;

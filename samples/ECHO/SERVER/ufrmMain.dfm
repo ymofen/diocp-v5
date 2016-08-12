@@ -38,6 +38,10 @@ object frmMain: TfrmMain
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -52,6 +56,10 @@ object frmMain: TfrmMain
     object tsOperator: TTabSheet
       Caption = #27979#35797#25805#20316
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoPushData: TMemo
         Left = 3
         Top = 16
