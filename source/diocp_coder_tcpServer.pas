@@ -527,7 +527,7 @@ begin
     try
       // 如果需要执行
       if TDiocpCoderTcpServer(Owner).FLogicWorkerNeedCoInitialize then
-         Self.FRecvRequest.IocpWorker.checkCoInitializeEx();
+         Self.CurrRecvRequest.IocpWorker.checkCoInitializeEx();
 
       // 执行任务
       if DoExecuteRequest(pvTaskObject) <> S_OK then
