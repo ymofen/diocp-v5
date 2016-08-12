@@ -28,7 +28,7 @@ object frmMain: TfrmMain
     Top = 105
     Width = 923
     Height = 332
-    ActivePage = tsOperator
+    ActivePage = tsMonitor
     Align = alClient
     TabOrder = 0
     object tsMonitor: TTabSheet
@@ -113,6 +113,10 @@ object frmMain: TfrmMain
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3

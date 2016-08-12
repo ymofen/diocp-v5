@@ -189,10 +189,11 @@ var
   lvDValue:TDValue;
 
 begin
-//  pvRequest.Response.ResponseCode := 404;
-//  pvRequest.SendResponse();
-//  pvRequest.DoResponseEnd;
-//  Exit;
+  pvRequest.Response.ResponseCode := 404;
+  pvRequest.Response.WriteString('404 not found');
+  pvRequest.SendResponse();
+  pvRequest.DoResponseEnd;
+  Exit;
 
   if pvRequest.RequestURI = '/json' then
   begin
@@ -382,6 +383,8 @@ begin
   s := s + sLineBreak + Format('池中共有:%d个内存块, 可能[%d]个内存块写入越界的情况', [FTcpServer.BlockBufferPool.FSize, r]);
   sfLogger.logMessage(s);
   sfLogger.logMessage(FTcpServer.GetPrintDebugInfo);
+
+  sfLogger.logMessage(Format('log:%d', [__logCounter]));
 
   
 end;

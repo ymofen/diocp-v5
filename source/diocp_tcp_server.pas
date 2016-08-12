@@ -1469,14 +1469,14 @@ end;
 
 procedure TIocpClientContext.InnerLock;
 begin
-  FContextLocker.lock();
-  //SpinLock(FInnerLockerFlag);
+  //FContextLocker.lock();
+  SpinLock(FInnerLockerFlag);
 end;
 
 procedure TIocpClientContext.InnerUnLock;
 begin
-  FContextLocker.unLock;
-  //SpinUnLock(FInnerLockerFlag);
+  //FContextLocker.unLock;
+  SpinUnLock(FInnerLockerFlag);
 end;
 
 
