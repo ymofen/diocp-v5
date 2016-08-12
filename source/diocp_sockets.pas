@@ -116,7 +116,7 @@ type
 
     FOwner: TDiocpCustom;
 
-    FRecvRequest:TIocpRecvRequest;
+    FCurrRecvRequest:TIocpRecvRequest;
 
     FcurrSendRequest:TIocpSendRequest;
 
@@ -148,7 +148,7 @@ type
     /// <summary>
     ///   called by recvRequest response
     /// </summary>
-    procedure DoReceiveData;
+    procedure DoReceiveData(pvRecvRequest: TIocpRecvRequest);
 
     /// <summary>
     ///   called by sendRequest response
@@ -289,13 +289,6 @@ type
 
     procedure SetMaxSendingQueueSize(pvSize:Integer);
     /// <summary>
-    ///   设置当前的接收线程信息
-    /// </summary>
-    procedure SetRecvWorkerHint(pvHintStr: String); overload;
-    procedure SetRecvWorkerHint(pvFmtMsg: string; const args: array of const);
-        overload;
-
-    /// <summary>
     ///  是否已经连接
     /// </summary>
     property Active: Boolean read FActive;
@@ -326,6 +319,7 @@ type
     ///   连接成功次数
     /// </summary>
     property ConnectedCounter: Integer read FConnectedCounter;
+    property CurrRecvRequest: TIocpRecvRequest read FCurrRecvRequest;
     property DisconnectedCounter: Integer read FDisconnectedCounter;
 
 
@@ -355,12 +349,17 @@ type
   /// </summary>
   TIocpRecvRequest = class(TIocpRequest)
   private
+    FAlive:Boolean;
     FInnerBuffer: diocp_winapi_winsock2.TWsaBuf;
     FRecvBuffer: diocp_winapi_winsock2.TWsaBuf;
     FRecvdFlag: Cardinal;
     FOwner: TDiocpCustom;
     FContext: TDiocpCustomContext;
     FDebugInfo:String;
+    /// <summary>
+    ///   归还释放
+    /// </summary>
+    procedure ReleaseBack;
   protected
 
     /// <summary>
@@ -377,6 +376,7 @@ type
     ///
     /// </summary>
     function PostRequest(pvBuffer:PAnsiChar; len:Cardinal): Boolean; overload;
+    procedure ResponseDone; override;
 
   public
     constructor Create;
@@ -582,6 +582,9 @@ type
     // 记录开始时间点_数据
     FLastSpeed_WSASendResponse: Int64;
     FLastSpeed_WSARecvResponse: Int64;
+    FRecvRequestCreateCounter: Integer;
+    FRecvRequestOutCounter: Integer;
+    FRecvRequestReturnCounter: Integer;
 
     FSpeed_WSASendResponse: Int64;
     FSpeed_WSARecvResponse: Int64;
@@ -601,6 +604,9 @@ type
     procedure IncSendRequestCreateCounter;
     procedure incResponseSendObjectCounter();
     procedure incDisconnectCounter;
+    procedure IncRecvRequestCreateCounter;
+    procedure IncRecvRequestOutCounter;
+    procedure IncRecvRequestReturnCounter;
   public
     constructor Create;
     destructor Destroy; override;
@@ -637,6 +643,9 @@ type
 
 
     property PostWSASendSize: Int64 read FPostWSASendSize;
+    property RecvRequestCreateCounter: Integer read FRecvRequestCreateCounter;
+    property RecvRequestOutCounter: Integer read FRecvRequestOutCounter;
+    property RecvRequestReturnCounter: Integer read FRecvRequestReturnCounter;
     property RecvSize: Int64 read FRecvSize;
 
     property ResponseWSAAcceptExCounter: Integer read FResponseWSAAcceptExCounter;
@@ -691,6 +700,8 @@ type
   private
     // sendRequest pool
     FSendRequestPool: TBaseQueue;
+
+    FRecvRequestPool: TBaseQueue;
 
     /// data record
     FDataMoniter: TIocpDataMonitor;
@@ -754,6 +765,7 @@ type
     FContextDNA : Integer;
     FDefaultMsgType: String;
     FOnSendBufferCompleted: TOnContextBufferEvent;
+    FUseObjectPool: Boolean;
 
     procedure DoSendBufferCompletedEvent(pvContext: TDiocpCustomContext; pvBuff:
         Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
@@ -791,6 +803,11 @@ type
   protected
     procedure DoAfterOpen;virtual;
     procedure DoAfterClose;virtual;
+    /// <summary>
+    ///   获取一个接收请求
+    /// </summary>
+    function GetRecvRequest: TIocpRecvRequest;
+    function ReleaseRecvRequest(pvObject: TIocpRecvRequest): Boolean;
 
   public
     /// <summary>
@@ -922,6 +939,10 @@ type
     ///   默认日志文件前缀
     /// </summary>
     property DefaultMsgType: String read FDefaultMsgType write FDefaultMsgType;
+    /// <summary>
+    ///   是否使用对象池
+    /// </summary>
+    property UseObjectPool: Boolean read FUseObjectPool write FUseObjectPool;
 
     /// <summary>
     ///   default cpu count * 2 -1
@@ -1144,8 +1165,6 @@ begin
   FRawSocket := TRawSocket.Create();
   FActive := false;
   FSendRequestLink := TIocpRequestSingleLink.Create(10);
-  FRecvRequest := TIocpRecvRequest.Create;
-  FRecvRequest.FContext := self;
 end;
 
 destructor TDiocpCustomContext.Destroy;
@@ -1160,16 +1179,6 @@ begin
 
   FRawSocket.close;
   FRawSocket.Free;
-
-  if FRecvRequest.Responding then
-  begin
-    // 正在响应，不进行释放
-    FRecvRequest.DestroyOnResponseEnd := true;
-  end else
-  begin
-    FRecvRequest.FContext := nil;
-    FRecvRequest.Free;
-  end;
 
 
   Assert(FSendRequestLink.Count = 0);
@@ -1321,18 +1330,18 @@ begin
   FOwner.DoClientContextError(Self, pvErrorCode);
 end;
 
-procedure TDiocpCustomContext.DoReceiveData;
+procedure TDiocpCustomContext.DoReceiveData(pvRecvRequest: TIocpRecvRequest);
 begin
   try
     FLastActivity := GetTickCount;
 
-    Inc(self.FRecvBytesSize, FRecvRequest.FBytesTransferred);
+    Inc(Self.FRecvBytesSize, pvRecvRequest.FBytesTransferred);
 
-    OnRecvBuffer(FRecvRequest.FRecvBuffer.buf,
-      FRecvRequest.FBytesTransferred,
-      FRecvRequest.ErrorCode);
+    OnRecvBuffer(pvRecvRequest.FRecvBuffer.buf,
+      pvRecvRequest.FBytesTransferred,
+      pvRecvRequest.ErrorCode);
     if FOwner <> nil then
-      FOwner.DoReceiveData(Self, FRecvRequest);
+      FOwner.DoReceiveData(Self, pvRecvRequest);
   except
     on E:Exception do
     begin
@@ -1537,8 +1546,15 @@ begin
 end;
 
 procedure TDiocpCustomContext.PostWSARecvRequest;
+var
+  lvRecvRequest:TIocpRecvRequest;
 begin
-  FRecvRequest.PostRequest;
+  lvRecvRequest := FOwner.GetRecvRequest;
+  lvRecvRequest.FContext := Self;
+  if not lvRecvRequest.PostRequest then
+  begin
+    lvRecvRequest.ReleaseBack;
+  end;
 end;
 
 
@@ -1621,7 +1637,6 @@ end;
 procedure TDiocpCustomContext.SetOwner(const Value: TDiocpCustom);
 begin
   FOwner := Value;
-  FRecvRequest.FOwner := FOwner;
 end;
 
 procedure TDiocpCustomContext.SetSocketState(pvState:TSocketState);
@@ -1677,7 +1692,8 @@ begin
 
   // send requestPool
   FSendRequestPool := TBaseQueue.Create;
-    
+  FRecvRequestPool := TBaseQueue.Create;
+  
   FIocpEngine := TIocpEngine.Create();
   FIocpEngine.IocpCore.OnIocpException := self.OnIocpException;
 
@@ -1702,12 +1718,14 @@ begin
   if FDataMoniter <> nil then FDataMoniter.Free;
 
   FSendRequestPool.FreeDataObject;
+  FRecvRequestPool.FreeDataObject;
 
   FOnlineContextList.Free;
 
   FIocpEngine.Free;
 
   FSendRequestPool.Free;
+  FRecvRequestPool.Free;
 
   FLocker.Free;
 
@@ -2267,6 +2285,32 @@ begin
   Result.FObjectAlive := True;
 end;
 
+function TDiocpCustom.GetRecvRequest: TIocpRecvRequest;
+begin
+  if UseObjectPool then
+  begin
+    Result := TIocpRecvRequest(FRecvRequestPool.DeQueue);
+    if Result = nil then
+    begin
+      Result := TIocpRecvRequest.Create;
+      if FDataMoniter <> nil then FDataMoniter.IncRecvRequestCreateCounter;
+    end;
+    Result.Tag := 0;
+    Result.FAlive := true;
+    //Result.DoCleanup;
+    Result.FOwner := Self;
+    if FDataMoniter <> nil then FDataMoniter.IncRecvRequestOutCounter;
+  end else
+  begin
+    Result := TIocpRecvRequest.Create;
+    if FDataMoniter <> nil then FDataMoniter.IncRecvRequestCreateCounter;
+    Result.Tag := 0;
+    Result.FAlive := true;
+    Result.FOwner := Self;
+    if FDataMoniter <> nil then FDataMoniter.IncRecvRequestOutCounter;
+  end;
+end;
+
 procedure TDiocpCustom.OnCreateContext(const context: TDiocpCustomContext);
 begin
 
@@ -2284,6 +2328,51 @@ begin
       LogMessage('未处理异常:%s',[E.Message], CORE_LOG_FILE, lgvError);
     end;
   except
+  end;
+end;
+
+function TDiocpCustom.ReleaseRecvRequest(pvObject: TIocpRecvRequest): Boolean;
+begin
+  if self = nil then
+  begin
+    Assert(False);
+  end;
+  if FRecvRequestPool = nil then
+  begin
+    // check call stack is crash
+    Assert(FRecvRequestPool <> nil);
+  end;
+
+  if IsDebugMode then
+  begin
+    Assert(pvObject.FAlive)
+  end;
+
+  if UseObjectPool then
+  begin
+    if lock_cmp_exchange(True, False, pvObject.FAlive) = True then
+    begin
+      if FDataMoniter <> nil then FDataMoniter.IncRecvRequestReturnCounter;
+
+  //    if pvObject.FBuf <> nil then
+  //    begin
+  //      /// Buff处理完成, 响应事件
+  //      DoSendBufferCompletedEvent(pvObject.FClientContext, pvObject.FBuf, pvObject.FLen, pvObject.Tag, pvObject.ErrorCode);
+  //    end;
+
+      // 清理Buffer
+     // pvObject.DoCleanUp;
+      pvObject.FContext := nil;
+    
+      FRecvRequestPool.EnQueue(pvObject);
+      Result := true;
+    end else
+    begin
+      Result := false;
+    end;
+  end else
+  begin
+    pvObject.Free;
   end;
 end;
 
@@ -2571,7 +2660,7 @@ begin
         Format(strRecvZero,  [FContext.FSocketHandle]),  Self);
     end else
     begin
-      FContext.DoReceiveData;
+      FContext.DoReceiveData(Self);
     end;
   finally
 
@@ -2581,10 +2670,11 @@ begin
       FContext.PostWSARecvRequest;
     end;
 
-    // 减少计数，可能会触发关闭事件
-    FContext.DecReferenceCounter(
-      Format('debugInfo:%s, refcount:%d, TIocpRecvRequest.WSARecvRequest.HandleResponse',
-        [FDebugInfo,FOverlapped.refCount]), Self);
+    //ResponseDone dec
+//    // 减少计数，可能会触发关闭事件
+//    FContext.DecReferenceCounter(
+//      Format('debugInfo:%s, refcount:%d, TIocpRecvRequest.WSARecvRequest.HandleResponse',
+//        [FDebugInfo,FOverlapped.refCount]), Self);
 
 
   end;
@@ -2668,6 +2758,35 @@ begin
     GetMem(FInnerBuffer.buf, FInnerBuffer.len);
   end;
   Result := PostRequest(FInnerBuffer.buf, FInnerBuffer.len);
+end;
+
+procedure TIocpRecvRequest.ReleaseBack;
+begin
+  FOwner.ReleaseRecvRequest(Self);
+end;
+
+procedure TIocpRecvRequest.ResponseDone;
+var
+  lvContext:TDiocpCustomContext;
+begin
+  inherited;
+  if FOwner = nil then
+  begin
+    if IsDebugMode then
+    begin
+      Assert(FOwner <> nil);
+      Assert(Self.FAlive);
+    end;
+  end else
+  begin
+    // fclientcontext is nil
+    lvContext := FContext;
+    try
+      FOwner.ReleaseRecvRequest(Self);
+    finally
+      lvContext.DecReferenceCounter('TIocpRecvRequest.WSARecvRequest.Response Done', Self);
+    end;
+  end;  
 end;
 
 function TIocpSendRequest.ExecuteSend: Boolean;
@@ -3019,6 +3138,21 @@ begin
   finally
     FLocker.Leave;
   end;
+end;
+
+procedure TIocpDataMonitor.IncRecvRequestCreateCounter;
+begin
+  InterlockedIncrement(FRecvRequestCreateCounter);
+end;
+
+procedure TIocpDataMonitor.IncRecvRequestOutCounter;
+begin
+  InterlockedIncrement(FRecvRequestOutCounter);
+end;
+
+procedure TIocpDataMonitor.IncRecvRequestReturnCounter;
+begin
+  InterlockedIncrement(FRecvRequestReturnCounter);
 end;
 
 procedure TIocpDataMonitor.incResponseSendObjectCounter;
@@ -3502,18 +3636,6 @@ end;
 procedure TDiocpCustomContext.SetMaxSendingQueueSize(pvSize:Integer);
 begin
   FSendRequestLink.setMaxSize(pvSize);
-end;
-
-procedure TDiocpCustomContext.SetRecvWorkerHint(pvHintStr: String);
-begin
-  if FRecvRequest <> nil then
-    FRecvRequest.SetWorkHintInfo(pvHintStr);
-end;
-
-procedure TDiocpCustomContext.SetRecvWorkerHint(pvFmtMsg: string; const args:
-    array of const);
-begin
-  SetRecvWorkerHint(Format(pvFmtMsg, args));
 end;
 
 initialization
