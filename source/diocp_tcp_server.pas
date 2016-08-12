@@ -20,7 +20,7 @@ unit diocp_tcp_server;
 
 {$I 'diocp.inc'}
 
-{.$DEFINE SPEED_TEST}
+
 
 {$IFDEF DEBUG}
   {$DEFINE DEBUG_ON}
@@ -1469,14 +1469,14 @@ end;
 
 procedure TIocpClientContext.InnerLock;
 begin
-  //FContextLocker.lock();
-  SpinLock(FInnerLockerFlag);
+  FContextLocker.lock();
+  //SpinLock(FInnerLockerFlag);
 end;
 
 procedure TIocpClientContext.InnerUnLock;
 begin
-  //FContextLocker.unLock;
-  SpinUnLock(FInnerLockerFlag);
+  FContextLocker.unLock;
+  //SpinUnLock(FInnerLockerFlag);
 end;
 
 

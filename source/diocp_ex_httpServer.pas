@@ -25,6 +25,8 @@ unit diocp_ex_httpServer;
 
 interface
 
+{$I 'diocp.inc'}
+
 /// 三个编译开关，只能开启一个
 {.$DEFINE INNER_IOCP_PROCESSOR}     // iocp线程触发事件
 {.$DEFINE QDAC_QWorker}   // 用qworker进行调度触发事件
@@ -1663,8 +1665,8 @@ begin
   RegisterContextClass(TDiocpHttpClientContext);
   RegisterSessionClass(TDiocpHttpDValueSession);
 
-  // 100K, 每次投递100k
-  FBlockBufferPool := newBufferPool(1024 * 100);
+  // 4K, 每次投递4k
+  FBlockBufferPool := newBufferPool(1024 * 4);
 end;
 
 destructor TDiocpHttpServer.Destroy;
