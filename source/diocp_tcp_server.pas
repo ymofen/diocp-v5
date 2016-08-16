@@ -2346,7 +2346,7 @@ begin
   FOnlineContextList := TDHashTable.Create(10949);
 
 
-  FMaxSendingQueueSize := 100;
+  FMaxSendingQueueSize := 1000;
 
   // post wsaRecv block size
   FWSARecvBufferSize := 1024 * 4;
