@@ -4754,10 +4754,6 @@ initialization
   __innerLogger.LogFilter := [lgvError, lgvWarning, lgvWriteFile];
   {$ENDIF}
 
-  {$IFDEF DEBUG}
-  {$ELSE}
-  __innerLogger.LogFilter := [lgvError, lgvWarning, lgvWriteFile];
-  {$ENDIF}
   __svrLogger := __innerLogger;
 
 finalization
