@@ -854,6 +854,8 @@ begin
     case ADValue.ValueType of
       vdtGuid:
         Dispose(ADValue.Value.AsGuid);
+      vdtStringA:
+        Dispose(ADValue.Value.AsStringA);
       vdtString:
         Dispose(ADValue.Value.AsString);
       vdtStringW:
