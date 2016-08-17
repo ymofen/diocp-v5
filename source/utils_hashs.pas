@@ -107,6 +107,11 @@ type
     procedure ForEach(pvCallback:TOnDHashDataNotifyEx; pvParamData:Pointer); overload;
 
     /// <summary>
+    ///   循环每一个数据, 带一个扩展的参数数据进行回调
+    /// </summary>
+    procedure ForEach(pvCallback:TPointerNotifyProc; pvParamData:Pointer); overload;
+
+    /// <summary>
     ///  add AData
     /// </summary>
     procedure Add(pvHashValue: TDHashValueType; pvData: Pointer);
@@ -876,6 +881,24 @@ end;
 procedure TDHashTableSafe.UnLock;
 begin
   FLocker.Leave;
+end;
+
+procedure TDHashTable.ForEach(pvCallback: TPointerNotifyProc;
+  pvParamData: Pointer);
+var
+  I:Integer;
+  lvBucket: PDHashData;
+begin
+  Assert(Assigned(pvCallback));
+  for I := 0 to High(FBuckets) do
+  begin
+    lvBucket := FBuckets[I];
+    while lvBucket<>nil do
+    begin
+      pvCallback(lvBucket, pvParamData);
+      lvBucket:=lvBucket.Next;
+    end;
+  end;  
 end;
 
 end.

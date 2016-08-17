@@ -14,6 +14,10 @@ unit utils_dvalue;
   {$DEFINE HAVE_GENERICS}
 {$IFEND}
 
+{$IFNDEF NEXTGEN}
+
+{$ENDIF}
+
 interface
 
 
@@ -64,7 +68,7 @@ type
 
 
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
-    vdtInteger, vdtInt64, vdtUInt64, vdtCurrency, vdtGuid, vdtDateTime,
+    vdtInteger, vdtInt64, vdtUInt64, vdtCurrency, vdtGuid, vdtDateTime, vdtStringA,
     vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtObject, vdtArray);
 
   TDValueDataTypes = set of TDValueDataType;
@@ -100,6 +104,10 @@ type
         (AsDateTime: TDateTime);
       7:
         (AsString: PString);
+      {$IF (not Defined(NEXTGEN))}
+      8:
+        (AsStringA: PAnsiString);
+      {$IFEND}
       9:
         (AsStringW: PDStringW);
       15:
@@ -280,6 +288,10 @@ type
     procedure CheckBeforeAddChild(pvType: TDValueObjectType);
     function GetAsInterface: IInterface;
     procedure SetAsInterface(const Value: IInterface);
+    function GetAsAnsiString: AnsiString;
+    procedure SetAsAnsiString(const Value: AnsiString);
+    function GetAsStringW: DStringW;
+    procedure SetAsStringW(const Value: DStringW);
   public
     constructor Create(pvType: TDValueObjectType); overload;
 
@@ -462,6 +474,8 @@ type
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
+    property AsStringW: DStringW read GetAsStringW write SetAsStringW;
+    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
     property AsInterface: IInterface read GetAsInterface write SetAsInterface;
 
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
@@ -502,6 +516,10 @@ type
     procedure SetAsUInt(const Value: UInt64);
     function GetAsStringW: WideString;
     procedure SetAsStringW(const Value: WideString);
+    {$IFNDEF NEXTGEN}
+    function GetAsStringA: AnsiString;
+    procedure SetAsStringA(const Value: AnsiString);
+    {$ENDIF}
   public
     procedure CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes: TDValueDataTypes
         = [vdtInterface, vdtObject, vdtPtr]);
@@ -528,7 +546,12 @@ type
 
 
     property AsFloat: Double read GetAsFloat write SetAsFloat;
+
     property AsString: String read GetAsString write SetAsString;
+    {$IFNDEF NEXTGEN}
+    property AsStringA: String read GetAsStringA write SetAsStringA;
+    {$ENDIF}
+    
     property AsStringW:WideString read GetAsStringW write SetAsStringW;
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
     property AsUInt: UInt64 read GetAsUInt write SetAsUInt;
@@ -582,6 +605,11 @@ function DValueGetAsString(ADValue:PDRawValue): string;
 procedure DValueSetAsStringW(ADValue:PDRawValue; pvString:DStringW);
 function DValueGetAsStringW(ADValue:PDRawValue): DStringW;
 
+{$IF (not Defined(NEXTGEN))}
+procedure DValueSetAsStringA(ADValue:PDRawValue; pvString:AnsiString);
+function DValueGetAsStringA(ADValue:PDRawValue): AnsiString;
+{$IFEND}
+
 procedure DValueBindPointerData(ADValue:PDRawValue; pvData:Pointer;
     pvReleaseAction:TPtrReleaseAction);
 procedure DValueBindObjectData(ADValue:PDRawValue; pvData:TObject;
@@ -633,7 +661,7 @@ resourcestring
 const
   DValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'UInt64', 'Currency', 'Guid',
-    'DateTime', 'String', 'StringW', 'Stream', 'Interface', 'Pointer', 'Object', 'Array');
+    'DateTime', 'AnsiString', 'String', 'StringW', 'Stream', 'Interface', 'Pointer', 'Object', 'Array');
 
 procedure FreeObject(AObject: TObject);
 begin
@@ -920,6 +948,78 @@ begin
   end;
 end;
 
+{$IF (not Defined(NEXTGEN))}
+procedure DValueSetAsStringA(ADValue:PDRawValue; pvString:AnsiString);
+begin
+  CheckDValueSetType(ADValue, vdtStringA);
+  ADValue.Value.AsStringA^ := pvString;
+end;
+
+function DValueGetAsStringA(ADValue:PDRawValue): AnsiString;
+var
+  lvHexStr:AnsiString;
+  function DTToStr(ADValue: PDRawValue): AnsiString;
+  begin
+    if Trunc(ADValue.Value.AsFloat) = 0 then
+      Result := FormatDateTime({$IF RTLVersion>=22} FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime)
+    else if IsZero(ADValue.Value.AsFloat - Trunc(ADValue.Value.AsFloat)) then
+      Result := FormatDateTime
+        ({$IF RTLVersion>=22}FormatSettings.{$IFEND}LongDateFormat,
+        ADValue.Value.AsDateTime)
+    else
+      Result := FormatDateTime
+        ({$IF RTLVersion>=22}FormatSettings.{$IFEND}LongDateFormat + ' ' +
+{$IF RTLVersion>=22}FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime);
+  end;
+
+begin
+  case ADValue.ValueType of
+    vdtStringA:
+      Result := ADValue.Value.AsStringA^;    
+    vdtString:
+      Result := ADValue.Value.AsString^;
+    vdtStringW:
+      Result := ADValue.Value.AsStringW^;
+    vdtUnset:
+      Result := 'default';
+    vdtNull:
+      Result := 'null';
+    vdtBoolean:
+      Result := BoolToStr(ADValue.Value.AsBoolean, True);
+    vdtSingle:
+      Result := FloatToStr(ADValue.Value.AsSingle);
+    vdtFloat:
+      Result := FloatToStr(ADValue.Value.AsFloat);
+    vdtInteger:
+      Result := IntToStr(ADValue.Value.AsInteger);
+    vdtInt64:
+      Result := IntToStr(ADValue.Value.AsInt64);
+    vdtCurrency:
+      Result := CurrToStr(ADValue.Value.AsCurrency);
+    vdtGuid:
+      Result := GuidToString(ADValue.Value.AsGuid^);
+    vdtDateTime:
+      Result := DTToStr(ADValue);
+    vdtObject:
+      Result := Format('@@object[$%p]', [ADValue.Value.AsPointer]);
+    vdtPtr:
+      Result := Format('@@Ptr[$%p]', [ADValue.Value.AsPointer]);
+    vdtInterface:
+      Result := Format('@@Interface[$%p]', [ADValue.Value.AsInterface]);
+    vdtStream:
+      begin
+        SetLength(lvHexStr, TMemoryStream(ADValue.Value.AsStream).Size * 2);
+        lvHexStr := BinToHex(
+          TMemoryStream(ADValue.Value.AsStream).Memory, TMemoryStream(ADValue.Value.AsStream).Size, False);
+
+        Result := lvHexStr;
+      end;
+    vdtArray:
+      Result := '@@Array';
+  end;
+end;
+{$IFEND}
+
 procedure DValueSetAsStringW(ADValue:PDRawValue; pvString:DStringW);
 begin
   CheckDValueSetType(ADValue, vdtStringW);
@@ -945,6 +1045,10 @@ var
 
 begin
   case ADValue.ValueType of
+{$IF (not Defined(NEXTGEN))}
+    vdtStringA:
+      Result := ADValue.Value.AsStringA^;
+{$IFEND}
     vdtString:
       Result := ADValue.Value.AsString^;
     vdtStringW:
@@ -1155,6 +1259,10 @@ var
 
 begin
   case ADValue.ValueType of
+{$IF (not Defined(NEXTGEN))}
+    vdtStringA:
+      Result := ADValue.Value.AsStringA^;
+{$IFEND}  
     vdtString:
       Result := ADValue.Value.AsString^;
     vdtStringW:
@@ -2016,6 +2124,11 @@ begin
   end;
 end;
 
+function TDValue.GetAsAnsiString: AnsiString;
+begin
+  Result := FValue.GetAsString;
+end;
+
 function TDValue.GetAsBoolean: Boolean;
 begin
   Result := FValue.GetAsBoolean;
@@ -2049,6 +2162,11 @@ end;
 function TDValue.GetAsString: String;
 begin
   Result := FValue.GetAsString;
+end;
+
+function TDValue.GetAsStringW: DStringW;
+begin
+  Result := FValue.AsStringW
 end;
 
 function TDValue.GetAsUInt: UInt64;
@@ -2376,6 +2494,11 @@ end;
 
 
 
+procedure TDValue.SetAsAnsiString(const Value: AnsiString);
+begin
+
+end;
+
 procedure TDValue.SetAsBoolean(const Value: Boolean);
 begin
   FValue.SetAsBoolean(Value);
@@ -2399,6 +2522,11 @@ end;
 procedure TDValue.SetAsString(const Value: String);
 begin
   FValue.SetAsString(Value);
+end;
+
+procedure TDValue.SetAsStringW(const Value: DStringW);
+begin
+  FValue.AsStringW := Value;
 end;
 
 procedure TDValue.SetAsUInt(const Value: UInt64);
@@ -2542,6 +2670,18 @@ begin
   Result := DValueGetAsString(@FRawValue);
 end;
 
+{$IFNDEF NEXTGEN}
+procedure TDValueItem.SetAsStringA(const Value: AnsiString);
+begin
+  DValueSetAsStringA(@FRawValue, Value);
+end;    
+
+function TDValueItem.GetAsStringA: AnsiString;
+begin
+  Result := DValueGetAsStringA(@FRawValue);
+end;
+{$ENDIF}
+
 function TDValueItem.GetAsStringW: WideString;
 begin
   Result := DValueGetAsStringW(@FRawValue);
@@ -2603,6 +2743,7 @@ procedure TDValueItem.SetAsString(const Value: String);
 begin
   DValueSetAsString(@FRawValue, Value);
 end;
+
 
 procedure TDValueItem.SetAsStringW(const Value: WideString);
 begin

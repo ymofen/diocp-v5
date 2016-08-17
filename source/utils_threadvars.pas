@@ -24,6 +24,7 @@ type
     FReleaseCallBack:TPointerNotifyProc;
     FLastActivity:Cardinal;
     FOwner:PThreadVars;
+    FFlag:Integer;
   end;                 
     
   TThreadVars = record
@@ -39,6 +40,9 @@ procedure SetCurrentThreadVar(const p_thread_vars: PThreadVars; const v:
     Pointer; pvReleaseCallBack: TPointerNotifyProc);
 procedure BindObjectAsThreadVar(const p_thread_vars: PThreadVars; const pvObj:
     TObject; pvOwnObject: Boolean);
+
+procedure InnerSetThreadVarsFlag(const p_thread_vars:PThreadVars;
+    pvFlag:Integer);
 
 
 procedure CallBack_AsFreeObject(const sender:Pointer; const v:Pointer);
@@ -57,10 +61,22 @@ procedure FinalizeForThreadVars;
 
 implementation
 
+const
+  FLAG_CLEAN_VAR = $0001;
+
 
 var
-  __info_list: TDHashTableSafe;
-  __waitEvent:TEvent;
+
+  __defaultVars:PThreadVars;
+
+procedure InnerReleaseVar(const pvPVar:PThreadVarRecord);
+begin
+  if Assigned(pvPVar.FReleaseCallBack) then
+  begin
+    pvPVar.FReleaseCallBack(pvPVar.FOwner, pvPVar.FVar);
+  end; 
+  pvPVar.FVar := nil;
+end;
 
 
 procedure CallBack_ForHashTableCleanUp(const sender:Pointer; const v:Pointer);
@@ -74,6 +90,37 @@ begin
   end; 
   Dispose(lvPVar);
   PDHashData(sender).Data := nil; 
+end;
+
+procedure CallBack_ForHashTableSetFlag(const sender:Pointer; const v:Pointer);
+var
+  lvPVar:PThreadVarRecord;
+begin
+  lvPVar := PDHashData(sender).Data;
+  if (Assigned(lvPVar)) then
+  begin
+    lvPVar.FFlag := Integer(v);
+  end; 
+end;
+
+procedure InnerSetThreadVarsFlag(const p_thread_vars:PThreadVars;
+    pvFlag:Integer);
+var
+  i:Integer;
+  lvPVar:PThreadVarRecord;
+  lvParam:Pointer;
+begin    
+  for i := Low(p_thread_vars.FVarArray) to High(p_thread_vars.FVarArray) do
+  begin
+    lvPVar := p_thread_vars.FVarArray[i];
+    if (Assigned(lvPVar)) then
+    begin
+      lvPVar.FFlag := pvFlag;
+    end;
+  end;
+
+  lvParam := Pointer(pvFlag);
+  p_thread_vars.FList.ForEach(CallBack_ForHashTableSetFlag, lvParam);
 end;
 
 /// <summary>
@@ -94,7 +141,7 @@ begin
     end;
     Dispose(lvPVar);
     p_thread_vars.FVarArray[i] := nil;
-  end;  
+  end;
 
   p_thread_vars.FList.ForEach(CallBack_ForHashTableCleanUp); 
     
@@ -122,63 +169,29 @@ begin
 end;
 
 function GetCurrentThreadDValue: TDValue;
-var
-  lvCurrentID:THandle;
-  lvInfo:TDValue;
 begin
-  Result := nil;
-  {$IFDEF MSWINDOWS}
-  lvCurrentID := GetCurrentThreadId;
-  {$ELSE}
-  lvCurrentID := TThread.CurrentThread.ThreadID;
-  {$ENDIF}
-  if __info_list = nil then Exit;
-  //  Assert(__info_list <> nil, 'GetCurrentThreadDValue not initalize');
-  __info_list.Lock;
-  try
-    lvInfo := TDValue(__info_list.Values[lvCurrentID]);
-    if lvInfo = nil then
-    begin
-      lvInfo := TDValue.Create;
-      lvInfo.ForceByName('__threadid').AsInteger := lvCurrentID;
-      {$IFDEF AUTOREFCOUNT}
-      lvInfo.__ObjAddRef();
-      {$ENDIF}
-      __info_list.Values[lvCurrentID] := lvInfo;
-    end;
-  finally
-    __info_list.unLock;
-  end;
-
-  Result := lvInfo;
+  Result := GetCurrentThreadVar(__defaultVars);
+  if Result = nil then
+  begin
+    Result := TDValue.Create();
+    BindObjectAsThreadVar(__defaultVars, Result, True);
+  end;                                                 
 end;
 
 
 procedure InitalizeForThreadVars;
 begin
-  if __info_list = nil then
-    __info_list := TDHashTableSafe.Create();
+  __defaultVars := NewThreadVars;
 end;
 
 procedure FinalizeForThreadVars;
 begin
-  if __info_list <> nil then
-  begin
-    __info_list.FreeAllDataAsObject;
-    __info_list.Free;
-    __info_list := nil;
-  end;
+  DisposeThreadVars(__defaultVars);
 end;
 
 procedure ResetThreadVars;
 begin
-  __info_list.Lock;
-  try
-    __info_list.FreeAllDataAsObject;
-    __info_list.Clear;
-  finally
-    __info_list.UnLock;
-  end;
+  InnerSetThreadVarsFlag(__defaultVars, FLAG_CLEAN_VAR);
 end;
 
 function NewThreadVars: PThreadVars;
@@ -194,15 +207,15 @@ begin
   Dispose(p_thread_vars);
 end;
 
-procedure InnerReleaseVar(const p_thread_vars: PThreadVars; const
-    p_thread_varrecord: PThreadVarRecord);
-begin
-  if p_thread_varrecord.FVar <> nil then
-  begin
-    p_thread_varrecord.FReleaseCallBack(p_thread_vars, p_thread_varrecord.FVar);
-    p_thread_varrecord.FVar := nil;
-  end;
-end;
+//procedure InnerReleaseVar(const p_thread_vars: PThreadVars; const
+//    p_thread_varrecord: PThreadVarRecord);
+//begin
+//  if p_thread_varrecord.FVar <> nil then
+//  begin
+//    p_thread_varrecord.FReleaseCallBack(p_thread_vars, p_thread_varrecord.FVar);
+//  end;
+//  p_thread_varrecord.FVar := nil;
+//end;
 
 function GetCurrentThreadVar(const p_thread_vars: PThreadVars): Pointer;
 var
@@ -214,7 +227,7 @@ begin
   begin
     SpinLock(p_thread_vars.FListLocker);
     try
-      lvPVar := p_thread_vars.FList.Values[lvThreadID];       
+      lvPVar := p_thread_vars.FList.Values[lvThreadID];
     finally
       SpinUnLock(p_thread_vars.FListLocker);
     end;
@@ -224,6 +237,12 @@ begin
   end;
   if lvPVar <> nil then
   begin
+    if lvPVar.FFlag = FLAG_CLEAN_VAR then
+    begin
+      InnerReleaseVar(lvPVar);
+      lvPVar.FFlag := 0;     // 还原 
+    end;
+    
     Result := lvPVar.FVar;
     lvPVar.FLastActivity := GetTickCount;
   end else
@@ -247,7 +266,7 @@ var
     end else
     begin
       // 清理原有对象
-      InnerReleaseVar(p_thread_vars, lvPVar);
+      InnerReleaseVar(lvPVar);
     end;
     lvPVar.FLastActivity := GetTickCount;
     lvPVar.FReleaseCallBack := pvReleaseCallBack;
@@ -304,7 +323,7 @@ end;
 procedure CallBack_AsDisposeMem(const sender:Pointer; const v:Pointer);
 begin
   Dispose(v);    
-end;
+end;    
 
 
 
@@ -314,7 +333,6 @@ initialization
 
 finalization
   FinalizeForThreadVars;
-  Assert(__info_list = nil, 'utils_thread_memoery_leak');
 
 
 
