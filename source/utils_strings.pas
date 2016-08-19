@@ -249,6 +249,16 @@ type
 /// <param name="pvChars"> 遇到这些字符后停止，然后返回 </param>
 function SkipUntil(var p:PChar; pvChars: TSysCharSet): Integer;
 
+/// <summary>
+///     跳过字符, 没有找到则不移动P
+/// </summary>
+/// <returns>
+///   没找到返回-1
+///   如果找到, 则返回跳过的字符
+/// </returns>
+/// <param name="p"> 开始检测位置 </param>
+/// <param name="pvChars"> 遇到这些字符后停止，然后返回 </param>
+function SkipUntilEx(var p:PChar; pvChars: TSysCharSet): Integer;
 
 
 
@@ -386,6 +396,19 @@ function URLEncode(S: URLString; pvIsPostData: Boolean = true): URLString;
 /// <param name="pvSpliters"> 名字和值的分割符 </param>
 function StringsValueOfName(pvStrings: TStrings; const pvName: string;
     pvSpliters: TSysCharSet; pvTrim: Boolean): String;
+
+/// <summary>
+///   s := content-type: application/json; chartset=utf-8
+///   GetStrValueOfName(s, 'charset', ['=',' ', #13, #10], [';']) = 'utf-8'
+/// </summary>
+/// <returns> string
+/// </returns>
+/// <param name="pvStr"> (string) </param>
+/// <param name="pvName"> (string) </param>
+/// <param name="pvSplitChars"> (TSysCharSet) </param>
+/// <param name="pvEndChars"> (TSysCharSet) </param>
+function GetStrValueOfName(const pvStr, pvName: string; pvSplitChars,
+    pvEndChars: TSysCharSet): string;
 
 
 /// <summary>
@@ -2150,6 +2173,62 @@ begin
       Inc(lvBuf);
     end;
   end;
+end;
+
+function GetStrValueOfName(const pvStr, pvName: string; pvSplitChars,
+    pvEndChars: TSysCharSet): string;
+var
+  lvPtr, lvSearchPtr:PChar;
+  r :Integer;
+begin
+  lvPtr := PChar(pvStr);
+
+  while True do
+  begin
+    lvSearchPtr := StrStrIgnoreCase(lvPtr, PChar(pvName));
+    if lvSearchPtr = nil then
+    begin
+      Result := '';
+      Exit;
+    end;
+    Inc(lvSearchPtr, Length(pvName));
+
+    lvPtr := lvSearchPtr;
+    r := SkipChars(lvPtr, pvSplitChars);
+    if r = 0 then
+    begin
+      Continue;
+    end else
+    begin
+      Break;
+    end;
+  end;
+
+  if LeftUntil(lvPtr, pvEndChars, Result) = -1 then
+  begin
+    Result := lvPtr;
+  end;
+end;
+
+function SkipUntilEx(var p:PChar; pvChars: TSysCharSet): Integer;
+var
+  ps, pe: PChar;
+begin
+  Result := -1;
+  ps := p;
+  pe := ps;
+  while pe^ <> #0 do
+  begin
+    if CharInSet(pe^, pvChars) then
+    begin
+      p := pe;
+      Result := 0;
+      Break;
+    end else
+      Inc(pe);
+  end;
+  if Result = 0 then
+    Result := pe - ps; 
 end;
 
 

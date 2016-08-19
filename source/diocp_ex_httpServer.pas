@@ -179,6 +179,7 @@ type
     function GetRequestURLParamData: string;
     function GetURLParams: TDValue;
     procedure InnerAddToDebugStrings(pvMsg:String);
+    function GetCharset: string;
   public
     constructor Create;
     destructor Destroy; override;   
@@ -250,6 +251,8 @@ type
     procedure ContentSaveToFile(pvFile:String);
 
     property ContentType: String read GetContentType;
+
+    property Charset:string read GetCharset;
 
     property ContentLength: Int64 read GetContentLength;
 
@@ -921,6 +924,11 @@ end;
 function TDiocpHttpRequest.GetContentType: String;
 begin
   Result := FInnerRequest.ContentType;
+end;
+
+function TDiocpHttpRequest.GetCharset: string;
+begin
+  Result := FInnerRequest.Charset;
 end;
 
 function TDiocpHttpRequest.GetContentAsMemory: PByte;

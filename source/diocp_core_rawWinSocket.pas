@@ -89,6 +89,8 @@ type
   end;
 
 
+
+
 const
   {$IFNDEF DOTNET}
     {$IFDEF USE_VCL_POSIX}
@@ -161,6 +163,8 @@ type
     function Listen(const backlog: Integer = 0): Boolean;
 
     function GetIpAddrByName(const host:string): String;
+
+    function GetLocalPort: Word;
 
     /// <summary>
     ///   -2:  ³¬Ê±
@@ -521,6 +525,17 @@ begin
 //  end;
 
   Result :=string(inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^));
+end;
+
+function TRawSocket.GetLocalPort: Word;
+var
+  lvSockAddr: TSockAddr;
+  Size: Integer;
+begin
+  Result := 0;
+  Size := SizeOf(TSockAddr);
+  getsockname(SocketHandle, lvSockAddr, Size);
+  Result := ntohs(lvSockAddr.sin_port);
 end;
 
 function TRawSocket.Listen(const backlog: Integer = 0): Boolean;

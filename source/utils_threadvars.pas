@@ -131,20 +131,22 @@ procedure InnerCleanUpThreadVars(const p_thread_vars:PThreadVars);
 var
   i:Integer;
   lvPVar:PThreadVarRecord;
-begin    
+begin
   for i := Low(p_thread_vars.FVarArray) to High(p_thread_vars.FVarArray) do
   begin
     lvPVar := p_thread_vars.FVarArray[i];
-    if (Assigned(lvPVar) and Assigned(lvPVar.FReleaseCallBack)) then
+    if Assigned(lvPVar) then
     begin
-      lvPVar.FReleaseCallBack(p_thread_vars, lvPVar.FVar);
+      if Assigned(lvPVar.FReleaseCallBack) then
+        lvPVar.FReleaseCallBack(p_thread_vars, lvPVar.FVar);
+
+      Dispose(lvPVar);
+      p_thread_vars.FVarArray[i] := nil;
     end;
-    Dispose(lvPVar);
-    p_thread_vars.FVarArray[i] := nil;
   end;
 
   p_thread_vars.FList.ForEach(CallBack_ForHashTableCleanUp); 
-    
+  p_thread_vars.FList.Free;  
 end;
 
 procedure CallBack_AsFreeObject(const sender:Pointer; const v:Pointer);
@@ -197,6 +199,7 @@ end;
 function NewThreadVars: PThreadVars;
 begin
   New(Result);
+  ZeroMemory(@Result.FVarArray[1], Length(Result.FVarArray) * SizeOf(PThreadVarRecord));
   Result.FList := TDHashTable.Create;
   Result.FListLocker := 0;
 end;

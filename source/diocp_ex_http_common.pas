@@ -87,6 +87,8 @@ type
     /// </summary>
     FContentType:String;
 
+    FContentCharset:String;
+
 
     FRequestRawCookie: string;
     // 存放客户端请求的Cookie信息
@@ -124,6 +126,7 @@ type
     function GetRawCookie: String;
 
     procedure CheckCookie;
+    function GetCharset: String;
     function GetContentAsRAWString: RAWString;
     function GetContentBody: TDBufferBuilder;
     function GetContentType: String;
@@ -182,6 +185,8 @@ type
     property ContentAsRAWString: RAWString read GetContentAsRAWString;
 
     property ContentBody: TDBufferBuilder read GetContentBody;
+
+    property Charset: String read GetCharset;
 
 
 
@@ -1238,6 +1243,7 @@ begin
   FRequestRawURL := '';
   FRequestRawCookie := '-1';
   FContentType := '-1';
+  FContentCharset := '-1';
   FRequestCookieList.Clear;
   FRequestRawURLParamStr := '';
   FURLParams.Clear;
@@ -1245,6 +1251,19 @@ begin
   FRequestFormParams.Clear;
   FHeaders.Clear;
   FKeepAlive := -1;
+end;
+
+function THttpRequest.GetCharset: String;
+var
+  lvCharset:String;
+  lvPtr:PChar;
+begin
+  if FContentCharset = '-1' then
+  begin
+    lvCharset := ContentType;
+    FContentCharset := GetStrValueOfName(lvCharset, 'charset', [' ', '='], [' ', ';']);
+  end;
+  Result := FContentCharset;
 end;
 
 function THttpRequest.GetContentLength: Int64;

@@ -599,10 +599,10 @@ procedure CheckDValueSetType(ADValue:PDRawValue; AType: TDValueDataType);
 procedure CheckDValueSetArrayLength(ADValue: PDRawValue; ALen: Integer);
 
 
-procedure DValueSetAsString(ADValue:PDRawValue; pvString:String);
+procedure DValueSetAsString(ADValue: PDRawValue; const pvString: String);
 function DValueGetAsString(ADValue:PDRawValue): string;
 
-procedure DValueSetAsStringW(ADValue:PDRawValue; pvString:DStringW);
+procedure DValueSetAsStringW(ADValue: PDRawValue; const pvString: DStringW);
 function DValueGetAsStringW(ADValue:PDRawValue): DStringW;
 
 {$IF (not Defined(NEXTGEN))}
@@ -1022,7 +1022,7 @@ begin
 end;
 {$IFEND}
 
-procedure DValueSetAsStringW(ADValue:PDRawValue; pvString:DStringW);
+procedure DValueSetAsStringW(ADValue: PDRawValue; const pvString: DStringW);
 begin
   CheckDValueSetType(ADValue, vdtStringW);
   ADValue.Value.AsStringW^ := pvString;
@@ -1236,7 +1236,7 @@ begin
   end;   
 end;
 
-procedure DValueSetAsString(ADValue:PDRawValue; pvString:String);
+procedure DValueSetAsString(ADValue: PDRawValue; const pvString: String);
 begin
   CheckDValueSetType(ADValue, vdtString);
   ADValue.Value.AsString^ := pvString;
@@ -2749,12 +2749,13 @@ end;
 
 procedure TDValueItem.SetAsStringW(const Value: WideString);
 begin
+  DValueSetAsStringW(@FRawValue, Value);
 
 end;
 
 procedure TDValueItem.SetAsUInt(const Value: UInt64);
 begin
-  // TODO -cMM: TDValueItem.SetAsUInt default body inserted
+  DValueSetAsUInt64(@FRawValue, Value);
 end;
 
 end.

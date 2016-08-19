@@ -963,8 +963,15 @@ const
 
 type
   sockaddr = record
-    sa_family: u_short;                 // address family
-    sa_data: array [0..13] of AnsiChar; // up to 14 bytes of direct address
+    case Integer of
+      0: (sin_family: u_short;
+          sin_port: u_short;
+          sin_addr: TInAddr;
+          sin_zero: array[0..7] of Char);
+      1: (
+          sa_family: u_short;                 // address family
+          sa_data: array [0..13] of AnsiChar; // up to 14 bytes of direct address
+         );
   end;
   {$EXTERNALSYM sockaddr}
   TSockAddr = sockaddr;
