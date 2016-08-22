@@ -549,7 +549,7 @@ type
 
     property AsString: String read GetAsString write SetAsString;
     {$IFNDEF NEXTGEN}
-    property AsStringA: String read GetAsStringA write SetAsStringA;
+    property AsStringA: AnsiString read GetAsStringA write SetAsStringA;
     {$ENDIF}
     
     property AsStringW:WideString read GetAsStringW write SetAsStringW;
