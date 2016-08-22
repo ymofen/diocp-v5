@@ -488,7 +488,6 @@ type
   private
     FAlive:Boolean;
     __debugFlag : Integer;
-    __debugFlag2 : Integer;
     FCounter:Integer;
     FDebugInfo:String;
     FInnerBuffer: diocp_winapi_winsock2.TWsaBuf;
@@ -496,7 +495,6 @@ type
     FRecvdFlag: Cardinal;
     FOwner: TDiocpTcpServer;
     FClientContext:TIocpClientContext;
-    procedure InnerCheckFreeBuffer;
     /// <summary>
     ///   πÈªπ Õ∑≈
     /// </summary>
@@ -2697,6 +2695,7 @@ begin
   end else
   begin
     pvObject.Free;
+    Result := True;
   end;
 end;
 
@@ -3744,11 +3743,6 @@ procedure TIocpAcceptExRequest.ResponseDone;
 begin
   inherited;
   FAcceptorMgr.ReleaseRequestObject(Self);
-end;
-
-procedure TIocpRecvRequest.InnerCheckFreeBuffer;
-begin
-
 end;
 
 constructor TIocpRecvRequest.Create;

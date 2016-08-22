@@ -70,7 +70,6 @@ type
   TIocpRequest = class(TObject)
   private
     __free_flag:Integer;
-    FPostCounter:Integer;    
     FThreadID : THandle;
     FData: Pointer;
 

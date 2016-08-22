@@ -194,7 +194,7 @@ var
   t:Cardinal;
 begin
   t := GetTickCount;
-  while (v <> pvExcept) and ((GetTickCount - t) < pvTimeOut) do
+  while (v <> pvExcept) and ((GetTickCount - t) < Cardinal(pvTimeOut)) do
   begin
     Sleep(10);
   end;        
