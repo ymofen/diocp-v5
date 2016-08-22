@@ -682,6 +682,24 @@ const
 //
 
 type
+  sockaddr = record
+    case Integer of
+      0: (sin_family: u_short;
+          sin_port: u_short;
+          sin_addr: TInAddr;
+          sin_zero: array[0..7] of AnsiChar);
+      1: (
+          sa_family: u_short;                 // address family
+          sa_data: array [0..13] of AnsiChar; // up to 14 bytes of direct address
+         );
+  end;
+  {$EXTERNALSYM sockaddr}
+  TSockAddr = sockaddr;
+  PSockAddr = ^sockaddr;
+  LPSOCKADDR = ^sockaddr;
+  {$EXTERNALSYM LPSOCKADDR}
+
+type
   sockaddr_in = record
     sin_family: Smallint;
     sin_port: u_short;
@@ -961,23 +979,7 @@ const
 // Structure used to store most addresses.
 //
 
-type
-  sockaddr = record
-    case Integer of
-      0: (sin_family: u_short;
-          sin_port: u_short;
-          sin_addr: TInAddr;
-          sin_zero: array[0..7] of Char);
-      1: (
-          sa_family: u_short;                 // address family
-          sa_data: array [0..13] of AnsiChar; // up to 14 bytes of direct address
-         );
-  end;
-  {$EXTERNALSYM sockaddr}
-  TSockAddr = sockaddr;
-  PSockAddr = ^sockaddr;
-  LPSOCKADDR = ^sockaddr;
-  {$EXTERNALSYM LPSOCKADDR}
+
 
 //
 // Portable socket structure (RFC 2553).
