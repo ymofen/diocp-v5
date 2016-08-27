@@ -33,7 +33,7 @@ type
 {$ifend}
 
 type
-  TSocketState = (ssDisconnected, ssConnected, ssConnecting, ssListening, ssAccepting);
+
 
   TIocpAcceptEx = function(sListenSocket, sAcceptSocket: TSocket; lpOutputBuffer: Pointer; dwReceiveDataLength, dwLocalAddressLength, dwRemoteAddressLength: DWORD; var lpdwBytesReceived: DWORD; lpOverlapped: POverlapped): BOOL; stdcall;
 

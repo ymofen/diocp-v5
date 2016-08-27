@@ -60,6 +60,7 @@ type
     FRawSocket: TRawSocket;
     FReadTimeOut: Integer;
     FSendTimeOut: Integer;
+    FSocketState: TSocketState;
     function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
 
@@ -227,6 +228,7 @@ var
 begin
   if FActive then exit;
 
+  FSocketState := ssConnecting;
   FRawSocket.createTcpSocket;
   try
     if FReadTimeOut > 0 then
@@ -251,6 +253,10 @@ begin
     if not FActive then
     begin
       FRawSocket.Close(False);
+      FSocketState := ssDisconnected;
+    end else
+    begin
+      FSocketState := ssConnected;
     end;
   end;
 end;
@@ -260,6 +266,7 @@ var
   lvIpAddr:String;
 begin
   if FActive then exit;
+  FSocketState := ssConnecting;
 
   FRawSocket.createTcpSocket;
   try
@@ -286,6 +293,10 @@ begin
     if not FActive then
     begin
       FRawSocket.Close(False);
+      FSocketState := ssDisconnected;
+    end else
+    begin
+      FSocketState := ssConnected;
     end;
   end;
 
@@ -293,11 +304,17 @@ end;
 
 procedure TDiocpBlockTcpClient.Disconnect;
 begin
-  if not FActive then Exit;
-  if Assigned(FOnDisconnected) then FOnDisconnected(Self);
+  if FSocketState in [ssDisconnecting, ssDisconnected] then Exit;
+  try
+    FSocketState := ssDisconnecting;
+    if not FActive then Exit;
+    if Assigned(FOnDisconnected) then FOnDisconnected(Self);
 
-  FRawSocket.Close(False);
-  FActive := false;
+    FRawSocket.Close(False);
+    FActive := false;
+  finally
+    FSocketState := ssDisconnected;
+  end;
 end;
 
 function TDiocpBlockTcpClient.GetActive: Boolean;

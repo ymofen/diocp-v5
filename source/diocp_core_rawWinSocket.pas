@@ -89,7 +89,8 @@ type
   end;
 
 
-
+type
+  TSocketState = (ssDisconnecting, ssDisconnected, ssConnected, ssConnecting, ssListening, ssAccepting);
 
 const
   {$IFNDEF DOTNET}
