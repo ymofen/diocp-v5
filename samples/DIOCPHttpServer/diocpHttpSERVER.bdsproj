@@ -134,7 +134,7 @@
 			<Directories Name="PackageDCPOutputDir"></Directories>
 			<Directories Name="SearchPath">$(BDS)\lib\Debug;$(BDS)\Lib\Debug\Indy10</Directories>
 			<Directories Name="Packages"></Directories>
-			<Directories Name="Conditionals">DEBUG</Directories>
+			<Directories Name="Conditionals">DEBUG;SPEED_TEST</Directories>
 			<Directories Name="DebugSourceDirs"></Directories>
 			<Directories Name="UsePackages">False</Directories>
 		</Directories>

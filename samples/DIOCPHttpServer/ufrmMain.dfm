@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 62
     Width = 856
     Height = 330
-    ActivePage = tsTester
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -60,6 +60,10 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
