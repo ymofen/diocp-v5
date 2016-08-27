@@ -43,6 +43,7 @@ type
     mmoLog: TMemo;
     chkUseSession: TCheckBox;
     chkUsePool: TCheckBox;
+    chkIPV6: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnInfoClick(Sender: TObject);
@@ -189,11 +190,11 @@ var
   lvDValue:TDValue;
 
 begin
-  pvRequest.Response.ResponseCode := 404;
-  pvRequest.Response.WriteString('404 not found');
-  pvRequest.SendResponse();
-  pvRequest.DoResponseEnd;
-  Exit;
+//  pvRequest.Response.ResponseCode := 404;
+//  pvRequest.Response.WriteString('404 not found');
+//  pvRequest.SendResponse();
+//  pvRequest.DoResponseEnd;
+//  Exit;
 
   if pvRequest.RequestURI = '/json' then
   begin
@@ -359,6 +360,12 @@ procedure TfrmMain.actOpenExecute(Sender: TObject);
 begin
   FTcpServer.Port := StrToInt(edtPort.Text);
   FTcpServer.UseObjectPool := chkUsePool.Checked;
+  FTcpServer.Listeners.ClearObjects;
+  if chkIPV6.Checked then
+  begin
+    FTcpServer.Listeners.Bind('0.0.0.0', StrToInt(edtPort.Text), IP_V6, TDiocpHttpClientContext);
+    ShowMessage('这样访问: http://[本机ipv6地址]:8081/');
+  end;
   FTcpServer.Active := true;
   FTcpServer.DisableSession := not chkUseSession.Checked;
   refreshState;

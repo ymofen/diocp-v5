@@ -60,10 +60,6 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -168,6 +164,14 @@ object frmMain: TfrmMain
       Checked = True
       State = cbChecked
       TabOrder = 6
+    end
+    object chkIPV6: TCheckBox
+      Left = 9
+      Top = 34
+      Width = 97
+      Height = 17
+      Caption = #30417#21548'IPV6'
+      TabOrder = 7
     end
   end
   object mmoLog: TMemo
