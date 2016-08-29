@@ -1156,6 +1156,7 @@ end;
 constructor TDiocpCustomContext.Create;
 begin
   inherited Create;
+  FSocketState := ssDisconnected;
   FDebugStrings := TStringList.Create;
   FReferenceCounter := 0;
   FDisconnectedCounter := 0;
