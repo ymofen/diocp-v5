@@ -20,6 +20,7 @@ uses
   diocp_sockets, SysUtils, diocp_sockets_utils
   {$IFDEF UNICODE}, Generics.Collections{$ELSE}, Contnrs {$ENDIF}
   , Classes, Windows, utils_objectPool, diocp_res
+  , diocp_core_rawWinSocket
   , utils_async
   , utils_fileWriter
   , utils_threadinfo

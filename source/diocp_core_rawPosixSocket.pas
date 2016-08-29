@@ -66,7 +66,7 @@ const
   IP_V6 = 1;
 
 type
-  TSocketState = (ssDisconnected, ssConnected, ssConnecting, ssListening, ssAccepting);
+  TSocketState = (ssDisconnecting, ssDisconnected, ssConnected, ssConnecting, ssListening, ssAccepting);
 
   TRawSocket = class(TObject)
   private
