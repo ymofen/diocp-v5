@@ -552,6 +552,8 @@ function ObjectIntStrAddr(pvObj:TObject): String;
 function DateTimeString(pvDateTime:TDateTime): string;
 function NowString: String;
 
+function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+
 implementation
 
 
@@ -602,6 +604,14 @@ begin
     Result := Char(V + Ord('0'))
   else
     Result := Char(V - 10 + Ord('A'));
+end;
+
+function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+begin
+  if tick_end >= tick_start then
+    result := tick_end - tick_start
+  else
+    result := High(Cardinal) - tick_start + tick_end;
 end;
 
 
