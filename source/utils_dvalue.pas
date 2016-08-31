@@ -288,8 +288,11 @@ type
     procedure CheckBeforeAddChild(pvType: TDValueObjectType);
     function GetAsInterface: IInterface;
     procedure SetAsInterface(const Value: IInterface);
+    {$IF (not Defined(NEXTGEN))}
     function GetAsAnsiString: AnsiString;
     procedure SetAsAnsiString(const Value: AnsiString);
+    {$IFEND}
+
     function GetAsStringW: DStringW;
     procedure SetAsStringW(const Value: DStringW);
   public
@@ -475,7 +478,11 @@ type
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsString: String read GetAsString write SetAsString;
     property AsStringW: DStringW read GetAsStringW write SetAsStringW;
+    
+    {$IF (not Defined(NEXTGEN))}
     property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
+    {$IFEND}
+
     property AsInterface: IInterface read GetAsInterface write SetAsInterface;
 
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
@@ -2126,10 +2133,8 @@ begin
   end;
 end;
 
-function TDValue.GetAsAnsiString: AnsiString;
-begin
-  Result := FValue.GetAsString;
-end;
+
+
 
 function TDValue.GetAsBoolean: Boolean;
 begin
@@ -2495,11 +2500,17 @@ begin
 end;
 
 
+{$IF (not Defined(NEXTGEN))}
+function TDValue.GetAsAnsiString: AnsiString;
+begin
+  Result := FValue.GetAsStringA;
+end;
 
 procedure TDValue.SetAsAnsiString(const Value: AnsiString);
 begin
-
+  FValue.SetAsStringA(Value);
 end;
+{$IFEND}
 
 procedure TDValue.SetAsBoolean(const Value: Boolean);
 begin

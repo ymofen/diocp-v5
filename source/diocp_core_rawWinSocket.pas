@@ -533,7 +533,6 @@ var
   lvSockAddr: TSockAddr;
   Size: Integer;
 begin
-  Result := 0;
   Size := SizeOf(TSockAddr);
   getsockname(SocketHandle, lvSockAddr, Size);
   Result := ntohs(lvSockAddr.sin_port);

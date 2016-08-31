@@ -696,12 +696,9 @@ type
     // sendRequest pool
     FAcceptExRequestPool: TBaseQueue;
     // clientContext pool
-    FContextPool: TBaseQueue;
+    FContextPool: TBaseQueue;  
 
     FListenSocket: TRawSocket;
-    FLocker: TIocpLocker;
-    FMaxRequest:Integer;
-    FMinRequest:Integer;
   protected
     FClientContextClass: TIocpClientContextClass;
     /// <summary>

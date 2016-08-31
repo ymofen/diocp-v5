@@ -487,11 +487,8 @@ var
   lvOutBuf: TBytes;
 {$ELSE}
 var
-  lvInBuf: TBytes;
   lvOutBuf: Pointer;
   lvOutBytes: Integer;
-var
-  l: Integer;
 {$ENDIF}
 
 begin
@@ -521,13 +518,10 @@ var
   lvBytes, lvOutBytes:TBytes;
 {$ELSE}
 var
-  lvInBuf: TBytes;
   lvOutBuf: Pointer;
   lvOutBytes: Integer;
 {$ENDIF}
   lvRefBuf: PByte;
-var
-  l: Integer;
 begin
 {$IFDEF POSIX}
   ZLib.ZCompress(pvBuilder.ToBytes, lvOutBytes);
@@ -559,14 +553,11 @@ begin
 end;
 
 procedure ZDecompressBufferBuilder(pvBuilder:TDBufferBuilder);
-var
-  l:Integer;
 {$IFDEF POSIX}
 var
   lvBytes, lvOutBytes:TBytes;
 {$ELSE}
 var
-  lvBytes:TBytes;
   OutBuf: Pointer;
   OutBytes: Integer;
 {$ENDIF}
