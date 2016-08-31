@@ -18,6 +18,10 @@ unit utils_dvalue;
 
 {$ENDIF}
 
+{$IF (not Defined(NEXTGEN))}
+  {$DEFINE HAVE_ASNI_STRING}
+{$IFEND}
+
 interface
 
 
@@ -861,8 +865,10 @@ begin
     case ADValue.ValueType of
       vdtGuid:
         Dispose(ADValue.Value.AsGuid);
+      {$IFDEF HAVE_ASNI_STRING}
       vdtStringA:
         Dispose(ADValue.Value.AsStringA);
+      {$ENDIF}
       vdtString:
         Dispose(ADValue.Value.AsString);
       vdtStringW:
@@ -983,8 +989,10 @@ var
 
 begin
   case ADValue.ValueType of
+{$IFDEF HAVE_ASNI_STRING}
     vdtStringA:
-      Result := ADValue.Value.AsStringA^;    
+      Result := ADValue.Value.AsStringA^;
+{$ENDIF}
     vdtString:
       Result := ADValue.Value.AsString^;
     vdtStringW:
