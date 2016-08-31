@@ -18,7 +18,7 @@ interface
 {$DEFINE USE_MEM_POOL}
 
 uses
-  SyncObjs, SysUtils
+  SyncObjs, SysUtils, Classes
   {$IFDEF MSWINDOWS}
   , Windows
   {$ELSE}
