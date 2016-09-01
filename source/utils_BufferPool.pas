@@ -37,7 +37,7 @@ const
 {$IFDEF DEBUG}
   protect_size = 8;
 {$ELSE}
-  protect_size = 2;
+  protect_size = 0;
 {$ENDIF}
 
 type
@@ -106,7 +106,7 @@ type
   end;
 
 const
-  BLOCK_SIZE = SizeOf(TBufferBlock);
+  BLOCK_HEAD_SIZE = SizeOf(TBufferBlock);
 
   FREE_TYPE_NONE = 0;
   FREE_TYPE_FREEMEM = 1;
@@ -150,7 +150,12 @@ function GetAttachDataAsObject(pvBuffer:Pointer): TObject;
 /// <summary>
 ///  检测池中内存块越界情况
 /// </summary>
-function CheckBufferBounds(ABuffPool:PBufferPool): Integer;
+function CheckBufferBounds(ABuffPool:PBufferPool): Integer; 
+
+/// <summary>
+///   检测单个内存块是否越界
+/// </summary>
+function CheckBlockBufferBounds(pvBuffer: Pointer): Integer;
 
 {$IF RTLVersion<24}
 function AtomicCmpExchange(var Target: Integer; Value: Integer;
@@ -292,7 +297,7 @@ var
 begin
   Result := True;
   lvBuffer:= PByte(ABlock);
-  Inc(lvBuffer, BLOCK_SIZE + ABlock.owner.FBlockSize);
+  Inc(lvBuffer, BLOCK_HEAD_SIZE + ABlock.owner.FBlockSize);
 
   for I := 0 to protect_size - 1 do
   begin
@@ -332,11 +337,11 @@ begin
   if lvBuffer = nil then
   begin
     // + 2保护边界(可以检测内存越界写入)
-    GetMem(Result, BLOCK_SIZE + ABuffPool.FBlockSize + protect_size);
+    GetMem(Result, BLOCK_HEAD_SIZE + ABuffPool.FBlockSize + protect_size);
     {$IFDEF DEBUG}
-    FillChar(Result^, BLOCK_SIZE + ABuffPool.FBlockSize + protect_size, 0);
+    FillChar(Result^, BLOCK_HEAD_SIZE + ABuffPool.FBlockSize + protect_size, 0);
     {$ELSE}
-    FillChar(Result^, BLOCK_SIZE, 0);
+    FillChar(Result^, BLOCK_HEAD_SIZE, 0);
     {$ENDIF}
     lvBuffer := PBufferBlock(Result);
     lvBuffer.owner := ABuffPool;
@@ -353,7 +358,7 @@ begin
 
   lvBuffer.__debug_flag := 1;
 
-  Inc(Result, BLOCK_SIZE);
+  Inc(Result, BLOCK_HEAD_SIZE);
   AtomicIncrement(ABuffPool.FGet);
 end;
 
@@ -399,7 +404,7 @@ var
   lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_SIZE);
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
   Result := AtomicIncrement(lvBlock.refcounter);
@@ -457,7 +462,7 @@ end;
 
 function CheckBufferBounds(ABuffPool:PBufferPool): Integer;
 var
-  lvBlock:PBufferBlock;  
+  lvBlock:PBufferBlock;
 begin
   if protect_size = 0 then
   begin   // 没有保护边界的大小
@@ -490,7 +495,7 @@ var
   lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_SIZE);
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
 
@@ -511,7 +516,7 @@ var
   lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_SIZE);
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
 
@@ -531,7 +536,7 @@ var
   lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_SIZE);
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
 
@@ -551,7 +556,7 @@ var
   lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_SIZE);
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
   Result := AtomicDecrement(lvBlock.refcounter);
@@ -573,7 +578,7 @@ var
   lvBlock:PBufferBlock;
 begin
   lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_SIZE);
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
   {$IFDEF DEBUG}
@@ -582,6 +587,38 @@ begin
   if pvReleaseAttachDataAtEnd then
     ReleaseAttachData(lvBlock);
   InnerFreeBuffer(lvBlock);
+end;
+
+function CheckBlockBufferBounds(pvBuffer: Pointer): Integer;
+var
+  lvBuffer:PByte;
+  lvBlock:PBufferBlock;
+  ABuffPool:PBufferPool;
+begin
+  lvBuffer := pvBuffer;
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
+  lvBlock := PBufferBlock(lvBuffer);
+  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+
+  if protect_size = 0 then
+  begin   // 没有保护边界的大小
+    Result := -1;
+    Exit;
+  end;
+  Result := 0;
+  ABuffPool := lvBlock.owner;
+  Assert(ABuffPool <> nil);
+  {$IFDEF USE_SPINLOCK}
+  SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
+  {$ELSE}
+  ABuffPool.FLocker.Enter;
+  {$ENDIF}
+  if not CheckBufferBlockBounds(lvBlock) then Result := 1;  
+  {$IFDEF USE_SPINLOCK}
+  SpinUnLock(ABuffPool.FSpinLock);
+  {$ELSE}
+  ABuffPool.FLocker.Leave;
+  {$ENDIF}
 end;
 
 procedure TBlockBuffer.Append(pvBuffer: Pointer; pvLength: Integer);

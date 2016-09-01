@@ -290,7 +290,7 @@ end;
 procedure TfrmMain.OnRecvBuffer(pvClientContext:TIocpClientContext;
     buf:Pointer; len:cardinal; errCode:Integer);
 var
-  j, i:Integer;
+  j, i, r:Integer;
   s:AnsiString;
   lvBuff:PByte;
   lvFileWriter:TSingleFileWriter;
@@ -305,17 +305,27 @@ begin
     if FChkEcho then
     begin
       if FChkUseBufferPool then
-      begin
-
+      begin   
         lvBuff := GetBuffer(FPool);
+        Assert(len <= FPool.FBlockSize, 'err');        
 
         Move(buf^, lvBuff^, len);
+        
+        {$IFNDEF SPEED_TEST}
+        r := CheckBlockBufferBounds(lvBuff);
+        if r = 1 then
+        begin
+          //r := CheckBufferBounds(lvBuff);
+          Assert(false, Format('r:%d, len:%d', [r, len]));
+        end;
+        {$ENDIF}
 
         //
-        AddRef(lvBuff);
-
-
-        pvClientContext.PostWSASendRequest(lvBuff, len, dtNone, 1);
+        AddRef(lvBuff); 
+        if not pvClientContext.PostWSASendRequest(lvBuff, len, dtNone, 1) then
+        begin
+          ReleaseRef(lvBuff);
+        end;
       end else
       begin
         pvClientContext.PostWSASendRequest(buf, len);      
@@ -339,9 +349,22 @@ end;
 
 procedure TfrmMain.OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff:
     Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+{$IFNDEF SPEED_TEST}
+var
+  r: Integer;
+{$ENDIF}
 begin
   if pvBufferTag = 1 then
+  begin
+    {$IFNDEF SPEED_TEST}
+    r := CheckBlockBufferBounds(pvBuff);
+    if r = 1 then
+    begin
+      Assert(false, Format('r:%d, len:%d', [r, len]));
+    end;
+    {$ENDIF}
     ReleaseRef(pvBuff);
+  end;
 end;
 
 procedure TfrmMain.ReadState;
