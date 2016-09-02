@@ -24,10 +24,17 @@ unit diocp_tcp_server;
 
 {$IFDEF DEBUG}
   {$DEFINE DEBUG_ON}
+  //输出日志记录编译开关
+  {$DEFINE WRITE_LOG}
 {$ENDIF}
 
-//输出日志记录编译开关
-{$DEFINE WRITE_LOG}
+
+
+{$IFDEF SPEED_TEST}
+  {$UNDEF WRITE_LOG}
+  {$UNDEF DEBUG_ON}
+{$ENDIF}
+
 
 interface 
 
