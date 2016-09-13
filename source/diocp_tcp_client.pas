@@ -39,6 +39,11 @@ type
     FHost: String;
     FOnASyncCycle: TNotifyContextEvent;
     FPort: Integer;
+    /// <summary>TIocpRemoteContext.PostConnectRequest
+    /// </summary>
+    /// <returns>
+    ///   投递成功或者正在连接返回true
+    /// </returns>
     function PostConnectRequest: Boolean;
     procedure ReCreateSocket;
     function CanAutoReConnect:Boolean;
@@ -75,7 +80,8 @@ type
 
     /// <summary>
     ///  请求异步连接
-    ///   连接状态变化: ssDisconnected -> ssConnecting -> ssConnected/ssDisconnected
+    ///    连接状态变化: ssDisconnected -> ssConnecting -> ssConnected/ssDisconnected
+    ///  如果投递失败，或者连接失败会触发OnDisconnected
     /// </summary>
     procedure ConnectASync;
 
@@ -335,8 +341,10 @@ begin
 
   ReCreateSocket;
 
-  PostConnectRequest;
-
+  if not PostConnectRequest then
+  begin
+    OnDisconnected;    
+  end;
 end;
 
 procedure TIocpRemoteContext.OnConnected;
@@ -360,8 +368,8 @@ begin
       {$ENDIF}
 
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
-
-      SetSocketState(ssDisconnected);
+            
+      DoNotifyDisconnected;
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;
@@ -397,7 +405,6 @@ begin
         ReCreateSocket;
       end;
 
-
       if not FConnectExRequest.PostRequest(FHost, FPort) then
       begin
         FIsConnecting := false;
@@ -407,6 +414,7 @@ begin
       end;
     end else
     begin
+      Result := True;
       sfLogger.logMessage('TIocpRemoteContext.PostConnectRequest:: 正在进行连接...');
     end;
   finally

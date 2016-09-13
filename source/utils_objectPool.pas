@@ -12,7 +12,7 @@ unit utils_objectPool;
 interface
 
 uses
-  utils_queues, Windows, SysUtils;
+  utils_queues, Windows, SysUtils, utils_hashs, utils_BufferPool, utils_strings;
 
 type
 {$IFDEF UNICODE}
@@ -84,20 +84,106 @@ type
     property ReleaseTime: Integer read FReleaseTime write FReleaseTime;
 
 
-
-
-
-
-
-
     /// <summary>
     ///   创建对象事件
     /// </summary>
     property OnCreateObjectEvent: TOnCreateObjectEvent read FOnCreateObjectEvent
         write FOnCreateObjectEvent;
+  end;
+
+
+  TMaxPoolItem = class(TObject)
+  private
+    FEnable: Boolean;
+    FData: TObject;
+    FDataReleaseType:Integer;
+    FMax:Integer;
+    FCount:Integer;
+  public
+    destructor Destroy; override;
+  end;
+
+
+  /// <summary>
+  ///   可以设置对象最大可用次数的池
+  /// </summary>
+  TMaxObjectPool = class(TObject)
+  private
+    FOutCounter:Integer;
+    FObjMap: TDHashTableSafe;
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    /// <summary>TMaxObjectPool.Clear
+    /// </summary>
+    /// <returns>
+    ///   0: 成功
+    ///  -1: 有正在使用的对象
+    /// </returns>
+    function Clear: Integer;
+
+    /// <summary>TMaxObjectPool.WaitForRelease
+    /// </summary>
+    /// <returns>
+    ///   0: 等待完成(可以释放)
+    ///  -1: 超时
+    /// </returns>
+    /// <param name="pvTimeOut"> (Integer) </param>
+    function WaitForRelease(pvTimeOut:Integer): Integer;
+
+    /// <summary>TMaxObjectPool.CheckPutObject
+    /// </summary>
+    /// <returns>
+    ///    0: 成功
+    ///   -1: 已经存在
+    /// </returns>
+    /// <param name="pvID"> (String) </param>
+    /// <param name="pvData"> (TObject) </param>
+    /// <param name="pvMaxNum"> (Integer) </param>
+    function CheckPutObject(pvID: String; pvData: TObject; pvMaxNum: Integer;
+        pvOwnObject: Boolean = true): Integer;
+        
+    /// <summary>TMaxObjectPool.CheckRemoveObject
+    /// </summary>
+    /// <returns>
+    ///   0: 成功
+    ///  -1: 不存在
+    ///  -2: 有正在使用
+    /// </returns>
+    /// <param name="pvID"> (string) </param>
+    function CheckRemoveObject(pvID:string): Integer;
+    
+    /// <summary>TMaxObjectPool.CheckGetObject
+    /// </summary>
+    /// <returns>
+    ///  nil:不成功
+    /// </returns>
+    /// <param name="pvID"> (string) </param>
+    function CheckGetObject(pvID: string): TObject;
 
 
 
+    /// <summary>TMaxObjectPool.CheckGetCurrentCount
+    /// </summary>
+    /// <returns>
+    ///   获取当前使用数量
+    ///  -1: 不存在
+    /// </returns>
+    /// <param name="pvID"> (String) </param>
+    function CheckGetCurrentCount(pvID:String): Integer;
+
+    /// <summary>TMaxObjectPool.ReleaseObject
+    /// </summary>
+    /// <returns>
+    ///   0: 成功
+    ///  -1: 对象不匹配
+    ///  -2: 重复归还
+    ///  -3: 不存在
+    /// </returns>
+    /// <param name="pvID"> (String) </param>
+    /// <param name="pvObject"> (TObject) </param>
+    function ReleaseObject(pvID:String; pvObject:TObject): Integer;
   end;
 
 implementation
@@ -201,6 +287,207 @@ begin
   end;
 
   Result := FUsingCount = 0;
+end;
+
+constructor TMaxObjectPool.Create;
+begin
+  inherited Create;
+  FObjMap := TDHashTableSafe.Create();
+  FOutCounter := 0;
+end;
+
+destructor TMaxObjectPool.Destroy;
+begin
+  FObjMap.FreeAllDataAsObject;
+  FreeAndNil(FObjMap);
+  inherited Destroy;
+end;
+
+function TMaxObjectPool.CheckGetCurrentCount(pvID:String): Integer;
+var
+  lvItem:TMaxPoolItem;
+begin
+  Result := 0;
+  FObjMap.Lock;
+  try
+    lvItem :=TMaxPoolItem(FObjMap.ValueMap[pvID]);
+    if lvItem <> nil then
+    begin
+      Result := lvItem.FCount;
+    end else
+    begin
+      Result := -1;
+    end;
+  finally
+    FObjMap.UnLock;
+  end;
+end;
+
+function TMaxObjectPool.CheckPutObject(pvID: String; pvData: TObject; pvMaxNum:
+    Integer; pvOwnObject: Boolean = true): Integer;
+var
+  lvItem:TMaxPoolItem;
+begin
+  FObjMap.Lock;
+  try
+    if FObjMap.ValueMap[pvID] <> nil then
+    begin
+      Result := -1;
+    end else
+    begin
+      lvItem := TMaxPoolItem.Create;
+      lvItem.FData := pvData;
+      lvItem.FMax := pvMaxNum;
+      lvItem.FCount := 0;
+      lvItem.FEnable := True;
+      
+      if pvOwnObject then
+      begin
+        lvItem.FDataReleaseType := 1;
+      end else
+      begin
+        lvItem.FDataReleaseType := 0;
+      end;
+      FObjMap.ValueMap[pvID] := lvItem;
+
+      Result := 0; 
+    end;
+  finally
+    FObjMap.UnLock;
+  end;  
+end;
+
+function TMaxObjectPool.CheckRemoveObject(pvID:string): Integer;
+var
+  lvItem:TMaxPoolItem;
+begin
+  FObjMap.Lock;
+  try
+    lvItem := TMaxPoolItem(FObjMap.ValueMap[pvID]);
+    if lvItem = nil then
+    begin
+      Result := -1;
+    end else
+    begin
+      if lvItem.FCount> 0 then
+      begin
+        Result := -2;
+      end; 
+      lvItem.Free;
+      FObjMap.Remove(pvID);
+      Result := 0;
+    end;                     
+  finally
+    FObjMap.UnLock;
+  end;
+end;
+
+function TMaxObjectPool.CheckGetObject(pvID: string): TObject;
+var
+  lvItem:TMaxPoolItem;
+begin
+  Result := nil;
+  FObjMap.Lock;
+  try
+    lvItem :=TMaxPoolItem(FObjMap.ValueMap[pvID]);
+    if lvItem <> nil then
+    begin
+      if not lvItem.FEnable then Exit;
+      if (lvItem.FMax >0) and (lvItem.FCount >= lvItem.FMax) then Exit;
+      Result := lvItem.FData;
+      Inc(lvItem.FCount);
+      Inc(FOutCounter);
+    end;
+  finally
+    FObjMap.UnLock;
+  end;
+end;
+
+function TMaxObjectPool.Clear: Integer;
+begin
+  FObjMap.Lock;
+  try
+    if FOutCounter > 0 then
+    begin
+      Result := -1;
+      Exit;
+    end else
+    begin
+      FObjMap.FreeAllDataAsObject;
+      FObjMap.Clear;
+      Result := 0;
+    end;
+  finally
+    FObjMap.UnLock;
+  end;
+end;
+
+function TMaxObjectPool.ReleaseObject(pvID:String; pvObject:TObject): Integer;
+var
+  lvItem:TMaxPoolItem;
+begin
+  FObjMap.Lock;
+  try
+    lvItem :=TMaxPoolItem(FObjMap.ValueMap[pvID]);
+    if lvItem <> nil then
+    begin
+      if (pvObject <> nil) and (lvItem.FData <> pvObject) then
+      begin
+        Result := -1;
+      end else
+      begin
+        if (lvItem.FCount = 0) then
+        begin
+          Result := -2;
+        end else
+        begin
+          Dec(lvItem.FCount);
+          Dec(FOutCounter);
+          Result := 0;
+        end;
+      end;
+    end else
+    begin
+      Result := -3;
+    end;
+  finally
+    FObjMap.UnLock;
+  end;
+end;
+
+function TMaxObjectPool.WaitForRelease(pvTimeOut:Integer): Integer;
+var
+  lvTick:Cardinal;
+begin
+  lvTick := GetTickCount;
+  while True do
+  begin
+    if FOutCounter = 0 then
+    begin
+      Result := 0;
+      Break;
+    end else
+    begin
+      if (tick_diff(lvTick, GetTickCount) >= pvTimeOut) then
+      begin
+        Result := -1;
+        Exit;
+      end;
+    end;
+    Sleep(0);
+  end;
+end;
+
+destructor TMaxPoolItem.Destroy;
+begin
+  if FDataReleaseType = 1 then
+  begin
+    try
+      FreeObject(FData);
+    except
+    end;
+  end;
+  inherited Destroy;
 end;
 
 initialization

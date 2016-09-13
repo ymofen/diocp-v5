@@ -201,6 +201,8 @@ type
 
     procedure DoError(pvErrorCode:Integer);
 
+    procedure DoNotifyDisconnected;
+
   protected
     /// <summary>
     ///    dec RequestCounter then check counter and Request flag for Disonnect
@@ -603,7 +605,7 @@ type
     procedure incPostSendObjectCounter();
     procedure IncSendRequestCreateCounter;
     procedure incResponseSendObjectCounter();
-    procedure incDisconnectCounter;
+    procedure IncDisconnectCounter;
     procedure IncRecvRequestCreateCounter;
     procedure IncRecvRequestOutCounter;
     procedure IncRecvRequestReturnCounter;
@@ -1331,6 +1333,23 @@ begin
   FOwner.DoClientContextError(Self, pvErrorCode);
 end;
 
+procedure TDiocpCustomContext.DoNotifyDisconnected;
+begin
+  if Assigned(FOwner.FOnContextDisconnected) then
+  begin
+    FOwner.FOnContextDisconnected(Self);
+  end;
+  //
+  OnDisconnected;
+
+  if Assigned(FOnDisconnectedEvent) then FOnDisconnectedEvent(Self);
+
+  // …Ë÷√Socket◊¥Ã¨
+  SetSocketState(ssDisconnected);
+
+  Inc(FDisconnectedCounter);
+end;
+
 procedure TDiocpCustomContext.DoReceiveData(pvRecvRequest: TIocpRecvRequest);
 begin
   try
@@ -1420,28 +1439,16 @@ begin
     CheckReleaseRes;
 
     try
-      if Assigned(FOwner.FOnContextDisconnected) then
-      begin
-        FOwner.FOnContextDisconnected(Self);
-      end;
-
-      // 
-      OnDisconnected;
+      DoNotifyDisconnected;
 
       if (FOwner<> nil) and (FOwner.FDataMoniter <> nil) then
       begin
-        FOwner.DataMoniter.incDisconnectCounter;
+        FOwner.DataMoniter.IncDisconnectCounter;
       end;
-
-
-      if Assigned(FOnDisconnectedEvent) then FOnDisconnectedEvent(Self);
-
-      // …Ë÷√Socket◊¥Ã¨
-      SetSocketState(ssDisconnected);
 
       DoCleanUp;
 
-      Inc(FDisconnectedCounter);
+
     except
     end;
   finally
@@ -3096,7 +3103,7 @@ begin
   if pvOnlineCount > FMaxOnlineCount then FMaxOnlineCount := pvOnlineCount;
 end;
 
-procedure TIocpDataMonitor.incDisconnectCounter;
+procedure TIocpDataMonitor.IncDisconnectCounter;
 begin
   InterlockedIncrement(FDisconnectCounter);
 end;
