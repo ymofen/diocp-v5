@@ -30,12 +30,14 @@ type
     Button1: TButton;
     btnDValueCloneFrom: TButton;
     btnDValueSetLength: TButton;
+    btnInputJSONBuffer: TButton;
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
     procedure btnDValueClick(Sender: TObject);
     procedure btnDValueCloneFromClick(Sender: TObject);
     procedure btnDValueSetLengthClick(Sender: TObject);
     procedure btnEncodeJSONClick(Sender: TObject);
+    procedure btnInputJSONBufferClick(Sender: TObject);
     procedure btnMsgPackTesterClick(Sender: TObject);
     procedure btnObjectTesterClick(Sender: TObject);
     procedure btnParseAFileClick(Sender: TObject);
@@ -154,6 +156,42 @@ begin
   lvDValue.Free;
 
   ShowMessage(s);
+end;
+
+procedure TForm1.btnInputJSONBufferClick(Sender: TObject);
+var
+  lvJSONBuffer:TJsonBuffer;
+  lvCache:TMemoryStream;
+  lvStr:AnsiString;
+  lvBuf:PByte;
+  l:Integer;
+  i, r: Integer;
+begin
+  lvStr := mmoData.Lines.Text;
+  lvCache := TMemoryStream.Create;
+  try
+    lvJSONBuffer.FBuffer := lvCache;
+    ResetJsonBuffer(@lvJSONBuffer);
+    lvBuf := PByte(lvStr);
+    l := Length(lvStr);
+    for i := 0 to l - 1 do
+    begin
+      r := InputJsonBuffer(@lvJSONBuffer, lvBuf^);
+      Inc(lvBuf);
+      if r = 1 then
+      begin
+        ShowMessage(ByteBufferToString(lvCache.Memory, lvCache.Size));
+        ResetJsonBuffer(@lvJSONBuffer);
+        lvCache.Clear;
+      end;
+
+    end;
+
+  finally
+    lvCache.Free;
+  end;
+
+  ;
 end;
 
 procedure TForm1.btnMsgPackTesterClick(Sender: TObject);

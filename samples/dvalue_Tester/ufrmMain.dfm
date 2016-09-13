@@ -18,7 +18,7 @@ object Form1: TForm1
     Top = 0
     Width = 929
     Height = 460
-    ActivePage = tsDValue
+    ActivePage = tsJSON
     Align = alClient
     TabOrder = 0
     object tsJSON: TTabSheet
@@ -29,7 +29,6 @@ object Form1: TForm1
         Width = 921
         Height = 65
         Align = alTop
-        Caption = 'pnlTop'
         TabOrder = 0
         object btnParseJSON: TButton
           Left = 0
@@ -59,13 +58,22 @@ object Form1: TForm1
           OnClick = btnClearClick
         end
         object btnObjectTester: TButton
-          Left = 504
+          Left = 352
           Top = 21
           Width = 145
           Height = 25
           Caption = 'btnObjectTester'
           TabOrder = 3
           OnClick = btnObjectTesterClick
+        end
+        object btnInputJSONBuffer: TButton
+          Left = 544
+          Top = 21
+          Width = 137
+          Height = 25
+          Caption = 'btnInputJSONBuffer'
+          TabOrder = 4
+          OnClick = btnInputJSONBufferClick
         end
       end
       object mmoData: TMemo

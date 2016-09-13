@@ -15,7 +15,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
-  utils_dvalue_json, utils_BufferPool, QWorker, diocp_tcp_server;
+  utils_dvalue_json, utils_BufferPool, QWorker, diocp_tcp_server, System.Actions;
 
 type
   TfrmMain = class(TForm)

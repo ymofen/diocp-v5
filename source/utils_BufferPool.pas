@@ -31,6 +31,9 @@ uses
 {$IFEND HAVE_INLINE}
 {$ENDIF}
 
+// 进行调试
+{.$UNDEF HAVE_INLINE}
+
 const
   block_flag :Word = $1DFB;
 
@@ -177,6 +180,8 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 {$ifend}
 
 procedure FreeObject(AObject: TObject); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
+procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 implementation
 
@@ -406,8 +411,9 @@ begin
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
-  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+  Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
   Result := AtomicIncrement(lvBlock.refcounter);
+  //PrintDebugString(Format('ref:%d', [result]));
   AtomicIncrement(lvBlock.owner.FAddRef);
 end;
 
@@ -558,7 +564,7 @@ begin
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
-  Assert(lvBlock.flag = block_flag, 'invalid DBufferBlock');
+  Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
   Result := AtomicDecrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FReleaseRef);
   if Result = 0 then
@@ -621,6 +627,18 @@ begin
   {$ENDIF}
 end;
 
+procedure PrintDebugString(s:string);
+begin
+  {$IFDEF MSWINDOWS}
+  {$IFDEF UNICODE}
+  OutputDebugStringW(PChar(s));
+  {$ELSE}
+  OutputDebugString(PAnsiChar(s));
+  {$ENDIF}
+  {$ENDIF}
+
+end;
+
 procedure TBlockBuffer.Append(pvBuffer: Pointer; pvLength: Integer);
 var
   l, r:Integer;
@@ -667,7 +685,7 @@ begin
   try
     if (Assigned(FOnBufferWrite) and (FSize > 0)) then
     begin
-      AddRef(FBuffer);    // 避免事件中使用计算器时，不释放buf
+      AddRef(FBuffer);    // 避免事件中没有使用引用计数，不释放buf
       try
         FOnBufferWrite(self, FBuffer, FSize);
       finally
