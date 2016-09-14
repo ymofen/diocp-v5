@@ -38,10 +38,6 @@ object frmMain: TfrmMain
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btnCompress: TButton
         Left = 3
         Top = 3
@@ -64,10 +60,6 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -165,7 +157,7 @@ object frmMain: TfrmMain
     end
     object chkUsePool: TCheckBox
       Left = 248
-      Top = 40
+      Top = 39
       Width = 97
       Height = 17
       Caption = #20351#29992#23545#35937#27744
@@ -175,11 +167,19 @@ object frmMain: TfrmMain
     end
     object chkIPV6: TCheckBox
       Left = 9
-      Top = 34
+      Top = 39
       Width = 97
       Height = 17
       Caption = #30417#21548'IPV6'
       TabOrder = 7
+    end
+    object chkRecord2File: TCheckBox
+      Left = 384
+      Top = 40
+      Width = 97
+      Height = 17
+      Caption = #35760#24405#35831#27714#21040#25991#20214
+      TabOrder = 8
     end
   end
   object mmoLog: TMemo

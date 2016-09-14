@@ -44,6 +44,7 @@ type
     chkUseSession: TCheckBox;
     chkUsePool: TCheckBox;
     chkIPV6: TCheckBox;
+    chkRecord2File: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnInfoClick(Sender: TObject);
@@ -190,6 +191,21 @@ var
   lvDValue:TDValue;
 
 begin
+  if chkRecord2File.Checked then
+  begin
+    pvRequest.SaveToFile(Format('DiocpHttpRequest_%s.req', [FormatDateTime('MMddhhnnsszzz', Now)]));
+  end;
+
+  if pvRequest.RequestURI = '/weixin' then
+  begin
+    pvRequest.DecodeURLParam(nil);
+    s := pvRequest.GetRequestParam('echostr');
+    pvRequest.Response.WriteString(s);
+    pvRequest.SendResponse;
+    pvRequest.DoResponseEnd;
+    Exit;
+  end;
+
 //  pvRequest.Response.ResponseCode := 404;
 //  pvRequest.Response.WriteString('404 not found');
 //  pvRequest.SendResponse();

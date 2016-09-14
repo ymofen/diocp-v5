@@ -411,12 +411,13 @@ function AddRef(const pvBuffer:PByte): Integer;
 var
   lvBlock:PBufferBlock;
 begin
-  {$O+}
   lvBlock := PBufferBlock(pvBuffer - BLOCK_HEAD_SIZE);
   Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
   Result := AtomicIncrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FAddRef);
-  {$O-}
+
+  // 不加会被优化掉(DX10)
+  Assert(Result > 0, 'error');
 end;
 
 function ReleaseRef(const pvBuffer:PByte): Integer;
