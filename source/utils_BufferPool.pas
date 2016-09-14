@@ -40,6 +40,7 @@ const
 {$IFDEF DEBUG}
   protect_size = 8;
 {$ELSE}
+  // 如果增加 则初始化时要进行填充
   protect_size = 0;
 {$ENDIF}
 
@@ -124,14 +125,17 @@ procedure FreeBufferPool(buffPool:PBufferPool);
 function GetBuffer(ABuffPool:PBufferPool): PByte;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 procedure FreeBuffer(pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean=True);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
-function AddRef(pvBuffer:PByte): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+/// <summary>
+///   对内存块进行引用计数
+/// </summary>
+function AddRef(const pvBuffer:PByte): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 /// <summary>
 ///   减少对内存块的引用
 ///   为0时，释放data数据
 /// </summary>
-function ReleaseRef(pvBuffer:PByte): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
-function ReleaseRef(pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
+function ReleaseRef(const pvBuffer:PByte): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+function ReleaseRef(const pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
     Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
 
 
@@ -403,23 +407,46 @@ end;
 
 
 
-function AddRef(pvBuffer:PByte): Integer;
+function AddRef(const pvBuffer:PByte): Integer;
+var
+  lvBlock:PBufferBlock;
+begin
+  {$O+}
+  lvBlock := PBufferBlock(pvBuffer - BLOCK_HEAD_SIZE);
+  Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
+  Result := AtomicIncrement(lvBlock.refcounter);
+  AtomicIncrement(lvBlock.owner.FAddRef);
+  {$O-}
+end;
+
+function ReleaseRef(const pvBuffer:PByte): Integer;
+begin
+  Result := ReleaseRef(pvBuffer, True);
+end;
+
+function ReleaseRef(const pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
+    Integer; overload;
 var
   lvBuffer:PByte;
   lvBlock:PBufferBlock;
 begin
+  {$O+}
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
   Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
-  Result := AtomicIncrement(lvBlock.refcounter);
-  //PrintDebugString(Format('ref:%d', [result]));
-  AtomicIncrement(lvBlock.owner.FAddRef);
-end;
-
-function ReleaseRef(pvBuffer:PByte): Integer;
-begin
-  Result := ReleaseRef(pvBuffer, True);
+  Result := AtomicDecrement(lvBlock.refcounter);
+  AtomicIncrement(lvBlock.owner.FReleaseRef);
+  if lvBlock.refcounter = 0 then
+  begin
+    if pvReleaseAttachDataAtEnd then
+      ReleaseAttachData(lvBlock);
+    InnerFreeBuffer(lvBlock);
+  end else if Result < 0 then
+  begin          // error(不能小于0，如果小于0，则出现了严重问题)
+    Assert(Result >= 0, Format('DBuffer error release ref:%d', [lvBlock.refcounter]));
+  end;
+  {$O-}
 end;
 
 function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
@@ -555,28 +582,7 @@ begin
   end;
 end;
 
-function ReleaseRef(pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
-    Integer; overload;
-var
-  lvBuffer:PByte;
-  lvBlock:PBufferBlock;
-begin
-  lvBuffer := pvBuffer;
-  Dec(lvBuffer, BLOCK_HEAD_SIZE);
-  lvBlock := PBufferBlock(lvBuffer);
-  Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
-  Result := AtomicDecrement(lvBlock.refcounter);
-  AtomicIncrement(lvBlock.owner.FReleaseRef);
-  if Result = 0 then
-  begin
-    if pvReleaseAttachDataAtEnd then
-      ReleaseAttachData(lvBlock);
-    InnerFreeBuffer(lvBlock);
-  end else if Result < 0 then
-  begin          // error(不能小于0，如果小于0，则出现了严重问题)
-    Assert(Result >= 0, 'DBuffer error release');
-  end;
-end;
+
 
 procedure FreeBuffer(pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean);
 var
@@ -661,8 +667,8 @@ begin
     begin
       FlushBuffer;
     end else if FPosition > FBlockSize then
-    begin
-      FlushBuffer;
+    begin            // 越界
+      Assert(false, Format('TBlockBuffer.Append bug :: pos:%d, block:%d', [FPosition, FBlockSize]));
     end;
   end;
 end;

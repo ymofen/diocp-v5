@@ -46,6 +46,7 @@ type
     procedure btnThreadTesterClick(Sender: TObject);
   private
     { Private declarations }
+    FBuffer:Pointer;
     FPool: PBufferPool;
     FBlockBufferTesterCount:Integer;
     FBlockBufferTesterTerminate:Boolean;
@@ -206,19 +207,22 @@ end;
 
 procedure TForm1.btnSimpleTesterClick(Sender: TObject);
 var
-  lvBuff:PByte;
+  lvAnsiStr:AnsiString;
 begin
-  lvBuff := GetBuffer(FPool);
-  lvBuff^ := 1;
-  PByte(Integer(lvBuff) + 8)^ := $FF;
+  FBuffer := GetBuffer(FPool);
 
-  AttachData(lvBuff, TSafeQueue.Create, FREE_TYPE_OBJECTFREE);
+  SetLength(lvAnsiStr, 100);
+  FillChar(PAnsiChar(lvAnsiStr)^, 100, '1');
 
-  AddRef(lvBuff);
-  AddRef(lvBuff);
+  Move(PAnsiChar(lvAnsiStr)^, FBuffer^, 100);
 
-  ReleaseRef(lvBuff);
-  ReleaseRef(lvBuff);
+  //AttachData(lvBuff, TSafeQueue.Create, FREE_TYPE_OBJECTFREE);
+  AddRef(FBuffer);
+  //AddRef(lvBuff);
+  //PByte(Integer(lvBuff) + 8)^ := $FF;
+
+ // ReleaseRef(lvBuff);
+  ReleaseRef(FBuffer);
 end;
 
 procedure TForm1.btnSpeedTesterClick(Sender: TObject);

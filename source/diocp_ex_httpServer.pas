@@ -1443,13 +1443,15 @@ end;
 
 procedure TDiocpHttpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
     Cardinal; pvBufferTag, pvErrorCode: Integer);
+var
+  r:Integer;
 begin
   inherited;
   if pvBufferTag = BLOCK_BUFFER_TAG then
   begin
-    ReleaseRef(pvBuffer);
-    //Assert(r = 0, Format('r:%d', [r]));
-  end;   
+    r := ReleaseRef(pvBuffer);
+    PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
+  end;
 end;
 
 procedure TDiocpHttpClientContext.FlushResponseBuffer;
@@ -1465,9 +1467,11 @@ var
 begin
   if not Self.Active then Exit;
   r := AddRef(pvBuffer);
+  //PrintDebugString(Format('+ %x: %d', [IntPtr(pvBuffer), r]));
   if not Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, BLOCK_BUFFER_TAG) then
   begin
-    ReleaseRef(pvBuffer);
+    r := ReleaseRef(pvBuffer);
+    PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
   end;
 end;
 
