@@ -848,6 +848,7 @@ end;
 procedure TIocpWorker.WriteStateInfo(const pvStrings: TStrings);
 var
   s:String;
+  lvLastRequest:TIocpRequest;
 begin
   pvStrings.Add(Format(strDebug_Worker_INfo, [self.ThreadID, FResponseCounter]));
   if FHintInfo <> '' then
@@ -864,9 +865,11 @@ begin
         boolToStr(CheckFlag(WORKER_ISWATING), true),
         boolToStr(CheckFlag(WORKER_RESERVED), true)]));
 
-    if (FLastRequest <> nil) then
+    lvLastRequest := FLastRequest;
+
+    if (lvLastRequest <> nil) then
     begin
-      s := FLastRequest.getStateINfo;
+      s := lvLastRequest.getStateINfo;
       if s <> '' then
       begin
         pvStrings.Add(strDebug_Request_Title);
@@ -1068,6 +1071,7 @@ var
   lvStrings :TStrings;
   i, j:Integer;
   lvWorker:TIocpWorker;
+  lvLastRequest:TIocpRequest;
 begin
   Assert(Assigned(pvThreadStackFunc));
 
@@ -1081,9 +1085,11 @@ begin
       begin
         lvWorker := TIocpWorker(FWorkerList[i]);
 
-        if lvWorker.checkFlag(WORKER_ISBUSY) then
+        lvLastRequest := lvWorker.FLastRequest;
+
+        if (lvLastRequest<> nil) and (lvWorker.checkFlag(WORKER_ISBUSY)) then
         begin
-          if GetTickCount - lvWorker.FLastRequest.FRespondStartTickCount > pvTimeOut then
+          if GetTickCount - lvLastRequest.FRespondStartTickCount > pvTimeOut then
           begin
             lvStrings.Add(Format(strDebug_WorkerTitle, [i + 1]));
             lvStrings.Add(pvThreadStackFunc(lvWorker));
@@ -1112,6 +1118,7 @@ var
   i, j:Integer;
   lvWorker:TIocpWorker;
   lvTickcount:Cardinal;
+  lvLastRequest:TIocpRequest;
 begin
   lvStrings := TStringList.Create;
   try
@@ -1123,12 +1130,12 @@ begin
       for i := 0 to FWorkerList.Count - 1 do
       begin
         lvWorker := TIocpWorker(FWorkerList[i]);
-
-        if lvWorker.CheckFlag(WORKER_ISBUSY) then
+        lvLastRequest := lvWorker.LastRequest;
+        if (lvLastRequest <> nil) and (lvWorker.CheckFlag(WORKER_ISBUSY)) then
         begin
-          if tick_diff(lvWorker.FLastRequest.FRespondStartTickCount, lvTickcount) > pvTimeOut then
+          if tick_diff(lvLastRequest.FRespondStartTickCount, lvTickcount) > pvTimeOut then
           begin
-            lvStrings.Add(Format('t_s:%d, t_now:%d', [lvWorker.FLastRequest.FRespondStartTickCount, lvTickcount]));
+            lvStrings.Add(Format('t_s:%d, t_now:%d', [lvLastRequest.FRespondStartTickCount, lvTickcount]));
             lvStrings.Add(Format(strDebug_WorkerTitle, [i + 1]));
             lvWorker.WriteStateINfo(lvStrings);
             inc(j);

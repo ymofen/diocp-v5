@@ -409,9 +409,13 @@ end;
 
 function AddRef(const pvBuffer:PByte): Integer;
 var
+  lvBuffer:PByte;
   lvBlock:PBufferBlock;
 begin
-  lvBlock := PBufferBlock(pvBuffer - BLOCK_HEAD_SIZE);
+  lvBuffer := pvBuffer;
+  Dec(lvBuffer, BLOCK_HEAD_SIZE);
+  lvBlock := PBufferBlock(lvBuffer);
+
   Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
   Result := AtomicIncrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FAddRef);
@@ -431,7 +435,6 @@ var
   lvBuffer:PByte;
   lvBlock:PBufferBlock;
 begin
-  {$O+}
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
@@ -447,7 +450,6 @@ begin
   begin          // error(不能小于0，如果小于0，则出现了严重问题)
     Assert(Result >= 0, Format('DBuffer error release ref:%d', [lvBlock.refcounter]));
   end;
-  {$O-}
 end;
 
 function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;

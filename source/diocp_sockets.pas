@@ -256,7 +256,7 @@ type
     ///     lock succ return false else return false( context request disconnect)
     /// </summary>
     function LockContext(pvDebugInfo: string; pvObj: TObject): Boolean;
-    procedure unLockContext(pvDebugInfo: string; pvObj: TObject);
+    procedure UnLockContext(pvDebugInfo: string; pvObj: TObject);
 
     procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
   public
@@ -1319,7 +1319,7 @@ begin
         SetSocketState(ssConnected);
         PostWSARecvRequest;
       finally
-        self.unLockContext('OnConnected', Self);
+        self.UnLockContext('OnConnected', Self);
       end;
     end;
   finally
@@ -1661,7 +1661,8 @@ begin
   FContextLocker.UnLock;
 end;
 
-procedure TDiocpCustomContext.unLockContext(pvDebugInfo: string; pvObj: TObject);
+procedure TDiocpCustomContext.UnLockContext(pvDebugInfo: string; pvObj:
+    TObject);
 begin
   if Self = nil then
   begin
