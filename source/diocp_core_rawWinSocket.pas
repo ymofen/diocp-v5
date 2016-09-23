@@ -7,7 +7,13 @@
  *     DIOCP-V5 ·¢²¼
  *
  *)
- 
+(*$HPPEMIT '#ifdef s6_addr'*)
+(*$HPPEMIT '  #undef s6_addr'*)
+(*$HPPEMIT '#endif'*)
+(*$HPPEMIT '#ifdef s6_addr16'*)
+(*$HPPEMIT '  #undef s6_addr16'*)
+(*$HPPEMIT '#endif'*)
+
 unit diocp_core_rawWinSocket;
 
 interface
