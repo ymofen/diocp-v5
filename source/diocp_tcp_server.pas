@@ -148,6 +148,10 @@ type
   TIocpClientContext = class(TObject)
   private
     __free_flag:Integer;
+
+    // 大于0时不会被KickOut
+    FBusingCounter: Integer; 
+
     // 当前建立的连接套接字句柄
     FSocketHandle:TSocket;
 
@@ -392,6 +396,9 @@ type
     ///   获取当前待发送队列中的请求数量
     /// </summary>
     function GetSendQueueSize: Integer;
+
+    procedure BeginBusy();
+    procedure EndBusy;
 
 
     constructor Create; virtual;
@@ -1503,6 +1510,11 @@ begin
 end;
 
 
+procedure TIocpClientContext.BeginBusy;
+begin
+  InterlockedIncrement(FBusingCounter);
+end;
+
 procedure TIocpClientContext.CheckNextSendRequest;
 var
   lvRequest:TIocpSendRequest;
@@ -1988,14 +2000,19 @@ begin
       // 不再响应任何的接收数据请求
       Exit;
     end;
+    
+    BeginBusy;
+    try
+      FLastActivity := GetTickCount;
 
-    FLastActivity := GetTickCount;
-
-    OnRecvBuffer(pvRecvRequest.FRecvBuffer.buf,
-      pvRecvRequest.FBytesTransferred,
-      pvRecvRequest.FErrorCode);
-    if FOwner <> nil then
-      FOwner.doReceiveData(Self, pvRecvRequest);
+      OnRecvBuffer(pvRecvRequest.FRecvBuffer.buf,
+        pvRecvRequest.FBytesTransferred,
+        pvRecvRequest.FErrorCode);
+      if FOwner <> nil then
+        FOwner.doReceiveData(Self, pvRecvRequest);
+    finally
+      EndBusy;
+    end;
   except
     on E:Exception do
     begin
@@ -2033,6 +2050,11 @@ begin
   begin
     FOwner.FOnSendRequestResponse(Self, pvRequest);
   end;
+end;
+
+procedure TIocpClientContext.EndBusy;
+begin
+  InterlockedDecrement(FBusingCounter);
 end;
 
 function TIocpClientContext.GetDebugInfo: string;
@@ -3254,7 +3276,8 @@ begin
           lvContext := TIocpClientContext(lvBucket.Data);
           if lvContext.FLastActivity <> 0 then
           begin
-            if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
+            if (lvContext.FBusingCounter = 0)    // 如果正在(>0), 就不进行KickOut
+               and (tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut) then
             begin
               // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
               lvKickOutList[j] := lvContext;

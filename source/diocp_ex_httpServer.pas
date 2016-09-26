@@ -1724,14 +1724,14 @@ begin
   {$IFDEF CONSOLE}
   
     {$IFDEF INNER_IOCP_PROCESSOR}
-      Writeln('[#] 由DIOCP线程处理Http请求');
+      sfLogger.logMessage('[#] 由网络IO工作线程处理Http请求');
     {$ELSE}
       {$IFDEF DIOCP_Task}
-        Writeln('[#] 由DIOCP-Task处理Http请求');
+        sfLogger.logMessage('[#] 由DIOCP-Task线程池处理Http请求');
       {$ENDIF}
 
       {$IFDEF QDAC_QWorker}
-        Writeln('[#] 由QDAC-QWorkers处理Http请求');
+        sfLogger.logMessage('[#] 由QDAC-QWorkers处理Http请求');
       {$ENDIF}
     {$ENDIF}
   {$ENDIF}
@@ -1741,7 +1741,10 @@ end;
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
 var
   lvMsg:String;
+  lvContext:TIocpClientContext;
 begin
+  lvContext := pvRequest.Connection;
+  lvContext.BeginBusy;
   try
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
@@ -1777,6 +1780,7 @@ begin
       end;
     end;
   finally
+    lvContext.EndBusy;
     SetCurrentThreadInfo('结束Http::DoRequest');
     //pvRequest.Connection.SetRecvWorkerHint('DoRequest:: end');
   end;
