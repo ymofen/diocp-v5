@@ -25,6 +25,18 @@ type
   TBytes = array of Byte;
 {$IFEND}
 
+  TDiocpSocketSendException = class(Exception)
+    ErrorCode:Integer;
+  end;
+
+  TDiocpSocketRecvException = class(Exception)
+    ErrorCode:Integer;
+  end;
+
+  TDiocpSocketHttpException = class(Exception)
+    ErrorCode:Integer;
+  end;
+
   TDiocpHttpClient = class(TComponent)
   private
     FBufferWriter:TBlockBuffer;
@@ -65,7 +77,7 @@ type
     ///  CheckRecv buffer
     /// </summary>
     procedure CheckRecv(buf: Pointer; len: cardinal);
-    procedure CheckSocketResult(pvSocketResult:Integer);
+    procedure CheckSocketRecvResult(pvSocketResult:Integer);
     procedure InnerExecuteRecvResponse();
     procedure InnerExecuteRecvResponseTimeOut;
     /// <summary>
@@ -82,6 +94,7 @@ type
     procedure DecodeFirstLine;
 
     function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
+    procedure CheckSocketSendResult(pvSocketResult:Integer);
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   public
@@ -199,30 +212,38 @@ resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
   STRING_E_TIMEOUT   = '服务端响应超时';
   STRING_E_CONNECT_TIMEOUT = '与服务器(%s:%d)建立连接超时';
+  STRING_E_OSException = 'System Error.  Code: %d.'+sLineBreak+'%s';
 
 var
   __trace_id: Integer;
   __writeBufferPool: PBufferPool;
 
-{$IFDEF POSIX}
-
-{$ELSE}
-// <2007版本的Windows平台使用
-//   SOSError = 'System Error.  Code: %d.'+sLineBreak+'%s';
-procedure RaiseLastOSErrorException(LastError: Integer);
+procedure RaiseLastSendException(LastError: Integer);
 var       // 高版本的 SOSError带3个参数
-  Error: EOSError;
+  Error: TDiocpSocketSendException;
 begin
   if LastError <> 0 then
-    Error := EOSError.CreateResFmt(@SOSError, [LastError,
+    Error := TDiocpSocketSendException.CreateResFmt(@STRING_E_OSException, [LastError,
       SysErrorMessage(LastError)])
   else
-    Error := EOSError.CreateRes(@SUnkOSError);
+    Error := TDiocpSocketSendException.CreateRes(@SUnkOSError);
   Error.ErrorCode := LastError;
   raise Error;
 end;
 
-{$ENDIF}
+procedure RaiseLastRecvException(LastError: Integer);
+var       // 高版本的 SOSError带3个参数
+  Error: TDiocpSocketRecvException;
+begin
+  if LastError <> 0 then
+    Error := TDiocpSocketRecvException.CreateResFmt(@STRING_E_OSException, [LastError,
+      SysErrorMessage(LastError)])
+  else
+    Error := TDiocpSocketRecvException.CreateRes(@SUnkOSError);
+  Error.ErrorCode := LastError;
+  raise Error;
+end;
+
 
 procedure WriteStringToStream(pvStream: TStream; pvDataString: string;
     pvConvert2Utf8: Boolean = true);
@@ -370,36 +391,28 @@ begin
   end;
 end;
 
-procedure TDiocpHttpClient.CheckSocketResult(pvSocketResult: Integer);
+procedure TDiocpHttpClient.CheckSocketRecvResult(pvSocketResult:Integer);
 var
   lvErrorCode:Integer;
 begin
   if pvSocketResult = -2 then
   begin
     self.Close;
-    raise Exception.Create(STRING_E_TIMEOUT);
+    raise TDiocpSocketRecvException.Create(STRING_E_TIMEOUT);
   end;
   {$IFDEF POSIX}
   if (pvSocketResult = -1) or (pvSocketResult = 0) then
   begin
-     try
-       RaiseLastOSError;
-     except
-       FRawSocket.Close;
-       raise;
-     end;
+     lvErrorCode := GetLastError;
+     FRawSocket.Close;
+     RaiseLastRecvException(lvErrorCode);
    end;
   {$ELSE}
   if (pvSocketResult = SOCKET_ERROR) then
   begin
     lvErrorCode := GetLastError;
     FRawSocket.Close;     // 出现异常后断开连接
-
-    {$if CompilerVersion < 23}
-    RaiseLastOSErrorException(lvErrorCode);
-    {$ELSE}
-    RaiseLastOSError(lvErrorCode);
-    {$ifend} 
+    RaiseLastRecvException(lvErrorCode);
   end;
   {$ENDIF}
 end;
@@ -551,12 +564,12 @@ begin
   while True do
   begin
     l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
-    CheckSocketResult(l);
+    CheckSocketRecvResult(l);
     if l = 0 then
     begin
       // 对方被关闭
       Close;
-      raise Exception.Create('与服务器断开连接！');
+      raise TDiocpSocketSendException.Create('与服务器断开连接！');
     end;
     x := DecodeHttp;
     if x = 1 then
@@ -568,12 +581,12 @@ begin
   while True do
   begin
     l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE, FTimeOut);
-    CheckSocketResult(l);
+    CheckSocketRecvResult(l);
     if l = 0 then
     begin
       // 对方被关闭
       Close;
-      raise Exception.Create('与服务器断开连接！');
+      raise TDiocpSocketSendException.Create('与服务器断开连接！');
     end;
     x := DecodeHttp;
     if x = 1 then
@@ -756,11 +769,37 @@ begin
       self.Close;
       raise Exception.Create('与服务器断开连接！');
     end;
-    CheckSocketResult(lvTempL);
+    CheckSocketRecvResult(lvTempL);
 
     lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));
     lvReadL := lvReadL + Cardinal(lvTempL);
   end;
+end;
+
+procedure TDiocpHttpClient.CheckSocketSendResult(pvSocketResult:Integer);
+var
+  lvErrorCode:Integer;
+begin
+  if pvSocketResult = -2 then
+  begin
+    self.Close;
+    raise TDiocpSocketSendException.Create(STRING_E_TIMEOUT);
+  end;
+  {$IFDEF POSIX}
+  if (pvSocketResult = -1) or (pvSocketResult = 0) then
+  begin
+     lvErrorCode := GetLastError;
+     FRawSocket.Close;
+     RaiseLastSendException(lvErrorCode);
+   end;
+  {$ELSE}
+  if (pvSocketResult = SOCKET_ERROR) then
+  begin
+    lvErrorCode := GetLastError;
+    FRawSocket.Close;     // 出现异常后断开连接
+    RaiseLastSendException(lvErrorCode);
+  end;
+  {$ENDIF}
 end;
 
 procedure TDiocpHttpClient.DecodeFirstLine;
@@ -814,7 +853,7 @@ begin
   if not CheckConnect(pvHost, pvPort) then Exit;
   try
     r := FRawSocket.SendBuf(pvBuf^, len);
-    CheckSocketResult(r);
+    CheckSocketRecvResult(r);
     if r <> len then
     begin
       raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
@@ -878,13 +917,13 @@ begin
   begin
     // 对方被关闭
     Close;
-    raise Exception.Create('与服务器断开连接！');
+    raise TDiocpSocketSendException.Create('与服务器断开连接！');
   end;
   // 检测是否有错误
-  CheckSocketResult(r);
+  CheckSocketRecvResult(r);
 
   Inc(FResponseSize, r);
-  
+
   {$IFDEF UNICODE}
   lvRawHeaderStr := TEncoding.Default.GetString(lvRawHeader);
   {$ELSE}
@@ -944,10 +983,11 @@ var
   r:Integer;
 begin
   r := FRawSocket.SendBuf(pvBuffer^, pvLength);
-  CheckSocketResult(r);
+  CheckSocketSendResult(r);
   if r <> pvLength then
   begin
-    raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
+    FRawSocket.Close();
+    raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
   end;
 end;
 
