@@ -363,6 +363,7 @@ var
   lvSource:PByte;
   i: Integer;
 begin
+  Result := '';
   lvSource := PByte(@v);
   for i := 1 to len do
   begin
