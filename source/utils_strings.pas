@@ -43,7 +43,8 @@ uses
   , Math;
 
 const
-  BUFFER_BLOCK_SIZE = $2000;  // Must be a power of 2 
+  BUFFER_BLOCK_SIZE = $2000;  // Must be a power of 2
+  STRING_EMPTY = ''; 
 
 type
 {$IFDEF MSWINDOWS}
@@ -77,6 +78,24 @@ type
   WChar = WideChar;
   PWChar = PWideChar;
 {$ENDIF}
+
+
+
+{$if (sizeof(Char) = 1)}
+  {$IFDEF FPC}
+  DStringW = UnicodeString;
+  {$ELSE}
+  DStringW = WideString;
+  {$ENDIF}
+  DCharW = WideChar;
+  PDCharW = PWideChar;
+  PDStringW = ^DStringW;
+{$else}
+  DCharW = Char;
+  PDCharW = PChar;
+  DStringW = string;
+  PDStringW = ^DStringW;
+{$ifend}
 
   // 25:XE5
   {$IF CompilerVersion<=25}
@@ -553,6 +572,13 @@ function DateTimeString(pvDateTime:TDateTime): string;
 function NowString: String;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+
+/// <summary>
+///   为字符串新建一个PString指针，并与s建立对应关系
+/// </summary>
+function NewPString(const s: string): PString;
+
+function GetStringFromPString(const p:Pointer): string;
 
 implementation
 
@@ -2239,6 +2265,26 @@ begin
   end;
   if Result = 0 then
     Result := pe - ps; 
+end;
+
+function NewPString(const s: string): PString;
+var
+  lvRVal:PString;
+begin
+  New(lvRVal);
+  lvRVal^ := s;
+  Result := lvRVal;
+end;
+
+function GetStringFromPString(const p:Pointer): string;
+begin
+  if p = nil then
+  begin
+    Result := STRING_EMPTY;
+  end else
+  begin
+    Result := PString(p)^;
+  end;
 end;
 
 
