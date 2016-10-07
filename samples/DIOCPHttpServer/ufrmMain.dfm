@@ -232,6 +232,7 @@ object frmMain: TfrmMain
     Top = 144
   end
   object tmrWebSocketPing: TTimer
+    Enabled = False
     Interval = 10000
     OnTimer = tmrWebSocketPingTimer
     Left = 400

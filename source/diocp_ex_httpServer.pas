@@ -125,6 +125,11 @@ type
     FThreadID:THandle;
     FThreadDebugInfo:String;
 
+    /// <summary>
+    ///  WebSocket接收到的整个数据
+    /// </summary>
+    FWebSocketContentBuffer:TDBufferBuilder;
+
     FReleaseLater:Boolean;
     FReleaseLaterMsg:String;
 
@@ -356,6 +361,7 @@ type
     /// </summary>
     property RequestParamsList: TDValue read GetRequestParamsList;
     property URLParams: TDValue read GetURLParams;
+    property WebSocketContentBuffer: TDBufferBuilder read FWebSocketContentBuffer;
 
     
 
@@ -771,6 +777,7 @@ begin
   FReleaseLater := false;
   FInnerRequest.DoCleanUp;
   FInnerWebSocketFrame.DoCleanUp;
+  FWebSocketContentBuffer.Clear;
 end;
 
 procedure TDiocpHttpRequest.Close;
@@ -820,6 +827,7 @@ begin
   FInnerRequest := THttpRequest.Create;
   FInnerWebSocketFrame := TDiocpWebSocketFrame.Create;
   FResponse := TDiocpHttpResponse.Create();
+  FWebSocketContentBuffer := TDBufferBuilder.Create;
 
   //FRequestParamsList := TStringList.Create; // TODO:创建存放http参数的StringList
 end;
@@ -830,7 +838,7 @@ begin
   FDebugStrings.Free;
 
   //FreeAndNil(FRequestParamsList); // TODO:释放存放http参数的StringList
-
+  FWebSocketContentBuffer.Free;
   FInnerRequest.Free;
   FInnerWebSocketFrame.Free;
 
@@ -1131,6 +1139,16 @@ begin
   if Connection.ContextType = Context_Type_WebSocket then
   begin
     Result := FInnerWebSocketFrame.InputBuffer(buf);
+    if Result = 1 then
+    begin
+      FWebSocketContentBuffer.AppendBuffer(FInnerWebSocketFrame.ContentBuffer, FInnerWebSocketFrame.ContentLength);
+
+      if FInnerWebSocketFrame.GetFIN <> FIN_EOF then
+      begin
+        Result := 0;
+        FInnerWebSocketFrame.DoCleanUp();
+      end;
+    end;
   end else
   begin
     Result := FInnerRequest.InputBuffer(buf);
@@ -1502,6 +1520,8 @@ begin
   end;
   FBlockBuffer.CheckThreadNone;
   FBlockBuffer.ClearBuffer;
+
+
   FContextType:= 0;
 
 end;
@@ -1800,6 +1820,7 @@ begin
   lvWSFrame := TDiocpWebSocketFrame.Create;
   try
     lvWSFrame.EncodeBuffer(pvBuffer, len, true, opcode);
+
     WriteResponseBuffer(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
     FlushResponseBuffer;
   finally
@@ -1928,7 +1949,7 @@ begin
           end else if lvOptCode = OPT_CLOSE then
           begin
             lvContext.RequestDisconnect('收到WebSocket-Close请求');
-          end else
+          end else if lvOptCode in [OPT_TEXT, OPT_BINARY] then                    
           begin
             if Assigned(FOnDiocpHttpRequest) then
             begin

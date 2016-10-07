@@ -15,6 +15,9 @@ const
   OPT_PING:  BYTE   = $09;
   OPT_PONG:  BYTE   = $0A;
 
+  // 首字节：最高位用于描述消息是否结束,如果为1则该消息为消息尾部,如果为零则还有后续数据包;
+  FIN_EOF: BYTE = 1;
+
   WS_MSG_PONG: Word = $008A;
   WS_MSG_PING: Word = $0089;
   
@@ -35,9 +38,8 @@ type
     FDecodeState:Integer;
     FFlag : Integer;
     FBuffer: TDBufferBuilder;
-    FContentLength:Integer;
   private
-    FDataLength:Int64;
+    FContentLength: Int64;
     FHeadLength: Byte;
     FPlayload:Byte;
     function GetMaskState: Byte;
@@ -58,7 +60,7 @@ type
 
     procedure DoCleanUp();
 
-    function DataBuffer: PByte;
+    function ContentBuffer: PByte;
 
     /// <summary>
     ///   获取OptCode
@@ -66,8 +68,14 @@ type
     /// </summary>
     function GetOptCode: Byte;
 
+    /// <summary>
+    ///  获取FIN状态
+    /// </summary>
+    function GetFIN:Byte;
+
     function DecodeDataWithUtf8: string;
     property Buffer: TDBufferBuilder read FBuffer;
+    property ContentLength: Int64 read FContentLength;
   end;
 
 function GetWebSocketAccept(pvWebSocketKey:AnsiString): AnsiString;
@@ -90,6 +98,11 @@ begin
   FBuffer := TDBufferBuilder.Create();
 end;
 
+function TDiocpWebSocketFrame.GetFIN: Byte;
+begin
+  Result := TByteTools.GetBit(FBuffer.MemoryBuffer(0)^, 7);
+end;
+
 function TDiocpWebSocketFrame.GetMaskState: Byte;
 begin
   Result := TByteTools.GetBit(FBuffer.MemoryBuffer(1)^, 7);
@@ -101,7 +114,7 @@ begin
   inherited Destroy;
 end;
 
-function TDiocpWebSocketFrame.DataBuffer: PByte;
+function TDiocpWebSocketFrame.ContentBuffer: PByte;
 begin
   Result := FBuffer.MemoryBuffer(FHeadLength);
 end;
@@ -117,7 +130,7 @@ begin
   FPlayload := FBuffer.MemoryBuffer(1)^ and $7F;
   if FPlayload < 126 then
   begin
-    FDataLength := FPlayload;
+    FContentLength := FPlayload;
   end else if FPlayload = 126 then
   begin
     FHeadLength := FHeadLength + 2;
@@ -136,7 +149,7 @@ end;
 
 function TDiocpWebSocketFrame.DecodeDataWithUtf8: string;
 begin
-  Result := Utf8BufferToString(DataBuffer, FDataLength);
+  Result := Utf8BufferToString(ContentBuffer, FContentLength);
 end;
 
 function TDiocpWebSocketFrame.DecodeWithMask: Integer;
@@ -148,7 +161,7 @@ begin
   lvMask := FBuffer.MemoryBuffer(FHeadLength - 4);
   P := lvMask;
   Inc(P, 4);
-  for I := 0 to FDataLength - 1 do
+  for I := 0 to FContentLength - 1 do
   begin
     lvTmpMask := lvMask;
     Inc(lvTmpMask, I mod 4);
@@ -193,7 +206,7 @@ begin
   begin
     FFlag := 1;
     FBuffer.Clear;
-    FDataLength := 0;
+    FContentLength := 0;
   end;
 
   FBuffer.Append(buf);
@@ -215,16 +228,16 @@ begin
     Exit;
   end else if (FBuffer.Length = FHeadLength) then
   begin 
-    if (FPlayload = 126) and (FBuffer.Length = 4) then
+    if (FPlayload = 126) then
     begin  // 解码长度
-      FDataLength := TByteTools.swap16(FBuffer.MemoryBuffer(2)^);//  Ord(SrcData[2]) shl 8 + Ord(SrcData[3])
-    end else if (FPlayload = 127) and (FBuffer.Length = 10) then
+      FContentLength := TByteTools.swap16(FBuffer.MemoryBuffer(2)^);//  Ord(SrcData[2]) shl 8 + Ord(SrcData[3])
+    end else if (FPlayload = 127) then
     begin
-      FDataLength := TByteTools.swap64(PInt64(FBuffer.MemoryBuffer(2))^);  //   Swap64(PInt64(@SrcData[2])^);
+      FContentLength := TByteTools.swap64(PInt64(FBuffer.MemoryBuffer(2))^);  //   Swap64(PInt64(@SrcData[2])^);
     end;
   end;
 
-  if FBuffer.Length = (FHeadLength + FDataLength) then
+  if FBuffer.Length = (FHeadLength + FContentLength) then
   begin   // 完整数据
     FFlag := 0; 
     if GetMaskState = 1 then

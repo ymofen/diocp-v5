@@ -220,12 +220,12 @@ begin
   if pvRequest.Connection.ContextType = Context_Type_WebSocket then
   begin   // 如果连接为WebSocket类型
     // 接收到的WebSocket数据侦
-    s := TByteTools.varToHexString(pvRequest.InnerWebSocketFrame.Buffer.Memory^, pvRequest.InnerWebSocketFrame.Buffer.Length);
-    sfLogger.logMessage(s);
+//    s := TByteTools.varToHexString(pvRequest.InnerWebSocketFrame.Buffer.Memory^, pvRequest.InnerWebSocketFrame.Buffer.Length);
+//    sfLogger.logMessage(s);
 
     // 提取字符串数据
-    s := pvRequest.InnerWebSocketFrame.DecodeDataWithUtf8;
-
+    s := pvRequest.WebSocketContentBuffer.DecodeUTF8;
+    
     sfLogger.logMessage(s);
 
     // 发送字符串给客户端
