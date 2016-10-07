@@ -57,4 +57,13 @@ object Form1: TForm1
     TabOrder = 4
     OnClick = btnGetBitUInt64Click
   end
+  object btnByteAsBinary: TButton
+    Left = 304
+    Top = 136
+    Width = 113
+    Height = 25
+    Caption = 'btnByteAsBinary'
+    TabOrder = 5
+    OnClick = btnByteAsBinaryClick
+  end
 end

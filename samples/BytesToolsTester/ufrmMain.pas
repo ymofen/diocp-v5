@@ -13,6 +13,8 @@ type
     edtNum: TEdit;
     mmoBuffer: TMemo;
     btnGetBitUInt64: TButton;
+    btnByteAsBinary: TButton;
+    procedure btnByteAsBinaryClick(Sender: TObject);
     procedure btnGetBitUInt64Click(Sender: TObject);
     procedure btnNumToBytesClick(Sender: TObject);
   private
@@ -27,6 +29,32 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TForm1.btnByteAsBinaryClick(Sender: TObject);
+var
+  v, v1, v2:Byte;
+
+  w:Word;
+begin
+  v := $84;
+  mmoOutputs.Lines.Add('0x84:' + TByteTools.varToBinaryString(v, 1));
+
+  w := $ABCD;
+  mmoOutputs.Lines.Add(Format('%2x: %d, swap16:%2x, binary:%s', [w, w,
+    TByteTools.swap16(w), TByteTools.varToBinaryString(w, 2, ' ')]));
+
+  v := $81;
+  v1 := v;
+  TByteTools.SetLow4Bit(v1, $FE);
+
+  v2 := v;
+  TByteTools.SetHigh4Bit(v2, $FE);
+  mmoOutputs.Lines.Add(Format('%d: %2x, binary:%s, off low4bit:%2x, on high4bit:%2x',
+    [v, v, TByteTools.varToBinaryString(v, 1, ' '),
+    v1, v2]));
+
+  
+end;
 
 procedure TForm1.btnGetBitUInt64Click(Sender: TObject);
 var

@@ -19,7 +19,8 @@
   *   2015-08-25 09:56:05
   *   修正TDiocpHttpRequest回归对象池时，进行清理对象。避免残留多余的Cookie对象。(感谢阿木反馈bug)
   *
-  *
+  *   2016-10-07 20:56:41
+  *   加入WebSocket支持(感谢音儿)
 *)
 unit diocp_ex_httpServer;
 
@@ -40,7 +41,8 @@ uses
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
   , diocp_tcp_server, utils_queues, utils_hashs, utils_dvalue
   , diocp_ex_http_common
-  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs, utils_BufferPool;
+  , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
+  utils_BufferPool,  utils_websocket;
 
 
 
@@ -48,6 +50,8 @@ const
   HTTPLineBreak = #13#10;
   SESSIONID = 'diocp_sid';
   BLOCK_BUFFER_TAG = 10000;
+
+  Context_Type_WebSocket = 1;
 
 type
   TDiocpHttpState = (hsCompleted, hsRequest { 接收请求 } , hsRecvingPost { 接收数据 } );
@@ -113,16 +117,20 @@ type
   TDiocpHttpRequest = class(TObject)
   private
     __free_flag:Integer;
+
+
     FOwnerPool:TSafeQueue;
-    
+
     FLocker:TCriticalSection;
     FThreadID:THandle;
     FThreadDebugInfo:String;
-    
+
     FReleaseLater:Boolean;
     FReleaseLaterMsg:String;
-    
+
     FSessionID : String;
+
+    FInnerWebSocketFrame:TDiocpWebSocketFrame;
 
     FInnerRequest:THttpRequest;
 
@@ -180,15 +188,25 @@ type
     function GetURLParams: TDValue;
     procedure InnerAddToDebugStrings(pvMsg:String);
     function GetCharset: string;
+
+
+    function InputBuffer(const buf:Byte):Integer;
   public
     constructor Create;
-    destructor Destroy; override;   
+    destructor Destroy; override;
+
+  public
 
     /// <summary>
     ///   设置Request暂时不进行释放
     /// </summary>
     /// <param name="pvMsg"> 信息(便于状态观察) </param>
     procedure SetReleaseLater(pvMsg:String);
+
+    /// <summary>
+    ///  检测是否是WebSocket请求
+    /// </summary>
+    function CheckIsWebSocketRequest: Boolean;
 
     /// <summary>
     ///   获取当前Session
@@ -282,6 +300,7 @@ type
 
     property HeaderAsMemory: PByte read GetHeaderAsMemory;
     property HeaderDataLength: Integer read GetHeaderDataLength;
+    property InnerWebSocketFrame: TDiocpWebSocketFrame read FInnerWebSocketFrame;
 
     property LastResponseContentLength: Integer read FLastResponseContentLength;
 
@@ -393,15 +412,10 @@ type
     /// </summary>
     procedure ResponseEnd;
 
-    
-
-
-
-
-
-
-
-
+    /// <summary>
+    ///  响应WEBSocket的握手
+    /// </summary>
+    procedure ResponseForWebSocketShake;
   end;
 
   TDiocpHttpResponse = class(TObject)
@@ -486,8 +500,11 @@ type
     procedure SetChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
 
     procedure SetChunkedUtf8(pvStr:string);
+  end;
 
-    
+  TDiocpWebSocketRequest = class(TDiocpHttpRequest)
+  public
+
   end;
 
   /// <summary>
@@ -495,6 +512,11 @@ type
   /// </summary>
   TDiocpHttpClientContext = class(TIocpClientContext)
   private
+    /// <summary>
+    ///   0:普通 Http连接
+    ///   1:WebSocket
+    /// </summary>
+    FContextType:Integer;
 
     /// <summary>
     ///   必须单线程操作
@@ -517,10 +539,16 @@ type
 
     procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag,
         pvErrorCode: Integer); override;
+    procedure SetContextType(const Value: Integer);
 
   public
     constructor Create; override;
     destructor Destroy; override;
+  public
+    procedure PostWebSocketSendBuffer(pvBuffer: Pointer; len: Int64; opcode: Byte);
+    procedure PostWebSocketData(const s:string; pvConvertToUtf8:Boolean);
+    procedure PostWebSocketPing();
+    property ContextType: Integer read FContextType write SetContextType;
   protected
     /// <summary>
     /// 归还到对象池，进行清理工作
@@ -614,6 +642,11 @@ type
     ///   可以在这里面做一些初始化
     /// </summary>
     procedure OnCreateClientContext(const context: TIocpClientContext); override;
+  public
+    /// <summary>
+    ///   发送Ping到所有的客户端
+    /// </summary>
+    procedure WebSocketSendPing();
   public
     constructor Create(AOwner: TComponent); override;
 
@@ -737,6 +770,7 @@ begin
   FResponse.Clear;
   FReleaseLater := false;
   FInnerRequest.DoCleanUp;
+  FInnerWebSocketFrame.DoCleanUp;
 end;
 
 procedure TDiocpHttpRequest.Close;
@@ -784,6 +818,7 @@ begin
   FLocker := TCriticalSection.Create;
   FDebugStrings := TStringList.Create;
   FInnerRequest := THttpRequest.Create;
+  FInnerWebSocketFrame := TDiocpWebSocketFrame.Create;
   FResponse := TDiocpHttpResponse.Create();
 
   //FRequestParamsList := TStringList.Create; // TODO:创建存放http参数的StringList
@@ -797,6 +832,7 @@ begin
   //FreeAndNil(FRequestParamsList); // TODO:释放存放http参数的StringList
 
   FInnerRequest.Free;
+  FInnerWebSocketFrame.Free;
 
   FLocker.Free;
 
@@ -854,6 +890,26 @@ begin
   begin
     FSessionID := SESSIONID + '_' + DeleteChars(CreateClassID, ['-', '{', '}']);
     Response.AddCookie(SESSIONID, FSessionID);
+  end;
+end;
+
+function TDiocpHttpRequest.CheckIsWebSocketRequest: Boolean;
+var
+  lvUpgrade:string;
+begin
+  //HTTP/1.1 101 Switching Protocols
+  //Upgrade: websocket
+  //Connection: Upgrade
+  //Sec-WebSocket-Accept: K7DJLdLooIwIG/MOpvWFB3y3FE8=
+  Result := False;
+
+  lvUpgrade := Header.GetValueByName('Upgrade', '');
+
+  if lvUpgrade = 'websocket' then
+  begin
+    Result := True;
+
+    //pvRequest.Response.
   end;
 end;
 
@@ -1070,10 +1126,53 @@ begin
   if FDebugStrings.Count > 500 then FDebugStrings.Delete(0);
 end;
 
+function TDiocpHttpRequest.InputBuffer(const buf: Byte): Integer;
+begin
+  if Connection.ContextType = Context_Type_WebSocket then
+  begin
+    Result := FInnerWebSocketFrame.InputBuffer(buf);
+  end else
+  begin
+    Result := FInnerRequest.InputBuffer(buf);
+  end;
+end;
+
 procedure TDiocpHttpRequest.ResponseEnd;
 begin
   SendResponse();
   DoResponseEnd;
+end;
+
+
+
+
+procedure TDiocpHttpRequest.ResponseForWebSocketShake;
+var
+  lvBuffer:AnsiString;
+  lvWebSocketKey:AnsiString;
+begin
+  lvWebSocketKey := Header.GetValueByName('Sec-WebSocket-Key', '');   
+
+  lvBuffer := 'HTTP/1.1 101 Switching Protocols'#13#10;
+  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+
+  lvBuffer := 'Server: DIOCP/1.1'#13#10;
+  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+
+  lvBuffer := 'Upgrade: websocket'#13#10;
+  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+  
+  lvBuffer := 'Connection: Upgrade'#13#10;
+  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+
+  lvBuffer := 'Sec-WebSocket-Accept: ' + GetWebSocketAccept(lvWebSocketKey) + #13#10#13#10;
+  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+  self.Connection.FlushResponseBuffer;
+  //HTTP/1.1 101 Switching Protocols
+  //Server: DIOCP/1.1
+  //Upgrade: websocket
+  //Connection: Upgrade
+  //Sec-WebSocket-Accept: Xc/VVMNKizn2QuORua7dU8kW0Og=
 end;
 
 procedure TDiocpHttpRequest.SaveToFile(pvFile:string);
@@ -1402,7 +1501,8 @@ begin
     FCurrentRequest := nil;
   end;
   FBlockBuffer.CheckThreadNone;
-  FBlockBuffer.FlushBuffer;
+  FBlockBuffer.ClearBuffer;
+  FContextType:= 0;
 
 end;
 
@@ -1587,11 +1687,11 @@ begin
       FCurrentRequest.Response.FDiocpContext := self;
       FCurrentRequest.Clear;
 
-      // 记录当前contextDNA，异步任务时组做检测
+      // 记录当前contextDNA，异步任务时做检测
       FCurrentRequest.FContextDNA := self.ContextDNA;
     end;
     
-    r := FCurrentRequest.FInnerRequest.InputBuffer(lvTmpBuf^);
+    r := FCurrentRequest.InputBuffer(lvTmpBuf^);
     if r = -1 then
     begin
 
@@ -1622,15 +1722,7 @@ begin
     end else
     if r = 1 then
     begin
-      if SameText(FCurrentRequest.FInnerRequest.Method, 'POST') or
-          SameText(FCurrentRequest.FInnerRequest.Method, 'PUT') then
-      begin
-        if FCurrentRequest.FInnerRequest.ContentLength = 0 then
-        begin
-          self.RequestDisconnect('无效的POST/PUT请求数据', self);
-          Exit;
-        end;
-      end else
+      if self.FContextType = Context_Type_WebSocket then
       begin
         lvTempRequest := FCurrentRequest;
 
@@ -1638,10 +1730,29 @@ begin
         FCurrentRequest := nil;
 
         DoRequest(lvTempRequest);
+      end else
+      begin
+        if SameText(FCurrentRequest.FInnerRequest.Method, 'POST') or
+            SameText(FCurrentRequest.FInnerRequest.Method, 'PUT') then
+        begin
+          if FCurrentRequest.FInnerRequest.ContentLength = 0 then
+          begin
+            self.RequestDisconnect('无效的POST/PUT请求数据', self);
+            Exit;
+          end;
+        end else
+        begin
+          lvTempRequest := FCurrentRequest;
+
+          // 避免断开后还回对象池，造成重复还回
+          FCurrentRequest := nil;
+
+          DoRequest(lvTempRequest);
+        end;
       end;
     end else
     if r = 2 then
-    begin
+    begin     // 解码到请求体
       lvTempRequest := FCurrentRequest;
 
       // 避免断开后还回对象池，造成重复还回
@@ -1653,6 +1764,61 @@ begin
 
     Dec(lvRemain);
     Inc(lvTmpBuf);
+  end;
+end;
+
+procedure TDiocpHttpClientContext.PostWebSocketData(const s:string;
+    pvConvertToUtf8:Boolean);
+var
+  lvBytes:TBytes;
+begin
+  if pvConvertToUtf8 then
+  begin
+    lvBytes := StringToUtf8Bytes(s);  
+  end else
+  begin
+    lvBytes := StringToBytes(s);
+  end;
+  PostWebSocketSendBuffer(PByte(@lvBytes[0]), Length(lvBytes), OPT_TEXT);
+end;
+
+procedure TDiocpHttpClientContext.PostWebSocketPing;
+begin
+  self.PostWSASendRequest(@WS_MSG_PING, 2, False);
+end;
+
+procedure TDiocpHttpClientContext.PostWebSocketSendBuffer(pvBuffer: Pointer;
+    len: Int64; opcode: Byte);
+var
+  lvWSFrame:TDiocpWebSocketFrame;
+begin
+  if ContextType <> Context_Type_WebSocket then
+  begin
+    raise Exception.Create('非WebSocket连接');
+  end;
+  
+  lvWSFrame := TDiocpWebSocketFrame.Create;
+  try
+    lvWSFrame.EncodeBuffer(pvBuffer, len, true, opcode);
+    WriteResponseBuffer(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
+    FlushResponseBuffer;
+  finally
+    lvWSFrame.Free;
+  end;
+  
+end;
+
+procedure TDiocpHttpClientContext.SetContextType(const Value: Integer);
+begin
+  if FContextType <> Value then
+  begin
+    if FContextType = 0 then
+    begin
+      FContextType := Value;
+    end else
+    begin
+      raise Exception.Create('不允许重复设定ContextType');
+    end;
   end;
 end;
 
@@ -1741,7 +1907,8 @@ end;
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
 var
   lvMsg:String;
-  lvContext:TIocpClientContext;
+  lvContext:TDiocpHttpClientContext;
+  lvOptCode:Byte;
 begin
   lvContext := pvRequest.Connection;
   lvContext.BeginBusy;
@@ -1749,12 +1916,34 @@ begin
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
       try
-        if not FDisableSession then
-          pvRequest.CheckCookieSession;
-
-        if Assigned(FOnDiocpHttpRequest) then
+        if lvContext.ContextType = Context_Type_WebSocket then
         begin
-          FOnDiocpHttpRequest(pvRequest);
+          lvOptCode := pvRequest.InnerWebSocketFrame.GetOptCode;
+          if lvOptCode = OPT_PING then
+          begin
+            lvContext.PostWSASendRequest(@WS_MSG_PONG, 2, False);
+          end else if lvOptCode = OPT_PONG then
+          begin
+            ; // {noop}
+          end else if lvOptCode = OPT_CLOSE then
+          begin
+            lvContext.RequestDisconnect('收到WebSocket-Close请求');
+          end else
+          begin
+            if Assigned(FOnDiocpHttpRequest) then
+            begin
+              FOnDiocpHttpRequest(pvRequest);
+            end;
+          end;
+        end else
+        begin         
+          if not FDisableSession then
+            pvRequest.CheckCookieSession;
+
+          if Assigned(FOnDiocpHttpRequest) then
+          begin
+            FOnDiocpHttpRequest(pvRequest);
+          end;
         end;
       except
         on E:Exception do
@@ -1926,6 +2115,35 @@ begin
   finally
     FSessionList.unLock;
   end;  
+end;
+
+procedure TDiocpHttpServer.WebSocketSendPing;
+var
+  lvList:TList;
+  i: Integer;
+  lvContext:TDiocpHttpClientContext;
+begin
+  lvList := TList.Create;
+  try
+    GetOnlineContextList(lvList);
+
+    for i := 0 to lvList.Count - 1 do
+    begin
+       lvContext := TDiocpHttpClientContext(lvList[i]);
+       if lvContext.LockContext('sendPing', lvContext) then
+       try
+         if lvContext.ContextType = Context_Type_WebSocket then
+         begin
+           lvContext.PostWebSocketPing();       
+         end;
+       finally
+         lvContext.UnLockContext('sendPing', lvContext);
+       end;
+    end;
+  finally
+    lvList.Free;
+  end;
+    
 end;
 
 constructor TDiocpHttpSession.Create;

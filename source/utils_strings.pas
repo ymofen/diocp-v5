@@ -143,6 +143,7 @@ type
     constructor Create;
     procedure Clear;
     function Append(const aByte:Byte): TDBufferBuilder; overload;
+    function Append(const w:Word):TDBufferBuilder; overload;
     function Append(const c: Char): TDBufferBuilder; overload;
     function Append(str:string): TDBufferBuilder; overload;
     function Append(str:string; pvLeftStr:string; pvRightStr:String):
@@ -206,6 +207,12 @@ type
     ///   数据内存指针
     /// </summary>
     function Memory: PByte;
+
+    /// <summary>
+    ///  返回一个指针
+    ///  pvIndex是数据下标(从0开始)
+    /// </summary>
+    function MemoryBuffer(const pvIndex: Integer): PByte;
 
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(Offset: Longint; Origin: Word): Longint; override;
@@ -1705,6 +1712,11 @@ begin
 
 end;
 
+function TDBufferBuilder.Append(const w: Word): TDBufferBuilder;
+begin
+  Result := AppendBuffer(@w, 2);
+end;
+
 function TDBufferBuilder.AppendBreakLineBytes: TDBufferBuilder;
 begin
   if FBufferLocked then
@@ -1875,6 +1887,11 @@ end;
 function TDBufferBuilder.Memory: PByte;
 begin
   Result := @FData[0];
+end;
+
+function TDBufferBuilder.MemoryBuffer(const pvIndex: Integer): PByte;
+begin
+  Result := @FData[pvIndex];
 end;
 
 function TDBufferBuilder.PeekBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;

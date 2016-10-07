@@ -15,7 +15,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
-  utils_dvalue_json, utils_BufferPool, diocp_tcp_server, System.Actions;
+  utils_dvalue_json, utils_BufferPool, diocp_tcp_server;
 
 type
   TfrmMain = class(TForm)
@@ -25,7 +25,7 @@ type
     actOpen: TAction;
     actStop: TAction;
     btnDisconectAll: TButton;
-    pgcMain: TPageControl;
+    pgcMain: TPageControl;       
     TabSheet1: TTabSheet;
     pnlMonitor: TPanel;
     btnGetWorkerState: TButton;
@@ -45,6 +45,10 @@ type
     chkUsePool: TCheckBox;
     chkIPV6: TCheckBox;
     chkRecord2File: TCheckBox;
+    tsWebSocket: TTabSheet;
+    mmoWebSocketData: TMemo;
+    btnWebSocketPush: TButton;
+    tmrWebSocketPing: TTimer;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnInfoClick(Sender: TObject);
@@ -54,8 +58,10 @@ type
     procedure btnGetWorkerStateClick(Sender: TObject);
     procedure btnURLDecodeClick(Sender: TObject);
     procedure btnURLEncodeClick(Sender: TObject);
+    procedure btnWebSocketPushClick(Sender: TObject);
     procedure chkUseSessionClick(Sender: TObject);
     procedure tmrHeartTimer(Sender: TObject);
+    procedure tmrWebSocketPingTimer(Sender: TObject);
   private
     iCounter:Integer;
     FChkSession:Boolean;
@@ -189,16 +195,48 @@ var
 var
   lvBytes:TBytes;
   lvDValue:TDValue;
-
+  lvUpgrade :String;
 begin
+
+  
+
   if chkRecord2File.Checked then
   begin
     pvRequest.SaveToFile(Format('DiocpHttpRequest_%s.req', [FormatDateTime('MMddhhnnsszzz', Now)]));
   end;
 
+
+  if pvRequest.CheckIsWebSocketRequest then
+  begin    // 检测是否为WebSocket的接入请求
+
+    // 响应WebSocket握手
+    pvRequest.ResponseForWebSocketShake;
+
+    // 设置连接为WebSocket类型
+    pvRequest.Connection.ContextType := Context_Type_WebSocket;
+    Exit;
+  end;
+
+  if pvRequest.Connection.ContextType = Context_Type_WebSocket then
+  begin   // 如果连接为WebSocket类型
+    // 接收到的WebSocket数据侦
+    s := TByteTools.varToHexString(pvRequest.InnerWebSocketFrame.Buffer.Memory^, pvRequest.InnerWebSocketFrame.Buffer.Length);
+    sfLogger.logMessage(s);
+
+    // 提取字符串数据
+    s := pvRequest.InnerWebSocketFrame.DecodeDataWithUtf8;
+
+    sfLogger.logMessage(s);
+
+    // 发送字符串给客户端
+    pvRequest.Connection.PostWebSocketData(s, true);
+    Exit;
+  end;
+  
+
   if pvRequest.RequestURI = '/weixin' then
   begin
-    pvRequest.DecodeURLParam(nil);
+    //pvRequest.DecodeURLParam(nil);
     s := pvRequest.GetRequestParam('echostr');
     pvRequest.Response.WriteString(s);
     pvRequest.SendResponse;
@@ -483,6 +521,34 @@ begin
   mmoURLOutput.Lines.Text := diocp_ex_http_common.URLEncode(mmoURLInput.Lines.Text);
 end;
 
+procedure TfrmMain.btnWebSocketPushClick(Sender: TObject);
+var
+  lvList:TList;
+  i: Integer;
+  lvContext:TDiocpHttpClientContext;
+begin
+  lvList := TList.Create;
+  try
+    FTcpServer.GetOnlineContextList(lvList);
+
+    for i := 0 to lvList.Count - 1 do
+    begin
+       lvContext := TDiocpHttpClientContext(lvList[i]);
+       if lvContext.LockContext('websocket', lvContext) then
+       try
+         if lvContext.ContextType = Context_Type_WebSocket then
+         begin
+           lvContext.PostWebSocketData(mmoWebSocketData.Lines.Text, True);       
+         end;
+       finally
+         lvContext.UnLockContext('websocket', lvContext);
+       end;
+    end;
+  finally
+    lvList.Free;
+  end;
+end;
+
 procedure TfrmMain.chkUseSessionClick(Sender: TObject);
 begin
   FChkSession := chkUseSession.Checked;
@@ -492,6 +558,11 @@ procedure TfrmMain.tmrHeartTimer(Sender: TObject);
 begin
   FTcpServer.KickOut();
   FTcpServer.CheckSessionTimeOut;
+end;
+
+procedure TfrmMain.tmrWebSocketPingTimer(Sender: TObject);
+begin
+  FTcpServer.WebSocketSendPing;
 end;
 
 

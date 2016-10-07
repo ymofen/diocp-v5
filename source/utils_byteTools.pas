@@ -61,17 +61,19 @@ type
      /// <summary>
      ///   高低位进行交换
      /// </summary>
-     class function swap32(v:Integer):Integer;
+     class function swap32(const v: Integer): Integer;
 
      /// <summary>
      ///   高低位进行交换
      /// </summary>
-     class function swap64(v:int64):Int64;
+     class function swap64(const v: int64): Int64;
 
      /// <summary>
      ///   高低位进行交换
      /// </summary>
-     class function swap16(const v):Word;
+     class function swap16(const v):Word; overload;
+
+     class function swap16(const v:Word):Word; overload;
 
 
      class function SwapBuff(buf: Pointer; offset, len: Integer): Integer;
@@ -96,6 +98,12 @@ type
      /// </summary>
      class function BufShowAsString(pvBuf:Pointer; pvBufLength:Integer): String;
 
+     /// <summary>
+     ///   添加Buf到文件尾部
+     /// </summary>
+     class procedure AppendBufToFile(pvBuf:Pointer; pvBufLength:Integer;
+         pvFileName:string);
+
 
      /// <summary>
      ///   从Buffer中截取几个字节后作为UInt64   
@@ -111,6 +119,39 @@ type
      ///  GetBitU(bin, 8, 8) = $EE
      /// </summary>
      class function GetBitU(pvBuf:Pointer; pvStart:Integer; pvLen:Integer): UInt64;
+
+     /// <summary>
+     ///   获取一位的值
+     ///   pvOffset 取值范围为 (0..7)
+     /// </summary>
+     class function GetBit(const pvByte:Byte; pvOffset:Byte): Byte;
+
+     /// <summary>
+     ///   设置字节的Bit位
+     ///   pvOffset 取值为(0..7)
+     ///   pvBitValue 为位值(0,1)
+     /// </summary>
+     class procedure SetBit(var vByte: Byte; pvOffset, pvBitValue: Byte);
+
+     /// <summary>
+     ///   设置低4位的值
+     ///   pvL4Bit 低4位值(只取低4位)
+     ///   SetLow4Bit($81, $FE) = $8E
+     /// </summary>
+     class procedure SetLow4Bit(var vByte: Byte; pvL4Bit:Byte);
+
+     /// <summary>
+     ///   获取低四位值
+     ///   GetLow4Bit($81) = $01
+     /// </summary>
+     class function GetLow4Bit(const pvByte:Byte): Byte;
+
+     /// <summary>
+     ///   设置高4位的值
+     ///   pvHigh4Bit 高4位值(只取高4位)
+     ///   SetHigh4Bit($81, $FE) = $F1
+     /// </summary>
+     class procedure SetHigh4Bit(var vByte: Byte; pvHigh4Bit: Byte);
   end;
 
 implementation
@@ -119,6 +160,27 @@ const
   U1 :UInt64 = 1;
 
 
+
+class procedure TByteTools.AppendBufToFile(pvBuf:Pointer; pvBufLength:Integer;
+    pvFileName:string);
+var
+  lvStream:TFileStream;
+begin
+  if FileExists(pvFileName) then
+  begin
+    lvStream := TFileStream.Create(pvFileName, fmOpenWrite);
+  end else
+  begin
+    lvStream := TFileStream.Create(pvFileName, fmCreate);
+  end;
+  try
+    lvStream.Seek(0, soEnd);
+    lvStream.WriteBuffer(pvBuf^, pvBufLength);
+  finally
+    lvStream.Free;
+  end;
+
+end;
 
 class function TByteTools.BufShowAsString(pvBuf:Pointer; pvBufLength:Integer):
     String;
@@ -162,6 +224,12 @@ begin
   end;
 end;
 
+class function TByteTools.GetBit(const pvByte:Byte; pvOffset:Byte): Byte;
+begin
+  Assert(pvOffset in [0..7]);
+  Result := pvByte and (1 shl pvOffset) shr pvOffset;
+end;
+
 class function TByteTools.GetBitU(pvBuf:Pointer; pvStart:Integer;
     pvLen:Integer): UInt64;
 const
@@ -181,6 +249,11 @@ begin
     j := (7 - i mod 8);
     Result := (Result shl 1) + ((b shr j) and v);
   end;
+end;
+
+class function TByteTools.GetLow4Bit(const pvByte:Byte): Byte;
+begin
+  Result := pvByte and $0F;
 end;
 
 class function TByteTools.GetUInt64(pvBuf:Pointer; pvStart, pvLen:Integer):
@@ -254,6 +327,27 @@ begin
   Result := ((c >= '0') and (c <= '9')) or ((c >= 'a') and (c <= 'f')) or ((c >= 'A') and (c <= 'F'));
 end;
 
+class procedure TByteTools.SetBit(var vByte: Byte; pvOffset, pvBitValue: Byte);
+begin
+  Assert(pvOffset in [0..7]);
+  Assert(pvBitValue in [0,1]);
+
+  if pvBitValue = 0 then
+    vByte := vByte and Byte(((1 shl pvOffset) xor $FFFFFFFF))
+  else
+    vByte := vByte or (1 shl pvOffset);
+end;
+
+class procedure TByteTools.SetHigh4Bit(var vByte: Byte; pvHigh4Bit: Byte);
+begin
+  vByte := (vByte and $0F) OR (pvHigh4Bit and $F0);
+end;
+
+class procedure TByteTools.SetLow4Bit(var vByte: Byte; pvL4Bit:Byte);
+begin
+  vByte := (vByte and $F0) OR (pvL4Bit and $0F);
+end;
+
 
 class function TByteTools.swap16(const v): Word;
 begin
@@ -262,7 +356,17 @@ begin
   PByte(IntPtr(@result) + 1)^ := PByte(@v)^;
 end;
 
-class function TByteTools.swap32(v: Integer): Integer;
+class function TByteTools.swap16(const v: Word): Word;
+var
+  lvPByte : PByte;
+begin
+  result := v;
+  lvPByte := PByte(@result);
+  PByte(lvPByte)^ := byte(v shr 8);
+  PByte(IntPtr(lvPByte) + 1)^ := byte(v);
+end;
+
+class function TByteTools.swap32(const v: Integer): Integer;
 var
   lvPByte : PByte;
 begin
@@ -274,7 +378,7 @@ begin
   PByte(IntPtr(lvPByte) + 3)^ := byte(v);
 end;
 
-class function TByteTools.swap64(v: int64): Int64;
+class function TByteTools.swap64(const v: int64): Int64;
 var
   lvPByte : PByte;
 begin

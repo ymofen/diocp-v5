@@ -173,7 +173,7 @@ type
     ///  2: 解码到请求体
     /// </returns>
     /// <param name="pvByte"> (Byte) </param>
-    function InputBuffer(pvByte:Byte): Integer;
+    function InputBuffer(const pvByte: Byte): Integer;
 
     procedure ContentSaveToFile(pvFile:String);
 
@@ -1322,7 +1322,7 @@ begin
   Result := FRequestCookieList;
 end;
 
-function THttpRequest.InputBuffer(pvByte:Byte): Integer;
+function THttpRequest.InputBuffer(const pvByte: Byte): Integer;
 
   procedure InnerCaseZero;
   begin

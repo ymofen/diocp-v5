@@ -190,4 +190,6 @@ DIOCP-v5 0.0.2
    * 优化在非池模式下面可能产生的AV的bug
    (感谢小白)
       
+38: 2016-10-07 21:11:56
+   * HTTP加入WebSocket支持(感谢小白), 使用方法参见(samples\DIOCPHttpServer)
     

@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 62
     Width = 856
     Height = 330
-    ActivePage = TabSheet1
+    ActivePage = tsWebSocket
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -93,6 +93,28 @@ object frmMain: TfrmMain
         Caption = 'URLEncode'
         TabOrder = 3
         OnClick = btnURLEncodeClick
+      end
+    end
+    object tsWebSocket: TTabSheet
+      Caption = 'WebSocket'
+      ImageIndex = 3
+      object mmoWebSocketData: TMemo
+        Left = 3
+        Top = 3
+        Width = 358
+        Height = 158
+        Lines.Strings = (
+          #25512#36865#20449#24687#21040#23458#25143#31471)
+        TabOrder = 0
+      end
+      object btnWebSocketPush: TButton
+        Left = 380
+        Top = 3
+        Width = 137
+        Height = 25
+        Caption = 'WebSocket'#25512#36865
+        TabOrder = 1
+        OnClick = btnWebSocketPushClick
       end
     end
   end
@@ -208,5 +230,11 @@ object frmMain: TfrmMain
     OnTimer = tmrHeartTimer
     Left = 528
     Top = 144
+  end
+  object tmrWebSocketPing: TTimer
+    Interval = 10000
+    OnTimer = tmrWebSocketPingTimer
+    Left = 400
+    Top = 200
   end
 end

@@ -7,7 +7,8 @@ uses
   uRunTimeINfoTools in '..\Common\Frames\uRunTimeINfoTools.pas',
   superobject in 'superobject.pas',
   diocp.ex.SimpleMsgPackSession in 'diocp.ex.SimpleMsgPackSession.pas',
-  SimpleMsgPack in 'SimpleMsgPack.pas';
+  SimpleMsgPack in 'SimpleMsgPack.pas',
+  utils_websocket in '..\..\source\utils_websocket.pas';
 
 {$R *.res}
 

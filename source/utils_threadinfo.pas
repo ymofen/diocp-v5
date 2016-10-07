@@ -294,7 +294,7 @@ end;
 
 procedure TThreadInfoObject.SetHintInfo(const Value: string);
 begin
-  Lock();  
+  Lock();
   FHintInfo := Value;
   UnLock;
 end;
