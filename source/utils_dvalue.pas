@@ -36,21 +36,6 @@ type
 
   TDValueException = class(Exception);
 
-{$if (sizeof(Char) = 1)}
-  {$IFDEF FPC}
-  DStringW = UnicodeString;
-  {$ELSE}
-  DStringW = WideString;
-  {$ENDIF}
-  DCharW = WideChar;
-  PDCharW = PWideChar;
-  PDStringW = ^DStringW;
-{$else}
-  DCharW = Char;
-  PDCharW = PChar;
-  DStringW = string;
-  PDStringW = ^DStringW;
-{$ifend}
 
 
   PInterface = ^IInterface;
