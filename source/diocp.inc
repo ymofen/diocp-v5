@@ -1,4 +1,4 @@
-ï»¿{$DEFINE DIOCP}
+{$DEFINE DIOCP}
 
 {$IFDEF DEBUG}
   {$DEFINE DEBUG_ON}
@@ -13,7 +13,7 @@
 // http://delphi.wikia.com/wiki/Borland_Compiler_Conditional_Defines
 // CodeGear Delphi 2007 for Win32	11.0	VER180 and VER185	  18, 18.5
 {$IF defined(FPC) or (RTLVersion>=18))}
-  {$IFNDEF DEBUG}     // INLINEä¸å¥½è°ƒè¯•
+  {$IFNDEF DEBUG}     // INLINE²»ºÃµ÷ÊÔ
     {$DEFINE HAVE_INLINE}
   {$ENDIF}
 {$ELSE}

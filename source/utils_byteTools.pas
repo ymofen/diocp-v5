@@ -68,12 +68,15 @@ type
      /// </summary>
      class function swap64(const v: int64): Int64;
 
+     {$if CompilerVersion >= 18} //after delphi 2007
      /// <summary>
      ///   高低位进行交换
      /// </summary>
      class function swap16(const v):Word; overload;
+     {$ifend}
 
      class function swap16(const v:Word):Word; overload;
+
 
 
      class function SwapBuff(buf: Pointer; offset, len: Integer): Integer;
@@ -348,13 +351,14 @@ begin
   vByte := (vByte and $F0) OR (pvL4Bit and $0F);
 end;
 
-
+{$if CompilerVersion >= 18} //after delphi 2007
 class function TByteTools.swap16(const v): Word;
 begin
   // FF, EE : EE->1, FF->2
   PByte(@result)^ := PByte(IntPtr(@v) + 1)^;
   PByte(IntPtr(@result) + 1)^ := PByte(@v)^;
 end;
+{$ifend}
 
 class function TByteTools.swap16(const v: Word): Word;
 var
@@ -365,6 +369,7 @@ begin
   PByte(lvPByte)^ := byte(v shr 8);
   PByte(IntPtr(lvPByte) + 1)^ := byte(v);
 end;
+
 
 class function TByteTools.swap32(const v: Integer): Integer;
 var

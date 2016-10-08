@@ -18,6 +18,10 @@ uses
 type
   T5x4LongWordRecord = array [0..4] of LongWord;
 
+  {$if CompilerVersion < 18} //before delphi 2007
+  TBytes = array of Byte;
+  {$ifend}
+
 function SHA1Bin(const S: AnsiString): TBytes; overload;
 function SHA1Bin(Stream: TStream): TBytes; overload;
 function SHA1Str(const S: AnsiString): AnsiString; overload;

@@ -88,7 +88,7 @@ var
   Bin: TBytes;
 begin
   Key := pvWebSocketKey + MHSTR;
-  Bin := SHA1Bin(Key);
+  Bin := TBytes(SHA1Bin(Key));
   Result := Base64Encode(@Bin[0], Length(Bin));
 end;
 
@@ -230,7 +230,7 @@ begin
   begin 
     if (FPlayload = 126) then
     begin  // ½âÂë³¤¶È
-      FContentLength := TByteTools.swap16(FBuffer.MemoryBuffer(2)^);//  Ord(SrcData[2]) shl 8 + Ord(SrcData[3])
+      FContentLength := TByteTools.swap16(PWord(FBuffer.MemoryBuffer(2))^);//  Ord(SrcData[2]) shl 8 + Ord(SrcData[3])
     end else if (FPlayload = 127) then
     begin
       FContentLength := TByteTools.swap64(PInt64(FBuffer.MemoryBuffer(2))^);  //   Swap64(PInt64(@SrcData[2])^);
