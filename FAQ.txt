@@ -60,3 +60,6 @@ A: Diocp在DEBUG模式会记录详细日志。可以把DEBUG模式关闭
    
 Q: 编码层逻辑处理的方式
 A: 编码层默认由接收数据的IOCP线程处理，这样会占用iocp接收网络io的资源，可以通过定义工程宏[QDAC_QWorker]由QWorker来处理逻辑(需要引用QWorkers单元)，[DIOCP_Task]有DiocpTask来处理逻辑(2016-07-19修改)
+
+Q: 怎么样将提高DIOCP速度
+A: 在工程属性中定义[DIOCP_HIGH_SPEED]宏(Project->Options->Directories/Conditionals->Conditional defines)

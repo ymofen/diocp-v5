@@ -24,3 +24,7 @@
 {.$DEFINE D6} 
 {$ifend}
 
+
+{$IFDEF DIOCP_HIGH_SPEED}
+  {$UNDEF DIOCP_DEBUG}
+{$ENDIF}

@@ -524,18 +524,33 @@ type
     /// </summary>
     FContextType:Integer;
 
+
+    /// 是否正在处理请求
+    FIsProcessRequesting:Boolean;
+    
+    /// 请求的任务队列
+    FRequestQueue:TSimpleQueue;
+
     /// <summary>
     ///   必须单线程操作
     /// </summary>
     FBlockBuffer: TBlockBuffer;
     FHttpState: TDiocpHttpState;
     FCurrentRequest: TDiocpHttpRequest;
+
+    /// <summary>
+    ///   清理请求列表中的对象
+    /// </summary>
+    procedure ClearTaskListRequest;
+
     {$IFDEF QDAC_QWorker}
     procedure OnExecuteJob(pvJob:PQJob);
     {$ENDIF}
     {$IFDEF DIOCP_Task}
     procedure OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
     {$ENDIF}
+
+    procedure InnerDoARequest(pvRequest:TDiocpHttpRequest);
 
     // 执行事件
     procedure DoRequest(pvRequest:TDiocpHttpRequest);
@@ -726,6 +741,9 @@ implementation
 uses
   ComObj;
 
+var
+  __debug_tag:Integer;
+
 function FixHeader(const Header: string): string;
 begin
   Result := Header;
@@ -769,7 +787,8 @@ begin
 
   Result := Result + 'Server: DIOCP-V5/1.0'#13#10;
 
-end;
+end;      
+
 
 procedure TDiocpHttpRequest.Clear;
 begin
@@ -1501,12 +1520,37 @@ begin
   inherited Create;
   FBlockBuffer := TBlockBuffer.Create(nil);
   FBlockBuffer.OnBufferWrite := OnBlockBufferWrite;
+  FRequestQueue := TSimpleQueue.Create();
 end;
 
 destructor TDiocpHttpClientContext.Destroy;
 begin
   FBlockBuffer.Free;
+
+  ClearTaskListRequest;
+  
+  FRequestQueue.Free;
   inherited Destroy;
+end;
+
+procedure TDiocpHttpClientContext.ClearTaskListRequest;
+var
+  lvTask:TDiocpHttpRequest;
+begin
+  self.Lock;
+  try
+    while True do
+    begin
+      lvTask := TDiocpHttpRequest(FRequestQueue.DeQueue);
+      if lvTask = nil then Break;
+
+      // 归还到任务池
+      lvTask.Close;
+    end;
+    FIsProcessRequesting := False;
+  finally
+    self.UnLock;
+  end;  
 end;
 
 procedure TDiocpHttpClientContext.DoCleanUp;
@@ -1521,6 +1565,8 @@ begin
   FBlockBuffer.CheckThreadNone;
   FBlockBuffer.ClearBuffer;
 
+  // 清理待处理请求队列
+  ClearTaskListRequest;
 
   FContextType:= 0;
 
@@ -1528,50 +1574,51 @@ end;
 
 procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
 begin
-   {$IFDEF INNER_IOCP_PROCESSOR}
-      try
-        pvRequest.AddDebugStrings('DoRequest::' + pvRequest.RequestURI);
+  {$IFDEF INNER_IOCP_PROCESSOR}
+  InnerDoARequest(pvRequest);
+  {$ELSE}
+  self.Lock;
+  try
+    FRequestQueue.EnQueue(pvRequest);
 
-        pvRequest.CheckThreadIn;
-
-        // 如果需要执行
-        if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
-          CurrRecvRequest.IocpWorker.checkCoInitializeEx();
-
-        // 直接触发事件
-        TDiocpHttpServer(FOwner).DoRequest(pvRequest);
-      finally
-        // 归还HttpRequest到池
-        if not pvRequest.FReleaseLater then
-        begin
-          pvRequest.CheckThreadOut;
-          pvRequest.Close;
-        end;
-      end;
-   {$ELSE}
-     {$IFDEF QDAC_QWorker}
-     Workers.Post(OnExecuteJob, pvRequest);
-     {$ELSE}
-       {$IFDEF DIOCP_TASK}
-       iocpTaskManager.PostATask(OnExecuteJob, pvRequest);
-       {$ELSE}
-       警告无处理处理逻辑方法，请定义处理宏// {$DEFINE DIOCP_TASK}
-       {$ENDIF}
-     {$ENDIF}
-   {$ENDIF}
+    if not FIsProcessRequesting then
+    begin 
+      {$IFDEF QDAC_QWorker}
+      Workers.Post(OnExecuteJob, FRequestQueue);
+      {$ELSE}
+      {$IFDEF DIOCP_TASK}
+      iocpTaskManager.PostATask(OnExecuteJob, FRequestQueue);
+      {$ELSE}
+      警告无处理处理逻辑方法，请定义处理宏// {$DEFINE DIOCP_TASK}
+      {$ENDIF}
+      {$ENDIF}
+    end;
+  finally
+    self.UnLock;
+  end;
+  {$ENDIF}
 end;
 
 procedure TDiocpHttpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
     Cardinal; pvBufferTag, pvErrorCode: Integer);
+{$IFDEF DIOCP_DEBUG}
 var
   r:Integer;
+{$ENDIF}
 begin
   inherited;
-  if pvBufferTag = BLOCK_BUFFER_TAG then
+  {$IFDEF DIOCP_DEBUG}
+  if pvBufferTag >= BLOCK_BUFFER_TAG then
   begin
-    r := ReleaseRef(pvBuffer);
+    r := ReleaseRef(pvBuffer, Format('- DoSendBufferCompleted(%d)', [pvBufferTag]));
     PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
   end;
+  {$ELSE}
+  if pvBufferTag >= BLOCK_BUFFER_TAG then
+  begin
+    ReleaseRef(pvBuffer);
+  end;
+  {$ENDIF}
 end;
 
 procedure TDiocpHttpClientContext.FlushResponseBuffer;
@@ -1580,19 +1627,75 @@ begin
   FBlockBuffer.FlushBuffer;
 end;
 
+procedure TDiocpHttpClientContext.InnerDoARequest(pvRequest: TDiocpHttpRequest);
+var
+  lvObj:TDiocpHttpRequest;
+begin
+  lvObj := pvRequest;
+  try
+    // 连接已经断开, 放弃处理逻辑
+    if (Self = nil) then Exit;
+
+    // 连接已经断开, 放弃处理逻辑
+    if (FOwner = nil) then Exit;
+
+    lvObj.CheckThreadIn;
+
+    lvObj.AddDebugStrings('DoRequest::' + pvRequest.RequestURI);
+
+    // 已经不是当时请求的连接， 放弃处理逻辑
+    if lvObj.FContextDNA <> self.ContextDNA then
+    begin
+     Exit;
+    end;
+
+    if Self.LockContext('HTTP逻辑处理...', Self) then
+    try
+     // 触发事件
+     TDiocpHttpServer(FOwner).DoRequest(lvObj);
+    finally
+     self.UnLockContext('HTTP逻辑处理...', Self);
+    end;
+  finally
+    lvObj.CheckThreadOut;
+    // 归还HttpRequest到池
+    if not lvObj.FReleaseLater then
+    begin
+      //lvObj.CheckThreadOut;
+      lvObj.Close;
+    end;
+  end;
+end;
+
 procedure TDiocpHttpClientContext.OnBlockBufferWrite(pvSender:TObject;
     pvBuffer:Pointer; pvLength:Integer);
+{$IFDEF DIOCP_DEBUG}
 var
-  r :Integer;
+  r , n:Integer;
+{$ENDIF}
 begin
   if not Self.Active then Exit;
-  r := AddRef(pvBuffer);
-  //PrintDebugString(Format('+ %x: %d', [IntPtr(pvBuffer), r]));
+  {$IFDEF DIOCP_DEBUG}
+  n := BLOCK_BUFFER_TAG + AtomicIncrement(__debug_tag);
+  if n < BLOCK_BUFFER_TAG then
+  begin
+    __debug_tag := 0;
+    n := BLOCK_BUFFER_TAG + 1;
+  end;
+  r := AddRef(pvBuffer, Format('+ OnBlockBufferWrite(%d)', [n]));
+  PrintDebugString(Format('+ %2x: %d', [IntPtr(pvBuffer), r]));
+  if not Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, n) then
+  begin
+    r := ReleaseRef(pvBuffer, '- OnBlockBufferWrite PostWSASendRequest false');
+    PrintDebugString(Format('- %2x: %d', [IntPtr(pvBuffer), r]));
+  end;
+  {$ELSE}
+  AddRef(pvBuffer);
   if not Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, BLOCK_BUFFER_TAG) then
   begin
-    r := ReleaseRef(pvBuffer);
-    PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
+     ReleaseRef(pvBuffer);
   end;
+  {$ENDIF}
 end;
 
 {$IFDEF QDAC_QWorker}
@@ -1600,41 +1703,34 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvJob:PQJob);
 var
   lvObj:TDiocpHttpRequest;
 begin
-  // 无论如何都要归还HttpRequest到池
-  lvObj := TDiocpHttpRequest(pvJob.Data);
+  //取出一个任务
+  self.Lock;
   try
-     // 连接已经断开, 放弃处理逻辑
-     if (Self = nil) then Exit;
-
-     // 连接已经断开, 放弃处理逻辑
-     if (FOwner = nil) then Exit;
-
-     lvObj.CheckThreadIn;
-
-      // 如果需要执行
-      if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
-        pvJob.Worker.ComNeeded();
-
-     // 已经不是当时请求的连接， 放弃处理逻辑
-     if lvObj.FContextDNA <> self.ContextDNA then
-     begin
-       Exit;
-     end;
-
-     if Self.LockContext('HTTP逻辑处理...', Self) then
-     try
-       // 触发事件
-       TDiocpHttpServer(FOwner).DoRequest(lvObj);
-     finally
-       self.UnLockContext('HTTP逻辑处理...', Self);
-     end;
+    if FIsProcessRequesting then Exit;
+    FIsProcessRequesting := True;
   finally
-    lvObj.CheckThreadOut;
-    // 归还HttpRequest到池
-    if not lvObj.FReleaseLater then
-    begin
-      lvObj.Close;
+    self.UnLock;
+  end;
+
+  // 如果需要执行
+  if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+    pvJob.Worker.ComNeeded();
+
+  while (Self.Active) do
+  begin
+    //取出一个任务
+    self.Lock;
+    try
+      lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
+      if lvObj = nil then
+      begin
+        FIsProcessRequesting := False;
+        Break;
+      end;
+    finally
+      self.UnLock;
     end;
+    InnerDoARequest(lvObj);
   end;
 end;
 
@@ -1645,43 +1741,38 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
 var
   lvObj:TDiocpHttpRequest;
 begin
-  lvObj := TDiocpHttpRequest(pvTaskRequest.TaskData);
+  // 连接已经断开, 放弃处理逻辑
+  if (FOwner = nil) then Exit;
+    
+  //取出一个任务
+  self.Lock;
   try
-    // 连接已经断开, 放弃处理逻辑
-    if (Self = nil) then Exit;
-
-    // 连接已经断开, 放弃处理逻辑
-    if (FOwner = nil) then Exit;
-
-    lvObj.CheckThreadIn;
-
-    // 如果需要执行
-    if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
-      pvTaskRequest.iocpWorker.checkCoInitializeEx();
-
-     // 已经不是当时请求的连接， 放弃处理逻辑
-     if lvObj.FContextDNA <> self.ContextDNA then
-     begin
-       Exit;
-     end;
-
-     if Self.LockContext('HTTP逻辑处理...', Self) then
-     try
-       // 触发事件
-       TDiocpHttpServer(FOwner).DoRequest(lvObj);
-     finally
-       self.UnLockContext('HTTP逻辑处理...', Self);
-     end;
+    if FIsProcessRequesting then Exit;
+    FIsProcessRequesting := True;
   finally
-    lvObj.CheckThreadOut;
-    // 归还HttpRequest到池
-    if not lvObj.FReleaseLater then
-    begin
-      //lvObj.CheckThreadOut;
-      lvObj.Close;
-    end;
+    self.UnLock;
   end;
 
+  // 如果需要执行
+  if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+    pvTaskRequest.iocpWorker.checkCoInitializeEx();
+
+  while (Self.Active) do
+  begin
+    //取出一个任务
+    self.Lock;
+    try
+      lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
+      if lvObj = nil then
+      begin
+        FIsProcessRequesting := False;
+        Break;
+      end;
+    finally
+      self.UnLock;
+    end;
+    InnerDoARequest(lvObj);
+  end;
 end;
 {$ENDIF}
 
@@ -1932,8 +2023,9 @@ var
   lvOptCode:Byte;
 begin
   lvContext := pvRequest.Connection;
-  lvContext.BeginBusy;
+  lvContext.CheckThreadIn;
   try
+    lvContext.BeginBusy;
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
       try
@@ -1991,6 +2083,7 @@ begin
     end;
   finally
     lvContext.EndBusy;
+    lvContext.CheckThreadOut;
     SetCurrentThreadInfo('结束Http::DoRequest');
     //pvRequest.Connection.SetRecvWorkerHint('DoRequest:: end');
   end;

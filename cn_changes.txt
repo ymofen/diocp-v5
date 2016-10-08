@@ -192,4 +192,8 @@ DIOCP-v5 0.0.2
       
 38: 2016-10-07 21:11:56
    * HTTP加入WebSocket支持(感谢小白), 使用方法参见(samples\DIOCPHttpServer)
+   
+   
+39: 2016-10-08 14:14:18 
+   修复utils_bufferPool可能会重复释放的BUG
     

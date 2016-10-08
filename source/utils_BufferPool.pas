@@ -23,7 +23,7 @@ uses
   , Windows
   {$ELSE}
 
-  {$ENDIF};
+  {$ENDIF}, Math;
 
 {$IFNDEF DEBUG}     // INLINE不好调试
 {$IF defined(FPC) or (RTLVersion>=18))}
@@ -33,15 +33,26 @@ uses
 
 // 进行调试
 {.$UNDEF HAVE_INLINE}
+{.$DEFINE DIOCP_DEBUG}
+
+{$IFDEF DIOCP_HIGH_SPEED}
+  {$UNDEF DIOCP_DEBUG}
+{$ENDIF}
+
 
 const
   block_flag :Word = $1DFB;
+  STRING_EMPTY:String = '';
 
 {$IFDEF DEBUG}
   protect_size = 8;
 {$ELSE}
   // 如果增加 则初始化时要进行填充
   protect_size = 0;
+{$ENDIF}
+
+{$IFDEF DIOCP_DEBUG}
+  BLOCK_DEBUG_HINT_LENGTH = 4096;
 {$ENDIF}
 
 type
@@ -73,14 +84,22 @@ type
 
   TBufferBlock = record
     flag: Word;
+
     refcounter :Integer;
     next: PBufferBlock;
     owner: PBufferPool;
     data: Pointer;
-    data_free_type:Byte; // 0,
+    data_free_type:Byte; // 0
 
+    {$IFDEF DIOCP_DEBUG}
+    __debug_lock:Integer;
+    __debug_hint:array[0..BLOCK_DEBUG_HINT_LENGTH -1] of Char;
+    __debug_hint_pos:Integer;
+    {$ENDIF}
     __debug_flag:Byte;
+
   end;
+
 
   TBufferNotifyEvent = procedure(pvSender: TObject; pvBuffer: Pointer; pvLength:
       Integer) of object;
@@ -123,20 +142,23 @@ function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
 procedure FreeBufferPool(buffPool:PBufferPool);
 
 function GetBuffer(ABuffPool:PBufferPool): PByte;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
-procedure FreeBuffer(pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean=True);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+procedure FreeBuffer(const pvBuffer:PByte; const pvHint: string; pvReleaseAttachDataAtEnd:Boolean=True);overload; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+procedure FreeBuffer(const pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean=True);overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 /// <summary>
 ///   对内存块进行引用计数
 /// </summary>
-function AddRef(const pvBuffer:PByte): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AddRef(const pvBuffer:PByte; const pvHint: string): Integer;overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AddRef(const pvBuffer:PByte): Integer;overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 /// <summary>
 ///   减少对内存块的引用
 ///   为0时，释放data数据
 /// </summary>
-function ReleaseRef(const pvBuffer:PByte): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
-function ReleaseRef(const pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
-    Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+function ReleaseRef(const pvBuffer: PByte; const pvHint: string): Integer;overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function ReleaseRef(const pvBuffer: PByte): Integer;overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function ReleaseRef(const pvBuffer: Pointer; pvReleaseAttachDataAtEnd: Boolean;
+    const pvHint: string): Integer;overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 
 /// <summary>
@@ -187,7 +209,13 @@ procedure FreeObject(AObject: TObject); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
+
+
+
 implementation
+
+var
+  __debug_dna:Integer;
 
 procedure FreeObject(AObject: TObject);
 begin
@@ -207,7 +235,55 @@ begin
   {$ENDIF};
 end;
 
-procedure ReleaseAttachData(pvBlock:PBufferBlock); {$IFDEF HAVE_INLINE} inline;{$ENDIF} 
+{$IFDEF DIOCP_DEBUG}
+procedure InnerAddBlockHint(const pvBlock:PBufferBlock; const pvHint:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+var
+  lvPtr:PChar;
+  l:Integer;
+  lvStr:string;
+begin
+  if Length(pvHint) = 0 then Exit;
+  lvPtr := PChar(@pvBlock.__debug_hint[0]);
+  SpinLock(pvBlock.__debug_lock);
+  try
+    if ((pvBlock.__debug_hint_pos + 1 + 2) >= BLOCK_DEBUG_HINT_LENGTH) then
+    begin
+      pvBlock.__debug_hint_pos := 0;
+    end;
+
+    if pvBlock.__debug_hint_pos > 0 then
+    begin
+      Inc(lvPtr, pvBlock.__debug_hint_pos);
+      lvPtr^ := #13;
+      Inc(lvPtr);
+      lvPtr^ := #10;
+      Inc(lvPtr);
+      Inc(pvBlock.__debug_hint_pos, 2);
+    end;
+
+    lvStr := IntToStr(pvBlock.refcounter) + ':';
+    l := Length(lvStr);
+    Move(PChar(lvStr)^, lvPtr^, l);
+    Inc(lvPtr, l);
+    Inc(pvBlock.__debug_hint_pos, l);
+
+    l := Length(pvHint);
+    if l > (BLOCK_DEBUG_HINT_LENGTH - pvBlock.__debug_hint_pos) - 1  then
+    begin
+      l := (BLOCK_DEBUG_HINT_LENGTH - pvBlock.__debug_hint_pos) - 1;
+    end;
+    Move(PChar(pvHint)^, lvPtr^, l);
+    Inc(lvPtr, l);
+    Inc(pvBlock.__debug_hint_pos, l);
+
+    lvPtr^ := #0;
+  finally
+    SpinUnLock(pvBlock.__debug_lock);
+  end;
+end;
+{$ENDIF}
+
+procedure ReleaseAttachData(pvBlock:PBufferBlock); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 begin
   if pvBlock.data <> nil then
   begin
@@ -356,6 +432,11 @@ begin
     lvBuffer.owner := ABuffPool;
     lvBuffer.flag := block_flag;
     lvBuffer.__debug_flag := 0;
+    
+    {$IFDEF DIOCP_DEBUG}
+    lvBuffer.__debug_lock := 0;
+    lvBuffer.__debug_hint_pos := 0;
+    {$ENDIF}
 
 
     AtomicIncrement(ABuffPool.FSize);
@@ -367,6 +448,10 @@ begin
 
   lvBuffer.__debug_flag := 1;
 
+  {$IFDEF DIOCP_DEBUG}
+  InnerAddBlockHint(lvBuffer, '* GetBuffer');
+  {$ENDIF}
+
   Inc(Result, BLOCK_HEAD_SIZE);
   AtomicIncrement(ABuffPool.FGet);
 end;
@@ -374,13 +459,20 @@ end;
 /// <summary>
 ///  释放内存块到Owner的列表中
 /// </summary>
-procedure InnerFreeBuffer(pvBufBlock:PBufferBlock);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+procedure InnerFreeBuffer(pvBufBlock: PBufferBlock; const pvHint: string);
 var
   lvBuffer:PBufferBlock;
   lvOwner:PBufferPool;
 begin
-  Assert(pvBufBlock.__debug_flag <> 0, '多次归还');
+  if pvBufBlock.__debug_flag = 0 then
+  begin
+    Assert(pvBufBlock.__debug_flag <> 0, '多次归还');
+  end;
   pvBufBlock.__debug_flag := 0;
+
+  {$IFDEF DIOCP_DEBUG}
+  InnerAddBlockHint(pvBufBlock, '# FreeBuff' + pvHint);
+  {$ENDIF}
 
   lvOwner := pvBufBlock.owner;
   {$IFDEF USE_MEM_POOL}
@@ -405,9 +497,12 @@ begin
   AtomicIncrement(lvOwner.FPut);
 end;
 
-
-
 function AddRef(const pvBuffer:PByte): Integer;
+begin
+  Result := AddRef(pvBuffer, STRING_EMPTY);
+end;
+
+function AddRef(const pvBuffer:PByte; const pvHint: string): Integer;
 var
   lvBuffer:PByte;
   lvBlock:PBufferBlock;
@@ -416,21 +511,35 @@ begin
   Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
 
+  if lvBlock.__debug_flag = 0 then
+  begin
+    Assert(lvBlock.__debug_flag <> 0, '已经归还, 不能进行AddRef');
+  end;
+
   Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
   Result := AtomicIncrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FAddRef);
 
+  {$IFDEF DIOCP_DEBUG}
+  InnerAddBlockHint(lvBlock, pvHint);
+  {$ENDIF}
+  
   // 不加会被优化掉(DX10)
   Assert(Result > 0, 'error');
 end;
 
-function ReleaseRef(const pvBuffer:PByte): Integer;
+function ReleaseRef(const pvBuffer: PByte): Integer;
 begin
-  Result := ReleaseRef(pvBuffer, True);
+  Result := ReleaseRef(pvBuffer, True, STRING_EMPTY);
 end;
 
-function ReleaseRef(const pvBuffer:Pointer; pvReleaseAttachDataAtEnd:Boolean):
-    Integer; overload;
+function ReleaseRef(const pvBuffer: PByte; const pvHint: string): Integer;
+begin
+  Result := ReleaseRef(pvBuffer, True, pvHint);
+end;
+
+function ReleaseRef(const pvBuffer: Pointer; pvReleaseAttachDataAtEnd: Boolean;
+    const pvHint: string): Integer;
 var
   lvBuffer:PByte;
   lvBlock:PBufferBlock;
@@ -441,11 +550,17 @@ begin
   Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
   Result := AtomicDecrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FReleaseRef);
-  if lvBlock.refcounter = 0 then
+
+  {$IFDEF DIOCP_DEBUG}
+  InnerAddBlockHint(lvBlock, pvHint);
+  {$ENDIF}
+
+  //if lvBlock.refcounter = 0 then
+  if Result = 0 then  
   begin
     if pvReleaseAttachDataAtEnd then
       ReleaseAttachData(lvBlock);
-    InnerFreeBuffer(lvBlock);
+    InnerFreeBuffer(lvBlock, pvHint);
   end else if Result < 0 then
   begin          // error(不能小于0，如果小于0，则出现了严重问题)
     Assert(Result >= 0, Format('DBuffer error release ref:%d', [lvBlock.refcounter]));
@@ -586,8 +701,12 @@ begin
 end;
 
 
+procedure FreeBuffer(const pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean=True);overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+  FreeBuffer(pvBuffer, STRING_EMPTY, pvReleaseAttachDataAtEnd);
+end;
 
-procedure FreeBuffer(pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean);
+procedure FreeBuffer(const pvBuffer:PByte; const pvHint: string; pvReleaseAttachDataAtEnd:Boolean);
 var
   lvBuffer:PByte;
   lvBlock:PBufferBlock;
@@ -601,7 +720,7 @@ begin
   {$ENDIF}
   if pvReleaseAttachDataAtEnd then
     ReleaseAttachData(lvBlock);
-  InnerFreeBuffer(lvBlock);
+  InnerFreeBuffer(lvBlock, pvHint);
 end;
 
 function CheckBlockBufferBounds(pvBuffer: Pointer): Integer;
@@ -648,6 +767,10 @@ begin
 
 end;
 
+
+
+
+
 procedure TBlockBuffer.Append(pvBuffer: Pointer; pvLength: Integer);
 var
   l, r:Integer;
@@ -689,20 +812,26 @@ begin
 end;
 
 procedure TBlockBuffer.FlushBuffer;
+{$IFDEF DIOCP_DEBUG}
+var
+  r, n:Integer;
+{$ENDIF}
 begin
   if FBuffer = nil then Exit;
   try
     if (Assigned(FOnBufferWrite) and (FSize > 0)) then
     begin
-      AddRef(FBuffer);    // 避免事件中没有使用引用计数，不释放buf
+      {$IFDEF DIOCP_DEBUG}n := AtomicIncrement(__debug_dna){$ENDIF};
+      {$IFDEF DIOCP_DEBUG}r := {$ENDIF}AddRef(FBuffer{$IFDEF DIOCP_DEBUG}, Format('+ FlushBuffer(%d)', [n]){$ENDIF});    // 避免事件中没有使用引用计数，不释放buf
       try
+        {$IFDEF DIOCP_DEBUG}PrintDebugString(Format('+ FlushBuffer %2x: %d', [Cardinal(FBuffer), r]));{$ENDIF}
         FOnBufferWrite(self, FBuffer, FSize);
       finally
-        ReleaseRef(FBuffer);
+        ReleaseRef(FBuffer{$IFDEF DIOCP_DEBUG}, Format('- FlushBuffer(%d)', [n]){$ENDIF});
       end;
     end else
     begin
-      if FBuffer <> nil then FreeBuffer(FBuffer);
+      if FBuffer <> nil then FreeBuffer(FBuffer{$IFDEF DIOCP_DEBUG}, 'FlushBuffer - 2'{$ENDIF});
     end;
   finally
     FBuffer := nil;
@@ -776,7 +905,7 @@ procedure TBlockBuffer.ClearBuffer;
 begin
   if FBuffer = nil then Exit;
   try                        
-    if FBuffer <> nil then FreeBuffer(FBuffer);
+    if FBuffer <> nil then FreeBuffer(FBuffer, 'ClearBuffer');
   finally
     FBuffer := nil;
   end;  

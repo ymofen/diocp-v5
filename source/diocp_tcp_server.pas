@@ -30,7 +30,7 @@ unit diocp_tcp_server;
 
 
 
-{$IFDEF SPEED_TEST}
+{$IFDEF DIOCP_HIGH_SPEED}
   {$UNDEF WRITE_LOG}
   {$UNDEF DEBUG_ON}
 {$ENDIF}
@@ -4771,7 +4771,7 @@ initialization
   __innerLogger := TSafeLogger.Create();
   __innerLogger.setAppender(TLogFileAppender.Create(True));
 
-  {$IFDEF SPEED_TEST}
+  {$IFDEF DIOCP_HIGH_SPEED}
   __innerLogger.LogFilter := [lgvError, lgvWarning, lgvWriteFile];
   {$ENDIF}
 

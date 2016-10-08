@@ -197,8 +197,14 @@ var
   lvDValue:TDValue;
   lvUpgrade :String;
 begin
-
-  
+  //Randomize;
+  //Sleep(Random(2000));
+//
+//  pvRequest.Response.ResponseCode := 200;
+//  pvRequest.Response.WriteString('hello');
+//  pvRequest.SendResponse();
+//  pvRequest.DoResponseEnd;
+//  Exit;
 
   if chkRecord2File.Checked then
   begin
@@ -244,11 +250,7 @@ begin
     Exit;
   end;
 
-//  pvRequest.Response.ResponseCode := 404;
-//  pvRequest.Response.WriteString('404 not found');
-//  pvRequest.SendResponse();
-//  pvRequest.DoResponseEnd;
-//  Exit;
+
 
   if pvRequest.RequestURI = '/json' then
   begin

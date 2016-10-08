@@ -472,9 +472,7 @@ begin
     end;
   finally
     self.UnLock;
-  end;
-
-  
+  end;  
 end;
 
 procedure TIOCPCoderClientContext.DoContextAction(const pvDataObject:TObject);
