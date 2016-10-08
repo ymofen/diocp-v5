@@ -459,7 +459,7 @@ end;
 /// <summary>
 ///  释放内存块到Owner的列表中
 /// </summary>
-procedure InnerFreeBuffer(pvBufBlock: PBufferBlock; const pvHint: string);
+procedure InnerFreeBuffer(pvBufBlock: PBufferBlock; const pvHint: string);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 var
   lvBuffer:PBufferBlock;
   lvOwner:PBufferPool;
