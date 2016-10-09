@@ -237,8 +237,7 @@ object frmMain: TfrmMain
     end
   end
   object tmrHeart: TTimer
-    Enabled = False
-    Interval = 30000
+    Interval = 20000
     OnTimer = tmrHeartTimer
     Left = 528
     Top = 144

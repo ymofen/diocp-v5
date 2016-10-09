@@ -15,7 +15,7 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
-  utils_dvalue_json, utils_BufferPool, diocp_tcp_server;
+  utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools;
 
 type
   TfrmMain = class(TForm)
@@ -66,9 +66,15 @@ type
     iCounter:Integer;
     FChkSession:Boolean;
     FTcpServer: TDiocpHttpServer;
+    function DoLoadFile(pvRequest:TDiocpHttpRequest): Boolean;
     procedure refreshState;
 
     procedure OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
+
+    function WebSocketPush(const pvData: string; pvExceptContext:
+        TDiocpHttpClientContext): Integer;
+
+    function GetWebSocketCounter(pvExceptContext:TDiocpHttpClientContext): Integer;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -196,6 +202,7 @@ var
   lvBytes:TBytes;
   lvDValue:TDValue;
   lvUpgrade :String;
+  n:Integer;
 begin
   //Randomize;
   //Sleep(Random(2000));
@@ -211,6 +218,8 @@ begin
     pvRequest.SaveToFile(Format('DiocpHttpRequest_%s.req', [FormatDateTime('MMddhhnnsszzz', Now)]));
   end;
 
+  if DoLoadFile(pvRequest) then Exit;
+
 
   if pvRequest.CheckIsWebSocketRequest then
   begin    // 检测是否为WebSocket的接入请求
@@ -220,6 +229,11 @@ begin
 
     // 设置连接为WebSocket类型
     pvRequest.Connection.ContextType := Context_Type_WebSocket;
+
+    s := Format('欢迎测试WebSocket协议%s本服务已经运行:%s, 当前在线用户:%d%s  <a href="http://www.diocp.org" target="_bank">本测试环境由DIOCP提供</a>',
+      ['<br>', TRunTimeINfoTools.GetRunTimeINfo, self.GetWebSocketCounter(nil), '<br>']);
+
+    pvRequest.Connection.PostWebSocketData(s, true);
     Exit;
   end;
 
@@ -230,9 +244,13 @@ begin
 //    sfLogger.logMessage(s);
 
     // 提取字符串数据
-    s := pvRequest.WebSocketContentBuffer.DecodeUTF8;
-    
+    s := Format('来自:%s:%d的消息:%s', [pvRequest.Connection.RemoteAddr, pvRequest.Connection.RemotePort, pvRequest.WebSocketContentBuffer.DecodeUTF8]);
+
     sfLogger.logMessage(s);
+
+    n := WebSocketPush(s, pvRequest.Connection);
+
+    s := Format('您的消息已经广播给%d个终端', [n]);
 
     // 发送字符串给客户端
     pvRequest.Connection.PostWebSocketData(s, true);
@@ -556,6 +574,64 @@ begin
   FChkSession := chkUseSession.Checked;
 end;
 
+function TfrmMain.DoLoadFile(pvRequest:TDiocpHttpRequest): Boolean;
+var
+  lvDefaultFile:string;
+  lvExt:string;
+begin
+  lvDefaultFile := ExtractFilePath(ParamStr(0)) + '\webroot\' + pvRequest.RequestURI;
+
+  if FileExists(lvDefaultFile) then
+  begin
+    pvRequest.Response.ClearContent;
+    lvExt :=LowerCase(ExtractFileExt(lvDefaultFile));
+    pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
+    pvRequest.Response.LoadFromFile(lvDefaultFile);
+    pvRequest.SendResponse();
+    pvRequest.DoResponseEnd;
+    Result := True;
+  end else
+  begin
+    Result := False;
+  end;
+
+//  pvRequest.SendResponse();
+//  pvRequest.DoResponseEnd();
+end;
+
+function TfrmMain.GetWebSocketCounter(pvExceptContext:TDiocpHttpClientContext):
+    Integer;
+var
+  lvList:TList;
+  i: Integer;
+  lvContext:TDiocpHttpClientContext;
+begin
+  lvList := TList.Create;
+  try
+    FTcpServer.GetOnlineContextList(lvList);
+    Result := 0;
+
+    for i := 0 to lvList.Count - 1 do
+    begin
+       lvContext := TDiocpHttpClientContext(lvList[i]);
+       if lvContext <> pvExceptContext then
+       begin
+         if lvContext.LockContext('websocket', lvContext) then
+         try
+           if lvContext.ContextType = Context_Type_WebSocket then
+           begin
+             inc(Result);
+           end;
+         finally
+           lvContext.UnLockContext('websocket', lvContext);
+         end;
+       end;
+    end;
+  finally
+    lvList.Free;
+  end;
+end;
+
 procedure TfrmMain.tmrHeartTimer(Sender: TObject);
 begin
   FTcpServer.KickOut();
@@ -565,6 +641,41 @@ end;
 procedure TfrmMain.tmrWebSocketPingTimer(Sender: TObject);
 begin
   FTcpServer.WebSocketSendPing;
+end;
+
+function TfrmMain.WebSocketPush(const pvData: string; pvExceptContext:
+    TDiocpHttpClientContext): Integer;
+var
+  lvList:TList;
+  i: Integer;
+  lvContext:TDiocpHttpClientContext;
+begin
+  lvList := TList.Create;
+  try
+    FTcpServer.GetOnlineContextList(lvList);
+    Result := 0;
+
+    for i := 0 to lvList.Count - 1 do
+    begin
+       lvContext := TDiocpHttpClientContext(lvList[i]);
+       if lvContext <> pvExceptContext then
+       begin
+         if lvContext.LockContext('websocket', lvContext) then
+         try
+           if lvContext.ContextType = Context_Type_WebSocket then
+           begin
+             lvContext.PostWebSocketData(pvData, True);
+             inc(Result);
+           end;
+         finally
+           lvContext.UnLockContext('websocket', lvContext);
+         end;
+       end;
+    end;
+  finally
+    lvList.Free;
+  end;
+  
 end;
 
 

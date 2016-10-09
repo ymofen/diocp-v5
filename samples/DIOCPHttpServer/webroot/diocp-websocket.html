@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>websocket在线测试</title>
+    <meta content="WebSocket 在线测试 工具" name="description">
+    <meta content="WebSocket 在线测试 工具" name="keywords">
+    <link rel="stylesheet" href="./diocp-websocket_files/index.css">
+    <link rel="stylesheet" href="./diocp-websocket_files/bootstrap.min.css">
+    
+</head>
+<body mycollectionplug="bind" youdao="bind">
+    <div class="page-header">
+        <h1 style="margin-top:-20px;margin-left:20px;">WebSocket 在线测试 v13 <small>by 煌</small></h1>
+
+    </div>
+    <div>
+        <div class="zone_conn">
+            <input type="text" class="form-control" style="float:left;" id="inp_url" value="ws://123.232.98.202:9008" placeholder="连接的地址">
+            <button type="button" id="btn_conn" class="btn btn-primary" style="float:left;margin-left:10px;margin-right:10px;" onclick="fun_initWebSocket();">连接</button>
+            <button type="button" id="btn_close" class="btn btn-danger" style="float:left;" disabled="disabled" onclick="fun_close();">断开</button>
+        </div>
+        <div class="clearboth">
+            连接格式为 ws://IP:端口（示例ws://123.232.98.202:9008）<br>
+            对于<span style="color:red">内网</span>的测试环境，只需填入服务端的<span style="color:red">内网</span>IP和端口。
+        </div>
+        <div class="zone_send">
+            <a id="emoji" style="position:relative;left:374px;bottom:5px;cursor:pointer;" data-toggle="popover" title="" data-original-title="表情"><img style="outline-width:40px;" src="./diocp-websocket_files/huanglianwx_thumb.gif">表情</a>
+            <textarea id="inp_send" class="form-control" style="height:154px;" placeholder="发送的内容"></textarea>
+            <br>
+            <button type="button" id="btn_send" class="btn btn-default" onclick="fun_sendto();">发送（ctrl+回车）</button>
+            <div style="margin-top:20px;color:red;">该测试工具完全兼容IE6及以上，服务端基于完成端口的socket监听</div>
+            <div style="color:red;">服务端支持多客户端数据收发</div>            
+            <div style="color:blue;">需要完整的客户端/服务器源码请联系我</div>
+            <div style="color:blue;font-weight:900">QQ：114687576</div>
+            <div style="color:blue;font-weight:900">微信：yaohuang46</div>
+            
+            <div style="color:blue;font-weight:900">diocp群：DIOCP(Delphi iocp) 320641073</div>
+            
+        </div>
+    </div>
+    <div style="position:absolute;top:100px;left:470px;">
+        <div id="div_msgzone" class="panel panel-default">
+            <div class="panel-heading">消息窗口</div>
+            <div id="div_msg" class="panel-body" style="width: 1180px; height: 736px;"></div>
+        </div>
+    </div>
+    <script type="text/javascript" src="./diocp-websocket_files/jquery-1.9.1.min.js"></script>
+    <script type="text/javascript" src="./diocp-websocket_files/bootstrap.min.js"></script>
+    <script type="text/javascript" src="./diocp-websocket_files/index.js"></script>
+
+
+</body></html>
