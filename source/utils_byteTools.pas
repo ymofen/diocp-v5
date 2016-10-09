@@ -79,7 +79,7 @@ type
 
 
 
-     class function SwapBuff(buf: Pointer; offset, len: Integer): Integer;
+     class procedure SwapBuff(buf: Pointer; offset, len: Integer);
 
      /// <summary>
      ///   生成数据校验码
@@ -399,7 +399,7 @@ begin
   PByte(IntPtr(lvPByte) + 7)^ := byte(v); //1
 end;
 
-class function TByteTools.SwapBuff(buf: Pointer; offset, len: Integer): Integer;
+class procedure TByteTools.SwapBuff(buf: Pointer; offset, len: Integer);
 var
   lvStart, lvEnd: PByte;
   lvByte: Byte;
@@ -429,7 +429,7 @@ var
   lvPtr:PChar;
 begin
   l1 := Length(Split);
-  SetLength(Result, len * 8 + l1 * len);
+  SetLength(Result, Integer(len * 8 + l1 * len));
   lvPtr := PChar(Result);
   lvBuf := @v;
   for i := 0 to (len * 8 - 1) do

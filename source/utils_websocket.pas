@@ -35,7 +35,6 @@ const
 type
   TDiocpWebSocketFrame = class(TObject)
   private
-    FDecodeState:Integer;
     FFlag : Integer;
     FBuffer: TDBufferBuilder;
   private
@@ -168,7 +167,8 @@ begin
 
     PByte(P)^ := Ord(P^) xor lvTmpMask^;
     Inc(P);
-  end;      
+  end;
+  Result := 0;      
 end;
 
 procedure TDiocpWebSocketFrame.EncodeBuffer(const buf: Pointer; len: Int64;

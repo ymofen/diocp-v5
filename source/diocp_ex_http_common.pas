@@ -658,8 +658,7 @@ const
 var
   Rp: PChar;
   lvBuff:PByte;
-  MultibyteChar: TBytes;
-  I, ByteCount, j: Integer;
+  j: Integer;
 begin
   // Characters that require more than 1 byte are translated as "percent-encoded byte"
   // which will be encoded with 3 chars per byte -> %XX
@@ -1056,7 +1055,7 @@ procedure THttpRequest.DecodeContentAsFormUrlencoded({$IFDEF UNICODE}
     pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 var
   lvRawData : RAWString;
-  lvRawParams, s, lvName, lvValue:String;
+  s, lvName, lvValue:String;
   i:Integer;
   lvStrings:TStrings;
 begin                       
@@ -1247,7 +1246,6 @@ end;
 function THttpRequest.GetCharset: String;
 var
   lvCharset:String;
-  lvPtr:PChar;
 begin
   if FContentCharset = '-1' then
   begin

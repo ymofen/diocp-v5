@@ -426,7 +426,6 @@ type
 
   TDiocpHttpResponse = class(TObject)
   private
-    FCookieData : String;
     FDiocpContext : TDiocpHttpClientContext;
     
     FInnerResponse:THttpResponse;
@@ -740,9 +739,11 @@ implementation
 
 uses
   ComObj;
-
+  
+{$IFDEF DIOCP_DEBUG}
 var
   __debug_tag:Integer;
+{$ENDIF}
 
 function FixHeader(const Header: string): string;
 begin
@@ -884,12 +885,8 @@ begin
 end;
 
 procedure TDiocpHttpRequest.DoResponseEnd;
-var
-  lvClose:Boolean;
 begin
   FDiocpContext.FlushResponseBuffer;
-
-  lvClose := False;
   if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
     FDiocpContext.PostWSACloseRequest;
@@ -1238,7 +1235,6 @@ end;
 procedure TDiocpHttpRequest.SendResponse(pvContentLength: Integer = 0);
 var
   len: Integer;
-  s:RAWString;
 begin
   if FResponse.Header.FindByName('Connection') = nil then
   begin

@@ -272,7 +272,7 @@ type
     FRemotePort: Integer;
     FTagStr: String;
 
-    procedure AddDebugString(pvString:string);
+
     /// <summary>
     ///   在投递的接收请求响应中调用，触发接收数据事件
     /// </summary>
@@ -383,6 +383,8 @@ type
     procedure RecordWorkerStartTick;
     procedure RecordWorkerEndTick;
   public
+    
+    procedure AddDebugString(pvString:string);
 
     /// <summary>
     ///   检测当前正在工作耗用时间
@@ -648,8 +650,6 @@ type
 
   TIocpDisconnectExRequest = class(TIocpRequest)
   private
-    FOwner:TDiocpTcpServer;
-
     FContext:TIocpClientContext;
 
   protected

@@ -345,7 +345,7 @@ begin
   WriteLogOutUrl();
   pvRequest.Response.WriteString('=======================================<br>');
 
-
+  lvSession := nil;
   if FChkSession then
   begin 
     lvSession := TDiocpSimpleMsgPackSession(pvRequest.GetSession);

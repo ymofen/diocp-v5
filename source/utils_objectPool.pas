@@ -307,7 +307,6 @@ function TMaxObjectPool.CheckGetCurrentCount(pvID:String): Integer;
 var
   lvItem:TMaxPoolItem;
 begin
-  Result := 0;
   FObjMap.Lock;
   try
     lvItem :=TMaxPoolItem(FObjMap.ValueMap[pvID]);
@@ -459,6 +458,7 @@ function TMaxObjectPool.WaitForRelease(pvTimeOut:Integer): Integer;
 var
   lvTick:Cardinal;
 begin
+  Result := -1;
   lvTick := GetTickCount;
   while True do
   begin
@@ -468,7 +468,7 @@ begin
       Break;
     end else
     begin
-      if (tick_diff(lvTick, GetTickCount) >= pvTimeOut) then
+      if (tick_diff(lvTick, GetTickCount) >= Cardinal(pvTimeOut)) then
       begin
         Result := -1;
         Exit;

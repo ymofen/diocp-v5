@@ -214,8 +214,10 @@ procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 implementation
 
+{$IFDEF DIOCP_DEBUG}
 var
   __debug_dna:Integer;
+{$ENDIF}
 
 procedure FreeObject(AObject: TObject);
 begin
@@ -371,6 +373,7 @@ end;
 
 {$IFEND <XE5}
 
+{$IFDEF DEBUG}
 /// <summary>
 ///   检测一块内存是否有越界情况
 ///   false 有越界清空
@@ -395,6 +398,7 @@ begin
   end;
 
 end;
+{$ENDIF}
 
 function GetBuffer(ABuffPool:PBufferPool): PByte;
 var
@@ -612,9 +616,14 @@ begin
 end;
 
 function CheckBufferBounds(ABuffPool:PBufferPool): Integer;
+{$IFDEF DEBUG}
 var
   lvBlock:PBufferBlock;
+{$ENDIF}
 begin
+  {$IFNDEF DEBUG}
+  Result := -1;
+  {$ELSE}
   if protect_size = 0 then
   begin   // 没有保护边界的大小
     Result := -1;
@@ -637,6 +646,7 @@ begin
   SpinUnLock(ABuffPool.FSpinLock);
   {$ELSE}
   ABuffPool.FLocker.Leave;
+  {$ENDIF}
   {$ENDIF}
 end;
 
@@ -724,11 +734,14 @@ begin
 end;
 
 function CheckBlockBufferBounds(pvBuffer: Pointer): Integer;
+{$IFDEF DEBUG}
 var
   lvBuffer:PByte;
   lvBlock:PBufferBlock;
   ABuffPool:PBufferPool;
+{$ENDIF}
 begin
+  {$IFDEF DEBUG}
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
@@ -752,6 +765,9 @@ begin
   SpinUnLock(ABuffPool.FSpinLock);
   {$ELSE}
   ABuffPool.FLocker.Leave;
+  {$ENDIF}
+  {$ELSE}
+  Result := -1;
   {$ENDIF}
 end;
 

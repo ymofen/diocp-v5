@@ -214,6 +214,10 @@ resourcestring
   STRING_E_CONNECT_TIMEOUT = '与服务器(%s:%d)建立连接超时';
   STRING_E_OSException = 'System Error.  Code: %d.'+sLineBreak+'%s';
 
+  {$IFDEF POSIX}
+  SUnkOSError = 'A call to an OS function failed';
+  {$ENDIF}
+
 var
   __trace_id: Integer;
   __writeBufferPool: PBufferPool;
