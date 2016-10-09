@@ -650,6 +650,10 @@ type
 
   TIocpDisconnectExRequest = class(TIocpRequest)
   private
+    {$IFDEF WRITE_LOG}
+    FOwner: TDiocpTcpServer;
+    {$ENDIF}
+
     FContext:TIocpClientContext;
 
   protected
@@ -660,6 +664,7 @@ type
     /// </summary>
     function DirectlyPost: Boolean;
   end;
+
 
   /// <summary>
   ///   acceptEx request
@@ -2291,7 +2296,9 @@ begin
   FOwner := Value;
   //FRecvRequest.FOwner := FOwner;
   {$IFDEF SOCKET_REUSE}
+  {$IFDEF WRITE_LOG}
   FDisconnectExRequest.FOwner := FOwner;
+  {$ENDIF}
   {$ENDIF}
 end;
 
@@ -4537,7 +4544,7 @@ begin
       // do normal close;
       FContext.RawSocket.close;
       {$IFDEF WRITE_LOG}
-       FOwner.logMessage('TIocpDisconnectExRequest.PostRequest Error:%d',  [lvErrorCode]);
+      FOwner.logMessage('TIocpDisconnectExRequest.PostRequest Error:%d',  [lvErrorCode]);
       {$ENDIF}
 
       // context may return to pool
