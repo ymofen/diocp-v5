@@ -30,9 +30,18 @@ unit diocp_tcp_server;
 
 
 
+// 详细记录接收信息
+{.$DEFINE TRACE_IOCP_RECV}
+
+// 详细记录发送信息
+{.$DEFINE TRACE_IOCP_SEND}
+
+
 {$IFDEF DIOCP_HIGH_SPEED}
   {$UNDEF WRITE_LOG}
   {$UNDEF DEBUG_ON}
+  {$UNDEF TRACE_IOCP_RECV}
+  {$UNDEF TRACE_IOCP_SEND}
 {$ENDIF}
 
 
@@ -49,7 +58,10 @@ uses
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
-  utils_queues, utils_locker, utils_strings, utils_threadinfo, utils_BufferPool;
+  utils_queues, utils_locker, utils_strings, utils_threadinfo
+  
+  , utils_byteTools
+  , utils_BufferPool;
 
 const
   SOCKET_HASH_SIZE = $FFFF;
@@ -1665,6 +1677,10 @@ begin
   end;
   InnerLock;
   try
+//    {$IFDEF WRITE_LOG}
+//    FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvDebugInfo]),
+//        strRequestDisconnectFileID, lgvDebug);
+//    {$ENDIF}
     Dec(FReferenceCounter);
     Result := FReferenceCounter;
     {$IFDEF DEBUG_ON}
@@ -1706,11 +1722,10 @@ begin
 
   InnerLock;
   try
-
-  {$IFDEF WRITE_LOG}
-    FOwner.logMessage(pvDebugInfo, strRequestDisconnectFileID);
-  {$ENDIF}
-
+    {$IFDEF WRITE_LOG}
+      FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvDebugInfo]),
+        strRequestDisconnectFileID, lgvDebug);
+    {$ENDIF}
 
     FRequestDisconnect := true;
     Dec(FReferenceCounter);
@@ -3825,8 +3840,15 @@ begin
     end;
     {$ENDIF}
 
+
     Assert(FOwner <> nil);
     try
+      {$IFDEF TRACE_IOCP_RECV}
+      TByteTools.AppendBufToFile(FRecvBuffer.buf,
+        FBytesTransferred, Format('%s_%d_%s.recv',
+        [FClientContext.RemoteAddr, FClientContext.RemotePort, FormatDateTime('hhnnsszzz', Now())]));
+      {$ENDIF}
+
       FClientContext.FCurrRecvRequest := Self;
       lvDebugStep := 2;
       if (FOwner.FDataMoniter <> nil) then
@@ -4193,9 +4215,15 @@ begin
   // maybe on HandleResonse and release self
   lvOwner := FOwner;
 
+
+
   lvContext := FClientContext;
   if lvContext.incReferenceCounter('InnerPostRequest::WSASend_Start', self) then
   try
+    {$IFDEF TRACE_IOCP_SEND}
+    TByteTools.AppendBufToFile(buf, len, Format('%s_%d_%s.send', [lvContext.RemoteAddr, lvContext.RemotePort, FormatDateTime('hhnnsszzz', Now())]));
+    {$ENDIF}
+
     lvRet := WSASend(lvContext.FRawSocket.SocketHandle,
                       @FWSABuf,
                       1,

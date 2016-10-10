@@ -20,15 +20,11 @@ object frmMain: TfrmMain
     Top = 62
     Width = 856
     Height = 330
-    ActivePage = tsWebSocket
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -68,10 +64,6 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -237,17 +229,15 @@ object frmMain: TfrmMain
     end
   end
   object tmrHeart: TTimer
-    Enabled = False
-    Interval = 20000
+    Interval = 30000
     OnTimer = tmrHeartTimer
     Left = 528
     Top = 144
   end
   object tmrWebSocketPing: TTimer
-    Enabled = False
-    Interval = 10000
+    Interval = 30000
     OnTimer = tmrWebSocketPingTimer
-    Left = 400
+    Left = 424
     Top = 200
   end
 end

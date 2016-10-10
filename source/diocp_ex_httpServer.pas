@@ -118,6 +118,8 @@ type
   private
     __free_flag:Integer;
 
+    FDecodeState:Integer;
+
 
     FOwnerPool:TSafeQueue;
 
@@ -798,6 +800,7 @@ begin
   FInnerRequest.DoCleanUp;
   FInnerWebSocketFrame.DoCleanUp;
   FWebSocketContentBuffer.Clear;
+  FDecodeState := 0;
 end;
 
 procedure TDiocpHttpRequest.Close;
@@ -1169,6 +1172,7 @@ begin
   begin
     Result := FInnerRequest.InputBuffer(buf);
   end;
+  FDecodeState := Result;
 end;
 
 procedure TDiocpHttpRequest.ResponseEnd;
@@ -1566,6 +1570,7 @@ begin
 
   FContextType:= 0;
 
+
 end;
 
 procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
@@ -1799,19 +1804,26 @@ begin
     end;
     
     r := FCurrentRequest.InputBuffer(lvTmpBuf^);
+
     if r = -1 then
-    begin
+    begin                             
+      ///  不能在这里处理, responseEnd会访问TBlockWriter，造成多线程访问
+//      lvTempRequest := FCurrentRequest;
+//      try
+//        FCurrentRequest := nil;
+//        lvTempRequest.Response.FInnerResponse.ResponseCode := 400;
+//        //lvTempRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
+//        lvTempRequest.ResponseEnd;
+//      finally
+//        lvTempRequest.Close;
+//      end;
 
       lvTempRequest := FCurrentRequest;
-      try
-        FCurrentRequest := nil;
-        lvTempRequest.Response.FInnerResponse.ResponseCode := 400;
-        //lvTempRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
-        lvTempRequest.ResponseEnd;
-      finally
-        lvTempRequest.Close;
-      end;
 
+      // 避免断开后还回对象池，造成重复还回
+      FCurrentRequest := nil;
+
+      DoRequest(lvTempRequest);
 
       //self.RequestDisconnect('无效的Http请求', self);
       Exit;
@@ -2025,6 +2037,13 @@ begin
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
       try
+        if pvRequest.FDecodeState = -1 then
+        begin
+          pvRequest.Response.FInnerResponse.ResponseCode := 400;
+          pvRequest.ResponseEnd;
+          Exit;
+        end;
+        
         if lvContext.ContextType = Context_Type_WebSocket then
         begin
           lvOptCode := pvRequest.InnerWebSocketFrame.GetOptCode;
@@ -2045,7 +2064,7 @@ begin
             end;
           end;
         end else
-        begin         
+        begin
           if not FDisableSession then
             pvRequest.CheckCookieSession;
 

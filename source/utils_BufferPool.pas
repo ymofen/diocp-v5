@@ -551,7 +551,10 @@ begin
   lvBuffer := pvBuffer;
   Dec(lvBuffer, BLOCK_HEAD_SIZE);
   lvBlock := PBufferBlock(lvBuffer);
-  Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
+  if lvBlock.flag <>  block_flag then
+  begin
+    Assert(lvBlock.flag = block_flag, 'Invalid DBufferBlock');
+  end;
   Result := AtomicDecrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FReleaseRef);
 

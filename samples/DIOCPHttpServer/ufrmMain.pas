@@ -244,7 +244,10 @@ begin
 //    sfLogger.logMessage(s);
 
     // 提取字符串数据
-    s := Format('来自:%s:%d的消息:%s', [pvRequest.Connection.RemoteAddr, pvRequest.Connection.RemotePort, pvRequest.WebSocketContentBuffer.DecodeUTF8]);
+    s := Format('来自:%s:%d的消息:%s',
+        [pvRequest.Connection.RemoteAddr,
+        pvRequest.Connection.RemotePort,
+        pvRequest.WebSocketContentBuffer.DecodeUTF8]);
 
     sfLogger.logMessage(s);
 

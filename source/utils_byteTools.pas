@@ -177,6 +177,7 @@ begin
     lvStream := TFileStream.Create(pvFileName, fmCreate);
   end;
   try
+    //lvStream.Position := lvStream.Size;
     lvStream.Seek(0, soEnd);
     lvStream.WriteBuffer(pvBuf^, pvBufLength);
   finally

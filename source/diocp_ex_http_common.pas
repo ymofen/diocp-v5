@@ -1230,6 +1230,7 @@ begin
   FDecodeState := 0;
   FContentLength := -1;
   FRawHeader := '';
+  FRequestURI := '';
   FRequestRawURL := '';
   FRequestRawCookie := '-1';
   FContentType := '-1';
