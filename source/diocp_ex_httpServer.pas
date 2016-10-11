@@ -41,6 +41,7 @@ uses
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
   , diocp_tcp_server, utils_queues, utils_hashs, utils_dvalue
   , diocp_ex_http_common
+  , diocp_res
   , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
   utils_BufferPool,  utils_websocket;
 
@@ -519,6 +520,8 @@ type
   /// </summary>
   TDiocpHttpClientContext = class(TIocpClientContext)
   private
+    __free_flag:Integer;
+    
     /// <summary>
     ///   0:普通 Http连接
     ///   1:WebSocket
@@ -597,6 +600,7 @@ type
     FRequestObjCounter:Integer;
     FRequestObjOutCounter:Integer;
     FRequestObjReturnCounter:Integer;
+    FRequestQueueSize:Integer;
     FSessionObjCounter:Integer;
     
     // 内存池
@@ -889,7 +893,6 @@ end;
 
 procedure TDiocpHttpRequest.DoResponseEnd;
 begin
-  FDiocpContext.FlushResponseBuffer;
   if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
     FDiocpContext.PostWSACloseRequest;
@@ -1188,24 +1191,31 @@ procedure TDiocpHttpRequest.ResponseForWebSocketShake;
 var
   lvBuffer:AnsiString;
   lvWebSocketKey:AnsiString;
+  lvBlockBuffer:TBlockBuffer;
 begin
-  lvWebSocketKey := Header.GetValueByName('Sec-WebSocket-Key', '');   
+  lvBlockBuffer :=self.Connection.FBlockBuffer;
+  lvBlockBuffer.Lock;
+  try
+    lvWebSocketKey := Header.GetValueByName('Sec-WebSocket-Key', '');
 
-  lvBuffer := 'HTTP/1.1 101 Switching Protocols'#13#10;
-  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+    lvBuffer := 'HTTP/1.1 101 Switching Protocols'#13#10;
+    self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
 
-  lvBuffer := 'Server: DIOCP/1.1'#13#10;
-  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+    lvBuffer := 'Server: DIOCP/1.1'#13#10;
+    self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
 
-  lvBuffer := 'Upgrade: websocket'#13#10;
-  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+    lvBuffer := 'Upgrade: websocket'#13#10;
+    self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
   
-  lvBuffer := 'Connection: Upgrade'#13#10;
-  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+    lvBuffer := 'Connection: Upgrade'#13#10;
+    self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
 
-  lvBuffer := 'Sec-WebSocket-Accept: ' + GetWebSocketAccept(lvWebSocketKey) + #13#10#13#10;
-  self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
-  self.Connection.FlushResponseBuffer;
+    lvBuffer := 'Sec-WebSocket-Accept: ' + GetWebSocketAccept(lvWebSocketKey) + #13#10#13#10;
+    self.Connection.WriteResponseBuffer(PAnsiChar(lvBuffer), Length(lvBuffer));
+    self.Connection.FlushResponseBuffer;
+  finally
+    lvBlockBuffer.UnLock;
+  end;
   //HTTP/1.1 101 Switching Protocols
   //Server: DIOCP/1.1
   //Upgrade: websocket
@@ -1273,12 +1283,19 @@ begin
     Assert(False, '响应数据为空');
   end;
 
-  FDiocpContext.WriteResponseBuffer(FResponse.FInnerResponse.HeaderBuilder.Memory,
-    FResponse.FInnerResponse.HeaderBuilder.Size);
-  if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
-  begin
-    FDiocpContext.WriteResponseBuffer(FResponse.FInnerResponse.ContentBuffer.Memory,
-      FLastResponseContentLength);
+  FDiocpContext.FBlockBuffer.Lock;
+  try
+    FDiocpContext.WriteResponseBuffer(FResponse.FInnerResponse.HeaderBuilder.Memory,
+      FResponse.FInnerResponse.HeaderBuilder.Size);
+    if FResponse.FInnerResponse.ContentBuffer.Length > 0 then
+    begin
+      FDiocpContext.WriteResponseBuffer(FResponse.FInnerResponse.ContentBuffer.Memory,
+        FLastResponseContentLength);
+    end;
+
+    FDiocpContext.FlushResponseBuffer;
+  finally
+    FDiocpContext.FBlockBuffer.UnLock;
   end;
 
 //  FDiocpContext.PostWSASendRequest(FResponse.FInnerResponse.HeaderBuilder.Memory,
@@ -1521,10 +1538,13 @@ begin
   FBlockBuffer := TBlockBuffer.Create(nil);
   FBlockBuffer.OnBufferWrite := OnBlockBufferWrite;
   FRequestQueue := TSimpleQueue.Create();
+  __free_flag := 0;
 end;
 
 destructor TDiocpHttpClientContext.Destroy;
 begin
+  __free_flag := FREE_FLAG;
+  
   FBlockBuffer.Free;
 
   ClearTaskListRequest;
@@ -1544,6 +1564,8 @@ begin
       lvTask := TDiocpHttpRequest(FRequestQueue.DeQueue);
       if lvTask = nil then Break;
 
+      InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
+
       // 归还到任务池
       lvTask.Close;
     end;
@@ -1554,8 +1576,7 @@ begin
 end;
 
 procedure TDiocpHttpClientContext.DoCleanUp;
-begin                                              
-  inherited;
+begin 
   FHttpState := hsCompleted;
   if FCurrentRequest <> nil then
   begin
@@ -1565,12 +1586,11 @@ begin
   FBlockBuffer.CheckThreadNone;
   FBlockBuffer.ClearBuffer;
 
+  FContextType:= 0;
   // 清理待处理请求队列
   ClearTaskListRequest;
 
-  FContextType:= 0;
-
-
+  inherited DoCleanUp;
 end;
 
 procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
@@ -1578,9 +1598,23 @@ begin
   {$IFDEF INNER_IOCP_PROCESSOR}
   InnerDoARequest(pvRequest);
   {$ELSE}
+
+
+  if FRequestQueue.Size > 20 then
+  begin
+    try
+      pvRequest.Connection.RequestDisconnect('未处理的请求队列过大', pvRequest);
+    finally
+      pvRequest.Close;
+    end;
+    Exit;
+  end;
+
   self.Lock;
   try
     FRequestQueue.EnQueue(pvRequest);
+
+    InterlockedIncrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
 
     if not FIsProcessRequesting then
     begin 
@@ -1624,7 +1658,6 @@ end;
 
 procedure TDiocpHttpClientContext.FlushResponseBuffer;
 begin
-  //FBlockBuffer.CheckIsCurrentThread;
   FBlockBuffer.FlushBuffer;
 end;
 
@@ -1642,7 +1675,9 @@ begin
 
     lvObj.CheckThreadIn;
 
+    {$IFDEF DIOCP_DEBUG}
     lvObj.AddDebugStrings('DoRequest::' + pvRequest.RequestURI);
+    {$ENDIF}
 
     // 已经不是当时请求的连接， 放弃处理逻辑
     if lvObj.FContextDNA <> self.ContextDNA then
@@ -1704,34 +1739,47 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvJob:PQJob);
 var
   lvObj:TDiocpHttpRequest;
 begin
-  //取出一个任务
-  self.Lock;
-  try
-    if FIsProcessRequesting then Exit;
-    FIsProcessRequesting := True;
-  finally
-    self.UnLock;
-  end;
+  // 连接已经断开, 放弃处理逻辑
+  if (FOwner = nil) then Exit;
 
-  // 如果需要执行
-  if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
-    pvJob.Worker.ComNeeded();
-
-  while (Self.Active) do
+  if __free_flag = FREE_FLAG then
   begin
+    Exit;
+  end;
+  if Self.LockContext('qworker httptask', nil) then
+  try
     //取出一个任务
     self.Lock;
     try
-      lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
-      if lvObj = nil then
-      begin
-        FIsProcessRequesting := False;
-        Break;
-      end;
+      if FIsProcessRequesting then Exit;
+      FIsProcessRequesting := True;
     finally
       self.UnLock;
     end;
-    InnerDoARequest(lvObj);
+
+    // 如果需要执行
+    if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+      pvJob.Worker.ComNeeded();
+
+    while (Self.Active) do
+    begin
+      //取出一个任务
+      self.Lock;
+      try
+        lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
+        if lvObj = nil then
+        begin
+          FIsProcessRequesting := False;
+          Break;
+        end;
+        InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
+      finally
+        self.UnLock;
+      end;
+      InnerDoARequest(lvObj);
+    end;
+  finally
+    self.UnLockContext('qworker httptask', nil);
   end;
 end;
 
@@ -1744,35 +1792,43 @@ var
 begin
   // 连接已经断开, 放弃处理逻辑
   if (FOwner = nil) then Exit;
-    
-  //取出一个任务
-  self.Lock;
-  try
-    if FIsProcessRequesting then Exit;
-    FIsProcessRequesting := True;
-  finally
-    self.UnLock;
-  end;
 
-  // 如果需要执行
-  if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
-    pvTaskRequest.iocpWorker.checkCoInitializeEx();
+  if __free_flag = FREE_FLAG then Exit;
 
-  while (Self.Active) do
-  begin
+  if Self.LockContext('iocptask httptask', nil) then
+  try 
     //取出一个任务
     self.Lock;
     try
-      lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
-      if lvObj = nil then
-      begin
-        FIsProcessRequesting := False;
-        Break;
-      end;
+      if FIsProcessRequesting then Exit;
+      FIsProcessRequesting := True;
     finally
       self.UnLock;
     end;
-    InnerDoARequest(lvObj);
+
+    // 如果需要执行
+    if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
+      pvTaskRequest.iocpWorker.checkCoInitializeEx();
+
+    while (Self.Active) do
+    begin
+      //取出一个任务
+      self.Lock;
+      try
+        lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
+        if lvObj = nil then
+        begin
+          FIsProcessRequesting := False;
+          Break;
+        end;
+      finally
+        self.UnLock;
+      end;
+      InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
+      InnerDoARequest(lvObj);
+    end;
+  finally
+    self.UnLockContext('iocptask httptask', nil);
   end;
 end;
 {$ENDIF}
@@ -1919,9 +1975,13 @@ begin
   lvWSFrame := TDiocpWebSocketFrame.Create;
   try
     lvWSFrame.EncodeBuffer(pvBuffer, len, true, opcode);
-
-    WriteResponseBuffer(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
-    FlushResponseBuffer;
+    FBlockBuffer.Lock;
+    try
+      WriteResponseBuffer(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
+      FlushResponseBuffer;
+    finally
+      FBlockBuffer.UnLock;
+    end;
   finally
     lvWSFrame.Free;
   end;
@@ -1945,7 +2005,7 @@ end;
 procedure TDiocpHttpClientContext.WriteResponseBuffer(buf: Pointer; len:
     Cardinal);
 begin
- // FBlockBuffer.CheckIsCurrentThread;
+  FBlockBuffer.CheckIsCurrentThread;
   FBlockBuffer.Append(buf, len);
 end;
 
@@ -1993,8 +2053,8 @@ begin
   FRequestPool.FreeDataObject;
   FRequestPool.Clear;
   FRequestObjCounter := 0;
-  FRequestObjOutCounter := 0;
-  FRequestObjReturnCounter := 0;
+
+  ClearBufferPool(FBlockBufferPool);
 
   /// 只需要清理，清理时会归还到Session对象池
   FSessionList.Clear;
@@ -2114,8 +2174,9 @@ end;
 
 function TDiocpHttpServer.GetPrintDebugInfo: string;
 begin
-  Result := Format('Session obj:%d, httpRequest(size/out/back):%d/%d/%d, BlockBuffer(size/put/get):%d/%d/%d',
+  Result := Format(strHttpServerStateInfo,
      [Self.FSessionObjCounter,
+      FRequestQueueSize,
       FRequestObjCounter, FRequestObjOutCounter, FRequestObjReturnCounter,
      self.FBlockBufferPool.FSize, self.FBlockBufferPool.FPut, self.FBlockBufferPool.FGet]);
 end;
@@ -2131,7 +2192,9 @@ begin
       InterlockedIncrement(FRequestObjCounter);
     end;
     Assert(Result.FThreadID = 0, 'request is using');
+    {$IFDEF DIOCP_DEBUG}
     Result.AddDebugStrings('+ GetHttpRequest');
+    {$ENDIF}
     Result.FDiocpHttpServer := Self;
     Result.FOwnerPool := FRequestPool;
     Result.Clear;
@@ -2182,7 +2245,9 @@ begin
   if UseObjectPool then
   begin
     pvRequest.Clear;
+    {$IFDEF DIOCP_DEBUG}
     pvRequest.AddDebugStrings('- GiveBackRequest');
+    {$ENDIF}
     pvRequest.FOwnerPool := nil;
     pvRequest.FDiocpHttpServer := nil;
 

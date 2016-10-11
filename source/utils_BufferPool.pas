@@ -105,6 +105,12 @@ type
       Integer) of object;
   TBlockBuffer = class(TObject)
   private
+    {$IFDEF USE_SPINLOCK}
+    FSpinLock:Integer;
+    FLockWaitCounter: Integer;
+    {$ELSE}
+    FLocker:TCriticalSection;
+    {$ENDIF}
     FBlockSize: Integer;
     FThreadID: THandle;
     FSize:Integer;
@@ -119,6 +125,9 @@ type
     procedure SetBufferPool(ABufferPool: PBufferPool);
     procedure Append(pvBuffer:Pointer; pvLength:Integer);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     destructor Destroy; override;
+
+    procedure Lock();
+    procedure UnLock();
     procedure CheckThreadIn;
     procedure CheckThreadOut;
     procedure CheckThreadNone;
@@ -140,6 +149,7 @@ const
 
 function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
 procedure FreeBufferPool(buffPool:PBufferPool);
+procedure ClearBufferPool(buffPool:PBufferPool);
 
 function GetBuffer(ABuffPool:PBufferPool): PByte;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 procedure FreeBuffer(const pvBuffer:PByte; const pvHint: string; pvReleaseAttachDataAtEnd:Boolean=True);overload; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
@@ -786,6 +796,38 @@ begin
 
 end;
 
+procedure ClearBufferPool(buffPool:PBufferPool);
+var
+  lvBlock, lvNext:PBufferBlock;
+begin
+  Assert(buffPool.FGet = buffPool.FPut,
+    Format('DBuffer-%s Leak, get:%d, put:%d', [buffPool.FName, buffPool.FGet, buffPool.FPut]));
+  {$IFDEF USE_SPINLOCK}
+  SpinLock(buffPool.FSpinLock, buffPool.FLockWaitCounter);
+  {$ELSE}
+  buffPool.FLocker.Enter;
+  {$ENDIF}
+  
+  lvBlock := buffPool.FHead;
+  while lvBlock <> nil do
+  begin
+    lvNext := lvBlock.next;
+    ReleaseAttachData(lvBlock);
+    FreeMem(lvBlock);
+    lvBlock := lvNext;
+  end;
+  
+  buffPool.FHead := nil;
+  buffPool.FSize := 0;
+  {$IFDEF USE_SPINLOCK}
+  SpinUnLock(buffPool.FSpinLock);
+  {$ELSE}
+  buffPool.FLocker.Leave;
+  {$ENDIF}
+
+
+end;
+
 
 
 
@@ -822,11 +864,24 @@ constructor TBlockBuffer.Create(ABufferPool: PBufferPool);
 begin
   inherited Create;
   SetBufferPool(ABufferPool);
+  {$IFDEF USE_SPINLOCK}
+  FSpinLock := 0;
+  FLockWaitCounter := 0;
+  {$ELSE}
+  FLocker := TCriticalSection.Create;
+  {$ENDIF}
 end;
 
 destructor TBlockBuffer.Destroy;
 begin
   FlushBuffer;
+
+  {$IFDEF USE_SPINLOCK}
+  ;
+  {$ELSE}
+  FLocker.Free;
+  {$ENDIF}
+
   inherited Destroy;
 end;
 
@@ -857,6 +912,15 @@ begin
   end;
 end;
 
+procedure TBlockBuffer.Lock;
+begin
+  {$IFDEF USE_SPINLOCK}
+  SpinLock(FSpinLock, FLockWaitCounter);
+  {$ELSE}
+  FLocker.Enter;
+  {$ENDIF}
+end;
+
 procedure TBlockBuffer.SetBufferPool(ABufferPool: PBufferPool);
 begin
   FBufferPool := ABufferPool;
@@ -868,6 +932,15 @@ begin
     FBlockSize := 0;
   end;
   FBuffer := nil;
+end;
+
+procedure TBlockBuffer.UnLock;
+begin
+  {$IFDEF USE_SPINLOCK}
+  SpinUnLock(FSpinLock);
+  {$ELSE}
+  ABuffPool.FLocker.Leave;
+  {$ENDIF}
 end;
 
 procedure TBlockBuffer.CheckBlockBuffer;
@@ -884,7 +957,7 @@ end;
 
 procedure TBlockBuffer.CheckIsCurrentThread;
 begin
-  if FThreadID <> GetCurrentThreadID then
+  if (FThreadID <> 0) and (FThreadID <> GetCurrentThreadID) then
   begin
     raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用',
        [GetCurrentThreadID, FThreadID]);

@@ -1,7 +1,7 @@
 object FMMonitor: TFMMonitor
   Left = 0
   Top = 0
-  Width = 515
+  Width = 625
   Height = 334
   TabOrder = 0
   object lblServerStateCaption: TLabel
@@ -65,14 +65,14 @@ object FMMonitor: TFMMonitor
     Caption = 'lblAcceptEx'
   end
   object lblOnlineCounter: TLabel
-    Left = 376
+    Left = 405
     Top = 144
     Width = 79
     Height = 13
     Caption = 'lblOnlineCounter'
   end
   object lblOnlineCaption: TLabel
-    Left = 318
+    Left = 347
     Top = 144
     Width = 32
     Height = 13
@@ -86,14 +86,14 @@ object FMMonitor: TFMMonitor
     Caption = 'lblRunTimeINfo'
   end
   object lblWorkersCaption: TLabel
-    Left = 318
+    Left = 347
     Top = 164
     Width = 38
     Height = 13
     Caption = 'workers'
   end
   object lblWorkerCount: TLabel
-    Left = 376
+    Left = 405
     Top = 164
     Width = 79
     Height = 13

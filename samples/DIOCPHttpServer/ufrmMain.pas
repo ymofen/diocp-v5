@@ -15,7 +15,8 @@ uses
   Dialogs, StdCtrls, ActnList, ExtCtrls
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
-  utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools;
+  utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools,
+  diocp_task;
 
 type
   TfrmMain = class(TForm)
@@ -49,6 +50,10 @@ type
     mmoWebSocketData: TMemo;
     btnWebSocketPush: TButton;
     tmrWebSocketPing: TTimer;
+    pnlHTTPInfo: TPanel;
+    lblHttpInfo: TLabel;
+    tmrInfoRefresh: TTimer;
+    edtWorkCount: TEdit;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnInfoClick(Sender: TObject);
@@ -61,6 +66,7 @@ type
     procedure btnWebSocketPushClick(Sender: TObject);
     procedure chkUseSessionClick(Sender: TObject);
     procedure tmrHeartTimer(Sender: TObject);
+    procedure tmrInfoRefreshTimer(Sender: TObject);
     procedure tmrWebSocketPingTimer(Sender: TObject);
   private
     iCounter:Integer;
@@ -218,7 +224,7 @@ begin
     pvRequest.SaveToFile(Format('DiocpHttpRequest_%s.req', [FormatDateTime('MMddhhnnsszzz', Now)]));
   end;
 
-  if DoLoadFile(pvRequest) then Exit;
+
 
 
   if pvRequest.CheckIsWebSocketRequest then
@@ -249,18 +255,31 @@ begin
         pvRequest.Connection.RemotePort,
         pvRequest.WebSocketContentBuffer.DecodeUTF8]);
 
-    sfLogger.logMessage(s);
-
-    n := WebSocketPush(s, pvRequest.Connection);
-
-    s := Format('您的消息已经广播给%d个终端', [n]);
-
     // 发送字符串给客户端
     pvRequest.Connection.PostWebSocketData(s, true);
+
+    if Length(s) > 1024 then
+    begin
+      s := Format('您的消息(%d)超过1024,服务器已经收到了,但是不给你转发。', [n]);
+
+      // 发送字符串给客户端
+      pvRequest.Connection.PostWebSocketData(s, true);
+    end else
+    begin
+      //sfLogger.logMessage(s);
+
+      n := WebSocketPush(s, pvRequest.Connection);
+
+      s := Format('您的消息已经广播给%d个终端', [n]);
+
+      // 发送字符串给客户端
+      pvRequest.Connection.PostWebSocketData(s, true);
+    end;
     Exit;
   end;
   
-
+  if DoLoadFile(pvRequest) then Exit;
+  
   if pvRequest.RequestURI = '/weixin' then
   begin
     //pvRequest.DecodeURLParam(nil);
@@ -436,6 +455,8 @@ end;
 procedure TfrmMain.actOpenExecute(Sender: TObject);
 begin
   FTcpServer.Port := StrToInt(edtPort.Text);
+  FTcpServer.WorkerCount := StrToInt(edtWorkCount.Text);
+  iocpTaskManager.setWorkerCount(FTcpServer.WorkerCount);
   FTcpServer.UseObjectPool := chkUsePool.Checked;
   FTcpServer.Listeners.ClearObjects;
   if chkIPV6.Checked then
@@ -639,6 +660,14 @@ procedure TfrmMain.tmrHeartTimer(Sender: TObject);
 begin
   FTcpServer.KickOut();
   FTcpServer.CheckSessionTimeOut;
+end;
+
+procedure TfrmMain.tmrInfoRefreshTimer(Sender: TObject);
+begin
+  //if FTcpServer.Active then
+  begin
+    lblHttpInfo.Caption := FTcpServer.GetPrintDebugInfo;
+  end;
 end;
 
 procedure TfrmMain.tmrWebSocketPingTimer(Sender: TObject);

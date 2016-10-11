@@ -40,6 +40,7 @@ unit diocp_tcp_server;
 {$IFDEF DIOCP_HIGH_SPEED}
   {$UNDEF WRITE_LOG}
   {$UNDEF DEBUG_ON}
+  {$UNDEF DIOCP_DEBUG}
   {$UNDEF TRACE_IOCP_RECV}
   {$UNDEF TRACE_IOCP_SEND}
 {$ENDIF}
@@ -379,6 +380,9 @@ type
 
     procedure DoDisconnected;
 
+    /// <summary>
+    ///   归还到池时进行调用
+    /// </summary>
     procedure DoCleanUp;virtual;
 
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); virtual;
@@ -1478,7 +1482,7 @@ begin
       end;
     end;
   finally
-    {$IFDEF DEBUG_ON}
+    {$IFDEF DIOCP_DEBUG}
     InnerLock;
     AddDebugString(Format('#-(%d):Disconnected', [FContextDNA]));
     InnerUnLock;
@@ -1639,7 +1643,7 @@ begin
       Assert(FReferenceCounter >= 0);
       
       Inc(FReferenceCounter);
-      {$IFDEF DEBUG_ON}
+      {$IFDEF DIOCP_DEBUG}
       AddDebugString(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
       {$ENDIF}
 
@@ -1683,7 +1687,7 @@ begin
 //    {$ENDIF}
     Dec(FReferenceCounter);
     Result := FReferenceCounter;
-    {$IFDEF DEBUG_ON}
+    {$IFDEF DIOCP_DEBUG}
     AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     {$ENDIF}
 
@@ -1730,7 +1734,7 @@ begin
     FRequestDisconnect := true;
     Dec(FReferenceCounter);
   
-    {$IFDEF DEBUG_ON}
+    {$IFDEF DIOCP_DEBUG}
     AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     {$ENDIF}
 
@@ -1786,7 +1790,7 @@ begin
 
   InnerLock;
   try
-    {$IFDEF DEBUG_ON}
+    {$IFDEF DIOCP_DEBUG}
     if pvDebugInfo <> '' then
     begin
       AddDebugString(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
@@ -1920,7 +1924,7 @@ begin
     FWorkerEndTick := 0;
     FWorkerStartTick := 0;
 
-    {$IFDEF DEBUG_ON}
+    {$IFDEF DIOCP_DEBUG}
     InnerLock;
     AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), '-----DoCleanUp-----']));
     InnerUnLock;
@@ -1968,7 +1972,7 @@ begin
       FContextDNA := FOwner.RequestContextDNA;
       FActive := true;
 
-      {$IFDEF DEBUG_ON}
+      {$IFDEF DIOCP_DEBUG}
       InnerLock;
       AddDebugString(Format('#+(%d):Connected', [FContextDNA]));
       InnerUnLock;
@@ -4393,12 +4397,20 @@ begin
     FResponseWSASendCounter:=0;
 
     FSendRequestCreateCounter := 0;
+    FSendRequestOutCounter := 0;
+    FSendRequestReturnCounter := 0;
+    FSendRequestAbortCounter := 0;
+    FPostSendObjectCounter := 0;
+
+
+    
     FPostWSARecvCounter:=0;
     FResponseWSARecvCounter:=0;
 
     FRecvRequestCreateCounter:=0;
     FRecvRequestReturnCounter:=0;
     FRecvRequestOutCounter:=0;
+    
 
     FPushSendQueueCounter := 0;
     FResponseSendObjectCounter := 0;

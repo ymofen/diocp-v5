@@ -17,31 +17,49 @@ object frmMain: TfrmMain
   TextHeight = 13
   object pgcMain: TPageControl
     Left = 0
-    Top = 62
+    Top = 80
     Width = 856
-    Height = 330
+    Height = 312
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
+    ExplicitTop = 62
+    ExplicitHeight = 330
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
+      ExplicitHeight = 302
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
         Width = 848
-        Height = 302
+        Height = 249
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
+        ExplicitHeight = 302
+      end
+      object pnlHTTPInfo: TPanel
+        Left = 0
+        Top = 249
+        Width = 848
+        Height = 35
+        Align = alBottom
+        BevelOuter = bvNone
+        TabOrder = 1
+        ExplicitTop = 267
+        object lblHttpInfo: TLabel
+          Left = 8
+          Top = 16
+          Width = 51
+          Height = 13
+          Caption = 'lblHttpInfo'
+        end
       end
     end
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
+      ExplicitHeight = 302
       object btnCompress: TButton
         Left = 3
         Top = 3
@@ -64,6 +82,7 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
+      ExplicitHeight = 302
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -102,6 +121,7 @@ object frmMain: TfrmMain
     object tsWebSocket: TTabSheet
       Caption = 'WebSocket'
       ImageIndex = 3
+      ExplicitHeight = 302
       object mmoWebSocketData: TMemo
         Left = 3
         Top = 3
@@ -126,7 +146,7 @@ object frmMain: TfrmMain
     Left = 0
     Top = 0
     Width = 856
-    Height = 62
+    Height = 80
     Align = alTop
     TabOrder = 1
     object edtPort: TEdit
@@ -174,7 +194,7 @@ object frmMain: TfrmMain
     end
     object chkUseSession: TCheckBox
       Left = 142
-      Top = 39
+      Top = 52
       Width = 97
       Height = 17
       Caption = #35775#38382'Session'
@@ -183,7 +203,7 @@ object frmMain: TfrmMain
     end
     object chkUsePool: TCheckBox
       Left = 248
-      Top = 39
+      Top = 52
       Width = 97
       Height = 17
       Caption = #20351#29992#23545#35937#27744
@@ -193,7 +213,7 @@ object frmMain: TfrmMain
     end
     object chkIPV6: TCheckBox
       Left = 9
-      Top = 39
+      Top = 52
       Width = 97
       Height = 17
       Caption = #30417#21548'IPV6'
@@ -201,11 +221,19 @@ object frmMain: TfrmMain
     end
     object chkRecord2File: TCheckBox
       Left = 384
-      Top = 40
+      Top = 53
       Width = 97
       Height = 17
       Caption = #35760#24405#35831#27714#21040#25991#20214
       TabOrder = 8
+    end
+    object edtWorkCount: TEdit
+      Left = 10
+      Top = 31
+      Width = 121
+      Height = 21
+      TabOrder = 9
+      Text = '0'
     end
   end
   object mmoLog: TMemo
@@ -239,5 +267,10 @@ object frmMain: TfrmMain
     OnTimer = tmrWebSocketPingTimer
     Left = 424
     Top = 200
+  end
+  object tmrInfoRefresh: TTimer
+    OnTimer = tmrInfoRefreshTimer
+    Left = 424
+    Top = 288
   end
 end
