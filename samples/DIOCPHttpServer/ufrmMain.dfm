@@ -235,6 +235,16 @@ object frmMain: TfrmMain
       TabOrder = 9
       Text = '0'
     end
+    object chkWebSocketEcho: TCheckBox
+      Left = 552
+      Top = 56
+      Width = 145
+      Height = 17
+      Caption = 'webSocket Echo'
+      Checked = True
+      State = cbChecked
+      TabOrder = 10
+    end
   end
   object mmoLog: TMemo
     Left = 0

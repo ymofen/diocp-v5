@@ -54,6 +54,7 @@ type
     lblHttpInfo: TLabel;
     tmrInfoRefresh: TTimer;
     edtWorkCount: TEdit;
+    chkWebSocketEcho: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnInfoClick(Sender: TObject);
@@ -255,25 +256,32 @@ begin
         pvRequest.Connection.RemotePort,
         pvRequest.WebSocketContentBuffer.DecodeUTF8]);
 
-    // 发送字符串给客户端
-    pvRequest.Connection.PostWebSocketData(s, true);
-
-    if Length(s) > 1024 then
+    if chkWebSocketEcho.Checked then
     begin
-      s := Format('您的消息(%d)超过1024,服务器已经收到了,但是不给你转发。', [n]);
-
       // 发送字符串给客户端
       pvRequest.Connection.PostWebSocketData(s, true);
     end else
-    begin
-      //sfLogger.logMessage(s);
-
-      n := WebSocketPush(s, pvRequest.Connection);
-
-      s := Format('您的消息已经广播给%d个终端', [n]);
-
+    begin 
       // 发送字符串给客户端
       pvRequest.Connection.PostWebSocketData(s, true);
+
+      if Length(s) > 1024 then
+      begin
+        s := Format('您的消息(%d)超过1024,服务器已经收到了,但是不给你转发。', [n]);
+
+        // 发送字符串给客户端
+        pvRequest.Connection.PostWebSocketData(s, true);
+      end else
+      begin
+        //sfLogger.logMessage(s);
+
+        n := WebSocketPush(s, pvRequest.Connection);
+
+        s := Format('您的消息已经广播给%d个终端', [n]);
+
+        // 发送字符串给客户端
+        pvRequest.Connection.PostWebSocketData(s, true);
+      end;
     end;
     Exit;
   end;
