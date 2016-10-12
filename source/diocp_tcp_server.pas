@@ -506,6 +506,11 @@ type
     property RemoteAddr: String read FRemoteAddr;
 
     property RemotePort: Integer read FRemotePort;
+
+    /// <summary>
+    ///   请注意
+    ///   SocketHandle非真正的Socket句柄，如果需要访问真正的Socket句柄可以访问RawSocket.Handle
+    /// </summary>
     property SocketHandle: TSocket read FSocketHandle;
     property SocketState: TSocketState read FSocketState;
     property TagStr: String read FTagStr write FTagStr;
@@ -994,6 +999,7 @@ type
     FIocpEngine: TIocpEngine;
 
     FKeepAlive: Boolean;
+    FNoDelayOption: Boolean;
 
     FOnAfterOpen: TNotifyEvent;
     FOnContextConnected: TContextNotifyEvent;
@@ -1242,9 +1248,20 @@ type
         write FOnSendBufferCompleted;
 
     /// <summary>
-    ///   开启后
+    ///   开启后执行的过程
     /// </summary>
     property OnAfterOpen: TNotifyEvent read FOnAfterOpen write FOnAfterOpen;
+
+    /// <summary>
+    ///   NoDelay属性(默认是false)
+    ///   设置为true是会禁用Socket的NoDelay属性(禁用nagle算法)
+    ///   nagle算法会造成200ms左右的延时
+    ///   开启时运行时改变改该属性，不会重新设置已经建立的连接(对以后建立的连接有效)
+    ///
+    ///   为了减少网络拥塞而设计的，它会等待足够的数据才发送出去，如果没有足够的数据，就会等待约200ms（内部计时器超时触发）后发送出去
+    /// </summary>
+    property NoDelayOption: Boolean read FNoDelayOption write FNoDelayOption;
+    
     /// <summary>
     ///   默认侦听的端口
     /// </summary>
@@ -1290,6 +1307,9 @@ type
     /// </summary>
     property OnDataReceived: TOnDataReceived read FOnDataReceived write
         FOnDataReceived;
+
+
+
 
 
 
@@ -2540,8 +2560,20 @@ var
         if not Result then
         begin
           lvErrCode := GetLastError;
-          {$IFDEF WRITE_LOG}
+          {$IFDEF DIOCP_DEBUG}
           logMessage('FClientContext.FRawSocket.setKeepAliveOption, Error:%d', [lvErrCode]);
+          {$ENDIF}
+        end;
+      end;
+
+      if FNoDelayOption then
+      begin
+        Result := pvRequest.FClientContext.FRawSocket.SetNoDelayOption(True);
+        if not Result then
+        begin
+          lvErrCode := GetLastError;
+          {$IFDEF DIOCP_DEBUG}
+          logMessage('FClientContext.FRawSocket.SetNoDelayOption, Error:%d', [lvErrCode]);
           {$ENDIF}
         end;
       end;

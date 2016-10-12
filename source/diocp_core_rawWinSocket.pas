@@ -243,6 +243,12 @@ type
     /// </summary>
     function UpdateAcceptContext(pvSocket: TSocket): Boolean;
 
+    /// <summary>
+    ///   是否使用延迟
+    ///   默认是开启延迟的
+    ///   nagle算法
+    /// </summary>
+    /// <param name="pvOption">true 为禁用</param>
     function SetNoDelayOption(pvOption:Boolean): Boolean;
 
     property IPVersion: Integer read FIPVersion write FIPVersion;
