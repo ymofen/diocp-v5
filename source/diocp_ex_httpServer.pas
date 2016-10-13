@@ -499,6 +499,8 @@ type
 
     procedure ZLibContent;
 
+    procedure LZOCompressContent;
+
     procedure SetChunkedStart;
 
     procedure SetChunkedEnd;
@@ -1501,6 +1503,11 @@ function TDiocpHttpResponse.LoadFromStream(pvStream: TStream; pvSize: Integer):
     Integer;
 begin
   Result := FInnerResponse.ContentBuffer.CopyFrom(pvStream, pvSize);
+end;
+
+procedure TDiocpHttpResponse.LZOCompressContent;
+begin
+  FInnerResponse.LZOCompressContent;  
 end;
 
 procedure TDiocpHttpResponse.SaveToFile(pvFile:string);

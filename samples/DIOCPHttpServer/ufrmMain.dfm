@@ -23,11 +23,8 @@ object frmMain: TfrmMain
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
-    ExplicitTop = 62
-    ExplicitHeight = 330
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitHeight = 302
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -36,7 +33,6 @@ object frmMain: TfrmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitHeight = 302
       end
       object pnlHTTPInfo: TPanel
         Left = 0
@@ -46,7 +42,6 @@ object frmMain: TfrmMain
         Align = alBottom
         BevelOuter = bvNone
         TabOrder = 1
-        ExplicitTop = 267
         object lblHttpInfo: TLabel
           Left = 8
           Top = 16
@@ -59,7 +54,6 @@ object frmMain: TfrmMain
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      ExplicitHeight = 302
       object btnCompress: TButton
         Left = 3
         Top = 3
@@ -82,7 +76,6 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitHeight = 302
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -121,7 +114,6 @@ object frmMain: TfrmMain
     object tsWebSocket: TTabSheet
       Caption = 'WebSocket'
       ImageIndex = 3
-      ExplicitHeight = 302
       object mmoWebSocketData: TMemo
         Left = 3
         Top = 3

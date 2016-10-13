@@ -6,7 +6,7 @@
         <DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
         <DCC_DependencyCheckOutputName>BIN\diocpHttpSERVER.exe</DCC_DependencyCheckOutputName>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">RELEASE-DEBUG</Config>
+        <Config Condition="'$(Config)'==''">Debug</Config>
         <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Application</AppType>
         <FrameworkType>VCL</FrameworkType>

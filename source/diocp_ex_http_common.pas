@@ -6,6 +6,7 @@ interface
 {$if CompilerVersion>= 18}
   {$IFDEF MSWINDOWS}
     {$DEFINE USE_ZLIBExGZ}
+    {$DEFINE USE_Z_LZO}
   {$ENDIF}
 {$ifend}
 
@@ -16,6 +17,9 @@ uses
   utils_strings, SysUtils, utils_dvalue
 {$IFDEF USE_NetEncoding}
     , System.NetEncoding
+{$ENDIF}
+{$IFDEF USE_Z_LZO}
+    , utils_lzo
 {$ENDIF}
 
 {$IFDEF USE_ZLIBExGZ}
@@ -341,6 +345,8 @@ type
 
     procedure ZCompressContent;
 
+    procedure LZOCompressContent;
+
 
   end;
 
@@ -385,6 +391,12 @@ function GetContentTypeFromFileExt(pvFileExt, pvDefault: string): String;
 procedure GZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
 procedure GZDecompressBufferBuilder(pvBuilder:TDBufferBuilder);
 {$ENDIF}
+
+{$IFDEF USE_Z_LZO}
+procedure LZOCompressBufferBuilder(pvBuilder:TDBufferBuilder);
+procedure LZODecompressBufferBuilder(pvBuilder:TDBufferBuilder);
+{$ENDIF}
+
 
 /// <summary>
 ///   [utf8/ansi]->url
@@ -596,6 +608,34 @@ begin
   end;
 {$ENDIF}
 end;
+
+{$IFDEF USE_Z_LZO}
+procedure LZOCompressBufferBuilder(pvBuilder:TDBufferBuilder);
+var
+  lvOutBytes: TBytes;
+  l: Integer;
+begin
+  l := utils_lzo.lzo_compressdestlen(pvBuilder.Length);
+  SetLength(lvOutBytes, l);
+  l := utils_lzo.lzo_compress(PAnsiChar(pvBuilder.Memory), pvBuilder.Length, PAnsiChar(@lvOutBytes[0]));
+
+  pvBuilder.Clear;
+  pvBuilder.AppendBuffer((@lvOutBytes[0]), l);
+end;
+
+procedure LZODecompressBufferBuilder(pvBuilder:TDBufferBuilder);
+var
+  lvOutBytes: TBytes;
+  l: Integer;
+begin
+  l := utils_lzo.lzo_decompressdestlen(PAnsiChar(pvBuilder.Memory));
+  SetLength(lvOutBytes, l);
+  l := utils_lzo.lzo_decompress(PAnsiChar(pvBuilder.Memory), pvBuilder.Length, PAnsiChar(@lvOutBytes[0]));
+
+  pvBuilder.Clear;
+  pvBuilder.AppendBuffer(@lvOutBytes[0], l);
+end;
+{$ENDIF}
 
 {$IFDEF USE_ZLIBExGZ}
 procedure GZCompressBufferBuilder(pvBuilder:TDBufferBuilder);
@@ -1564,6 +1604,16 @@ begin
   begin
     pvBuilder.AppendRawStr('Set-Cookie: ').AppendRawStr(TDHttpCookie(FCookies[i].AsObject).ToString()).AppendBreakLineBytes;
   end;
+end;
+
+procedure THttpResponse.LZOCompressContent;
+begin
+{$IFDEF USE_ZLIBExGZ}
+  LZOCompressBufferBuilder(FContentBuffer);
+{$ELSE}
+  Assert(False, '需要引用ZLibxExGZ');
+{$ENDIF}
+
 end;
 
 procedure THttpResponse.ChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);

@@ -16,7 +16,7 @@ uses
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
   utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools,
-  diocp_task;
+  diocp_task, System.Actions;
 
 type
   TfrmMain = class(TForm)
@@ -250,11 +250,24 @@ begin
 //    s := TByteTools.varToHexString(pvRequest.InnerWebSocketFrame.Buffer.Memory^, pvRequest.InnerWebSocketFrame.Buffer.Length);
 //    sfLogger.logMessage(s);
 
-    // 提取字符串数据
-    s := Format('来自:%s:%d的消息:%s',
-        [pvRequest.Connection.RemoteAddr,
-        pvRequest.Connection.RemotePort,
-        pvRequest.WebSocketContentBuffer.DecodeUTF8]);
+    try
+      s := pvRequest.WebSocketContentBuffer.DecodeUTF8;
+
+      // 提取字符串数据
+      s := Format('来自:%s:%d的消息:%s',
+          [pvRequest.Connection.RemoteAddr,
+          pvRequest.Connection.RemotePort,
+          s]);
+    except
+      on e:Exception do
+      begin
+        s := '解码失败:' + e.Message;
+        // 发送字符串给客户端
+        pvRequest.Connection.PostWebSocketData(s, true);
+        Exit;
+      end;
+    end;
+
 
     if chkWebSocketEcho.Checked then
     begin
@@ -262,8 +275,6 @@ begin
       pvRequest.Connection.PostWebSocketData(s, true);
     end else
     begin 
-      // 发送字符串给客户端
-      pvRequest.Connection.PostWebSocketData(s, true);
 
       if Length(s) > 1024 then
       begin
