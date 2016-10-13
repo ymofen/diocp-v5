@@ -501,7 +501,14 @@ begin
     {$if defined(NEWZLib)}
     ZLib.ZCompress(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
     {$ELSE}
+    {$IFDEF USE_ZLIBExGZ}
+    ZLibEx.ZCompress(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
+    {$ELSE}
     ZLib.CompressBuf(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
+    {$IFDEF DEBUG}
+    PrintDebugString('****旧版本Zlib压缩效率比较低');
+    {$ENDIF}
+    {$ENDIF}
     {$ifend}
 
     pvBuilder.Clear;
@@ -537,7 +544,15 @@ begin
     {$if defined(NEWZLib)}
     ZLib.ZCompress(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
     {$ELSE}
+
+    {$IFDEF USE_ZLIBExGZ}
+    ZLibEx.ZCompress(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
+    {$ELSE}
     ZLib.CompressBuf(pvBuilder.Memory, pvBuilder.Length, lvOutBuf, lvOutBytes);
+    {$IFDEF DEBUG}
+    PrintDebugString('****旧版本Zlib压缩效率比较低');
+    {$ENDIF}
+    {$ENDIF} 
     {$ifend}
 
     // 截取前面2位标识符和后四位（2007测试通过OK, deflate压缩方式)

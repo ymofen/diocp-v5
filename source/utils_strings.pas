@@ -587,6 +587,8 @@ function NewPString(const s: string): PString;
 
 function GetStringFromPString(const p:Pointer): string;
 
+procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
 implementation
 
 
@@ -607,6 +609,18 @@ var
 {$ENDIF}
 //  VCMemCmp: TMSVCMemCmp;
 {$ENDIF}
+
+procedure PrintDebugString(s:string);
+begin
+  {$IFDEF MSWINDOWS}
+  {$IFDEF UNICODE}
+  OutputDebugStringW(PChar(s));
+  {$ELSE}
+  OutputDebugString(PAnsiChar(s));
+  {$ENDIF}
+  {$ENDIF}
+
+end;
 
 {$if CompilerVersion < 20}
 function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
@@ -1853,6 +1867,7 @@ begin
 {$IFDEF MSWINDOWS}
   Result := Utf8BufferToString(@FData[0], FSize);
 {$ELSE}
+
   CheckNeedSize(2);
   FData[FSize] := 0;
   FData[FSize + 1] := 0;
