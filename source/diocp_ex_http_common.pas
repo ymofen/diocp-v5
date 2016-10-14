@@ -6,7 +6,7 @@ interface
 {$if CompilerVersion>= 18}
   {$IFDEF MSWINDOWS}
     {$DEFINE USE_ZLIBExGZ}
-    {$DEFINE USE_Z_LZO}
+    {.$DEFINE USE_Z_LZO}
   {$ENDIF}
 {$ifend}
 
@@ -1608,10 +1608,10 @@ end;
 
 procedure THttpResponse.LZOCompressContent;
 begin
-{$IFDEF USE_ZLIBExGZ}
+{$IFDEF USE_Z_LZO}
   LZOCompressBufferBuilder(FContentBuffer);
 {$ELSE}
-  Assert(False, '需要引用ZLibxExGZ');
+  Assert(False, '需要引用LZO');
 {$ENDIF}
 
 end;
