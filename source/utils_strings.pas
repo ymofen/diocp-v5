@@ -589,6 +589,8 @@ function GetStringFromPString(const p:Pointer): string;
 
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
+function PosWStr(sub: WideString; const s: WideString): Integer;
+
 implementation
 
 
@@ -2317,6 +2319,11 @@ begin
   begin
     Result := PString(p)^;
   end;
+end;
+
+function PosWStr(sub: WideString; const s: WideString): Integer;
+begin
+  Result := Pos(sub, s);
 end;
 
 

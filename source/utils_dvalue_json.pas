@@ -46,6 +46,11 @@ function InputJsonBuffer(const jsonBuffer:PJsonBuffer; pvByte:Integer): Integer;
 procedure ResetJsonBuffer(const jsonBuffer:PJsonBuffer);
 
 
+procedure JSONEscapeWithoutDoEscape(ABuilder: TDStringBuilder; const S: String);
+
+procedure JSONEscape(ABuilder: TDStringBuilder; const S: DStringW; ADoEscape: Boolean);
+
+
     
 implementation
 

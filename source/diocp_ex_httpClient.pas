@@ -735,6 +735,7 @@ begin
       FRawSocket.SetReadTimeOut(FTimeOut);
       FRawSocket.SetSendTimeOut(FTimeOut);
     end;
+    FRawSocket.SetNoDelayOption(True);
     {$ELSE}
 
     {$ENDIF}

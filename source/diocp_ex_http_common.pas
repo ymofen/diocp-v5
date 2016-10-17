@@ -6,7 +6,7 @@ interface
 {$if CompilerVersion>= 18}
   {$IFDEF MSWINDOWS}
     {$DEFINE USE_ZLIBExGZ}
-    {.$DEFINE USE_Z_LZO}
+    {$DEFINE USE_Z_LZO}
   {$ENDIF}
 {$ifend}
 
