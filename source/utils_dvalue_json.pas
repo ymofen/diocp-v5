@@ -204,13 +204,16 @@ begin
   end;
   if (v.ObjectType = vntObject) then
   begin
-    lvName := v.Name.AsString;
-    if Length(lvName) <> 0 then
-    begin
-      pvBuilder.Append('"');
-      JSONEscape(pvBuilder, v.Name.AsString, ADoEscape);
-      pvBuilder.Append('"');
-      pvBuilder.Append(':');
+    if pvLevel > 0 then
+    begin      // 首层不需要name
+      lvName := v.Name.AsString;
+      if Length(lvName) <> 0 then
+      begin
+        pvBuilder.Append('"');
+        JSONEscape(pvBuilder, v.Name.AsString, ADoEscape);
+        pvBuilder.Append('"');
+        pvBuilder.Append(':');
+      end;
     end;
     pvBuilder.Append('{');
     if ADoFormat then pvBuilder.Append(sLineBreak);

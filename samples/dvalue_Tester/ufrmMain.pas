@@ -5,7 +5,8 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, utils_DValue, utils_strings, ComCtrls,
-  utils_dvalue_multiparts, utils_dvalue_msgpack, utils_base64;
+  utils_dvalue_multiparts, utils_dvalue_msgpack, utils_base64, utils_dvalue_dataset,
+  DB, DBClient, utils_cds, ComObj, Grids, DBGrids;
 
 type
   TForm1 = class(TForm)
@@ -31,19 +32,37 @@ type
     btnDValueCloneFrom: TButton;
     btnDValueSetLength: TButton;
     btnInputJSONBuffer: TButton;
+    btnRemovePath: TButton;
+    mmoLog: TMemo;
+    btnSetJSON: TButton;
+    tsDataSet: TTabSheet;
+    btnConvertToDValue: TButton;
+    cdsDemo: TClientDataSet;
+    btnInitCDSDemo: TButton;
+    dbgrdDemo: TDBGrid;
+    dsMain: TDataSource;
+    mmoJSONData: TMemo;
+    btnDValueToDataSet: TButton;
+    btnEmptyDemo: TButton;
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
+    procedure btnConvertToDValueClick(Sender: TObject);
     procedure btnDValueClick(Sender: TObject);
     procedure btnDValueCloneFromClick(Sender: TObject);
     procedure btnDValueSetLengthClick(Sender: TObject);
+    procedure btnDValueToDataSetClick(Sender: TObject);
+    procedure btnEmptyDemoClick(Sender: TObject);
     procedure btnEncodeJSONClick(Sender: TObject);
+    procedure btnInitCDSDemoClick(Sender: TObject);
     procedure btnInputJSONBufferClick(Sender: TObject);
     procedure btnMsgPackTesterClick(Sender: TObject);
     procedure btnObjectTesterClick(Sender: TObject);
     procedure btnParseAFileClick(Sender: TObject);
     procedure btnParseClick(Sender: TObject);
     procedure btnParseJSONClick(Sender: TObject);
+    procedure btnRemovePathClick(Sender: TObject);
     procedure btnSaveClick(Sender: TObject);
+    procedure btnSetJSONClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
@@ -74,6 +93,19 @@ end;
 procedure TForm1.btnClearClick(Sender: TObject);
 begin
   mmoData.Clear;
+end;
+
+procedure TForm1.btnConvertToDValueClick(Sender: TObject);
+var
+  lvDValue:TDValue;
+begin
+  if not cdsDemo.Active then raise Exception.Create('DEMO数据集尚未初始化');
+  
+  lvDValue := TDValue.Create();
+  ConvertDataSetToDValue(self.cdsDemo, lvDValue);
+  mmoJSONData.Clear;
+  mmoJSONData.Lines.Add(JSONEncode(lvDValue));
+  lvDValue.Free;
 end;
 
 procedure TForm1.btnDValueClick(Sender: TObject);
@@ -126,6 +158,26 @@ begin
   lvDValue.Free;
 end;
 
+procedure TForm1.btnDValueToDataSetClick(Sender: TObject);
+var
+  lvDValue:TDValue;
+begin
+  if not cdsDemo.Active then raise Exception.Create('DEMO数据集尚未初始化');
+  if cdsDemo.RecordCount > 0 then raise Exception.Create('请先清空DEMO数据集(Empty)');
+  
+  
+  lvDValue := TDValue.Create();
+  JSONParser(mmoJSONData.Lines.Text, lvDValue);
+  AppendFromDValueList(cdsDemo, lvDValue);
+  lvDValue.Free;
+
+end;
+
+procedure TForm1.btnEmptyDemoClick(Sender: TObject);
+begin
+  cdsDemo.EmptyDataSet;
+end;
+
 procedure TForm1.btnEncodeJSONClick(Sender: TObject);
 var
   lvDValue, lvItem:TDValue;
@@ -156,6 +208,31 @@ begin
   lvDValue.Free;
 
   ShowMessage(s);
+end;
+
+procedure TForm1.btnInitCDSDemoClick(Sender: TObject);
+var
+  i: Integer;
+begin
+  // 初始化数据集
+  cdsDemo.Close;
+  cdsDemo.FieldDefs.Clear;
+  cdsDemo.Fields.Clear;
+  CreateField(cdsDemo, 'fid', ftGuid).DisplayWidth := 10;
+  CreateField(cdsDemo, 'fcode', ftString, 50).DisplayWidth := 20;
+  CreateField(cdsDemo, 'fname', ftString, 50).DisplayWidth := 20;
+  cdsDemo.CreateDataSet;
+
+
+  // 演示记录
+  for i := 0 to 100 - 1 do
+  begin
+    cdsDemo.Append;
+    cdsDemo.FieldByName('fid').AsString := CreateClassID;
+    cdsDemo.FieldByName('fcode').AsString := Format('%0.3d', [i + 1]);
+    cdsDemo.FieldByName('fname').AsString := 'dvalue';
+    cdsDemo.Post;
+  end;
 end;
 
 procedure TForm1.btnInputJSONBufferClick(Sender: TObject);
@@ -295,6 +372,21 @@ begin
 
 end;
 
+procedure TForm1.btnRemovePathClick(Sender: TObject);
+var
+  lvDValue:TDValue;
+begin
+  lvDValue := TDValue.Create;
+  lvDValue.ForceByPath('a.b.c').AsString := '1234';
+  lvDValue.ForceByPath('a.b.e').AsInteger := 567;
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, True));
+  lvDValue.RemoveByPath('a.b.c');
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, True));
+  lvDValue.RemoveByPath('a.b');
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, True));
+  lvDValue.Free;
+end;
+
 procedure TForm1.btnSaveClick(Sender: TObject);
 var
   lvFileStream:TFileStream;
@@ -317,6 +409,23 @@ begin
   lvBuilder.SaveToFile(ExtractFilePath(ParamStr(0)) + 'dvalue_multparts.dat');
   lvBuilder.Free;
 
+
+end;
+
+procedure TForm1.btnSetJSONClick(Sender: TObject);
+var
+  lvDValue:TDValue;
+begin
+  lvDValue := TDValue.Create;
+  lvDValue.ForceByPath('a.b.c').AsString := '1234';
+  JSONParser('{"value":123}', lvDValue.ForceByPath('a.b.e'));
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+
+  JSONParser('{"value":456}', lvDValue.ForceByPath('a.b.e'));
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+  JSONParser('{"key":001}', lvDValue.ForceByPath('a.b.e'));
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+  lvDValue.Free;
 
 end;
 

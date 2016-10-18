@@ -17,8 +17,8 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 929
-    Height = 460
-    ActivePage = tsJSON
+    Height = 288
+    ActivePage = tsDataSet
     Align = alClient
     TabOrder = 0
     object tsJSON: TTabSheet
@@ -75,12 +75,21 @@ object Form1: TForm1
           TabOrder = 4
           OnClick = btnInputJSONBufferClick
         end
+        object btnSetJSON: TButton
+          Left = 728
+          Top = 21
+          Width = 75
+          Height = 25
+          Caption = 'btnSetJSON'
+          TabOrder = 5
+          OnClick = btnSetJSONClick
+        end
       end
       object mmoData: TMemo
         Left = 0
         Top = 65
         Width = 921
-        Height = 367
+        Height = 195
         Align = alClient
         Lines.Strings = (
           '{'
@@ -184,10 +193,104 @@ object Form1: TForm1
         TabOrder = 4
         OnClick = btnDValueSetLengthClick
       end
+      object btnRemovePath: TButton
+        Left = 208
+        Top = 168
+        Width = 113
+        Height = 25
+        Caption = 'btnRemovePath'
+        TabOrder = 5
+        OnClick = btnRemovePathClick
+      end
+    end
+    object tsDataSet: TTabSheet
+      Caption = 'tsDataSet'
+      ImageIndex = 4
+      ExplicitLeft = -12
+      ExplicitTop = 22
+      object btnConvertToDValue: TButton
+        Left = 379
+        Top = 3
+        Width = 153
+        Height = 25
+        Caption = #25968#25454#38598#36716#25442#21040'DValue->JSON'
+        TabOrder = 0
+        OnClick = btnConvertToDValueClick
+      end
+      object btnInitCDSDemo: TButton
+        Left = 16
+        Top = 8
+        Width = 129
+        Height = 25
+        Caption = 'DEMO'#25968#25454#38598#21021#22987#21270
+        TabOrder = 1
+        OnClick = btnInitCDSDemoClick
+      end
+      object dbgrdDemo: TDBGrid
+        Left = 16
+        Top = 39
+        Width = 345
+        Height = 210
+        DataSource = dsMain
+        TabOrder = 2
+        TitleFont.Charset = DEFAULT_CHARSET
+        TitleFont.Color = clWindowText
+        TitleFont.Height = -11
+        TitleFont.Name = 'Tahoma'
+        TitleFont.Style = []
+      end
+      object mmoJSONData: TMemo
+        Left = 379
+        Top = 39
+        Width = 502
+        Height = 210
+        Lines.Strings = (
+          'mmoJSONData')
+        TabOrder = 3
+      end
+      object btnDValueToDataSet: TButton
+        Left = 592
+        Top = 3
+        Width = 145
+        Height = 25
+        Caption = 'JSON-DValue->'#25968#25454#38598
+        TabOrder = 4
+        OnClick = btnDValueToDataSetClick
+      end
+      object btnEmptyDemo: TButton
+        Left = 184
+        Top = 8
+        Width = 113
+        Height = 25
+        Caption = #28165#31354'DEMO'#25968#25454#38598
+        TabOrder = 5
+        OnClick = btnEmptyDemoClick
+      end
     end
   end
+  object mmoLog: TMemo
+    Left = 0
+    Top = 288
+    Width = 929
+    Height = 172
+    Align = alBottom
+    Lines.Strings = (
+      'mmoLog')
+    TabOrder = 1
+  end
   object dlgOpenFile: TOpenDialog
-    Left = 456
-    Top = 232
+    Left = 296
+    Top = 352
+  end
+  object cdsDemo: TClientDataSet
+    Aggregates = <>
+    Params = <>
+    Left = 40
+    Top = 192
+  end
+  object dsMain: TDataSource
+    DataSet = cdsDemo
+    Left = 80
+    Top = 192
   end
 end

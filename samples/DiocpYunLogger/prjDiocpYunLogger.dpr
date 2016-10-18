@@ -2,8 +2,7 @@ program prjDiocpYunLogger;
 
 uses
   Forms,
-  ufrmMain in 'ufrmMain.pas' {Form1},
-  utils_yunlogger in '..\..\source\utils_yunlogger.pas';
+  ufrmMain in 'ufrmMain.pas' {Form1};
 
 {$R *.res}
 

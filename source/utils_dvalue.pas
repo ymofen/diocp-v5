@@ -2578,42 +2578,50 @@ end;
 
 procedure TDValue.SetAsAnsiString(const Value: AnsiString);
 begin
+  CheckSetNodeType(vntValue);
   FValue.SetAsStringA(Value);
 end;
 {$IFEND}
 
 procedure TDValue.SetAsBoolean(const Value: Boolean);
 begin
+  CheckSetNodeType(vntValue);
   FValue.SetAsBoolean(Value);
 end;
 
 procedure TDValue.SetAsFloat(const Value: Double);
 begin
+  CheckSetNodeType(vntValue);
   FValue.SetAsFloat(Value);
 end;
 
 procedure TDValue.SetAsInteger(const Value: Int64);
 begin
+  CheckSetNodeType(vntValue);
   FValue.SetAsInteger(Value);
 end;
 
 procedure TDValue.SetAsInterface(const Value: IInterface);
 begin
+  CheckSetNodeType(vntValue);
   FValue.SetAsInterface(Value);
 end;
 
 procedure TDValue.SetAsString(const Value: String);
 begin
+  CheckSetNodeType(vntValue);
   FValue.SetAsString(Value);
 end;
 
 procedure TDValue.SetAsStringW(const Value: DStringW);
 begin
+  CheckSetNodeType(vntValue);
   FValue.AsStringW := Value;
 end;
 
 procedure TDValue.SetAsUInt(const Value: UInt64);
 begin
+  CheckSetNodeType(vntValue);
   FValue.SetAsUInt(Value);
 end;
 
