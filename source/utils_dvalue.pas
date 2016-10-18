@@ -22,6 +22,11 @@ unit utils_dvalue;
   {$DEFINE HAVE_ASNI_STRING}
 {$IFEND}
 
+
+{$IFDEF DEBUG}
+{$DEFINE CHECK_DVALUE}
+{$ENDIF}
+
 interface
 
 
@@ -215,6 +220,13 @@ type
   /// </summary>
   TDValue = class(TObject)
   private
+    {$IFDEF CHECK_DVALUE}
+    ///用于检测对象是否遭到破坏
+    __CheckValue:array[0..7] of Byte;
+    procedure __CheckValueOK;
+    procedure __InitalizeCheckValue;
+    {$ENDIF}
+  private
     FName: TDValueItem;
     FValue: TDValueItem;
     FObjectType: TDValueObjectType;
@@ -326,8 +338,8 @@ type
     /// <summary>
     ///   将子节点整理成字符串列表
     /// </summary>
-    function ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string = '';
-        pvValueDelimiter: string = sLineBreak): String;
+    function ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
+        STRING_EMPTY; pvValueDelimiter: string = sLineBreak): String;
 
     /// <summary>
     ///   本身作为一个数组添加一个子节点
@@ -365,6 +377,18 @@ type
     ///   请使用Delete
     /// </summary>
     function RemoveByName(pvName:String): Integer;
+
+    function RemoveByPath(const pvPath: String): Boolean;
+
+    /// <summary>
+    ///   从父类中进行了移除，如果移除成功, 返回true, 且本身将被销毁
+    /// </summary>
+    function RemoveFromParent: Boolean;
+
+    /// <summary>
+    ///   从父类中进行了移除，如果移除成功, 返回true，本身不会被销毁
+    /// </summary>
+    function UnAttachFromParent: Boolean;
 
 
     function IndexDataOf(pvData:Pointer): Integer;
@@ -430,6 +454,11 @@ type
     property Value: TDValueItem read FValue;
 
   public
+    /// <summary>
+    ///   统计数据大小
+    /// </summary>
+    function SizeOf: Integer;
+
     function GetStrValueByName(pvName:string; pvDefault:string): String;
     function GetIntValueByName(pvName: String; pvDefault: Int64): Int64;
     function GetFloatValueByName(pvName: String; pvDefault: Double): Double;
@@ -517,6 +546,11 @@ type
     procedure SetAsStringA(const Value: AnsiString);
     {$ENDIF}
   public
+    /// <summary>
+    ///   获取数据大小
+    /// </summary>
+    function SizeOf: Integer;
+
     procedure CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes: TDValueDataTypes
         = [vdtInterface, vdtObject, vdtPtr]);
 
@@ -1700,6 +1734,9 @@ end;
 constructor TDValue.Create(pvType: TDValueObjectType);
 begin
   inherited Create;
+  {$IFDEF CHECK_DVALUE}
+  __InitalizeCheckValue;
+  {$ENDIF}
   FObjectType := vntNull;
   CreateName;
   FValue := TDValueItem.Create;
@@ -1710,11 +1747,13 @@ end;
 constructor TDValue.Create;
 begin
   inherited;
+  {$IFDEF CHECK_DVALUE}
+  __InitalizeCheckValue;
+  {$ENDIF}
   FObjectType := vntNull;
   CreateName;
   FValue := TDValueItem.Create;
   CheckSetNodeType(vntObject);
-
 end;
 
 procedure TDValue.CreateName;
@@ -1742,6 +1781,11 @@ begin
 
   if Assigned(FValue) then FValue.Free;
   DeleteName;
+
+  {$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+  FillChar(__checkvalue[0], length(__checkvalue), 0);
+  {$ENDIF}  
   inherited;
 end;
 
@@ -2492,6 +2536,39 @@ begin
   end;
 end;
 
+function TDValue.RemoveByPath(const pvPath: String): Boolean;
+var
+  lvParent, lvDValue:TDValue;
+  lvIndex:Integer;
+begin
+  lvIndex := -1;
+  InnerFindByPath(pvPath, lvParent, lvIndex);
+  if lvIndex <> -1 then
+  begin
+    lvParent.Delete(lvIndex);
+
+    if lvParent.Count = 0 then
+    begin
+      lvDValue := lvParent;
+
+      // 1.没有子集
+      // 2.不等于本身
+      while (lvDValue <> nil) and (lvDValue.Count <= 1) and (lvDValue <> Self)  do
+      begin
+        lvParent := lvDValue.Parent;
+        lvDValue.RemoveFromParent;
+        lvDValue := lvParent;
+      end;
+    end;
+  end;
+end;
+
+
+function TDValue.RemoveFromParent: Boolean;
+begin
+  Result := UnAttachFromParent;
+  if Result then Self.Free;
+end;
 
 {$IF (not Defined(NEXTGEN))}
 function TDValue.GetAsAnsiString: AnsiString;
@@ -2540,12 +2617,34 @@ begin
   FValue.SetAsUInt(Value);
 end;
 
-function TDValue.ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
-    ''; pvValueDelimiter: string = sLineBreak): String;
+function TDValue.SizeOf: Integer;
 var
   i: Integer;
 begin
-  Result := '';
+  {$IFDEF UNICODE}
+  Result := Length(FName.AsString) shl 1;
+  {$ELSE}
+  Result := Length(FName.AsString);
+  {$ENDIF}
+  if FObjectType in [vntArray, vntObject] then
+  begin
+    for i := 0 to self.Count - 1 do
+    begin
+      Inc(Result, self.Items[i].SizeOf);
+    end;
+  end else
+  begin
+    Inc(Result, self.Value.SizeOf);
+  end;
+  
+end;
+
+function TDValue.ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
+    STRING_EMPTY; pvValueDelimiter: string = sLineBreak): String;
+var
+  i: Integer;
+begin
+  Result := STRING_EMPTY;
 
   if self.ObjectType = vntArray then
   begin
@@ -2579,6 +2678,44 @@ begin
   else
     Result := nil;
 end;
+
+function TDValue.UnAttachFromParent: Boolean;
+var
+  i:Integer;
+begin
+  Result := False;
+  if Parent <> nil then
+  begin
+    i := Parent.FChildren.IndexOf(Self);
+    if i > -1 then
+    begin
+      Parent.UnAttach(i);
+      Result := True;
+    end;
+  end;
+end;
+
+{$IFDEF CHECK_DVALUE}
+procedure TDValue.__CheckValueOK;
+var
+  lvTick1, lvTick2:PCardinal;
+begin
+  lvTick1 := PCardinal(@__checkvalue[0]);
+  lvTick2 := PCardinal(@__checkvalue[4]);
+  Assert((lvTick1^ > 0) and (lvTick1^ = lvTick2^), '对象遭到或者已经释放');
+end;
+
+procedure TDValue.__InitalizeCheckValue;
+var
+  lvTick1, lvTick2:PCardinal;
+begin
+  lvTick1 := PCardinal(@__checkvalue[0]);
+  lvTick2 := PCardinal(@__checkvalue[4]);
+  lvTick1^ := GetTickCount;
+  lvTick2^ := lvTick1^;
+end;
+
+{$ENDIF}
 
 destructor TDValueItem.Destroy;
 begin
@@ -2760,6 +2897,11 @@ end;
 procedure TDValueItem.SetAsUInt(const Value: UInt64);
 begin
   DValueSetAsUInt64(@FRawValue, Value);
+end;
+
+function TDValueItem.SizeOf: Integer;
+begin
+  Result := GetDValueSize(@FRawValue);
 end;
 
 end.

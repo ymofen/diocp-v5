@@ -9,7 +9,7 @@ uses
 type
   TDiocpYunLogger = class(TObject)
   private
-    FURI:String;
+    FYunServerURL: String;
     FHttpClient: TDiocpHttpClient;
     FASync: TASyncInvoker;
     FLogDataQueue: TSafeQueue;
@@ -19,7 +19,8 @@ type
     procedure Start;
     procedure Stop;
   public
-    
+    procedure SetYunServer(pvURL:string);
+
     constructor Create;
     destructor Destroy; override;
     procedure LogMessage(const pvAccessToken, pvMsg, pvType, pvLevel:string);
@@ -61,7 +62,7 @@ begin
   FHttpClient := TDiocpHttpClient.Create(nil);
   FASync := TASyncInvoker.Create();
   FLogDataQueue := TSafeQueue.Create();
-  FURI := 'http://123.232.98.202:9007/api/yunlogger';
+  FYunServerURL := 'http://123.232.98.202:9007/api/yunlogger';
 end;
 
 destructor TDiocpYunLogger.Destroy;
@@ -79,7 +80,7 @@ begin
     FHttpClient.RequestContentType := 'text/json;chartset=utf-8';
     FHttpClient.RequestBody.Clear;
     FHttpClient.SetRequestBodyAsString(s, True);
-    FHttpClient.Post(FURI);
+    FHttpClient.Post(FYunServerURL);
   except
     on e:Exception do
     begin
@@ -132,6 +133,11 @@ begin
   end; 
 
   FLogDataQueue.EnQueue(NewPString(lvData));
+end;
+
+procedure TDiocpYunLogger.SetYunServer(pvURL:string);
+begin
+  FYunServerURL := pvURL;
 end;
 
 procedure TDiocpYunLogger.Start;

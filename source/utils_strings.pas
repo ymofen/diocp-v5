@@ -53,6 +53,13 @@ type
   RAWString = String;
 {$ENDIF}
 
+  // ÓÃÓÚ´æ´¢×Ö·û´®
+  PMAPKeyString = ^MAPKeyString;
+  MAPKeyString = record
+    key:Integer;
+    value: string;
+  end; 
+
 
 {$IF (RTLVersion>=26)}
 
@@ -586,6 +593,9 @@ function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 function NewPString(const s: string): PString;
 
 function GetStringFromPString(const p:Pointer): string;
+
+function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
+
 
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
@@ -2324,6 +2334,13 @@ end;
 function PosWStr(sub: WideString; const s: WideString): Integer;
 begin
   Result := Pos(sub, s);
+end;
+
+function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
+begin
+  New(Result);
+  Result^.key := key;
+  Result^.value := s;
 end;
 
 
