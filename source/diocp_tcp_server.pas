@@ -162,8 +162,10 @@ type
   private
     __free_flag:Integer;
 
+    FCreateSN:Integer;
+
     // 大于0时不会被KickOut
-    FBusingCounter: Integer; 
+    FBusingCounter: Integer;
 
     // 当前建立的连接套接字句柄
     FSocketHandle:TSocket;
@@ -491,6 +493,11 @@ type
     ///  连接时进行 +1
     /// </summary>
     property ContextDNA: Integer read FContextDNA;
+
+    /// <summary>
+    ///   创建顺序, 创建时 +1
+    /// </summary>
+    property CreateSN: Integer read FCreateSN;
     property CurrRecvRequest: TIocpRecvRequest read FCurrRecvRequest;
     property DisconnectedReason: String read FDisconnectedReason;
 
@@ -1347,7 +1354,7 @@ uses
 var
   __startTime:TDateTime;
   __innerLogger:TSafeLogger;
-
+  __create_sn:Integer;
 
 
 
@@ -1638,6 +1645,8 @@ end;
 constructor TIocpClientContext.Create;
 begin
   inherited Create;
+  FCreateSN := InterlockedIncrement(__create_sn);
+
   FDebugStrings := TStringList.Create;
   FReferenceCounter := 0;
   FContextLocker := TIocpLocker.Create('contextLocker');
