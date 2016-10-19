@@ -3590,7 +3590,11 @@ begin
       InnerAddToDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     end;
 
-    FRequestDisconnect := True;
+    if not FRequestDisconnect then
+    begin
+      self.FDisconnectedReason := pvDebugInfo;
+      FRequestDisconnect := True;
+    end;
 
     //
     if FReferenceCounter = 0 then
@@ -3633,14 +3637,11 @@ begin
           /// Push Fail unbinding buf
           lvRequest.UnBindingSendBuffer;
 
-          {$IFDEF DEBUG_ON}
           lvErrStr := Format(strSendPushFail, [SocketHandle,
             FSendRequestLink.Count, FSendRequestLink.MaxSize]);
           Self.RequestDisconnect(lvErrStr,
             lvRequest);
-          {$ELSE}
-          Self.RequestDisconnect('', lvRequest);
-          {$ENDIF}
+
 
           lvRequest.CancelRequest;
           FOwner.ReleaseSendRequest(lvRequest);
