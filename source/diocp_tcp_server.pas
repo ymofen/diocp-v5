@@ -233,6 +233,11 @@ type
     procedure OnDisconnectExResponse(pvObject:TObject);
   {$ENDIF}
   private
+    /// <summary>
+    ///   断线原因
+    /// </summary>
+    FDisconnectedReason:String;
+
     FAlive:Boolean;
 
     FInnerLockerFlag: Integer;
@@ -441,7 +446,7 @@ type
     /// </summary>
     procedure PostWSACloseRequest();
 
-    procedure RequestDisconnect(pvDebugInfo: string = ''; pvObj: TObject = nil);
+    procedure RequestDisconnect(pvReason: string = ''; pvObj: TObject = nil);
 
     /// <summary>
     ///  post send request to iocp queue, if post successful return true.
@@ -487,6 +492,7 @@ type
     /// </summary>
     property ContextDNA: Integer read FContextDNA;
     property CurrRecvRequest: TIocpRecvRequest read FCurrRecvRequest;
+    property DisconnectedReason: String read FDisconnectedReason;
 
     /// <summary>
     ///   最后交互数据的时间点
@@ -1794,7 +1800,7 @@ begin
   Result := FOwner.ReleaseSendRequest(pvObject);
 end;
 
-procedure TIocpClientContext.RequestDisconnect(pvDebugInfo: string = ''; pvObj:
+procedure TIocpClientContext.RequestDisconnect(pvReason: string = ''; pvObj:
     TObject = nil);
 var
   lvCloseContext:Boolean;
@@ -1802,7 +1808,7 @@ begin
   if not FActive then exit;
 
 {$IFDEF WRITE_LOG}
-  FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvDebugInfo]), strRequestDisconnectFileID, lgvDebug);
+  FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvReason]), strRequestDisconnectFileID, lgvDebug);
 {$ENDIF}
 
   // 关闭请求
@@ -1811,9 +1817,9 @@ begin
   InnerLock;
   try
     {$IFDEF DIOCP_DEBUG}
-    if pvDebugInfo <> '' then
+    if pvReason <> '' then
     begin
-      AddDebugString(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+      AddDebugString(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvReason]));
     end;
     {$ENDIF}
   
@@ -1821,6 +1827,8 @@ begin
     lvCloseContext := False;
     if not FRequestDisconnect then
     begin
+      FDisconnectedReason := pvReason;
+
       // cancel
       FRawSocket.ShutDown();
       FRawSocket.CancelIO;
@@ -1834,10 +1842,12 @@ begin
       FRequestDisconnect := True;
     end;
     {$ELSE}
-
-
+    if not FRequestDisconnect then
+    begin
+      FDisconnectedReason := pvReason;
+      FRequestDisconnect := True;
+    end;
     lvCloseContext := False;
-    FRequestDisconnect := True;
     if FReferenceCounter = 0 then  lvCloseContext := true;
     {$ENDIF}
   finally
@@ -2028,7 +2038,7 @@ end;
 
 procedure TIocpClientContext.DoDisconnect;
 begin
-  RequestDisconnect;
+  RequestDisconnect('DoDisconnect');
 end;
 
 procedure TIocpClientContext.DoDisconnected;
@@ -2206,13 +2216,7 @@ begin
     InnerUnLock;
   end;
 
-  {$IFDEF WRITE_LOG}
-  if not Result then
-  begin
-    FOwner.logMessage(
-      strSendPushFail, [FSocketHandle, FSendRequestLink.Count, FSendRequestLink.MaxSize]);
-  end;
-  {$ENDIF}
+
 
   if lvStart then
   begin      // start send work
@@ -2280,6 +2284,7 @@ function TIocpClientContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
     = nil): Boolean;
 var
   lvRequest:TIocpSendRequest;
+  s:String;
 begin
   Result := false;
   if self.Active then
@@ -2296,8 +2301,11 @@ begin
         begin
           /// Push Fail unbinding buf
           lvRequest.UnBindingSendBuffer;
-          Self.RequestDisconnect('TIocpClientContext.PostWSASendRequest Post Fail',
-            lvRequest);
+
+          s := Format(strSendPushFail, [FSocketHandle, FSendRequestLink.Count, FSendRequestLink.MaxSize]);
+
+          Self.RequestDisconnect(s,lvRequest);
+
           FOwner.ReleaseSendRequest(lvRequest);
         end;
       finally

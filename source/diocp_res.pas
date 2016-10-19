@@ -34,6 +34,7 @@ resourcestring
 
   strRequestDisconnectFileID = '请求断开日志';
 
+
   strBindingIocpError = '[%d]绑定到IOCP句柄时出现了异常, 错误代码:%d, (%s)';
 
   strPushFail      = '[%d]压入到待发送队列失败, 队列信息: %d/%d';

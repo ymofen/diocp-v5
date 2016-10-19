@@ -24,7 +24,7 @@ uses
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
-  utils_queues, utils_locker, utils_async, utils_fileWriter;
+  utils_queues, utils_locker, utils_async, utils_fileWriter, utils_strings;
 
 const
   CORE_LOG_FILE = 'diocp_core_exception';
@@ -70,6 +70,7 @@ type
   /// </summary>
   TDiocpCustomContext = class(TObject)
   private
+    FCreateSN:Integer;
     // 如果使用池，关闭后将会回归到池中
     FOwnePool:TSafeQueue;
     
@@ -100,6 +101,7 @@ type
     procedure DecReferenceCounterAndRequestDisconnect(pvDebugInfo: string; pvObj:TObject);
 
   private
+
     FObjectAlive: Boolean;
 
     // link
@@ -121,6 +123,12 @@ type
     FcurrSendRequest:TIocpSendRequest;
 
     FData: Pointer;
+
+    /// <summary>
+    ///   断线原因
+    /// </summary>
+    FDisconnectedReason: String;
+
     FOnConnectedEvent: TNotifyContextEvent;
     FOnDisconnectedEvent: TNotifyContextEvent;
     FOnRecvBufferEvent: TOnBufferReceived;
@@ -286,7 +294,9 @@ type
     /// </summary>
     function PostWSASendRequest(buf: Pointer; len: Cardinal; pvBufReleaseType:
         TDataReleaseType): Boolean; overload;
-    procedure RequestDisconnect(pvDebugInfo: string = ''; pvObj: TObject = nil);
+
+    procedure RequestDisconnect(pvReason: string = STRING_EMPTY; pvObj: TObject =
+        nil);
 
 
     procedure SetMaxSendingQueueSize(pvSize:Integer);
@@ -321,8 +331,10 @@ type
     ///   连接成功次数
     /// </summary>
     property ConnectedCounter: Integer read FConnectedCounter;
+    property CreateSN: Integer read FCreateSN;
     property CurrRecvRequest: TIocpRecvRequest read FCurrRecvRequest;
     property DisconnectedCounter: Integer read FDisconnectedCounter;
+    property DisconnectedReason: String read FDisconnectedReason;
 
 
 
@@ -1025,6 +1037,7 @@ resourcestring
 
 var
   __innerLogger:TSafeLogger;
+  __create_sn:Integer;
 
 type
   TContextDoublyLinked = class(TObject)
@@ -1158,6 +1171,8 @@ end;
 constructor TDiocpCustomContext.Create;
 begin
   inherited Create;
+  FCreateSN := InterlockedIncrement(__create_sn);
+
   FSocketState := ssDisconnected;
   FDebugStrings := TStringList.Create;
   FReferenceCounter := 0;
@@ -1590,8 +1605,8 @@ begin
 
 end;
 
-procedure TDiocpCustomContext.RequestDisconnect(pvDebugInfo: string = '';
-    pvObj: TObject = nil);
+procedure TDiocpCustomContext.RequestDisconnect(pvReason: string =
+    STRING_EMPTY; pvObj: TObject = nil);
 var
   lvCloseContext:Boolean;
 begin
@@ -1603,8 +1618,8 @@ begin
   end;
 
 {$IFDEF DEBUG_ON}
-  FOwner.logMessage('(%d)断开请求信息:%s, 当前引用计数:%d', [SocketHandle, pvDebugInfo, FReferenceCounter],
-      'RequestDisconnect');
+  FOwner.logMessage('(%d)断开请求信息:%s, 当前引用计数:%d', [SocketHandle, pvReason, FReferenceCounter],
+      strRequestDisconnectFileID);
 {$ENDIF}
 
   lvCloseContext := false;
@@ -1613,11 +1628,16 @@ begin
 
   FContextLocker.lock('RequestDisconnect');
   try
-    if pvDebugInfo <> '' then
+    if pvReason <> '' then
     begin
-      InnerAddToDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+      InnerAddToDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvReason]));
     end;
-    FRequestDisconnect := True;
+
+    if not FRequestDisconnect then
+    begin
+      FDisconnectedReason := pvReason;
+      FRequestDisconnect := True;
+    end;
 
     //
     if FReferenceCounter = 0 then
@@ -2021,7 +2041,7 @@ begin
         lvClientContext := TDiocpCustomContext(lvBucket.Data);
         if lvClientContext <> nil then
         begin
-          lvClientContext.RequestDisconnect('DisconnectAll');
+          lvClientContext.RequestDisconnect('主动请求断开所有连接');
         end;
         lvBucket:=lvBucket.Next;
       end;

@@ -23,7 +23,8 @@ type
 
     constructor Create;
     destructor Destroy; override;
-    procedure LogMessage(const pvAccessToken, pvMsg, pvType, pvLevel:string);
+    procedure LogMessage(const pvAccessToken, pvMsg: string; const pvType: string =
+        STRING_EMPTY; const pvLevel: string = STRING_EMPTY);
   end;
 
 var
@@ -108,8 +109,8 @@ begin
   end;
 end;
 
-procedure TDiocpYunLogger.LogMessage(const pvAccessToken, pvMsg, pvType,
-    pvLevel:string);
+procedure TDiocpYunLogger.LogMessage(const pvAccessToken, pvMsg: string; const
+    pvType: string = STRING_EMPTY; const pvLevel: string = STRING_EMPTY);
 var
   lvData:String;
   lvJSON:TDValue;

@@ -24,7 +24,9 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure SetValue(const pvAccessToken, pvPath, pvValue: string);
-    procedure SetJSON(const pvAccessToken, pvPath: string; const pvValue: TDValue);
+    procedure SetJSON(const pvAccessToken, pvPath: string; const pvValue: TDValue);overload;
+    procedure SetJSON(const pvAccessToken, pvPath: string; const pvJSON: String);
+        overload;
   end;
 
 var
@@ -155,6 +157,22 @@ begin
     lvJSON.Free;
   end;    
   FLogDataQueue.EnQueue(NewPString(lvData));
+end;
+
+procedure TDiocpYunStorage.SetJSON(const pvAccessToken, pvPath: string; const
+    pvJSON: String);
+var
+  lvValue:TDValue;
+begin
+  lvValue := TDValue.Create();
+  try
+    JSONParser(pvJSON, lvValue);
+    SetJSON(pvAccessToken, pvPath, lvValue);
+  finally
+    lvValue.Free;
+  end;
+
+
 end;
 
 procedure TDiocpYunStorage.SetYunServer(pvURL:string);
