@@ -18,6 +18,7 @@ uses
 type
   TASyncWorker = class;
   TOnASyncEvent = procedure(pvASyncWorker: TASyncWorker) of object;
+  TOnASyncGlobalEvent = procedure(pvASyncWorker: TASyncWorker);
   TASyncWorker = class(TThread)
   private
     FData: Pointer;
@@ -50,7 +51,10 @@ type
     procedure WaitForSleep(pvTime:Cardinal);
 
     procedure Start(pvASyncEvent: TOnASyncEvent; pvData: Pointer = nil;
-        pvDataObject: TObject = nil);
+        pvDataObject: TObject = nil);overload;
+
+    procedure Start(pvASyncEvent: TOnASyncGlobalEvent; pvData: Pointer = nil;
+        pvDataObject: TObject = nil); overload;
     procedure Terminate;
     procedure WaitForStop;
 
@@ -95,6 +99,12 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 function InterlockedExchangeAdd(Addend: PLongint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
 function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
 {$IFEND <D2007}
+
+function ConvertToOnASyncEvent(const AProc: TOnASyncGlobalEvent): TOnASyncEvent;
+begin
+  TMethod(Result).Data := nil;
+  TMethod(Result).Code := @AProc;
+end;
 
 
 function GetCPUCount: Integer;
@@ -252,6 +262,12 @@ begin
   FTerminated := False;
   FOnAsyncEvent := pvASyncEvent;
   FWorker := ASyncInvoke(InnerASync, pvData, pvDataObject);
+end;
+
+procedure TASyncInvoker.Start(pvASyncEvent: TOnASyncGlobalEvent; pvData:
+    Pointer = nil; pvDataObject: TObject = nil);
+begin
+  Start(ConvertToOnASyncEvent(pvASyncEvent), pvData, pvDataObject);
 end;
 
 procedure TASyncInvoker.Terminate;

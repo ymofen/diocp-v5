@@ -95,6 +95,7 @@ type
 
     function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
     procedure CheckSocketSendResult(pvSocketResult:Integer);
+    function GetActive: Boolean;
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   public
@@ -114,6 +115,7 @@ type
     procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
         Boolean);
 
+    property Active: Boolean read GetActive;
     /// <summary>
     ///   是否检测线程安全，只能在创建线程中使用
     /// </summary>
@@ -132,6 +134,7 @@ type
     ///   KeepAlive时有效
     /// </summary>
     property KeepAliveTimeOut: Cardinal read FKeepAliveTimeOut write FKeepAliveTimeOut;
+    property LastActivity: Cardinal read FLastActivity;
 
     /// <summary>
     ///   请求参数:
@@ -895,6 +898,11 @@ begin
     FHttpBuffer.ContentBuilder.SaveToFile('response.dat');
     raise Exception.Create(Format('错误的ResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
   end;
+end;
+
+function TDiocpHttpClient.GetActive: Boolean;
+begin
+  Result := FRawSocket.SocketValid;
 end;
 
 function TDiocpHttpClient.GetResponseResultCode: Integer;
