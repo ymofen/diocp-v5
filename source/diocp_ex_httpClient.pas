@@ -39,6 +39,7 @@ type
 
   TDiocpHttpClient = class(TComponent)
   private
+    FReConnectCounter:Integer;
     FBufferWriter:TBlockBuffer;
     FCheckThreadSafe: Boolean;
     FCreatTheadID:THandle;
@@ -135,6 +136,7 @@ type
     /// </summary>
     property KeepAliveTimeOut: Cardinal read FKeepAliveTimeOut write FKeepAliveTimeOut;
     property LastActivity: Cardinal read FLastActivity;
+    property ReConnectCounter: Integer read FReConnectCounter;
 
     /// <summary>
     ///   ÇëÇó²ÎÊý:
@@ -757,6 +759,8 @@ begin
       RaiseLastOSError;
     end;
     {$ENDIF}
+
+    Inc(FReConnectCounter);
   end;
 
   FLastHost := pvHost;

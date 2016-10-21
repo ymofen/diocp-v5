@@ -227,6 +227,12 @@ type
     procedure __InitalizeCheckValue;
     {$ENDIF}
   private
+    /// <summary>
+    ///   最后修改时间
+    /// </summary>
+    FLastModify:Cardinal;
+    procedure DoLastModify;
+  private
     FName: TDValueItem;
     FValue: TDValueItem;
     FObjectType: TDValueObjectType;
@@ -297,6 +303,12 @@ type
     function GetAsStringW: DStringW;
     procedure SetAsStringW(const Value: DStringW);
   public
+
+    /// <summary>
+    ///   清理子节点中超期未修改的子节点
+    /// </summary>
+    function ClearLastModify(pvTimeOut:Cardinal = 30000): Integer;
+    
     constructor Create(pvType: TDValueObjectType); overload;
 
     constructor Create; overload;
@@ -1224,6 +1236,7 @@ end;
 
 procedure DValueSetAsBoolean(ADValue:PDRawValue; pvValue:Boolean);
 begin
+
   CheckDValueSetType(ADValue, vdtBoolean);
   ADValue.Value.AsBoolean := pvValue;
 end;
@@ -1953,6 +1966,7 @@ end;
 
 function TDValue.CheckSetNodeType(pvType:TDValueObjectType): TDValue;
 begin
+  DoLastModify;
   if pvType <> FObjectType then
   begin
     if not (FObjectType in [vntNull]) then
@@ -1989,6 +2003,21 @@ begin
     begin
       raise Exception.CreateFmt('%s(%s):%s:%s', [e.ClassName, FLastMsg, lvDebug, e.Message]);
     end;
+  end;
+end;
+
+function TDValue.ClearLastModify(pvTimeOut:Cardinal = 30000): Integer;
+var
+  i: Integer;
+  lvNow:Cardinal;
+begin
+  lvNow := GetTickCount;
+  for i := Count - 1 downto 0 do
+  begin
+    if tick_diff(Items[i].FLastModify, lvNow) >= pvTimeOut then
+    begin
+      Delete(i);
+    end;    
   end;
 end;
 
@@ -2623,6 +2652,15 @@ procedure TDValue.SetAsUInt(const Value: UInt64);
 begin
   CheckSetNodeType(vntValue);
   FValue.SetAsUInt(Value);
+end;
+
+procedure TDValue.DoLastModify;
+begin
+  FLastModify := GetTickCount;
+  if Parent <> nil then
+  begin
+    Parent.DoLastModify;
+  end;
 end;
 
 function TDValue.SizeOf: Integer;
