@@ -44,7 +44,10 @@ uses
 
 const
   BUFFER_BLOCK_SIZE = $2000;  // Must be a power of 2
-  STRING_EMPTY = ''; 
+  STRING_EMPTY = '';
+{$IFDEF MSWINDOWS}
+  STRING_EMPTY_A :AnsiString = '';
+{$ENDIF}
 
 type
 {$IFDEF MSWINDOWS}
@@ -1355,14 +1358,13 @@ begin
 
   if pvIgnoreCase then
   begin
-    lvSubUP := UpperCase(pvStart^);
-    PSubUP := PChar(lvSubUP);
+    PSubUP := pvStart;
     if (P = nil) or (PSubUP = nil) then  Exit;
     
     if P^ = #0 then Exit;
     while PSubUP^ <> #0 do
     begin
-      if UpperChar(P^) = PSubUP^ then
+      if UpperChar(P^) =UpperChar(PSubUP^) then
       begin
         Inc(P);
         Inc(PSubUP);
