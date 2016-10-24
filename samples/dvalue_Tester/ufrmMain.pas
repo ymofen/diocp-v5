@@ -44,8 +44,10 @@ type
     mmoJSONData: TMemo;
     btnDValueToDataSet: TButton;
     btnEmptyDemo: TButton;
+    btnClearTimeOut: TButton;
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
+    procedure btnClearTimeOutClick(Sender: TObject);
     procedure btnConvertToDValueClick(Sender: TObject);
     procedure btnDValueClick(Sender: TObject);
     procedure btnDValueCloneFromClick(Sender: TObject);
@@ -66,6 +68,7 @@ type
     procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
+    FDValueObj:TDValue;
   public
     { Public declarations }
   end;
@@ -77,6 +80,7 @@ function CreateField(const pvDataSet: TDataSet; const pvFieldName: string;
 
 var
   Form1: TForm1;
+  __sn:Integer;
 
 implementation
 
@@ -184,6 +188,25 @@ end;
 procedure TForm1.btnClearClick(Sender: TObject);
 begin
   mmoData.Clear;
+end;
+
+procedure TForm1.btnClearTimeOutClick(Sender: TObject);
+var
+  sn:Integer;
+begin
+  sn := InterlockedIncrement(__sn);
+  if FDValueObj = nil then
+  begin
+    FDValueObj := TDValue.Create();
+
+    mmoLog.Clear;
+  end;
+  FDValueObj.ForceByPath(Format('a.%d.value', [sn])).AsString := NowString;
+  FDValueObj.ForceByPath(Format('a.%d.tick', [sn])).AsInteger := GetTickCount;
+  FDValueObj.ForceByPath('a').ClearLastModify(10000);
+
+  //
+  mmoLog.Lines.Add(JSONEncode(FDValueObj, True, False));
 end;
 
 procedure TForm1.btnConvertToDValueClick(Sender: TObject);
