@@ -602,7 +602,7 @@ function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
 
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
-function PosWStr(sub: WideString; const s: WideString): Integer;
+function PosWStr(sub: DStringW; const s: DStringW): Integer;
 
 implementation
 
@@ -2333,7 +2333,7 @@ begin
   end;
 end;
 
-function PosWStr(sub: WideString; const s: WideString): Integer;
+function PosWStr(sub: DStringW; const s: DStringW): Integer;
 begin
   Result := Pos(sub, s);
 end;
