@@ -378,6 +378,9 @@ type
     function Add(pvName:string; pvValue:Boolean): TDValue; overload;
     function Add(pvName:string; pvValue:Double): TDValue; overload;
 
+    function AddVar(pvName:string; pvValue:Variant): TDValue;
+
+
     /// <summary>
     ///   直接绑定, 拥有该对象的生命周期
     /// </summary>
@@ -1881,6 +1884,21 @@ begin
   CheckSetNodeType(vntArray);
   pvDValue.FParent := Self;
   FChildren.Add(pvDValue);
+end;
+
+function TDValue.AddVar(pvName:string; pvValue:Variant): TDValue;
+var
+  lvVarType:TVarType;
+begin
+  lvVarType := VarType(pvValue);
+  Result := Add(pvName);
+  case lvVarType of
+    varSmallInt, varInteger, varShortInt: Result.AsInteger := pvValue;
+    varSingle, varDouble: Result.AsFloat := pvValue;
+    varDate: Result.AsString := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvValue);
+  else
+    Result.AsString := pvValue;
+  end;
 end;
 
 procedure TDValue.AttachDValue(pvName: String; pvDValue: TDValue);

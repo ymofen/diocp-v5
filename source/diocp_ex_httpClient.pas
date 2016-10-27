@@ -25,6 +25,8 @@ type
   TBytes = array of Byte;
 {$IFEND}
 
+  EDiocpHttpClient = class(Exception);
+
   TDiocpSocketSendException = class(Exception)
     ErrorCode:Integer;
   end;
@@ -751,7 +753,7 @@ begin
     {$IFDEF MSWINDOWS}
     if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
     begin
-      raise Exception.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+      raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
     end;
     {$ELSE}
     if not FRawSocket.Connect(lvIpAddr, pvPort) then

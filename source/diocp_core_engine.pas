@@ -319,6 +319,7 @@ type
     FLastResponseStart:TDateTime;
 
     FLastResponseEnd: TDateTime;
+    FTagStr: String;
 
     /// <summary>
     ///  设置线程当前信息(由线程内部调用执行)
@@ -352,6 +353,11 @@ type
     ///   the last handle respond iocp request
     /// </summary>
     property LastRequest: TIocpRequest read FLastRequest;
+
+    /// <summary>
+    ///   单线程访问
+    /// </summary>
+    property TagStr: String read FTagStr write FTagStr;
 
 
   end;
