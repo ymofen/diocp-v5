@@ -280,6 +280,7 @@ end;
 
 procedure TfrmMain.OnDisconnected(pvClientContext: TIocpClientContext);
 begin
+  sfLogger.logMessage(Format('%s:%d-%s', [pvClientContext.RemoteAddr, pvClientContext.RemotePort, pvClientContext.DisconnectedReason]));
   if pvClientContext.Data <> nil then
   begin
     TObject(pvClientContext.Data).Free;
