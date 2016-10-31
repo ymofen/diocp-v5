@@ -113,10 +113,6 @@ object frmMain: TfrmMain
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3
@@ -364,6 +360,15 @@ object frmMain: TfrmMain
       Caption = #25171#24320#37197#32622
       TabOrder = 16
       OnClick = btnReadConfigClick
+    end
+    object btnBreakConnectNumLimit: TButton
+      Left = 784
+      Top = 8
+      Width = 105
+      Height = 25
+      Caption = #35299#38500#36830#25509#25968#38480#21046
+      TabOrder = 17
+      OnClick = btnBreakConnectNumLimitClick
     end
   end
   object pnlLog: TPanel

@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp_tcp_client,
   utils_safeLogger, ComCtrls, diocp_sockets, ExtCtrls, utils_async,
-  utils_BufferPool, utils_fileWriter, diocp_tcp_blockClient;
+  utils_BufferPool, utils_fileWriter, diocp_tcp_blockClient, Registry;
 
 type
   TEchoContext = class(TIocpRemoteContext)
@@ -71,6 +71,8 @@ type
     spllog: TSplitter;
     btnReadConfig: TButton;
     btnInfo: TButton;
+    btnBreakConnectNumLimit: TButton;
+    procedure btnBreakConnectNumLimitClick(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
@@ -187,6 +189,38 @@ begin
   FIocpClientSocket.Free;
   FFileLogger.Free;
   inherited Destroy;
+end;
+
+procedure RegUpdateMaxUserPort();
+var
+  reg: TRegistry;
+begin
+  reg := TRegistry.Create;
+  try
+    reg.RootKey := HKEY_LOCAL_MACHINE;
+    if reg.OpenKey('\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters', True) then
+    begin
+      try 
+        if (not reg.ValueExists('MaxUserPort')) or (reg.ReadInteger('MaxUserPort') <> 65534) then
+        begin
+          reg.WriteInteger('MaxUserPort', 65534);
+          reg.WriteInteger('MaxHashTableSize', 65536);
+          reg.WriteInteger('MaxFreeTcbs', 16000);
+          reg.WriteInteger('TcpTimedWaitDelay', 5);
+        end;
+      except
+      end;
+      reg.CloseKey;
+    end;
+  finally
+    reg.Free;
+  end;
+end;
+
+procedure TfrmMain.btnBreakConnectNumLimitClick(Sender: TObject);
+begin
+  RegUpdateMaxUserPort;
+  ShowMessage('连接数更新成功，可能需要重启系统');
 end;
 
 procedure TfrmMain.btnClearClick(Sender: TObject);
