@@ -557,6 +557,8 @@ function HexValue(c: Char): Integer;
 
 function HexChar(V: Byte): Char;
 
+function HexToInt(const p:PChar; pvLength:Integer): Integer;
+
 function PickString(p: PChar; pvOffset, pvCount: Integer): String;
 
 /// <summary>
@@ -571,7 +573,7 @@ procedure WriteStringToUtf8NoBOMFile(pvFile, pvData: String);
 ///   copy from qdac.qstrings.pas
 /// </summary>
 function ParseNumeric(var S: PChar; var ANum: Extended): Boolean;
-function ParseHex(var p: PChar; var Value: Int64): Integer; 
+function ParseHex(var p: PChar; var Value: Int64): Integer;
 function ParseInt(var S: PChar; var ANum: Int64): Integer;
 
 {$if CompilerVersion < 20}
@@ -2343,6 +2345,23 @@ begin
   New(Result);
   Result^.key := key;
   Result^.value := s;
+end;
+
+function HexToInt(const p:PChar; pvLength:Integer): Integer;
+var
+  ps: PChar;
+  i: Integer;
+begin
+  Result := 0;
+  ps := p;
+
+
+  
+  for i := 0 to pvLength - 1 do
+  begin
+    Result := (Result shl 4) + HexValue(ps^);
+    Inc(ps);
+  end;
 end;
 
 

@@ -63,3 +63,6 @@ A: 编码层默认由接收数据的IOCP线程处理，这样会占用iocp接收
 
 Q: 怎么样将提高DIOCP速度
 A: 在工程属性中定义[DIOCP_HIGH_SPEED]宏(Project->Options->Directories/Conditionals->Conditional defines)
+
+Q: 获取连接的IP和端口
+A: 找到对应的连接(Context), IP: Context.RemoteAddr, 端口: Context.RemotePort
