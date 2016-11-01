@@ -18,6 +18,14 @@
   {$ENDIF}
 {$ELSE}
 
+// 小于2007的版本不使用ZlibExGZ
+{$if CompilerVersion>= 18}
+  {$IFDEF MSWINDOWS}
+    {$DEFINE USE_ZLIBExGZ}
+    {$DEFINE USE_Z_LZO}
+  {$ENDIF}
+{$ifend}
+
 {$IFEND RTLVersion}
 
 {$if CompilerVersion < 15}  // <D7

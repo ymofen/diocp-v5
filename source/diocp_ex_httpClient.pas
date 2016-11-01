@@ -2,6 +2,8 @@ unit diocp_ex_httpClient;
 
 interface
 
+{$I 'diocp.inc'}
+
 uses
   Classes
   {$IFDEF POSIX}
@@ -546,14 +548,14 @@ var
         begin
           ZDecompressBufferBuilder(FHttpBuffer.ContentBuilder);
         end
-        {$IFDEF MSWINDOWS}
+        {$IFDEF USE_Z_LZO}
         else if FResponseContentEncoding = 'lzo' then
         begin
           LZODecompressBufferBuilder(FHttpBuffer.ContentBuilder);
         end
         {$ENDIF}
         {$if CompilerVersion>= 18}
-        {$IFDEF MSWINDOWS}
+        {$IFDEF USE_ZLIBExGZ}
         else if FResponseContentEncoding = 'gzip' then
         begin
           GZDecompressBufferBuilder(FHttpBuffer.ContentBuilder);

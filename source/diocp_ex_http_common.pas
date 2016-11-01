@@ -2,13 +2,8 @@ unit diocp_ex_http_common;
 
 interface
 
-// 小于2007的版本不使用ZlibExGZ
-{$if CompilerVersion>= 18}
-  {$IFDEF MSWINDOWS}
-    {$DEFINE USE_ZLIBExGZ}
-    {$DEFINE USE_Z_LZO}
-  {$ENDIF}
-{$ifend}
+{$I 'diocp.inc'}
+
 
 {$if CompilerVersion>= 28}    // XE7:28
 {$DEFINE USE_NetEncoding}
