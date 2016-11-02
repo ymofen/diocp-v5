@@ -554,14 +554,12 @@ var
           LZODecompressBufferBuilder(FHttpBuffer.ContentBuilder);
         end
         {$ENDIF}
-        {$if CompilerVersion>= 18}
         {$IFDEF USE_ZLIBExGZ}
         else if FResponseContentEncoding = 'gzip' then
         begin
           GZDecompressBufferBuilder(FHttpBuffer.ContentBuilder);
         end
         {$ENDIF}
-        {$ifend}
         ;
 
         l:= FHttpBuffer.ContentBuilder.Length;
@@ -976,14 +974,18 @@ begin
     begin
       ZDecompressBufferBuilder(FReponseBuilder);
     end
-    {$if CompilerVersion>= 18}
-    {$IFDEF MSWINDOWS}
+    {$IFDEF USE_Z_LZO}
+    else if FResponseContentEncoding = 'lzo' then
+    begin
+      LZODecompressBufferBuilder(FReponseBuilder);
+    end
+    {$ENDIF}
+    {$IFDEF USE_ZLIBExGZ}
     else if FResponseContentEncoding = 'gzip' then
     begin
       GZDecompressBufferBuilder(FReponseBuilder);
     end
     {$ENDIF}
-    {$ifend}
     ;
 
     l:= FReponseBuilder.Length;
