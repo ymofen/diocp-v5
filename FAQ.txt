@@ -66,3 +66,9 @@ A: 在工程属性中定义[DIOCP_HIGH_SPEED]宏(Project->Options->Directories/C
 
 Q: 获取连接的IP和端口
 A: 找到对应的连接(Context), IP: Context.RemoteAddr, 端口: Context.RemotePort
+
+Q: 怎么使用单独的Iocp引擎
+A: Diocp从2016-11-08号的版本，底层默认都使用__defaultDiocpEngine, 如果不希望互相干扰，可以绑定一个新的引擎
+   服务端: TDiocpTcpServer.BindDiocpEngine(CreateNewDiocpEngine(0), true);
+   客户端: TDiocpCustom.BindDiocpEngine(CreateNewDiocpEngine(0), true);
+   

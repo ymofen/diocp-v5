@@ -1009,7 +1009,7 @@ type
     FConnectedCount: Integer;
     FDefaultListenAddress: String;
 
-    FIocpEngine: TIocpEngine;
+
 
     FKeepAlive: Boolean;
     FNoDelayOption: Boolean;
@@ -1041,6 +1041,10 @@ type
 
     procedure DoReceiveData(pvIocpClientContext:TIocpClientContext;
         pvRequest:TIocpRecvRequest);
+  private
+    FIocpEngine: TIocpEngine;
+    FOwnerEngine:Boolean;
+    procedure CheckDoDestroyEngine;
   protected
     FLocker:TIocpLocker;
 
@@ -1086,6 +1090,16 @@ type
         Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
     procedure InnerAddToDebugStrings(pvMsg:String);
   public
+
+    /// <summary>
+    ///   绑定一个Iocp引擎
+    /// </summary>
+    /// <param name="pvEngine"> (TIocpEngine) </param>
+    /// <param name="pvOwner">
+    ///   是否拥有这个引擎,
+    ///   true: 释放时这个引擎会一起释放
+    /// </param>
+    procedure BindDiocpEngine(const pvEngine: TIocpEngine; pvOwner: Boolean = true);
 
     /// <summary>
     ///   超时检测, 如果超过Timeout指定的时间还没有任何数据交换数据记录，
@@ -2408,6 +2422,20 @@ begin
   Result := (pvClientContext.FOwner = Self);
 end;
 
+procedure TDiocpTcpServer.CheckDoDestroyEngine;
+begin
+  if FOwnerEngine then
+  begin
+    if FIocpEngine <> nil then
+    begin
+      FIocpEngine.SafeStop();
+      FIocpEngine.Free;
+      FIocpEngine := nil;
+    end;
+    FOwnerEngine := False;
+  end;
+end;
+
 procedure TDiocpTcpServer.Close;
 begin
   SetActive(False);
@@ -2437,8 +2465,9 @@ begin
 
   // 开启默认的Diocp引擎
   StartDiocpEngine;
-  
-  FIocpEngine := __defaultDiocpEngine;   
+  FOwnerEngine := False;
+
+  BindDiocpEngine(__defaultDiocpEngine, False);
 
   FOnlineContextList := TDHashTable.Create(10949);
 
@@ -2470,8 +2499,8 @@ begin
   FSendRequestPool.FreeDataObject;
   FRecvRequestPool.FreeDataObject;
 
-  FIocpEngine := nil;
-
+  CheckDoDestroyEngine;
+  
   FOnlineContextList.Free;
 
   FSendRequestPool.Free;
@@ -2499,6 +2528,15 @@ begin
   finally
     FLocker.unLock;
   end;
+end;
+
+procedure TDiocpTcpServer.BindDiocpEngine(const pvEngine: TIocpEngine; pvOwner:
+    Boolean = true);
+begin
+  CheckDoDestroyEngine;
+    
+  FIocpEngine := pvEngine;
+  FOwnerEngine := pvOwner;
 end;
 
 

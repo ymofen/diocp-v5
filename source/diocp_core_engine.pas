@@ -517,6 +517,8 @@ var
 
 procedure StartDiocpEngine;
 procedure StopDiocpEngine;
+function CreateNewDiocpEngine(const pvWorkerNum:Integer): TIocpEngine;
+
 procedure SetDiocpEngineWorkerNum(const pvWorkerNum:Integer);
 
 function IsDebugMode: Boolean;
@@ -637,6 +639,12 @@ begin
   begin
     __defaultDiocpEngine.SetWorkerCount(pvWorkerNum);    
   end;
+end;
+
+function CreateNewDiocpEngine(const pvWorkerNum:Integer): TIocpEngine;
+begin
+  Result := TIocpEngine.Create;
+  Result.SetWorkerCount(pvWorkerNum);
 end;
 
 function TIocpCore.Bind2IOCPHandle(pvHandle: THandle; pvCompletionKey:

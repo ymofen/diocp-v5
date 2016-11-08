@@ -729,7 +729,6 @@ type
 
     FActive: Boolean;
 
-    FIocpEngine: TIocpEngine;
 
     FOnContextConnected: TNotifyContextEvent;
     FOnContextDisconnected: TNotifyContextEvent;
@@ -753,6 +752,10 @@ type
 
     procedure DoReceiveData(pvIocpContext: TDiocpCustomContext; pvRequest:
         TIocpRecvRequest);
+  private
+    FOwnerEngine:Boolean;
+    FIocpEngine: TIocpEngine;
+    procedure CheckDoDestroyEngine;
   protected
 
     /// <summary>
@@ -810,6 +813,7 @@ type
     ///   添加到在线列表中
     /// </summary>
     procedure AddToOnlineList(pvObject: TDiocpCustomContext);
+
 
 
     /// <summary>
@@ -940,8 +944,6 @@ type
 
     
     procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
-    procedure BindingEngine(const pvEngine:TIocpEngine);
-
     function GetDebugString: String;
 
 
@@ -956,6 +958,15 @@ type
     property NoDelayOption: Boolean read FNoDelayOption write FNoDelayOption;
 
   public
+    /// <summary>
+    ///   绑定一个Iocp引擎
+    /// </summary>
+    /// <param name="pvEngine"> (TIocpEngine) </param>
+    /// <param name="pvOwner">
+    ///   是否拥有这个引擎,
+    ///   true: 释放时这个引擎会一起释放
+    /// </param>
+    procedure BindDiocpEngine(const pvEngine: TIocpEngine; pvOwner: Boolean = true);
     procedure IncOperaOptions(const pvFlag:Integer);
     procedure DecOperaOptions(const pvFlag:Integer);
     function CheckOperaFlag(const pvFlag:Integer): Boolean;
@@ -1764,8 +1775,8 @@ begin
 
   // 开启默认的Diocp引擎
   StartDiocpEngine;
-  
-  FIocpEngine := __defaultDiocpEngine;
+  FOwnerEngine := False;
+  BindDiocpEngine(__defaultDiocpEngine, False);
 
   // post wsaRecv block size
   FWSARecvBufferSize := 1024 * 4;
@@ -1792,7 +1803,7 @@ begin
 
   FOnlineContextList.Free;
 
-  FIocpEngine := nil;
+  CheckDoDestroyEngine;
 
   FSendRequestPool.Free;
   FRecvRequestPool.Free;
@@ -1848,9 +1859,27 @@ begin
   end;
 end;
 
-procedure TDiocpCustom.BindingEngine(const pvEngine:TIocpEngine);
+procedure TDiocpCustom.BindDiocpEngine(const pvEngine: TIocpEngine; pvOwner:
+    Boolean = true);
 begin
+  CheckDoDestroyEngine;
+    
   FIocpEngine := pvEngine;
+  FOwnerEngine := pvOwner;
+end;
+
+procedure TDiocpCustom.CheckDoDestroyEngine;
+begin
+  if FOwnerEngine then
+  begin
+    if FIocpEngine <> nil then
+    begin
+      FIocpEngine.SafeStop();
+      FIocpEngine.Free;
+      FIocpEngine := nil;
+    end;
+    FOwnerEngine := False;
+  end;
 end;
 
 
