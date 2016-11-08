@@ -489,9 +489,6 @@ type
 
 
 
-
-
-
     /// <summary>
     ///  获取工作线程数量
     /// </summary>
@@ -515,6 +512,12 @@ type
 
 var
   __ProcessIDStr:String;
+  
+  __defaultDiocpEngine:TIocpEngine;
+
+procedure StartDiocpEngine;
+procedure StopDiocpEngine;
+procedure SetDiocpEngineWorkerNum(const pvWorkerNum:Integer);
 
 function IsDebugMode: Boolean;
 procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
@@ -524,6 +527,7 @@ function TraceDateString(pvDate:TDateTime): String;
 
 
 implementation
+
 
 {$IFDEF DEBUG_ON}
 var
@@ -607,6 +611,33 @@ begin
   Result := 1;
   {$ENDIF !POSIX}
   {$ENDIF !MSWINDOWS}
+end;
+
+procedure StartDiocpEngine;
+begin
+  if __defaultDiocpEngine = nil then
+  begin
+    __defaultDiocpEngine := TIocpEngine.Create;
+    __defaultDiocpEngine.Start;
+  end;
+end;
+
+procedure StopDiocpEngine;
+begin
+  if __defaultDiocpEngine <> nil then
+  begin
+    __defaultDiocpEngine.SafeStop();
+    __defaultDiocpEngine.Free;
+    __defaultDiocpEngine := nil;
+  end;
+end;
+
+procedure SetDiocpEngineWorkerNum(const pvWorkerNum:Integer);
+begin
+  if __defaultDiocpEngine = nil then
+  begin
+    //__defaultDiocpEngine.WorkerCount := pvWorkerNum;    
+  end;
 end;
 
 function TIocpCore.Bind2IOCPHandle(pvHandle: THandle; pvCompletionKey:
@@ -1202,7 +1233,6 @@ end;
 procedure TIocpEngine.SetMaxWorkerCount(AWorkerCount: Word);
 begin
   FMaxWorkerCount := AWorkerCount;
-
 end;
 
 procedure TIocpEngine.SetWorkerCount(AWorkerCount: Integer);
@@ -1662,5 +1692,6 @@ finalization
   if IsDebugMode then
     Assert(workerCounter <= 0, ('diocp_core_engine workerCounter, has dead thread? current worker Counter:' + IntToStr(workerCounter)));
 {$ENDIF}
+  StopDiocpEngine;
 
 end.

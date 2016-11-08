@@ -1125,6 +1125,13 @@ type
 
     procedure RegisterSendRequestClass(pvClass: TIocpSendRequestClass);
 
+
+    /// <summary>
+    ///   推送到所有在线终端
+    /// </summary>
+    function PostBufferToOnlineClients(pvBuf:Pointer; pvLen:Integer; pvCopyBuf:
+        Boolean = true; pvTag: Integer = 0; pvTagData: Pointer = nil): Integer;
+
     /// <summary>
     ///   创建数据监控中心实例
     /// </summary>
@@ -3408,6 +3415,38 @@ begin
       LogMessage('未处理异常:%s',[E.Message], CORE_LOG_FILE, lgvError);
     end;
   except
+  end;
+end;
+
+function TDiocpTcpServer.PostBufferToOnlineClients(pvBuf:Pointer;
+    pvLen:Integer; pvCopyBuf: Boolean = true; pvTag: Integer = 0; pvTagData:
+    Pointer = nil): Integer;
+var
+  I:Integer;
+  lvBucket: PDHashData;
+  lvContext: TIocpClientContext;
+begin
+  Result := 0;
+  FLocker.lock('GetOnlineContextList');
+  try
+    for I := 0 to FOnlineContextList.BucketSize - 1 do
+    begin
+      lvBucket := FOnlineContextList.Buckets[I];
+      while lvBucket<>nil do
+      begin
+        if lvBucket.Data <> nil then
+        begin
+          lvContext := TIocpClientContext(lvBucket.Data);
+          if lvContext.PostWSASendRequest(pvBuf, pvlen, pvCopyBuf, pvTag, pvTagData) then
+          begin
+            Inc(Result);
+          end;
+        end;
+        lvBucket:=lvBucket.Next;
+      end;
+    end;
+  finally
+    FLocker.unLock;
   end;
 end;
 

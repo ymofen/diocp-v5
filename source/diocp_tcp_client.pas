@@ -102,12 +102,6 @@ type
 
     property Port: Integer read FPort write FPort;
 
-
-
-
-
-
-
   end;
 
   TDiocpExRemoteContext = class(TIocpRemoteContext)
@@ -192,6 +186,13 @@ type
 
     
     function GetStateInfo: String;
+    /// <summary>
+    ///  禁止重连
+    ///    请求断开所有
+    ///    等待断开所有(30000)
+    ///    清理所有
+    /// </summary>
+    procedure RemoveAllContext;
 
     /// <summary>
     ///   总的连接对象数量
@@ -271,6 +272,7 @@ end;
 
 procedure TIocpRemoteContext.CheckDoReConnect;
 begin
+
   if not (SocketState in [ssConnecting, ssConnected]) then
   begin
     if Owner.Active then
@@ -500,20 +502,23 @@ var
   i: Integer;
   lvContext:TIocpRemoteContext;
 begin
-  FListLocker.Enter;
-  try
-    for i := 0 to FList.Count - 1 do
-    begin
-      if pvASyncWorker.Terminated then Break;
-
-      lvContext := TIocpRemoteContext(FList[i]);
-      if lvContext.FAutoReConnect and lvContext.CheckActivityTimeOut(10000) then
+  if not CheckOperaFlag(OPERA_SHUTDOWN_CONNECT) then
+  begin
+    FListLocker.Enter;
+    try
+      for i := 0 to FList.Count - 1 do
       begin
-        lvContext.CheckDoReConnect;
+        if pvASyncWorker.Terminated then Break;
+
+        lvContext := TIocpRemoteContext(FList[i]);
+        if lvContext.FAutoReConnect and lvContext.CheckActivityTimeOut(10000) then
+        begin
+          lvContext.CheckDoReConnect;
+        end;
       end;
+    finally
+      FListLocker.Leave;
     end;
-  finally
-    FListLocker.Leave;
   end;
 end;
 
@@ -664,6 +669,18 @@ begin
     end;
   finally
     FListLocker.Leave;
+  end;
+end;
+
+procedure TDiocpTcpClient.RemoveAllContext;
+begin
+  IncOperaOptions(OPERA_SHUTDOWN_CONNECT);
+  try
+    DisconnectAll;
+    WaitForContext(30000);
+    ClearContexts();
+  finally
+    DecOperaOptions(OPERA_SHUTDOWN_CONNECT);
   end;
 end;
 

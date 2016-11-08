@@ -24,9 +24,12 @@ procedure SetPackageStartBytes(pvRaw: PRawPackage; pvStartBytes: TBytes;
   pvOffset, pvLength: Cardinal);
 procedure SetPackageEndBytes(pvRaw: PRawPackage; pvEndBytes: TBytes;
   pvOffset, pvLength: Cardinal);
+procedure SetPackageEndIsLineBreak(pvRaw: PRawPackage);
+
 procedure ResetPacakge(pvRaw: PRawPackage);
 
 function InputBuffer(pvRaw: PRawPackage; pvData: Byte): Integer;
+
 
 implementation
 
@@ -103,6 +106,15 @@ begin
   end;
   Result := 0;
   Exit;
+end;
+
+procedure SetPackageEndIsLineBreak(pvRaw: PRawPackage);
+begin
+  SetLength(pvRaw.FEndBytes, 2);
+  pvRaw.FEndBytesLength := 2;
+  pvRaw.FEndBytes[0] := 13;
+  pvRaw.FEndBytes[1] := 10;
+
 end;
 
 

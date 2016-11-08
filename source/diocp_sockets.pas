@@ -29,6 +29,8 @@ uses
 const
   CORE_LOG_FILE = 'diocp_core_exception';
 
+  OPERA_SHUTDOWN_CONNECT = $0002;
+
 
 type
   TDiocpCustom = class;
@@ -267,6 +269,7 @@ type
     procedure UnLockContext(pvDebugInfo: string; pvObj: TObject);
 
     procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
+
   public
 
     /// <summary>
@@ -683,6 +686,8 @@ type
     /// </summary>
     FRefCounter:Integer;
 
+    FOperaOptions:Integer;
+
     FContextPool: TSafeQueue;
 
     FASyncInvoker:TASyncInvoker;
@@ -701,6 +706,8 @@ type
     function LogCanWrite: Boolean;
 
   protected
+
+
     FContextClass:TIocpContextClass;
 
     FIocpSendRequestClass:TIocpSendRequestClass;
@@ -932,8 +939,14 @@ type
 
     
     procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
+    procedure BindingEngine(const pvEngine:TIocpEngine);
 
     function GetDebugString: String;
+
+  public
+    procedure IncOperaOptions(const pvFlag:Integer);
+    procedure DecOperaOptions(const pvFlag:Integer);
+    function CheckOperaFlag(const pvFlag:Integer): Boolean;
 
   published
 
@@ -1701,6 +1714,8 @@ constructor TDiocpCustom.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
 
+  FOperaOptions := 0;
+
   FContextPool := TSafeQueue.Create;
 
   FASyncInvoker := TASyncInvoker.Create;
@@ -1722,9 +1737,11 @@ begin
   // send requestPool
   FSendRequestPool := TBaseQueue.Create;
   FRecvRequestPool := TBaseQueue.Create;
+
+  // 开启默认的Diocp引擎
+  StartDiocpEngine;
   
-  FIocpEngine := TIocpEngine.Create();
-  FIocpEngine.IocpCore.OnIocpException := self.OnIocpException;
+  FIocpEngine := __defaultDiocpEngine;
 
   // post wsaRecv block size
   FWSARecvBufferSize := 1024 * 4;
@@ -1751,7 +1768,7 @@ begin
 
   FOnlineContextList.Free;
 
-  FIocpEngine.Free;
+  FIocpEngine := nil;
 
   FSendRequestPool.Free;
   FRecvRequestPool.Free;
@@ -1806,6 +1823,13 @@ begin
     DataMoniter.CalcuMaxOnlineCount(i);
   end;
 end;
+
+procedure TDiocpCustom.BindingEngine(const pvEngine:TIocpEngine);
+begin
+  FIocpEngine := pvEngine;
+end;
+
+
 
 function TDiocpCustom.CheckTimeOutContext(pvContext:TDiocpCustomContext;
     pvTimeOut:Cardinal = 60000): Integer;
@@ -1977,9 +2001,6 @@ begin
   WaitForContext(30000);
 
   FASyncInvoker.WaitForStop;
-
-  // engine Stop
-  FIocpEngine.SafeStop;
 
   DoAfterClose;
 end;
@@ -2456,6 +2477,21 @@ begin
   FWSASendBufferSize := Value;
   if FWSASendBufferSize <=0 then
     FWSASendBufferSize := 1024 * 8;
+end;
+
+procedure TDiocpCustom.IncOperaOptions(const pvFlag:Integer);
+begin
+  FOperaOptions := FOperaOptions or pvFlag;
+end;
+
+procedure TDiocpCustom.DecOperaOptions(const pvFlag:Integer);
+begin
+  FOperaOptions := FOperaOptions AND (not pvFlag);
+end;
+
+function TDiocpCustom.CheckOperaFlag(const pvFlag:Integer): Boolean;
+begin
+  Result := ((FOperaOptions and FOperaOptions) <> 0);
 end;
 
 function TDiocpCustom.WaitForContext(pvTimeOut: Cardinal): Boolean;

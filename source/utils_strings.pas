@@ -2353,9 +2353,7 @@ var
   i: Integer;
 begin
   Result := 0;
-  ps := p;
-
-
+  ps := p; 
   
   for i := 0 to pvLength - 1 do
   begin
