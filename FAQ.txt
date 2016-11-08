@@ -72,3 +72,6 @@ A: Diocp从2016-11-08号的版本，底层默认都使用__defaultDiocpEngine, �
    服务端: TDiocpTcpServer.BindDiocpEngine(CreateNewDiocpEngine(0), true);
    客户端: TDiocpCustom.BindDiocpEngine(CreateNewDiocpEngine(0), true);
    
+Q: 怎么设置服务器的最大并发连接数
+A: TDiocpTcpServer.AllowMaxOnlineCount := 10000, 默认为0，不进行限制。
+   

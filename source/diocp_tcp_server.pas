@@ -1043,6 +1043,7 @@ type
         pvRequest:TIocpRecvRequest);
   private
     FIocpEngine: TIocpEngine;
+    FAllowMaxOnlineCount: Integer;
     FOwnerEngine:Boolean;
     procedure CheckDoDestroyEngine;
   protected
@@ -1285,6 +1286,12 @@ type
     ///   开启后执行的过程
     /// </summary>
     property OnAfterOpen: TNotifyEvent read FOnAfterOpen write FOnAfterOpen;
+
+    /// <summary>
+    ///   允许最大并发数量
+    /// </summary>
+    property AllowMaxOnlineCount: Integer read FAllowMaxOnlineCount write
+        FAllowMaxOnlineCount;
 
     /// <summary>
     ///   NoDelay属性(默认是false)
@@ -2605,6 +2612,15 @@ var
   function DoAfterAcceptEx():Boolean;
   begin
     Result := true;
+    if (FAllowMaxOnlineCount>0) and (self.ClientCount >= FAllowMaxOnlineCount) then
+    begin
+      Result := False;
+      {$IFDEF DIOCP_DEBUG}
+      logMessage('DoAfterAcceptEx, Out of AllowMaxOnlineCount(%d/%d)', [self.ClientCount, FAllowMaxOnlineCount]);
+      {$ENDIF}
+      Exit;
+    end;
+        
     if Assigned(FOnContextAccept) then
     begin
       FOnContextAccept(pvRequest.FClientContext.RawSocket.SocketHandle,
@@ -2612,7 +2628,7 @@ var
 
       if not Result then
       begin
-        {$IFDEF WRITE_LOG}
+        {$IFDEF DIOCP_DEBUG}
         logMessage('OnAcceptEvent vAllowAccept = false');
         {$ENDIF}
       end;
@@ -3344,8 +3360,8 @@ begin
        ]
       ));
 
-    lvStrings.Add(Format(strOnline_Info, [ClientCount, DataMoniter.FMaxOnlineCount]));
-  
+    lvStrings.Add(Format(strOnline_Info, [ClientCount, DataMoniter.FAllowMaxOnlineCount]));
+
     lvStrings.Add(Format(strWorkers_Info, [WorkerCount]));
 
     lvStrings.Add(Format(strRunTime_Info, [GetRunTimeINfo]));
