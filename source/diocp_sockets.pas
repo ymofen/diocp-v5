@@ -798,7 +798,8 @@ type
 
     procedure SetWSASendBufferSize(const Value: Cardinal);
 
-  private    
+  private
+    FNoDelayOption: Boolean;
 
     /// <summary>
     ///   获取当前在线数量
@@ -942,6 +943,17 @@ type
     procedure BindingEngine(const pvEngine:TIocpEngine);
 
     function GetDebugString: String;
+
+
+    /// <summary>
+    ///   NoDelay属性(默认是false)
+    ///   设置为true是会禁用Socket的NoDelay属性(禁用nagle算法)
+    ///   nagle算法会造成200ms左右的延时
+    ///   开启时运行时改变改该属性，不会重新设置已经建立的连接(对以后建立的连接有效)
+    ///
+    ///   为了减少网络拥塞而设计的，它会等待足够的数据才发送出去，如果没有足够的数据，就会等待约200ms（内部计时器超时触发）后发送出去
+    /// </summary>
+    property NoDelayOption: Boolean read FNoDelayOption write FNoDelayOption;
 
   public
     procedure IncOperaOptions(const pvFlag:Integer);
@@ -1297,6 +1309,9 @@ begin
 end;
 
 procedure TDiocpCustomContext.DoConnected;
+var
+  r:Boolean;
+  lvError:Integer;
 begin
   // 一些状态的初始化
   FRequestDisconnect := false;
@@ -1328,6 +1343,15 @@ begin
       InnerAddToDebugStrings(Format('[%s]:*(%d):(%d:objAddr:%d) %s',
         [NowString, FReferenceCounter, self.SocketHandle, IntPtr(Self), 'DoConnected:添加到在线列表']));
 
+      if FOwner.FNoDelayOption then
+      begin
+        r := FRawSocket.SetNoDelayOption(True);
+        if not r then
+        begin
+          lvError := GetLastError;
+          FOwner.logMessage('FRawSocket.SetNoDelayOption, Error:%d', [lvError], CORE_LOG_FILE);
+        end;
+      end;
 
       if self.LockContext('OnConnected', Self) then
       try
