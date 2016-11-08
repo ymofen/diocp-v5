@@ -3360,7 +3360,7 @@ begin
        ]
       ));
 
-    lvStrings.Add(Format(strOnline_Info, [ClientCount, DataMoniter.FAllowMaxOnlineCount]));
+    lvStrings.Add(Format(strOnline_Info, [ClientCount, DataMoniter.MaxOnlineCount]));
 
     lvStrings.Add(Format(strWorkers_Info, [WorkerCount]));
 
