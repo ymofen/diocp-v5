@@ -618,7 +618,6 @@ begin
   if __defaultDiocpEngine = nil then
   begin
     __defaultDiocpEngine := TIocpEngine.Create;
-    __defaultDiocpEngine.Start;
   end;
 end;
 
@@ -636,7 +635,7 @@ procedure SetDiocpEngineWorkerNum(const pvWorkerNum:Integer);
 begin
   if __defaultDiocpEngine = nil then
   begin
-    //__defaultDiocpEngine.WorkerCount := pvWorkerNum;    
+    __defaultDiocpEngine.SetWorkerCount(pvWorkerNum);    
   end;
 end;
 
@@ -1241,8 +1240,7 @@ begin
   if AWorkerCount <= 0 then
     FWorkerCount := (GetCPUCount shl 1) -1
   else
-    FWorkerCount := AWorkerCount;
-  
+    FWorkerCount := AWorkerCount;   
 
 end;
 

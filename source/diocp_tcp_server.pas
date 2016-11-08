@@ -2434,8 +2434,11 @@ begin
   FSendRequestPool := TBaseQueue.Create;
   FRecvRequestPool := TBaseQueue.Create;
     
-  FIocpEngine := TIocpEngine.Create();
-  FIocpEngine.IocpCore.OnIocpException := self.OnIocpException;
+
+  // 开启默认的Diocp引擎
+  StartDiocpEngine;
+  
+  FIocpEngine := __defaultDiocpEngine;   
 
   FOnlineContextList := TDHashTable.Create(10949);
 
@@ -2467,7 +2470,7 @@ begin
   FSendRequestPool.FreeDataObject;
   FRecvRequestPool.FreeDataObject;
 
-  FIocpEngine.Free;
+  FIocpEngine := nil;
 
   FOnlineContextList.Free;
 
@@ -2960,9 +2963,6 @@ begin
 
     FRecvRequestPool.FreeDataObject;
     FRecvRequestPool.Clear;
-
-    // engine stop
-    FIocpEngine.SafeStop();
 
     DoAfterClose;
   end; 
