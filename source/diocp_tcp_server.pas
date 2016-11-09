@@ -2435,6 +2435,14 @@ begin
   begin
     if FIocpEngine <> nil then
     begin
+      if not FIocpEngine.StopWorkers(10000) then
+      begin        // record info
+        SafeWriteFileMsg('EngineWorkerInfo:' +
+           sLineBreak + FIocpEngine.GetStateINfo + sLineBreak +
+           '================================================' + sLineBreak +
+           'TcpServerInfo:' +
+           sLineBreak + GetStateINfo, Self.Name + '_SafeStopTimeOut');
+      end;
       FIocpEngine.SafeStop();
       FIocpEngine.Free;
       FIocpEngine := nil;
