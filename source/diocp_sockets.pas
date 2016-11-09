@@ -334,6 +334,7 @@ type
     ///   连接成功次数
     /// </summary>
     property ConnectedCounter: Integer read FConnectedCounter;
+    property ContextDNA: Integer read FContextDNA;
     property CreateSN: Integer read FCreateSN;
     property CurrRecvRequest: TIocpRecvRequest read FCurrRecvRequest;
     property DisconnectedCounter: Integer read FDisconnectedCounter;

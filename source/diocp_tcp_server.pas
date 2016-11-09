@@ -2988,25 +2988,27 @@ begin
       Sleep(10);
 
       // stop workers 10's
-      if not FIocpEngine.StopWorkers(10000) then
-      begin        // record info
-        SafeWriteFileMsg('EngineWorkerInfo:' +
-           sLineBreak + FIocpEngine.GetStateINfo + sLineBreak +
-           '================================================' + sLineBreak +
-           'TcpServerInfo:' +
-           sLineBreak + GetStateINfo, Self.Name + '_SafeStopTimeOut');
-      end;
+//      不停止Iocp引擎
+//      if not FIocpEngine.StopWorkers(10000) then
+//      begin        // record info
+//        SafeWriteFileMsg('EngineWorkerInfo:' +
+//           sLineBreak + FIocpEngine.GetStateINfo + sLineBreak +
+//           '================================================' + sLineBreak +
+//           'TcpServerInfo:' +
+//           sLineBreak + GetStateINfo, Self.Name + '_SafeStopTimeOut');
+//      end;
 
     end else
     begin    // all context is give back to pool
-      if not FIocpEngine.StopWorkers(120000) then
-      begin        // record info
-        SafeWriteFileMsg('EngineWorkerInfo:' +
-           sLineBreak + FIocpEngine.GetStateINfo + sLineBreak +
-           '================================================' + sLineBreak +
-           'TcpServerInfo:' +
-           sLineBreak + GetStateINfo, Self.Name + '_SafeStopTimeOut');
-      end;
+//      不停止Iocp引擎
+//      if not FIocpEngine.StopWorkers(120000) then
+//      begin        // record info
+//        SafeWriteFileMsg('EngineWorkerInfo:' +
+//           sLineBreak + FIocpEngine.GetStateINfo + sLineBreak +
+//           '================================================' + sLineBreak +
+//           'TcpServerInfo:' +
+//           sLineBreak + GetStateINfo, Self.Name + '_SafeStopTimeOut');
+//      end;
     end;
 
     FListeners.ClearObjects;
