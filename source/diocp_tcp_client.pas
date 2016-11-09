@@ -219,8 +219,8 @@ uses
 
 resourcestring
   strCannotConnect = '当前状态下不能进行连接...';
-  strConnectError  = '建立连接失败, 错误代码:%d';
-  strConnectTimeOut= '建立连接超时';
+  strConnectError  = '建立连接(%s:%d)失败, 错误代码:%d';
+  strConnectTimeOut= '建立连接(%s:%d)超时';
 
 
 const
@@ -328,7 +328,7 @@ begin
 
   if not RawSocket.ConnectTimeOut(lvRemoteIP, FPort, pvTimeOut) then
   begin
-    raise Exception.Create(strConnectTimeOut);
+    raise Exception.Create(Format(strConnectTimeOut, [lvRemoteIP, FPort]));
   end;
 
   DoConnected;
@@ -366,7 +366,7 @@ begin
     end else
     begin
       {$IFDEF DEBUG_ON}
-      Owner.logMessage(strConnectError,  [TIocpConnectExRequest(pvObject).ErrorCode]);
+      Owner.logMessage(strConnectError,  [self.Host, self.Port,  TIocpConnectExRequest(pvObject).ErrorCode]);
       {$ENDIF}
 
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
