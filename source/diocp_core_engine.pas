@@ -1694,10 +1694,11 @@ initialization
 
 
 finalization
+  StopDiocpEngine;
 {$IFDEF DEBUG_ON}
   if IsDebugMode then
     Assert(workerCounter <= 0, ('diocp_core_engine workerCounter, has dead thread? current worker Counter:' + IntToStr(workerCounter)));
 {$ENDIF}
-  StopDiocpEngine;
+
 
 end.
