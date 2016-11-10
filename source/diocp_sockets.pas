@@ -844,7 +844,7 @@ type
 
     /// <summary>
     ///   原子操作添加引用计数(一定要有对应的DecRefCounter);
-    ///   目的: 阻止释放连接
+    ///   目的: 阻止释放连接对象
     /// </summary>
     function IncRefCounter: Integer;
 
@@ -1253,8 +1253,9 @@ begin
   try
     Dec(FReferenceCounter);
     Result := FReferenceCounter;
-    
-    InnerAddToDebugStrings('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]);
+
+    if Length(pvDebugInfo) > 0 then
+      InnerAddToDebugStrings('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]);
 
 
     if FReferenceCounter < 0 then
@@ -1466,7 +1467,8 @@ begin
   end else
   begin
     Inc(FReferenceCounter);
-    InnerAddToDebugStrings(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+    if Length(pvDebugInfo) > 0 then
+      InnerAddToDebugStrings(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
 
     Result := true;
   end;
@@ -2815,7 +2817,8 @@ begin
 
 
 
-  if FContext.incReferenceCounter('TIocpRecvRequest.WSARecvRequest.Post', Self) then
+  //if FContext.incReferenceCounter('TIocpRecvRequest.WSARecvRequest.Post', Self) then
+  if FContext.incReferenceCounter(STRING_EMPTY, Self) then
   begin
     {$IFDEF DEBUG_ON}
     InterlockedIncrement(FOverlapped.refCount);
@@ -2903,7 +2906,9 @@ begin
     try
       FOwner.ReleaseRecvRequest(Self);
     finally
-      lvContext.DecReferenceCounter('TIocpRecvRequest.WSARecvRequest.Response Done', Self);
+      //lvContext.DecReferenceCounter('TIocpRecvRequest.WSARecvRequest.Response Done', Self);
+
+      lvContext.DecReferenceCounter(STRING_EMPTY, Self);
     end;
   end;  
 end;
