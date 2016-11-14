@@ -218,7 +218,7 @@ uses
   utils_safeLogger, diocp_winapi_winsock2, diocp_core_engine;
 
 resourcestring
-  strCannotConnect = '当前状态下不能进行连接...';
+  strCannotConnect = '当前状态(%s)下不能进行连接...';
   strConnectError  = '建立连接(%s:%d)失败, 错误代码:%d';
   strConnectTimeOut= '建立连接(%s:%d)超时';
 
@@ -292,7 +292,7 @@ var
 begin
   if not Owner.Active then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
 
-  if SocketState <> ssDisconnected then raise Exception.Create(strCannotConnect);
+  if SocketState <> ssDisconnected then raise Exception.Create(Format(strCannotConnect, [TSocketStateCaption[SocketState]]));
 
   ReCreateSocket;
 

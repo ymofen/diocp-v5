@@ -99,6 +99,9 @@ type
   TSocketState = (ssDisconnecting, ssDisconnected, ssConnected, ssConnecting, ssListening, ssAccepting);
 
 const
+  TSocketStateCaption: array[TSocketState] of String = ('正在断开', '已经断开', '已经连接', '正在连接', '正在侦听', '正在接入');
+
+const
   {$IFNDEF DOTNET}
     {$IFDEF USE_VCL_POSIX}
   DIOCP_PF_INET4 = AF_INET;
