@@ -177,7 +177,7 @@ type
     /// </example>
     procedure CheckReleaseRes;
     function GetDebugInfo: string;
-    procedure InnerCloseContext;
+    procedure InnerCloseContext(pvDoShutDown: Boolean = True);
 
 
     procedure SetOwner(const Value: TDiocpCustom);
@@ -275,7 +275,7 @@ type
     /// <summary>
     ///   关闭连接，不会再进行数据的发送, 待发送队列中的数据会进行取消
     /// </summary>
-    procedure Close;
+    procedure Close(pvDoShutDown: Boolean = True);
 
     constructor Create; virtual;
 
@@ -299,7 +299,7 @@ type
         TDataReleaseType): Boolean; overload;
 
     procedure RequestDisconnect(pvReason: string = STRING_EMPTY; pvObj: TObject =
-        nil);
+        nil; pvDoShutDown: Boolean = True);
 
 
     procedure SetMaxSendingQueueSize(pvSize:Integer);
@@ -1200,9 +1200,9 @@ begin
   end;
 end;
 
-procedure TDiocpCustomContext.Close;
+procedure TDiocpCustomContext.Close(pvDoShutDown: Boolean = True);
 begin
-  RequestDisconnect('TDiocpCustomContext.Close');
+  RequestDisconnect('TDiocpCustomContext.Close', nil, pvDoShutDown);
 end;
 
 constructor TDiocpCustomContext.Create;
@@ -1475,7 +1475,7 @@ begin
   FContextLocker.UnLock;
 end;
 
-procedure TDiocpCustomContext.InnerCloseContext;
+procedure TDiocpCustomContext.InnerCloseContext(pvDoShutDown: Boolean = True);
 begin
   Assert(FOwner <> nil);
   AddDebugStrings(Format('*(%d):(%d:objAddr:%d)->InnerCloseContext- BEGIN, socketstate:%d',
@@ -1501,7 +1501,7 @@ begin
 
   try
     FActive := false;
-    FRawSocket.Close;
+    FRawSocket.Close(pvDoShutDown);
     CheckReleaseRes;
 
     try
@@ -1657,7 +1657,7 @@ begin
 end;
 
 procedure TDiocpCustomContext.RequestDisconnect(pvReason: string =
-    STRING_EMPTY; pvObj: TObject = nil);
+    STRING_EMPTY; pvObj: TObject = nil; pvDoShutDown: Boolean = True);
 var
   lvCloseContext:Boolean;
 begin
@@ -1699,8 +1699,12 @@ begin
     FContextLocker.UnLock;
   end; 
   Self.DebugInfo :=Format('[%d]执行完成->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
-  
-  if lvCloseContext then InnerCloseContext else FRawSocket.Close;
+
+  if lvCloseContext then InnerCloseContext(pvDoShutDown) else
+  begin
+    FSocketState := ssDisconnecting;
+    FRawSocket.Close(pvDoShutDown);
+  end;
 end;
 
 procedure TDiocpCustomContext.SetDebugInfo(const Value: string);

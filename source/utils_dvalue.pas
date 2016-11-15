@@ -302,6 +302,9 @@ type
 
     function GetAsStringW: DStringW;
     procedure SetAsStringW(const Value: DStringW);
+
+    procedure SetAsDateTime(const Value: TDateTime);
+    function GetAsDateTime: TDateTime;
   public
 
     /// <summary>
@@ -519,6 +522,9 @@ type
     property AsInterface: IInterface read GetAsInterface write SetAsInterface;
 
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
+
+    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
+
     property AsUInt: UInt64 read GetAsUInt write SetAsUInt;
 
     property AsObject: TObject read GetAsObject;
@@ -556,6 +562,10 @@ type
     procedure SetAsUInt(const Value: UInt64);
     function GetAsStringW: WideString;
     procedure SetAsStringW(const Value: WideString);
+
+    function GetAsDateTime: TDateTime;
+    procedure SetAsDateTime(const Value: TDateTime);
+
     {$IFNDEF NEXTGEN}
     function GetAsStringA: AnsiString;
     procedure SetAsStringA(const Value: AnsiString);
@@ -591,6 +601,8 @@ type
 
 
     property AsFloat: Double read GetAsFloat write SetAsFloat;
+
+    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
 
     property AsString: String read GetAsString write SetAsString;
     {$IFNDEF NEXTGEN}
@@ -678,6 +690,9 @@ function DValueGetAsInteger(ADValue: PDRawValue): Integer;
 
 procedure DValueSetAsFloat(ADValue:PDRawValue; pvValue:Double);
 function DValueGetAsFloat(ADValue: PDRawValue): Double;
+
+procedure DValueSetAsDateTime(ADValue:PDRawValue; pvValue:TDateTime);
+function DValueGetAsDateTime(ADValue: PDRawValue): TDateTime;
 
 procedure DValueSetAsBoolean(ADValue:PDRawValue; pvValue:Boolean);
 function DValueGetAsBoolean(ADValue: PDRawValue): Boolean;
@@ -1589,6 +1604,35 @@ begin
       DValueTypeName[vdtInt64]]);
   end;
 
+end;
+
+procedure DValueSetAsDateTime(ADValue:PDRawValue; pvValue:TDateTime);
+begin
+  CheckDValueSetType(ADValue, vdtDateTime);
+  ADValue.Value.AsDateTime := pvValue;
+end;
+
+function DValueGetAsDateTime(ADValue: PDRawValue): TDateTime;
+begin
+  case ADValue.ValueType of
+    vdtFloat, vdtDateTime:
+      Result := ADValue.Value.AsDateTime;
+    vdtSingle:
+      Result := ADValue.Value.AsSingle;
+    vdtUnset, vdtNull:
+      Result := 0;
+    vdtInteger:
+      Result := ADValue.Value.AsInteger;
+    vdtInt64:
+      Result := ADValue.Value.AsInt64;
+    vdtCurrency:
+      Result := TDateTime(ADValue.Value.AsCurrency);
+    vdtString:
+      Result := StrToFloat(ADValue.Value.AsString^)
+  else
+    raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
+      DValueTypeName[vdtFloat]]);
+  end;
 end;
 
 destructor TDValueObject.Destroy;
@@ -2681,6 +2725,17 @@ begin
   end;
 end;
 
+function TDValue.GetAsDateTime: TDateTime;
+begin
+  Result := FValue.AsDateTime;
+end;
+
+procedure TDValue.SetAsDateTime(const Value: TDateTime);
+begin
+  CheckSetNodeType(vntValue);
+  FValue.SetAsDateTime(Value);
+end;
+
 function TDValue.SizeOf: Integer;
 var
   i: Integer;
@@ -2838,6 +2893,16 @@ begin
   Result := DValueGetAsBoolean(@FRawValue);
 end;
 
+function TDValueItem.GetAsDateTime: TDateTime;
+begin
+  Result := DValueGetAsDateTime(@FRawValue);
+end;
+
+procedure TDValueItem.SetAsDateTime(const Value: TDateTime);
+begin
+  DValueSetAsDateTime(@FRawValue, Value);
+end;
+
 function TDValueItem.GetAsFloat: Double;
 begin
   Result := DValueGetAsFloat(@FRawValue);
@@ -2850,7 +2915,6 @@ end;
 
 function TDValueItem.GetAsInterface: IInterface;
 begin
-  // TODO -cMM: TDValueItem.GetAsInterface default body inserted
   Result := DValueGetAsInterface(@FRawValue);
 end;
 
@@ -2930,6 +2994,7 @@ procedure TDValueItem.SetAsBoolean(const Value: Boolean);
 begin
   DValueSetAsBoolean(@FRawValue, Value);
 end;
+
 
 procedure TDValueItem.SetAsFloat(const Value: Double);
 begin
