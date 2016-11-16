@@ -594,7 +594,7 @@ function NowString: String;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
-procedure SwapBuff(buf: Pointer; offset, len: Integer);
+procedure SwapBuff(buf: Pointer; offset, len: Integer); overload;
 
 /// <summary>
 ///   为字符串新建一个PString指针，并与s建立对应关系
@@ -609,6 +609,8 @@ function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 function PosWStr(sub: DStringW; const s: DStringW): Integer;
+
+
 
 implementation
 
@@ -694,6 +696,8 @@ begin
     Dec(lvEnd);
   end;
 end;
+
+
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 begin

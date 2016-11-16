@@ -2,7 +2,8 @@ program DValueTester;
 
 uses
   Forms,
-  ufrmMain in 'ufrmMain.pas' {Form1};
+  ufrmMain in 'ufrmMain.pas' {Form1},
+  utils_textfile in 'utils_textfile.pas';
 
 {$R *.res}
 

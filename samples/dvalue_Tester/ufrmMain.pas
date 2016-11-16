@@ -6,7 +6,8 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, utils_DValue, utils_strings, ComCtrls,
   utils_dvalue_multiparts, utils_dvalue_msgpack, utils_base64, utils_dvalue_dataset,
-  DB, DBClient, ComObj, Grids, DBGrids;
+  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, utils_textfile,
+  qstring;
 
 type
   TForm1 = class(TForm)
@@ -45,6 +46,8 @@ type
     btnDValueToDataSet: TButton;
     btnEmptyDemo: TButton;
     btnClearTimeOut: TButton;
+    tsLoadFile: TTabSheet;
+    btnLoadTextFrom: TButton;
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
     procedure btnClearTimeOutClick(Sender: TObject);
@@ -57,6 +60,7 @@ type
     procedure btnEncodeJSONClick(Sender: TObject);
     procedure btnInitCDSDemoClick(Sender: TObject);
     procedure btnInputJSONBufferClick(Sender: TObject);
+    procedure btnLoadTextFromClick(Sender: TObject);
     procedure btnMsgPackTesterClick(Sender: TObject);
     procedure btnObjectTesterClick(Sender: TObject);
     procedure btnParseAFileClick(Sender: TObject);
@@ -383,6 +387,22 @@ begin
   end;
 
   ;
+end;
+
+procedure TForm1.btnLoadTextFromClick(Sender: TObject);
+var
+  s, lvFileName:String;
+begin
+  lvFileName := ExtractFilePath(ParamStr(0)) + 'text.txt';
+  mmoLog.Clear;
+  s := LoadTextFromFile(lvFileName);
+  mmoLog.Lines.Add(s);
+
+  s := LoadTextA(lvFileName);
+
+  mmoLog.Lines.Add('=================');
+  mmoLog.Lines.Add(s);
+
 end;
 
 procedure TForm1.btnMsgPackTesterClick(Sender: TObject);
