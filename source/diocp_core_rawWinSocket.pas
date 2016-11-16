@@ -230,6 +230,8 @@ type
 
     function CancelIO: Boolean;
 
+    function CancelIOEx: Boolean;
+
     /// <summary>
     ///  The shutdown function disables sends or receives on a socket.
     /// </summary>
@@ -277,6 +279,8 @@ implementation
 
 var
   __WSAStartupDone:Boolean;
+
+//function CancelIoEx(hFile: THandle; lpOverlapped:LPOVERLAPPED): BOOL; stdcall; external kernel32 name 'CancelIoEx';
 
 function TranslateTInAddrToString(const sockaddr; const AIPVersion:
     Integer): string;
@@ -502,6 +506,12 @@ destructor TRawSocket.Destroy;
 begin
   CheckDestroyHandle;
   inherited;
+end;
+
+function TRawSocket.CancelIOEx: Boolean;
+begin
+  CancelIO
+  //Result := ;
 end;
 
 procedure TRawSocket.DoInitialize;

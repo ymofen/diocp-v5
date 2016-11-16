@@ -530,6 +530,8 @@ function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
 
 
 
+function WideBufferToStringW(pvBuffer:Pointer; pvBufLength:Integer): DStringW;
+
 function StringToBytes(pvData:String; pvBytes:TBytes): Integer; overload;
 
 function StringToBytes(pvData:string): TBytes; overload;
@@ -591,6 +593,8 @@ function DateTimeString(pvDateTime:TDateTime): string;
 function NowString: String;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
+
+procedure SwapBuff(buf: Pointer; offset, len: Integer);
 
 /// <summary>
 ///   为字符串新建一个PString指针，并与s建立对应关系
@@ -668,6 +672,27 @@ begin
     Result := Char(V + Ord('0'))
   else
     Result := Char(V - 10 + Ord('A'));
+end;
+
+procedure SwapBuff(buf: Pointer; offset, len: Integer);
+var
+  lvStart, lvEnd: PByte;
+  lvByte: Byte;
+begin
+  lvStart := PByte(buf);
+  Inc(lvStart, offset);
+  
+  lvEnd := lvStart;
+  Inc(lvEnd, len - 1);
+
+  while IntPtr(lvStart) < IntPtr(lvEnd) do
+  begin
+    lvByte := lvStart^;
+    lvStart^ := lvEnd^;
+    lvEnd^ := lvByte;
+    Inc(lvStart);
+    Dec(lvEnd);
+  end;
 end;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
@@ -2360,6 +2385,12 @@ begin
     Result := (Result shl 4) + HexValue(ps^);
     Inc(ps);
   end;
+end;
+
+function WideBufferToStringW(pvBuffer:Pointer; pvBufLength:Integer): DStringW;
+begin
+  SetLength(Result, pvBufLength shr 1);
+  Move(pvBuffer^, PDCharW(Result)^, pvBufLength);
 end;
 
 
