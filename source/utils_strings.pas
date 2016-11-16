@@ -589,8 +589,8 @@ function GetCurrentThreadID: Cardinal;
 function ObjectHexAddr(pvObj:TObject): String;
 function ObjectIntStrAddr(pvObj:TObject): String;
 
-function DateTimeString(pvDateTime:TDateTime): string;
-function NowString: String;
+function DateTimeString(pvDateTime:TDateTime): string; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function NowString: String; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 

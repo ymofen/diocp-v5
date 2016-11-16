@@ -9,7 +9,7 @@ unit utils_dvalue_json;
 interface
 
 uses
-  utils_dvalue, utils_strings, classes, Math;
+  utils_dvalue, utils_strings, classes, Math, utils_textfile;
 
 type
   TByteChar = record
@@ -40,6 +40,7 @@ function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
     vdtPtr]): String;
 
 function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
+function JSONParseFromFile(pvFile:string; pvDValue:TDValue): Integer;
 procedure JSONWriteToUtf8NoBOMFile(pvFile:string; pvDValue:TDValue);
 
 function InputJsonBuffer(const jsonBuffer:PJsonBuffer; pvByte:Integer): Integer;
@@ -770,7 +771,7 @@ function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
 var
   s:String;
 begin
-  s := LoadStringFromUtf8NoBOMFile(pvFile);
+  s := LoadTextFromFile(pvFile);
   Result := JSONParser(s, pvDValue);
 end;
 
@@ -886,6 +887,14 @@ procedure ResetJsonBuffer(const jsonBuffer:PJsonBuffer);
 begin
   jsonBuffer.FLevel := 0;
   jsonBuffer.FState := 0;
+end;
+
+function JSONParseFromFile(pvFile:string; pvDValue:TDValue): Integer;
+var
+  s:String;
+begin
+  s := LoadTextFromFile(pvFile);
+  Result := JSONParser(s, pvDValue);
 end;
 
 end.
