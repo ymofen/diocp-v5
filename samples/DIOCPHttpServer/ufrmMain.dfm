@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 80
     Width = 856
     Height = 312
-    ActivePage = TabSheet1
+    ActivePage = tsTester
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
