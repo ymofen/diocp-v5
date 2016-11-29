@@ -8,6 +8,7 @@ interface
   {$DEFINE USE_QJSON}
 {$ENDIF}
 
+{$I 'diocp.inc'}
 
 
 uses
@@ -16,7 +17,7 @@ uses
   , utils_safeLogger, StrUtils,
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
   utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools,
-  diocp_task, System.Actions;
+  diocp_task;
 
 type
   TfrmMain = class(TForm)
@@ -114,6 +115,14 @@ begin
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
   sfLogger.AppendInMainThread := true;
   //sfLogger.LogFilter := [lgvError, lgvWarning];
+
+{$if CompilerVersion>= 18}
+  //ShowMessage('Hello');
+{$ifend}
+
+{$IFDEF USE_ZLIBExGZ}
+  //HELLO;
+{$ENDIF}
 end;
 
 procedure TfrmMain.OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
@@ -517,6 +526,7 @@ procedure TfrmMain.btnCompressClick(Sender: TObject);
 var
   lvBuilder:TDBufferBuilder;
 begin
+  {$IFDEF USE_ZLIBExGZ}
   lvBuilder := TDBufferBuilder.Create;
   lvBuilder.Clear;
   lvBuilder.AppendUtf8('0000');
@@ -541,6 +551,9 @@ begin
   //GZDecompressBufferBuilder(lvBuilder);
   //ShowMessage(lvBuilder.ToRAWString);
   lvBuilder.Free;
+  {$ELSE}
+  raise Exception.Create('Œ¥∆Ù”√ZlibEx');
+  {$ENDIF}
 
 end;
 

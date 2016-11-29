@@ -7,7 +7,8 @@ uses
 
 procedure MsgPackEncode(pvInDValue: TDValue; pvOutStream: TStream;
     pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
-
+procedure MsgPackEncode2File(pvInDValue: TDValue; pvFileName: String;
+    pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 
 procedure MsgPackParseFromStream(pvInStream: TStream; pvOutDValue: TDValue);
 
@@ -1024,6 +1025,19 @@ begin
   finally
     lvStream.Free;    
   end;
+end;
+
+procedure MsgPackEncode2File(pvInDValue: TDValue; pvFileName: String;
+    pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+var
+  lvFileStream:TFileStream;
+begin
+  lvFileStream := TFileStream.Create(pvFileName, fmCreate);
+  try
+    MsgPackEncode(pvInDValue, lvFileStream, pvIgnoreTypes);
+  finally
+    lvFileStream.Free;
+  end;                                                     
 end;
 
 end.
