@@ -48,6 +48,66 @@ type
 
   TIOCPEncoderClass = class of TIOCPEncoder;
 
+
+  TDiocpEncoder = class(TObject)
+  protected
+    FContext:TObject;
+  public
+    procedure SetContext(const pvContext:TObject);
+  end;
+
+
+  /// <summary>
+  ///  解码器
+  /// </summary>
+  TDiocpDecoder = class(TObject)
+  protected
+    FContext:TObject;
+  public
+    /// <summary>
+    ///   输入数据
+    /// </summary>
+    procedure OnRecvBuffer(const buf:Pointer; len:Cardinal); virtual; abstract;
+
+    procedure SetContext(const pvContext:TObject);
+
+    /// <summary>
+    ///   获取解码好的数据
+    /// </summary>
+    function GetData:Pointer; virtual; abstract;
+
+
+    /// <summary>
+    ///   释放解码好的数据
+    /// </summary>
+    procedure ReleaseData(const pvData:Pointer); virtual; abstract;
+
+    /// <summary>
+    ///   解码收到的数据,如果有接收到数据,调用该方法,进行解码
+    /// </summary>
+    /// <returns>
+    ///   0：需要更多的数据
+    ///   1: 解码成功
+    ///  -1: 解码失败
+    /// </returns>
+    /// <param name="inBuf"> 接收到的流数据 </param>
+    function Decode(): Integer;  virtual; abstract;
+  end;
+
+  TDiocpDecoderClass = class of TDiocpDecoder;
+
 implementation
+
+procedure TDiocpDecoder.SetContext(const pvContext:TObject);
+begin
+  FContext := pvContext;
+end;
+
+{ TDiocpEncoder }
+
+procedure TDiocpEncoder.SetContext(const pvContext: TObject);
+begin
+  FContext := pvContext;
+end;
 
 end.
