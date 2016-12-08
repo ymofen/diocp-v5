@@ -184,6 +184,11 @@ type
     /// <param name="pvID"> (String) </param>
     /// <param name="pvObject"> (TObject) </param>
     function ReleaseObject(pvID:String; pvObject:TObject): Integer;
+
+    /// <summary>
+    ///  获取池的使用情况
+    /// </summary>
+    function GetPoolInfo: String;
   end;
 
 implementation
@@ -416,6 +421,51 @@ begin
       FObjMap.Clear;
       Result := 0;
     end;
+  finally
+    FObjMap.UnLock;
+  end;
+end;
+
+
+
+procedure InnerGetPoolInfo(const sender:Pointer; const v:Pointer);
+var
+  lvSB:TDStringBuilder;
+  lvBucket:PDHashData;
+  lvItem:TMaxPoolItem;
+begin
+  lvSB := TDStringBuilder(v);
+  lvBucket := PDHashData(sender);
+  lvItem := TMaxPoolItem(lvBucket.Data);
+  lvSB.Append(lvBucket.Key).Append(':');
+  lvSB.Append('max:').Append(lvItem.FMax);
+end;
+
+function TMaxObjectPool.GetPoolInfo: String;
+var
+  lvSB:TDStringBuilder;
+begin
+  Result := '';
+  FObjMap.Lock;
+  try
+    lvSB := TDStringBuilder.Create;
+    try
+      FObjMap.ForEach(InnerGetPoolInfo, Pointer(lvSB));
+      Result := lvSB.ToString;
+    finally
+      lvSB.Free;
+    end;
+
+//
+//    lvItem :=TMaxPoolItem(FObjMap.ValueMap[pvID]);
+//    if lvItem <> nil then
+//    begin
+//      if not lvItem.FEnable then Exit;
+//      if (lvItem.FMax >0) and (lvItem.FCount >= lvItem.FMax) then Exit;
+//      Result := lvItem.FData;
+//      Inc(lvItem.FCount);
+//      Inc(FOutCounter);
+//    end;
   finally
     FObjMap.UnLock;
   end;

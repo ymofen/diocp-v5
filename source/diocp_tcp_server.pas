@@ -1527,13 +1527,18 @@ begin
     CheckReleaseRes;
 
     try
-      if FOwner.Active then
-      begin
-        if Assigned(FOwner.FOnContextDisconnected) then
+      CheckThreadIn;
+      try
+        if FOwner.Active then
         begin
-          FOwner.FOnContextDisconnected(Self);
+          if Assigned(FOwner.FOnContextDisconnected) then
+          begin
+            FOwner.FOnContextDisconnected(Self);
+          end;
+          DoDisconnected;
         end;
-        DoDisconnected;
+      finally
+        CheckThreadOut;
       end;
     except
       on e:Exception do
