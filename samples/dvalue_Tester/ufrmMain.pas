@@ -48,6 +48,8 @@ type
     btnClearTimeOut: TButton;
     tsLoadFile: TTabSheet;
     btnLoadTextFrom: TButton;
+    btnAdd1000: TButton;
+    procedure btnAdd1000Click(Sender: TObject);
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
     procedure btnClearTimeOutClick(Sender: TObject);
@@ -73,7 +75,10 @@ type
   private
     { Private declarations }
     FDValueObj:TDValue;
+    FLogObj: TDValue;
   public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     { Public declarations }
   end;
 
@@ -177,6 +182,47 @@ begin
 //  begin
 //    Result.Name := pvDataSet.Name + pvFieldName;
 //  end;
+end;
+
+constructor TForm1.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FLogObj := TDValue.Create();
+end;
+
+destructor TForm1.Destroy;
+begin
+  FreeAndNil(FLogObj);
+  inherited Destroy;
+end;
+
+procedure TForm1.btnAdd1000Click(Sender: TObject);
+var
+  lvItem:TDValue;
+  i: Integer;
+  s:String;
+begin
+  // 查看内存情况
+
+  for i := 0 to 10000 - 1 do
+  begin
+    lvItem:= TDValue.Create();
+    try
+      lvItem.ForceByName('sn').AsInteger := i;
+      lvItem.ForceByName('content').AsString := '日志内容';
+      lvItem.ForceByName('time').AsDateTime := Now();
+      s := JSONEncode(lvItem);
+      lvItem.Clear;
+      JSONParser(s, lvItem);
+      if FLogObj.Count > 100 then
+      begin
+        FLogObj.Delete(0);
+      end;
+      FLogObj.AddArrayChild(lvItem.Clone());
+    finally
+      lvItem.Free;
+    end;
+  end;
 end;
 
 procedure TForm1.btnBase64Click(Sender: TObject);

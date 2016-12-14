@@ -2,7 +2,7 @@ object Form1: TForm1
   Left = 0
   Top = 0
   Caption = 'Form1'
-  ClientHeight = 290
+  ClientHeight = 380
   ClientWidth = 554
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -50,7 +50,7 @@ object Form1: TForm1
   end
   object btnStartTimer: TButton
     Left = 176
-    Top = 8
+    Top = 6
     Width = 75
     Height = 25
     Caption = 'btnStartTimer'
@@ -99,6 +99,32 @@ object Form1: TForm1
     Caption = 'btnSetJSON'
     TabOrder = 9
     OnClick = btnSetJSONClick
+  end
+  object btnSetHost: TButton
+    Left = 456
+    Top = 6
+    Width = 75
+    Height = 25
+    Caption = 'btnSetHost'
+    TabOrder = 10
+    OnClick = btnSetHostClick
+  end
+  object edtHost: TEdit
+    Left = 296
+    Top = 8
+    Width = 154
+    Height = 21
+    TabOrder = 11
+    Text = '127.0.0.1:32000'
+  end
+  object btnWriteLog1000: TButton
+    Left = 176
+    Top = 36
+    Width = 97
+    Height = 25
+    Caption = 'btnWriteLog1000'
+    TabOrder = 12
+    OnClick = btnWriteLog1000Click
   end
   object tmrLog: TTimer
     Enabled = False

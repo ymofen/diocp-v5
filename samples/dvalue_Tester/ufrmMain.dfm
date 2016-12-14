@@ -18,15 +18,11 @@ object Form1: TForm1
     Top = 0
     Width = 929
     Height = 288
-    ActivePage = tsLoadFile
+    ActivePage = tsDValue
     Align = alClient
     TabOrder = 0
     object tsJSON: TTabSheet
       Caption = 'tsJSON'
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object pnlTop: TPanel
         Left = 0
         Top = 0
@@ -107,10 +103,6 @@ object Form1: TForm1
     object tsMultiParts: TTabSheet
       Caption = 'tsMultiParts'
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btnSave: TButton
         Left = 16
         Top = 16
@@ -142,10 +134,6 @@ object Form1: TForm1
     object tsMsgPack: TTabSheet
       Caption = 'tsMsgPack'
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btnMsgPackTester: TButton
         Left = 24
         Top = 16
@@ -159,10 +147,6 @@ object Form1: TForm1
     object tsDValue: TTabSheet
       Caption = 'tsDValue'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btnDValue: TButton
         Left = 16
         Top = 32
@@ -227,14 +211,19 @@ object Form1: TForm1
         TabOrder = 6
         OnClick = btnClearTimeOutClick
       end
+      object btnAdd1000: TButton
+        Left = 376
+        Top = 104
+        Width = 121
+        Height = 25
+        Caption = 'btnAdd1000'
+        TabOrder = 7
+        OnClick = btnAdd1000Click
+      end
     end
     object tsDataSet: TTabSheet
       Caption = 'tsDataSet'
       ImageIndex = 4
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btnConvertToDValue: TButton
         Left = 379
         Top = 3

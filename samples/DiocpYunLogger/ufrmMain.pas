@@ -20,12 +20,17 @@ type
     edtValue: TEdit;
     btnViewStorage: TButton;
     btnSetJSON: TButton;
+    btnSetHost: TButton;
+    edtHost: TEdit;
+    btnWriteLog1000: TButton;
+    procedure btnSetHostClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure btnSetValueClick(Sender: TObject);
     procedure btnStartTimerClick(Sender: TObject);
     procedure btnViewLogClick(Sender: TObject);
     procedure btnViewStorageClick(Sender: TObject);
     procedure btnSetJSONClick(Sender: TObject);
+    procedure btnWriteLog1000Click(Sender: TObject);
     procedure btnWriterLogClick(Sender: TObject);
     procedure tmrLogTimer(Sender: TObject);
   private
@@ -42,6 +47,13 @@ implementation
 {$R *.dfm}
 var
   __sn:Integer;
+
+
+procedure TForm1.btnSetHostClick(Sender: TObject);
+begin
+  yunStorage.SetYunServer(Format('http://%s/api/yunStorageWriter', [edtHost.Text]));
+  yunLogger.SetYunServer(Format('http://%s/api/yunlogger', [edtHost.Text]));
+end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
@@ -64,7 +76,7 @@ procedure TForm1.btnViewLogClick(Sender: TObject);
 var
   s:String;
 begin
-  s := 'http://123.232.98.202:9007/api/querylog?accesstoken=' + edtAccessToken.Text;
+  s := Format('http://%s/api/querylog?accesstoken=%s', [edtHost.Text, edtAccessToken.Text]);
   ShellExecute(0, 'open', PChar(s), nil, nil, SW_SHOWNORMAL);
 end;
 
@@ -72,7 +84,7 @@ procedure TForm1.btnViewStorageClick(Sender: TObject);
 var
   s:String;
 begin
-  s := Format('http://123.232.98.202:9007/api/yunStorageQuery?accesstoken=%s&path=%s', [edtAccessToken.Text, edtPath.Text]);
+  s := Format('http://%s/api/yunStorageQuery?accesstoken=%s&path=%s', [edtHost.Text, edtAccessToken.Text, edtPath.Text]);
   ShellExecute(0, 'open', PChar(s), nil, nil, SW_SHOWNORMAL);
 end;
 
@@ -85,6 +97,17 @@ begin
   lvDValue.Add('time', NowString);
   yunStorage.SetJSON(edtAccessToken.Text, edtPath.Text, lvDValue);
   lvDValue.Free;
+end;
+
+procedure TForm1.btnWriteLog1000Click(Sender: TObject);
+var
+  i: Integer;
+begin
+  for i := 0 to 1000 - 1 do
+  begin
+    Inc(__sn);
+    yunLogger.LogMessage(edtAccessToken.Text, Format('sn:%d, %s',[__sn, edtLogContent.Text]), 'dss-client', 'message');
+  end;
 end;
 
 procedure TForm1.btnWriterLogClick(Sender: TObject);
