@@ -2073,7 +2073,7 @@ procedure TDiocpHttpServer.DoAfterOpen;
 begin
   inherited DoAfterOpen;
 
-  {$IFDEF DEBUG}
+  //{$IFDEF DEBUG}
   {$IFDEF CONSOLE}
   
     {$IFDEF INNER_IOCP_PROCESSOR}
@@ -2088,7 +2088,7 @@ begin
       {$ENDIF}
     {$ENDIF}
   {$ENDIF}
-  {$ENDIF}
+  //{$ENDIF}
 end;
 
 procedure TDiocpHttpServer.DoRequest(pvRequest: TDiocpHttpRequest);
@@ -2185,7 +2185,7 @@ begin
      [Self.FSessionObjCounter,
       FRequestQueueSize,
       FRequestObjCounter, FRequestObjOutCounter, FRequestObjReturnCounter,
-     self.FBlockBufferPool.FSize, self.FBlockBufferPool.FPut, self.FBlockBufferPool.FGet]);
+     self.FBlockBufferPool.FSize, self.FBlockBufferPool.FBlockSize, self.FBlockBufferPool.FPut, self.FBlockBufferPool.FGet]);
 end;
 
 function TDiocpHttpServer.GetHttpRequest: TDiocpHttpRequest;

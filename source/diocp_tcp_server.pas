@@ -2265,6 +2265,15 @@ begin
 
     CheckNextSendRequest;
   end;
+
+  if FSendRequestLink.Count > 10 then
+  begin
+    {$IFDEF MSWINDOWS}
+    SwitchToThread;
+    {$ELSE}
+    TThread.Yield;
+    {$ENDIF}
+  end;  
 end;
 
 

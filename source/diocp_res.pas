@@ -48,7 +48,7 @@ resourcestring
 
   strListenFail  = '侦听(%s:%d)时出现异常:%s';
 
-  strHttpServerStateInfo = 'Session对象:%d, 未处理请求队列: %d, 请求对象(size/out/back):%d/%d/%d, 响应内存块池(size/put/get):%d/%d/%d';
+  strHttpServerStateInfo = 'Session对象:%d, 未处理请求队列: %d, 请求对象(num/out/back):%d/%d/%d, 响应内存块池(num*size/put/get):%d*%d/%d/%d';
 
 
 
