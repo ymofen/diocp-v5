@@ -208,6 +208,8 @@ type
     /// </summary>
     function GetSendRequest: TIocpSendRequest;
 
+    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag,
+        pvErrorCode: Integer); virtual;
 
     procedure DoError(pvErrorCode:Integer);
 
@@ -296,7 +298,8 @@ type
     ///    if request is completed, will call DoSendRequestCompleted procedure
     /// </summary>
     function PostWSASendRequest(buf: Pointer; len: Cardinal; pvBufReleaseType:
-        TDataReleaseType): Boolean; overload;
+        TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
+        overload;
 
     procedure RequestDisconnect(pvReason: string = STRING_EMPTY; pvObj: TObject =
         nil; pvDoShutDown: Boolean = True);
@@ -780,7 +783,7 @@ type
     /// <summary>
     ///   occur on create instance
     /// </summary>
-    procedure OnCreateContext(const context: TDiocpCustomContext); virtual;
+    procedure OnCreateContext(const pvContext: TDiocpCustomContext); virtual;
 
     /// <summary>
     ///   设置组件的名字，重载用于设置日志记录器的前缀符
@@ -824,6 +827,7 @@ type
 
     procedure InnerAddToDebugStrings(pvMsg:String);
     procedure OnASyncWork(pvASyncWorker:TASyncWorker);
+
   protected
     procedure DoASyncWork(pvFileWritter: TSingleFileWriter; pvASyncWorker:
         TASyncWorker); virtual;
@@ -834,6 +838,8 @@ type
     ///   获取一个接收请求
     /// </summary>
     function GetRecvRequest: TIocpRecvRequest;
+
+    
     function ReleaseRecvRequest(pvObject: TIocpRecvRequest): Boolean;
 
   public
@@ -1441,6 +1447,12 @@ begin
     end;
   end;
 
+end;
+
+procedure TDiocpCustomContext.DoSendBufferCompleted(pvBuffer: Pointer;
+  len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+begin
+  
 end;
 
 procedure TDiocpCustomContext.DoSendRequestCompleted(pvRequest:
@@ -2097,13 +2109,12 @@ begin
   if FContextClass <> nil then
   begin
     Result := FContextClass.Create;
-    OnCreateContext(Result);
   end else
   begin
     Result := TDiocpCustomContext.Create;
-    OnCreateContext(Result);
   end;
-
+  Result.Owner := Self;
+  OnCreateContext(Result);
 end;
 
 procedure TDiocpCustom.DisconnectAll;
@@ -2136,6 +2147,18 @@ procedure TDiocpCustom.DoSendBufferCompletedEvent(pvContext:
     TDiocpCustomContext; pvBuff: Pointer; len: Cardinal; pvBufferTag,
     pvErrorCode: Integer);
 begin
+  if pvContext <> nil then
+  begin
+    try
+      pvContext.DoSendBufferCompleted(pvBuff, len, pvBufferTag, pvErrorCode);
+    except
+      on e:Exception do
+      begin
+        LogMessage('pvContext.DoSendBufferCompleted error:' + e.Message, '', lgvError);
+      end;
+    end;
+  end;
+  
   try
     if Assigned(pvContext.FOnSendBufferCompleted) then
       pvContext.FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvErrorCode);
@@ -2421,10 +2444,6 @@ begin
   end;
 end;
 
-procedure TDiocpCustom.OnCreateContext(const context: TDiocpCustomContext);
-begin
-
-end;
 
 procedure TDiocpCustom.OnIocpException(pvRequest:TIocpRequest; E:Exception);
 begin
@@ -2552,6 +2571,11 @@ end;
 function TDiocpCustom.CheckOperaFlag(const pvFlag:Integer): Boolean;
 begin
   Result := ((FOperaOptions and FOperaOptions) <> 0);
+end;
+
+procedure TDiocpCustom.OnCreateContext(const pvContext: TDiocpCustomContext);
+begin
+
 end;
 
 function TDiocpCustom.WaitForContext(pvTimeOut: Cardinal): Boolean;
@@ -3714,7 +3738,8 @@ begin
 end;
 
 function TDiocpCustomContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
-    pvBufReleaseType: TDataReleaseType): Boolean;
+    pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer
+    = nil): Boolean;
 var
   lvRequest:TIocpSendRequest;
   lvErrStr :String;
@@ -3728,6 +3753,8 @@ begin
       try
         lvRequest := GetSendRequest;
         lvRequest.SetBuffer(buf, len, pvBufReleaseType);
+        lvRequest.Tag := pvTag;
+        lvRequest.Data := pvTagData;
         Result := InnerPostSendRequestAndCheckStart(lvRequest);
         if not Result then
         begin

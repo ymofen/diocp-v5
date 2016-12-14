@@ -525,15 +525,12 @@ end;
 function TDiocpTcpClient.Add: TIocpRemoteContext;
 begin
   FListLocker.Enter;
-  try
+  try  
     if FContextClass = nil then
     begin
-      Result := TIocpRemoteContext.Create;
-    end else
-    begin
-      Result := TIocpRemoteContext(FContextClass.Create());
+      RegisterContextClass(TIocpRemoteContext);
     end;
-    Result.Owner := Self;
+    Result := TIocpRemoteContext(CreateContext);
     FList.Add(Result);
   finally
     FListLocker.Leave;

@@ -13,7 +13,7 @@ unit diocp_coder_baseObject;
 interface
 
 uses
-  diocp_tcp_server, utils_buffer;
+  diocp_tcp_server, utils_buffer, utils_queues, utils_BufferPool;
 
 type
 {$if CompilerVersion< 18.5}
@@ -54,8 +54,18 @@ type
     FContext:TObject;
   public
     procedure SetContext(const pvContext:TObject);
+
+    /// <summary>
+    ///   编码要发送的对象
+    /// </summary>
+    /// <param name="pvDataObject"> 要进行编码的对象 </param>
+    /// <param name="pvBufWriter"> 数据写入 </param>
+    procedure Encode(const pvDataObject: Pointer; const pvBufWriter: TBlockBuffer);
+        virtual; abstract;
   end;
 
+  
+  TDiocpEncoderClass = class of TDiocpEncoder;
 
   /// <summary>
   ///  解码器
@@ -64,12 +74,14 @@ type
   protected
     FContext:TObject;
   public
+    constructor Create; virtual;
+
+    procedure SetContext(const pvContext:TObject);
+
     /// <summary>
     ///   输入数据
     /// </summary>
-    procedure OnRecvBuffer(const buf:Pointer; len:Cardinal); virtual; abstract;
-
-    procedure SetContext(const pvContext:TObject);
+    procedure SetRecvBuffer(const buf:Pointer; len:Cardinal); virtual; abstract;
 
     /// <summary>
     ///   获取解码好的数据
@@ -92,11 +104,17 @@ type
     /// </returns>
     /// <param name="inBuf"> 接收到的流数据 </param>
     function Decode(): Integer;  virtual; abstract;
+
   end;
 
   TDiocpDecoderClass = class of TDiocpDecoder;
 
 implementation
+
+constructor TDiocpDecoder.Create;
+begin
+  inherited;
+end;
 
 procedure TDiocpDecoder.SetContext(const pvContext:TObject);
 begin

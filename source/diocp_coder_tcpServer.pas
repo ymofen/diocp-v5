@@ -715,7 +715,7 @@ begin
     if Integer(lvDecodeObj) = -1 then
     begin
       /// 错误的包格式, 关闭连接
-      DoDisconnect;
+      RequestDisconnect('错误的包格式');
       exit;
     end else if lvDecodeObj <> nil then
     begin
