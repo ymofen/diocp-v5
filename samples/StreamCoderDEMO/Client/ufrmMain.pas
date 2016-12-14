@@ -4,10 +4,9 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
-  Controls, Forms, Dialogs, StdCtrls, diocp_coder_tcpClient,
+  Controls, Forms, Dialogs, StdCtrls, diocp_ex_coder_tcpclient,
   utils_safeLogger,
-  uDIOCPDxStreamCoder,
-  diocp_task, diocp_sockets, diocp_tcp_client;
+  diocp_task, diocp_sockets, diocp_tcp_client, diocp_ex_StreamCoder;
 
 type
   TfrmMain = class(TForm)
@@ -25,7 +24,7 @@ type
 
     FCoderTcpClient: TDiocpCoderTcpClient;
 
-    procedure OnRecvObject(pvObject:TObject);
+    procedure OnRecvObject(const pvObject: Pointer);
 
     procedure OnDisconnected(pvContext: TDiocpCustomContext);
   public
@@ -117,7 +116,7 @@ begin
   sfLogger.logMessage('disconnected');
 end;
 
-procedure TfrmMain.OnRecvObject(pvObject: TObject);
+procedure TfrmMain.OnRecvObject(const pvObject: Pointer);
 var
   s:AnsiString;
   lvStream:TMemoryStream;

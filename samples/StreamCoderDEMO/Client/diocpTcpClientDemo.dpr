@@ -2,8 +2,7 @@ program diocpTcpClientDemo;
 
 uses
   Forms,
-  ufrmMain in 'ufrmMain.pas' {frmMain},
-  uDIOCPDxStreamCoder in '..\..\DiocpCoders\uDIOCPDxStreamCoder.pas';
+  ufrmMain in 'ufrmMain.pas' {frmMain};
 
 {$R *.res}
 
