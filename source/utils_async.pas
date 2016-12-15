@@ -95,7 +95,7 @@ function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inli
 {$IFEND <XE5}
 
 {$IFDEF LOW_VER}
-function TryEnterCriticalSection; external 'kernel32.dll' name 'TryEnterCriticalSection';
+//function TryEnterCriticalSection(var lpCriticalSection: TRTLCriticalSection): BOOL; external 'kernel32.dll' name 'TryEnterCriticalSection';
 {$ENDIF}
 
 function GetCPUCount: Integer;
