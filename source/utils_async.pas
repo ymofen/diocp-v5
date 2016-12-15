@@ -15,6 +15,10 @@ uses
   {$DEFINE HAVE_INLINE}
 {$IFEND HAVE_INLINE}
 
+{$if CompilerVersion< 18}
+  {$DEFINE LOW_VER}
+{$ifend}
+
 type
   TASyncWorker = class;
   TOnASyncEvent = procedure(pvASyncWorker: TASyncWorker) of object;
@@ -36,6 +40,16 @@ type
 
     property Terminated;     
   end;
+
+
+  TCriticalSection = class(SyncObjs.TCriticalSection)
+  public
+    {$IFDEF LOW_VER}
+    function TryEnter: Boolean;
+    {$ENDIF}
+
+  end;
+
 
   TASyncInvoker = class(TObject)
   private
@@ -79,6 +93,10 @@ function AtomicCmpExchange(var Target: Integer; Value: Integer;
 function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 {$IFEND <XE5}
+
+{$IFDEF LOW_VER}
+function TryEnterCriticalSection; external 'kernel32.dll' name 'TryEnterCriticalSection';
+{$ENDIF}
 
 function GetCPUCount: Integer;
 
@@ -287,5 +305,12 @@ procedure TASyncInvoker.WaitForStop;
 begin
   FStopEvent.WaitFor(MaxInt);
 end;
+
+{$IFDEF LOW_VER}
+function TCriticalSection.TryEnter: Boolean;
+begin
+  Result := TryEnterCriticalSection(FSection);
+end;
+{$ENDIF}
 
 end.
