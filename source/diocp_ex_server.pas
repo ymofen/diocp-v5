@@ -355,13 +355,13 @@ end;
 procedure TDiocpStringTcpServer.DoDataAction(pvContext: TDiocpExContext; pvData:
     Pointer; pvDataLen: Integer);
 var
-  ansiStr:AnsiString;
+  lvStr:String;
 begin
   inherited;
-  ansiStr := ByteBufferToString(PByte(pvData), pvDataLen);
+  lvStr := ByteBufferToString(PByte(pvData), pvDataLen);
   if Assigned(FOnContextStringAction) then
   begin
-    FOnContextStringAction(TDiocpStringContext(pvContext), ansiStr);
+    FOnContextStringAction(TDiocpStringContext(pvContext), lvStr);
   end;    
 end;
 
