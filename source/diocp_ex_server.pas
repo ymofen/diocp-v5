@@ -139,14 +139,14 @@ var
 begin
   lvOwner := TDiocpExTcpServer(Owner);
 
+  lvStartDataLen := lvOwner.FStartDataLen;
+  lvEndDataLen := lvOwner.FEndDataLen;
 
   if (FCacheBuffer.FEndBytesLength = 0) and (FCacheBuffer.FStartBytesLength = 0)  then
   begin
     SetPackageMaxLength(@FCacheBuffer, lvOwner.FMaxDataLen);
     lvStartData := @lvOwner.FStartData[0];
-    lvStartDataLen := lvOwner.FStartDataLen;
     lvEndData := @lvOwner.FEndData[0];
-    lvEndDataLen := lvOwner.FEndDataLen;
 
     if lvStartDataLen > 0 then
     begin
@@ -170,7 +170,8 @@ begin
     inc(lvPtr);
     if r = 1 then
     begin
-      OnDataAction(@FCacheBuffer.FRawBytes[0], FCacheBuffer.FRawLength);
+      // È¥µôÍ·Î²
+      OnDataAction(@FCacheBuffer.FRawBytes[lvStartDataLen], FCacheBuffer.FRawLength - lvStartDataLen - lvEndDataLen);
       ResetPacakge(@FCacheBuffer);
     end;
 
