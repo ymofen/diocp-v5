@@ -126,6 +126,15 @@ object Form1: TForm1
     TabOrder = 12
     OnClick = btnWriteLog1000Click
   end
+  object btnSetValue1000: TButton
+    Left = 176
+    Top = 288
+    Width = 129
+    Height = 25
+    Caption = 'btnSetValue1000'
+    TabOrder = 13
+    OnClick = btnSetValue1000Click
+  end
   object tmrLog: TTimer
     Enabled = False
     OnTimer = tmrLogTimer

@@ -23,6 +23,7 @@ type
     btnSetHost: TButton;
     edtHost: TEdit;
     btnWriteLog1000: TButton;
+    btnSetValue1000: TButton;
     procedure btnSetHostClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure btnSetValueClick(Sender: TObject);
@@ -30,6 +31,7 @@ type
     procedure btnViewLogClick(Sender: TObject);
     procedure btnViewStorageClick(Sender: TObject);
     procedure btnSetJSONClick(Sender: TObject);
+    procedure btnSetValue1000Click(Sender: TObject);
     procedure btnWriteLog1000Click(Sender: TObject);
     procedure btnWriterLogClick(Sender: TObject);
     procedure tmrLogTimer(Sender: TObject);
@@ -97,6 +99,22 @@ begin
   lvDValue.Add('time', NowString);
   yunStorage.SetJSON(edtAccessToken.Text, edtPath.Text, lvDValue);
   lvDValue.Free;
+end;
+
+procedure TForm1.btnSetValue1000Click(Sender: TObject);
+var
+  i: Integer;
+  lvDValue:TDValue;
+begin
+  for i := 0 to 1000 - 1 do
+  begin
+    lvDValue := TDValue.Create;
+    lvDValue.Add('value', edtValue.Text);
+    lvDValue.Add('time', NowString);
+    lvDValue.Add('sn', i);
+    yunStorage.SetJSON(edtAccessToken.Text, edtPath.Text, lvDValue);
+    lvDValue.Free;
+  end;
 end;
 
 procedure TForm1.btnWriteLog1000Click(Sender: TObject);
