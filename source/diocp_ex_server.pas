@@ -16,7 +16,8 @@ unit diocp_ex_server;
 interface
 
 uses
-  diocp_tcp_server, utils_buffer, utils_safeLogger, SysUtils, Classes;
+  diocp_tcp_server, utils_rawPackage, utils_safeLogger, SysUtils, Classes,
+  utils_strings;
 
 type
   TDiocpExContext = class;
@@ -31,7 +32,7 @@ type
 
   TDiocpExContext = class(TIocpClientContext)
   private
-    FCacheBuffer: TBufferLink;
+    FCacheBuffer: TRawPackage;
     FRecvData: array of Byte;
   protected
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
@@ -99,19 +100,14 @@ type
 
 implementation
 
-uses
-  utils_strings;
-
 
 constructor TDiocpExContext.Create;
 begin
   inherited Create;
-  FCacheBuffer := TBufferLink.Create();
 end;
 
 destructor TDiocpExContext.Destroy;
 begin
-  FCacheBuffer.Free;
   inherited Destroy;
 end;
 
@@ -120,7 +116,8 @@ end;
 procedure TDiocpExContext.DoCleanUp;
 begin
   inherited DoCleanUp;
-  FCacheBuffer.clearBuffer;
+  FCacheBuffer.FEndBytesLength := 0;
+  FCacheBuffer.FStartBytesLength := 0;
 end;
 
 procedure TDiocpExContext.OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD);
@@ -137,57 +134,49 @@ var
 
   lvOwner:TDiocpExTcpServer;
 
+  lvPtr:PByte;
+
 begin
   lvOwner := TDiocpExTcpServer(Owner);
-  lvStartData := @lvOwner.FStartData[0];
+
   lvStartDataLen := lvOwner.FStartDataLen;
-  lvEndData := @lvOwner.FEndData[0];
   lvEndDataLen := lvOwner.FEndDataLen;
 
-  FCacheBuffer.AddBuffer(buf, len);
-
-  while FCacheBuffer.validCount > 0 do
+  if (FCacheBuffer.FEndBytesLength = 0) and (FCacheBuffer.FStartBytesLength = 0)  then
   begin
-    // 标记读取的开始位置，如果数据不够，进行恢复，以便下一次解码
-    FCacheBuffer.markReaderIndex;
+    SetPackageMaxLength(@FCacheBuffer, lvOwner.FMaxDataLen);
+    lvStartData := @lvOwner.FStartData[0];
+    lvEndData := @lvOwner.FEndData[0];
+
     if lvStartDataLen > 0 then
     begin
-      // 不够数据，跳出
-      if FCacheBuffer.validCount < lvStartDataLen + lvEndDataLen then Break;
-      
-      j := FCacheBuffer.SearchBuffer(lvStartData, lvStartDataLen);
-      if j = -1 then
-      begin  // 没有搜索到开始标志
-        FCacheBuffer.clearBuffer();
-        Exit;
-      end else
-      begin
-        // 跳过开头标志
-        FCacheBuffer.Skip(j + lvStartDataLen);
-      end;
+      SetLength(FCacheBuffer.FStartBytes, lvStartDataLen);
+      Move(lvStartData^, FCacheBuffer.FStartBytes[0], lvStartDataLen);
+      FCacheBuffer.FStartBytesLength := lvStartDataLen;
     end;
-
-    // 不够数据，跳出
-    if FCacheBuffer.validCount < lvEndDataLen then
+    if lvEndDataLen > 0 then
     begin
-      FCacheBuffer.restoreReaderIndex;
-      Break;
+      SetLength(FCacheBuffer.FEndBytes, lvEndDataLen);
+      Move(lvEndData^, FCacheBuffer.FEndBytes[0], lvEndDataLen);
+      FCacheBuffer.FEndBytesLength := lvEndDataLen;
     end;
-
-    j := FCacheBuffer.SearchBuffer(lvEndData, lvEndDataLen);
-    if j <> -1 then
-    begin
-      SetLength(FRecvData, j);
-      FCacheBuffer.readBuffer(@FRecvData[0], j);
-      OnDataAction(@FRecvData[0], j);
-      FCacheBuffer.Skip(lvEndDataLen);
-    end else
-    begin      // 没有结束符
-      FCacheBuffer.restoreReaderIndex;
-      Break;
-    end;
+    ResetPacakge(@FCacheBuffer);
   end;
-  FCacheBuffer.clearHaveReadBuffer();
+
+  lvPtr := PByte(buf);
+  for i := 0 to len -1 do
+  begin
+    r := InputBuffer(@FCacheBuffer, lvPtr^);
+    inc(lvPtr);
+    if r = 1 then
+    begin
+      // 去掉头尾
+      OnDataAction(@FCacheBuffer.FRawBytes[lvStartDataLen], FCacheBuffer.FRawLength - lvStartDataLen - lvEndDataLen);
+      ResetPacakge(@FCacheBuffer);
+    end;
+
+  end;
+
 
 
 
@@ -367,14 +356,13 @@ end;
 procedure TDiocpStringTcpServer.DoDataAction(pvContext: TDiocpExContext; pvData:
     Pointer; pvDataLen: Integer);
 var
-  ansiStr:AnsiString;
+  lvStr:String;
 begin
   inherited;
-  SetLength(ansiStr, pvDataLen);
-  Move(pvData^, PAnsiChar(ansiStr)^, pvDataLen);
+  lvStr := ByteBufferToString(PByte(pvData), pvDataLen);
   if Assigned(FOnContextStringAction) then
   begin
-    FOnContextStringAction(TDiocpStringContext(pvContext), ansiStr);
+    FOnContextStringAction(TDiocpStringContext(pvContext), lvStr);
   end;    
 end;
 
