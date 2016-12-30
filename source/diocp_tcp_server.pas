@@ -1044,6 +1044,7 @@ type
   private
     FIocpEngine: TIocpEngine;
     FAllowMaxOnlineCount: Integer;
+    FKeepAliveTime: Cardinal;
     FOwnerEngine:Boolean;
     procedure CheckDoDestroyEngine;
   protected
@@ -1176,11 +1177,12 @@ type
     procedure GetOnlineContextList(pvList:TList);
 
     /// <summary>
-    ///   stop and wait all workers down
+    ///  .关闭侦听服务
+    ///  .请求断开所有连接
+    ///  .等待所有连接断开
+    ///  .切换到关闭状态
     /// </summary>
     procedure SafeStop;
-
-
 
     procedure Open;
 
@@ -1207,14 +1209,22 @@ type
     property IocpEngine: TIocpEngine read FIocpEngine;
 
     /// <summary>
-    ///   set socket Keep alive option when acceptex
+    ///   开启Tcp的KeepAlive选项, 默认不开启
+    ///   (在AcceptEx成功后进行设置)
     /// </summary>
     property KeepAlive: Boolean read FKeepAlive write FKeepAlive;
+
+    /// <summary>
+    ///   开启KeepAlive时,设置的时间.默认10000(10秒)
+    /// </summary>
+    property KeepAliveTime: Cardinal read FKeepAliveTime write FKeepAliveTime;
 
     /// <summary>
     ///   extend data
     /// </summary>
     property DataPtr: Pointer read FDataPtr write FDataPtr;
+
+
     property Listeners: TDiocpListeners read FListeners;
 
     //property IocpAcceptorMgr: TIocpAcceptorMgr read FIocpAcceptorMgr;
@@ -2473,6 +2483,7 @@ end;
 constructor TDiocpTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FKeepAliveTime := 10000;
   FListeners := TDiocpListeners.Create(Self);
   FDefaultListener := TDiocpListener.Create(Self);
 
@@ -2659,7 +2670,7 @@ var
     begin
       if FKeepAlive then
       begin
-        Result := SetKeepAlive(pvRequest.FClientContext.FRawSocket.SocketHandle, 10000);
+        Result := SetKeepAlive(pvRequest.FClientContext.FRawSocket.SocketHandle, FKeepAliveTime);
         if not Result then
         begin
           lvErrCode := GetLastError;
@@ -2992,8 +3003,6 @@ begin
       Assert(False);
     end;
 
-    FActive := false;
-
     FListeners.Close;
     FDefaultListener.Close;
 
@@ -3009,28 +3018,8 @@ begin
     begin  // wait time out
       Sleep(10);
 
-      // stop workers 10's
-//      不停止Iocp引擎
-//      if not FIocpEngine.StopWorkers(10000) then
-//      begin        // record info
-//        SafeWriteFileMsg('EngineWorkerInfo:' +
-//           sLineBreak + FIocpEngine.GetStateINfo + sLineBreak +
-//           '================================================' + sLineBreak +
-//           'TcpServerInfo:' +
-//           sLineBreak + GetStateINfo, Self.Name + '_SafeStopTimeOut');
-//      end;
-
-    end else
-    begin    // all context is give back to pool
-//      不停止Iocp引擎
-//      if not FIocpEngine.StopWorkers(120000) then
-//      begin        // record info
-//        SafeWriteFileMsg('EngineWorkerInfo:' +
-//           sLineBreak + FIocpEngine.GetStateINfo + sLineBreak +
-//           '================================================' + sLineBreak +
-//           'TcpServerInfo:' +
-//           sLineBreak + GetStateINfo, Self.Name + '_SafeStopTimeOut');
-//      end;
+      // 等待Context断开超时
+      SafeWriteFileMsg('等待Context断开超时', Self.Name + '_SafeStopTimeOut');
     end;
 
     FListeners.ClearObjects;
@@ -3043,6 +3032,9 @@ begin
     FRecvRequestPool.Clear;
 
     DoAfterClose;
+
+    /// 切换到关闭状态
+    FActive := false;
   end; 
 end;
 

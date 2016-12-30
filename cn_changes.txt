@@ -204,3 +204,6 @@ DIOCP-v5 0.0.2
 41: 2016-11-08 15:24:43
    * 底层共享同一个Iocp引擎
     
+42: 2016-12-30 20:08:21
+   + 添加KeepAliveTime设定
+   * 修改SafeStop时，会触发OnDisconnected事件

@@ -771,8 +771,14 @@ function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
 var
   s:String;
 begin
-  s := LoadTextFromFile(pvFile);
-  Result := JSONParser(s, pvDValue);
+  if FileExists(pvFile) then
+  begin
+    s := LoadTextFromFile(pvFile);
+    Result := JSONParser(s, pvDValue);
+  end else
+  begin
+    Result := 0;
+  end;
 end;
 
 procedure JSONWriteToUtf8NoBOMFile(pvFile:string; pvDValue:TDValue);
@@ -893,8 +899,14 @@ function JSONParseFromFile(pvFile:string; pvDValue:TDValue): Integer;
 var
   s:String;
 begin
-  s := LoadTextFromFile(pvFile);
-  Result := JSONParser(s, pvDValue);
+  if FileExists(pvFile) then
+  begin
+    s := LoadTextFromFile(pvFile);
+    Result := JSONParser(s, pvDValue);
+  end else
+  begin
+    Result := 0;
+  end; 
 end;
 
 end.

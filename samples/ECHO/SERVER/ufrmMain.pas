@@ -43,7 +43,6 @@ type
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
-    procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
     procedure btnPoolInfoClick(Sender: TObject);
@@ -167,14 +166,8 @@ end;
 
 procedure TfrmMain.actStopExecute(Sender: TObject);
 begin
-  FTcpServer.DisconnectAll;
   FTcpServer.SafeStop;
   RefreshState;
-end;
-
-procedure TfrmMain.btnDisconectAllClick(Sender: TObject);
-begin
-  FTcpServer.DisConnectAll();
 end;
 
 procedure TfrmMain.btnFindContextClick(Sender: TObject);

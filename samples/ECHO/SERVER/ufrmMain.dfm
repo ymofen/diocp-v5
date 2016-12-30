@@ -86,7 +86,6 @@ object frmMain: TfrmMain
       Height = 25
       Caption = #26029#24320#25152#26377
       TabOrder = 0
-      OnClick = btnDisconectAllClick
     end
     object btnFindContext: TButton
       Left = 462
