@@ -3,7 +3,7 @@ object frmMain: TfrmMain
   Top = 0
   Caption = 'diocp-v5 ex client'
   ClientHeight = 314
-  ClientWidth = 565
+  ClientWidth = 644
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -16,8 +16,8 @@ object frmMain: TfrmMain
   object mmoRecvMessage: TMemo
     Left = 8
     Top = 152
-    Width = 521
-    Height = 145
+    Width = 601
+    Height = 154
     Lines.Strings = (
       'iocp tcp client demo')
     TabOrder = 0

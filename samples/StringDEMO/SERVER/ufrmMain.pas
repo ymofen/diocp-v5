@@ -182,7 +182,10 @@ end;
 procedure TfrmMain.OnContextStringAction(pvContext: TDiocpStringContext;
     pvDataString: String);
 begin
-  sfLogger.logMessage(pvDataString);
+  if chkLogDetails.Checked then
+  begin
+    sfLogger.logMessage(pvDataString);
+  end;
 
   // 可以把一个数据直接写回去
   pvContext.WriteAnsiString(pvDataString);

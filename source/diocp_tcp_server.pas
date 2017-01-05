@@ -742,6 +742,7 @@ type
   /// </summary>
   TIocpAcceptorMgr = class(TObject)
   private
+    FFlag:Integer;
     FOwner: TDiocpTcpServer;
 
     FCount: Integer;
@@ -771,6 +772,8 @@ type
 
     procedure ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
 
+    procedure Close;
+
     /// <summary>
     ///   检测是否需要投递AcceptEx
     /// </summary>
@@ -789,8 +792,6 @@ type
     procedure ClearObjects;
 
     property ListenSocket: TRawSocket read FListenSocket;
-
-
 
   end;
 
@@ -3579,6 +3580,11 @@ begin
   FContextPool.Clear;
 end;
 
+procedure TIocpAcceptorMgr.Close;
+begin
+  FListenSocket.Close();
+end;
+
 constructor TIocpAcceptorMgr.Create(AOwner: TDiocpTcpServer);
 begin
   inherited Create;
@@ -3656,6 +3662,7 @@ var
   lvRequest:TIocpAcceptExRequest;
   i, j:Integer;
 begin
+  if not FListenSocket.SocketValid then Exit;
   j := 0;
   Assert(FOwner <> nil);
 
@@ -3887,7 +3894,7 @@ begin
     begin     // binding error
       lvErrCode := GetLastError;
       FOwner.logMessage(
-         Format(strBindingIocpError,
+         Format(strAcceptExError,
            [FClientContext.FRawSocket.SocketHandle, lvErrCode, 'TIocpAcceptExRequest.PostRequest(SOCKET_REUSE)'])
          , CORE_LOG_FILE);
 
@@ -3935,7 +3942,7 @@ begin
     if not Result then
     begin 
       FOwner.logMessage(
-         Format(strBindingIocpError,
+         Format(strAcceptExError,
            [FClientContext.FRawSocket.SocketHandle, lvErrCode, 'TIocpAcceptExRequest.PostRequest'])
          , CORE_LOG_FILE);
 
