@@ -17,7 +17,11 @@ type
     btnSendObject: TButton;
     mmoData: TMemo;
     Button1: TButton;
+    btnForSend: TButton;
+    btnClear: TButton;
+    procedure btnClearClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
+    procedure btnForSendClick(Sender: TObject);
     procedure btnSendObjectClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
   private
@@ -78,6 +82,12 @@ begin
   inherited Destroy;
 end;
 
+procedure TfrmMain.btnClearClick(Sender: TObject);
+begin
+  mmoRecvMessage.Clear;
+  mmoData.Clear;
+end;
+
 procedure TfrmMain.btnConnectClick(Sender: TObject);
 begin
   FDiocpTcpClient.open;
@@ -94,6 +104,20 @@ begin
   mmoRecvMessage.Clear;
 
   mmoRecvMessage.Lines.Add('start to recv...');
+end;
+
+procedure TfrmMain.btnForSendClick(Sender: TObject);
+var
+  s, s1:AnsiString;
+  i: Integer;
+begin
+  FDiocpContext.SetMaxSendingQueueSize(1000);
+  s := mmoData.Lines.Text;
+  for i := 0 to 99 - 1 do
+  begin
+    s1 := Format('#%d.%s!', [i, s]);
+    FDiocpContext.PostWSASendRequest(PAnsiChar(s1), Length(s1), True);
+  end;
 end;
 
 procedure TfrmMain.btnSendObjectClick(Sender: TObject);
