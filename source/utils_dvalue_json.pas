@@ -51,6 +51,8 @@ procedure JSONEscapeWithoutDoEscape(ABuilder: TDStringBuilder; const S: String);
 
 procedure JSONEscape(ABuilder: TDStringBuilder; const S: DStringW; ADoEscape: Boolean);
 
+function StringJSONEscape(const s:String): String;
+
 
     
 implementation
@@ -907,6 +909,19 @@ begin
   begin
     Result := 0;
   end; 
+end;
+
+function StringJSONEscape(const s:String): String;
+var
+  lvSB:TDStringBuilder;
+begin
+  lvSB := TDStringBuilder.Create;
+  try
+    JSONEscape(lvSB, s, False);
+    Result := lvSB.ToString;
+  finally
+    lvSB.Free;
+  end;
 end;
 
 end.
