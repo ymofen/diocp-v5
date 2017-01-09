@@ -49,50 +49,57 @@ type
   TIOCPEncoderClass = class of TIOCPEncoder;
 
 
-  TDiocpEncoder = class(TObject)
-  protected
-    FContext:TObject;
+
+  TDiocpContextCoderExchange = class(TObject)
+  private
+    FContext: TObject;
   public
-    procedure SetContext(const pvContext:TObject);
+    constructor Create; virtual;
+    property Context: TObject read FContext write FContext;
+  end;
+
+  TDiocpContextCoderExchangeClass = class of TDiocpContextCoderExchange;
+
+  TDiocpEncoder = class(TObject)
+  public
 
     /// <summary>
     ///   编码要发送的对象
     /// </summary>
     /// <param name="pvDataObject"> 要进行编码的对象 </param>
     /// <param name="pvBufWriter"> 数据写入 </param>
-    procedure Encode(const pvDataObject: Pointer; const pvBufWriter: TBlockBuffer);
-        virtual; abstract;
+    procedure Encode(const pvExchange: TDiocpContextCoderExchange; const
+        pvDataObject: Pointer; const pvBufWriter: TBlockBuffer); virtual; abstract;
   end;
 
   
   TDiocpEncoderClass = class of TDiocpEncoder;
 
+
   /// <summary>
   ///  解码器
   /// </summary>
   TDiocpDecoder = class(TObject)
-  protected
-    FContext:TObject;
   public
-    constructor Create; virtual;
-
-    procedure SetContext(const pvContext:TObject);
-
-    /// <summary>
-    ///   输入数据
-    /// </summary>
-    procedure SetRecvBuffer(const buf:Pointer; len:Cardinal); virtual; abstract;
 
     /// <summary>
     ///   获取解码好的数据
     /// </summary>
-    function GetData:Pointer; virtual; abstract;
+    function GetData(const pvExchange: TDiocpContextCoderExchange; const pvCopy:
+        Boolean): Pointer; virtual; abstract;
 
 
     /// <summary>
     ///   释放解码好的数据
     /// </summary>
-    procedure ReleaseData(const pvData:Pointer); virtual; abstract;
+    procedure ReleaseData(const pvExchange: TDiocpContextCoderExchange; const
+        pvData: Pointer; const pvCopy: Boolean); virtual; abstract;
+
+    /// <summary>
+    ///   输入数据
+    /// </summary>
+    procedure SetRecvBuffer(const pvExchange: TDiocpContextCoderExchange;
+      const buf:Pointer; len:Cardinal); virtual; abstract;
 
     /// <summary>
     ///   解码收到的数据,如果有接收到数据,调用该方法,进行解码
@@ -103,29 +110,19 @@ type
     ///  -1: 解码失败
     /// </returns>
     /// <param name="inBuf"> 接收到的流数据 </param>
-    function Decode(): Integer;  virtual; abstract;
-
+    function Decode(const pvExchange: TDiocpContextCoderExchange): Integer;  virtual; abstract;
   end;
 
   TDiocpDecoderClass = class of TDiocpDecoder;
 
 implementation
 
-constructor TDiocpDecoder.Create;
-begin
-  inherited;
-end;
-
-procedure TDiocpDecoder.SetContext(const pvContext:TObject);
-begin
-  FContext := pvContext;
-end;
 
 { TDiocpEncoder }
 
-procedure TDiocpEncoder.SetContext(const pvContext: TObject);
+constructor TDiocpContextCoderExchange.Create;
 begin
-  FContext := pvContext;
+  inherited;
 end;
 
 end.
