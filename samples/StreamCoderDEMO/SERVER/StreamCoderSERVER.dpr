@@ -1,7 +1,7 @@
 program StreamCoderSERVER;
 
 uses
-  QMM,
+  memchecker,
   Forms,
   ufrmMain in 'ufrmMain.pas' {frmMain},
   uDIOCPStreamCoder in '..\..\diocpCoders\uDIOCPStreamCoder.pas',

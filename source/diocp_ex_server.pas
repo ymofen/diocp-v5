@@ -351,6 +351,7 @@ end;
 constructor TDiocpStringTcpServer.Create(AOwner: TComponent);
 begin
   inherited;
+  RegisterContextClass(TDiocpStringContext);
 end;
 
 procedure TDiocpStringTcpServer.DoDataAction(pvContext: TDiocpExContext; pvData:

@@ -213,4 +213,7 @@ DIOCP-v5 0.0.2
    
 44: 2017-01-10 11:16:32
    * 修改新的编码器模式()
+  
+45: 2017-01-10 15:11:35
+   * DiocpStringServer修复没有注册TDiocpStringContext类的bug，如果扩展TDiocpStringContext会出现内存越界，感谢Beem(8418601)配合调试。
    
