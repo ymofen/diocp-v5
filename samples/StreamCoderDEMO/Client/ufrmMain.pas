@@ -52,6 +52,7 @@ begin
   FCoderTcpClient := TDiocpCoderTcpClient.Create(Self);
   FDiocpContext :=TIocpCoderRemoteContext(FCoderTcpClient.Add);
 
+  FDiocpContext.RegisterCoderExchangeClass(TDiocpStreamCoderExchange);
   FDiocpContext.RegisterCoderClass(TIOCPStreamDecoder, TIOCPStreamEncoder);
   FDiocpContext.OnContextAction := OnRecvObject;
   FCoderTcpClient.OnContextDisconnected := OnDisconnected;

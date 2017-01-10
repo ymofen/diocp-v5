@@ -6,29 +6,56 @@ uses
   diocp_coder_baseObject, Classes, SysUtils, utils_buffer, utils_BufferPool, diocp_ex_streamProtocol;
 
 type
-  TIOCPStreamDecoder = class(TDiocpDecoder)
+  TDiocpStreamCoderExchange = class(TDiocpContextCoderExchange)
   private
-    FBuf: PByte;
-    FLength: Integer;
-    FStreamObj: TDiocpStreamObject;
+    FRecvBuf: PByte;
+    FRecvLength: Integer;
+    FRecvStreamObj: TDiocpStreamObject;
+    FContentStream:TMemoryStream;
+
+    /// <summary>
+    ///   新生成一个Content来接收数据, 原Content不再管理
+    ///   (外部GetData时把原有数据拿走了)
+    /// </summary>
+    procedure NewContent;
   public
     constructor Create; override;
     destructor Destroy; override;
+    
+    /// <summary>
+    ///   解码收到的数据,如果有接收到数据,调用该方法,进行解码
+    /// </summary>
+    /// <returns>
+    ///   0：需要更多的数据
+    ///   1: 解码成功
+    ///  -1: 解码失败
+    /// </returns>
+    /// <param name="inBuf"> 接收到的流数据 </param>
+    function Decode: Integer;
+
+  end;
+
+
+  TIOCPStreamDecoder = class(TDiocpDecoder)
+  public
     /// <summary>
     ///   输入数据
     /// </summary>
-    procedure SetRecvBuffer(const buf:Pointer; len:Cardinal); override;
+    procedure SetRecvBuffer(const pvExchange: TDiocpContextCoderExchange; const
+        buf:Pointer; len:Cardinal); override;
 
     /// <summary>
     ///   获取解码好的数据
     /// </summary>
-    function GetData: Pointer; override;
+    function GetData(const pvExchange: TDiocpContextCoderExchange; const pvCopy:
+        Boolean): Pointer; override;
 
 
     /// <summary>
     ///   释放解码好的数据
     /// </summary>
-    procedure ReleaseData(const pvData:Pointer); override;
+    procedure ReleaseData(const pvExchange: TDiocpContextCoderExchange; const
+        pvData: Pointer; const pvCopy: Boolean); override;
 
     /// <summary>
     ///   解码收到的数据,如果有接收到数据,调用该方法,进行解码
@@ -39,7 +66,7 @@ type
     ///  -1: 解码失败
     /// </returns>
     /// <param name="inBuf"> 接收到的流数据 </param>
-    function Decode: Integer; override;
+    function Decode(const pvExchange: TDiocpContextCoderExchange): Integer;  override;
   end;
 
 
@@ -50,8 +77,8 @@ type
     /// </summary>
     /// <param name="pvDataObject"> 要进行编码的对象 </param>
     /// <param name="pvBufWriter"> 数据写入 </param>
-    procedure Encode(const pvDataObject: Pointer; const pvBufWriter: TBlockBuffer);
-        override;
+    procedure Encode(const pvExchange: TDiocpContextCoderExchange; const
+        pvDataObject: Pointer; const pvBufWriter: TBlockBuffer); override;
   end;
 
 function verifyData(const buf; len:Cardinal): Cardinal;
@@ -86,53 +113,50 @@ const
 
 
 
-constructor TIOCPStreamDecoder.Create;
+function TIOCPStreamDecoder.Decode(
+  const pvExchange: TDiocpContextCoderExchange): Integer;
+var
+  lvExchange:TDiocpStreamCoderExchange;
 begin
-  inherited Create;
-  FStreamObj := TDiocpStreamObject.Create();
+  lvExchange := TDiocpStreamCoderExchange(pvExchange);
+  Result := lvExchange.Decode();
 end;
 
-destructor TIOCPStreamDecoder.Destroy;
+function TIOCPStreamDecoder.GetData(const pvExchange:
+    TDiocpContextCoderExchange; const pvCopy: Boolean): Pointer;
+var
+  lvExchange:TDiocpStreamCoderExchange;
 begin
-  FreeAndNil(FStreamObj);
-  inherited Destroy;
-end;
-
-function TIOCPStreamDecoder.Decode: Integer;
-begin
-  Result := 0;
-  while FLength > 0 do
-  begin
-    Result := FStreamObj.InputBuffer(FBuf^);
-    Inc(FBuf);
-    Dec(FLength);
-    if Result <> 0 then
-    begin
-      Break;
-    end;
+  lvExchange := TDiocpStreamCoderExchange(pvExchange);
+  Result := lvExchange.FRecvStreamObj.Content;
+  if pvCopy then
+  begin       
+    lvExchange.NewContent;
   end;
 end;
 
-function TIOCPStreamDecoder.GetData: Pointer;
+procedure TIOCPStreamDecoder.SetRecvBuffer(const pvExchange:
+    TDiocpContextCoderExchange; const buf:Pointer; len:Cardinal);
 begin
-  Result := FStreamObj.Content;
+  TDiocpStreamCoderExchange(pvExchange).FRecvBuf := PByte(buf);
+  TDiocpStreamCoderExchange(pvExchange).FRecvLength := len;
 end;
 
-procedure TIOCPStreamDecoder.SetRecvBuffer(const buf:Pointer; len:Cardinal);
-begin
-  FBuf := PByte(buf);
-  FLength := len;
-end;
-
-procedure TIOCPStreamDecoder.ReleaseData(const pvData:Pointer);
+procedure TIOCPStreamDecoder.ReleaseData(const pvExchange:
+    TDiocpContextCoderExchange; const pvData: Pointer; const pvCopy: Boolean);
 begin
   inherited;
+  if pvCopy then
+  begin
+    TMemoryStream(pvData).Free;
+  end;
 end;
 
 { TIOCPStreamEncoder }
 
-procedure TIOCPStreamEncoder.Encode(const pvDataObject: Pointer; const
-    pvBufWriter: TBlockBuffer);
+procedure TIOCPStreamEncoder.Encode(const pvExchange:
+    TDiocpContextCoderExchange; const pvDataObject: Pointer; const pvBufWriter:
+    TBlockBuffer);
 var
   lvPACK_FLAG: WORD;
   lvDataLen, lvWriteIntValue: Integer;
@@ -165,6 +189,46 @@ begin
   pvBufWriter.Append(@lvbuf[0],lvDataLen);
 
   
+end;
+
+constructor TDiocpStreamCoderExchange.Create;
+begin
+  inherited Create;
+
+  FRecvStreamObj := TDiocpStreamObject.Create();
+  NewContent;
+end;
+
+destructor TDiocpStreamCoderExchange.Destroy;
+begin
+  FreeAndNil(FRecvStreamObj);
+  if FContentStream <> nil then
+  begin
+    FContentStream.Free;
+    FContentStream := nil;
+  end;
+  inherited Destroy;
+end;
+
+function TDiocpStreamCoderExchange.Decode: Integer;
+begin
+  Result := 0;
+  while FRecvLength > 0 do
+  begin
+    Result := FRecvStreamObj.InputBuffer(FRecvBuf^);
+    Inc(FRecvBuf);
+    Dec(FRecvLength);
+    if Result <> 0 then
+    begin
+      Break;
+    end;
+  end;
+end;
+
+procedure TDiocpStreamCoderExchange.NewContent;
+begin
+  FContentStream := TMemoryStream.Create;
+  FRecvStreamObj.WrapContent(FContentStream);
 end;
 
 end.

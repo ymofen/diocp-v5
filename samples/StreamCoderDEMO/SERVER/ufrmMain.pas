@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ActnList, diocp_coder_tcpServer, diocp_tcp_server, ExtCtrls,
+  Dialogs, StdCtrls, ActnList, diocp_ex_coder_tcpserver, diocp_ex_StreamCoder,
+  diocp_tcp_server, ExtCtrls,
   ComObj, ComCtrls, utils_safeLogger;
 
 type
@@ -45,7 +46,7 @@ var
 implementation
 
 uses
-  uFMMonitor, uDIOCPStreamCoder, uMyClientContext;
+  uFMMonitor, uMyClientContext;
 
 {$R *.dfm}
 
@@ -57,9 +58,9 @@ begin
   FTcpServer := TDiocpCoderTcpServer.Create(Self);
   FTcpServer.createDataMonitor;
 
-  FTcpServer.WorkerCount := 3;
   // register decoder and encoder class
   FTcpServer.registerCoderClass(TIOCPStreamDecoder, TIOCPStreamEncoder);
+  FTcpServer.RegisterCoderExchangeClass(TDiocpStreamCoderExchange);
 
   FTcpServer.registerContextClass(TMyClientContext);
   

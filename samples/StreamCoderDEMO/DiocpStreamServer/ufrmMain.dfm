@@ -39,6 +39,10 @@ object frmMain: TfrmMain
     object tsLog: TTabSheet
       Caption = #26085#24535
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoLog: TMemo
         Left = 0
         Top = 0
@@ -51,6 +55,10 @@ object frmMain: TfrmMain
     object tsTest: TTabSheet
       Caption = #27979#35797#39029#38754
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
     end
   end
   object pnlTop: TPanel

@@ -37,8 +37,9 @@ type
   private
     // 发送写入单线程写入
     FBlockBuffer: TBlockBuffer;
-
-
+    FCoderExchange:TDiocpContextCoderExchange;
+    FCoderExchangeClass:TDiocpContextCoderExchangeClass;
+    
     FInnerEncoder: TDiocpEncoder;
     FInnerDecoder: TDiocpDecoder;
 
@@ -50,6 +51,7 @@ type
     procedure OnBlockBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   protected
+    function CreateCoderExchange: TDiocpContextCoderExchange;
     /// <summary>
     ///   on recved data, run in iocp worker thread
     /// </summary>
@@ -64,6 +66,8 @@ type
     /// </summary>
     procedure RegisterCoderClass(pvDecoderClass: TDiocpDecoderClass;
         pvEncoderClass: TDiocpEncoderClass);
+    procedure RegisterCoderExchangeClass(const pvCoderExchangeClass:
+        TDiocpContextCoderExchangeClass);
 
     /// <summary>
     ///   注册解码器
@@ -135,10 +139,22 @@ end;
 
 destructor TIocpCoderRemoteContext.Destroy;
 begin
+  if FCoderExchange <> nil then
+  begin
+    FCoderExchange.Free;
+  end;
+
   FBlockBuffer.Free;
   if FInnerDecoder <> nil then FInnerDecoder.Free;
   if FInnerEncoder <> nil then FInnerEncoder.Free;
   inherited Destroy;
+end;
+
+function TIocpCoderRemoteContext.CreateCoderExchange:
+    TDiocpContextCoderExchange;
+begin
+  Assert(FCoderExchangeClass <> nil);
+  Result := FCoderExchangeClass.Create;
 end;
 
 procedure TIocpCoderRemoteContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
@@ -201,18 +217,18 @@ var
   lvObject:Pointer;
   r:Integer;
 begin
-  FDecoder.SetRecvBuffer(buf, len);
+  FDecoder.SetRecvBuffer(FCoderExchange, buf, len);
   while True do
   begin
     //调用注册的解码器<进行解码>
-    r := FDecoder.Decode();
+    r := FDecoder.Decode(FCoderExchange);
     if r = -1 then
     begin
       self.RequestDisconnect('解码失败');
       exit;
     end else if r = 1 then
     begin
-      lvObject := FDecoder.GetData;
+      lvObject := FDecoder.GetData(FCoderExchange, False);
       try
         try
           if Assigned(FOnContextAction) then FOnContextAction(lvObject);
@@ -224,7 +240,7 @@ begin
           end;
         end;
       finally
-        FDecoder.ReleaseData(lvObject);
+        FDecoder.ReleaseData(FCoderExchange, lvObject, False);
       end;
     end else
     begin
@@ -253,6 +269,18 @@ begin
   RegisterEncoder(FInnerEncoder);
 end;
 
+procedure TIocpCoderRemoteContext.RegisterCoderExchangeClass(const
+    pvCoderExchangeClass: TDiocpContextCoderExchangeClass);
+begin
+  FCoderExchangeClass := pvCoderExchangeClass;
+  if FCoderExchange <> nil then
+  begin
+    FCoderExchange.Free;
+    FCoderExchange := nil;
+  end;
+  FCoderExchange := CreateCoderExchange;
+end;
+
 { TIocpCoderRemoteContext }
 
 procedure TIocpCoderRemoteContext.RegisterDecoder(pvDecoder: TDiocpDecoder);
@@ -275,7 +303,7 @@ begin
     lock;
     try
       FBlockBuffer.ClearBuffer;
-      FEncoder.Encode(pvObject, FBlockBuffer);
+      FEncoder.Encode(FCoderExchange, pvObject, FBlockBuffer);
       FBlockBuffer.FlushBuffer;
     finally
       UnLock;

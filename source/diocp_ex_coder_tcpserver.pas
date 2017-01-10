@@ -683,7 +683,6 @@ begin
   inherited Create(AOwner);
   FTaskObjectPool := TBaseQueue.Create();
   RegisterContextClass(TIOCPCoderClientContext);
-  
   FIocpSendRequestClass := TDiocpCoderSendRequest;
 
   // 4K, Ã¿´ÎÍ¶µÝ4k
@@ -703,6 +702,7 @@ end;
 
 function TDiocpCoderTcpServer.CreateCoderExchange: TDiocpContextCoderExchange;
 begin
+  Assert(FCoderExchangeClass <> nil);
   Result := FCoderExchangeClass.Create;
 end;
 
@@ -752,6 +752,7 @@ procedure TDiocpCoderTcpServer.OnCreateClientContext(const context:
 begin
   inherited;
   TIOCPCoderClientContext(context).FCoderExchange := CreateCoderExchange;
+  TIOCPCoderClientContext(context).FBlockBuffer.SetBufferPool(FBlockBufferPool);
 end;
 
 procedure TDiocpCoderTcpServer.RegisterCoderClass(
