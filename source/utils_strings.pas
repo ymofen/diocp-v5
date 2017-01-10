@@ -163,7 +163,7 @@ type
     FCapacity :Integer;
     FBufferLocked:Boolean;
     FLineBreak: String;
-    
+
     procedure CheckNeedSize(pvSize: LongInt); overload;
     procedure CheckNeedSize(pvOffset, pvSize: LongInt); overload;
     function GetLength: Integer;
@@ -1697,6 +1697,11 @@ end;
 procedure TDStringBuilder.Clear;
 begin
   FPosition := 0;
+
+  // modify by ymf
+  // 2017-01-10 17:36:13
+  FCapacity := 0;
+  SetLength(FData, 0);
 end;
 
 function TDStringBuilder.GetLength: Integer;
@@ -1902,11 +1907,17 @@ procedure TDBufferBuilder.Clear;
 begin
   FSize := 0;
   FPosition := 0;
-  {$IFDEF MSWINDOWS}
-  {$IFDEF DEBUG}
-  ZeroMemory(@FData[0], FCapacity);
-  {$ENDIF}
-  {$ENDIF}
+
+  // modify by ymf
+  // 2017-01-10 17:36:13
+  FCapacity := 0;
+  SetLength(FData, 0);
+  
+//  {$IFDEF MSWINDOWS}
+//  {$IFDEF DEBUG}
+//  ZeroMemory(@FData[0], FCapacity);
+//  {$ENDIF}
+//  {$ENDIF}
 end;
 
 function TDBufferBuilder.DecodeUTF8: string;
