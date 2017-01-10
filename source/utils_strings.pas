@@ -253,6 +253,8 @@ type
     /// </summary>
     function ReArrange: TDBufferBuilder;
 
+    function GetInstanceSize: Integer;
+
 
     /// <summary>
     ///   所有数据长度
@@ -2085,6 +2087,11 @@ begin
   CheckNeedSize(0, NewSize);
   FSize := NewSize;
   if OldPosition > NewSize then Seek(0, soFromEnd);
+end;
+
+function TDBufferBuilder.GetInstanceSize: Integer;
+begin
+  Result := FCapacity;
 end;
 
 function TDBufferBuilder.ToBytes: TBytes;
