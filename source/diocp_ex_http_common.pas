@@ -1208,8 +1208,11 @@ begin
 
     for i := 0 to lvStrings.Count - 1 do
     begin
-
+      {$if CompilerVersion < 15}  // <D7
+      lvRawData := lvStrings.Values[lvStrings.Names[i]];
+      {$else}
       lvRawData := lvStrings.ValueFromIndex[i];
+      {$ifend}
       if lvRawData<> '' then
       begin
 

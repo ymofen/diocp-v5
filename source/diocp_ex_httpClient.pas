@@ -341,7 +341,12 @@ begin
   FRequestBody := TMemoryStream.Create;
   FRequestHeader := TStringList.Create;
   FCustomeHeader := TStringList.Create;
+  {$if CompilerVersion < 15}  // <D7
+  
+  {$else}
   FCustomeHeader.NameValueSeparator := ':';
+  {$ifend}
+
 
   FResponseBody := TMemoryStream.Create;
   FResponseHeader := TStringList.Create;

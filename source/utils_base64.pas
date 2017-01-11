@@ -19,7 +19,10 @@ uses
 {$ENDIF}
   ;
 
-
+{$if CompilerVersion < 15}  // <D7
+type
+  UInt64 = int64;//0..18446744073709551615;
+{$ifend}
 
 
 
