@@ -2093,6 +2093,7 @@ end;
 
 procedure TDiocpCustom.SetWorkerCount(const Value: Integer);
 begin
+  if FIocpEngine = __defaultDiocpEngine then Exit;
   FIocpEngine.setWorkerCount(Value);
 end;
 
