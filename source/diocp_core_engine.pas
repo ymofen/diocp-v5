@@ -410,6 +410,8 @@ type
 
     function GetStateINfo: String;
 
+    procedure PostAExitRequest;
+
     /// <summary>
     ///   get worker handle response
     /// </summary>
@@ -447,6 +449,10 @@ type
     /// <returns> true,成功创建一个工作线程.</returns>
     /// <param name="pvIsTempWorker"> 临时工作线程 </param>
     function CheckCreateWorker(pvIsTempWorker: Boolean): Boolean;
+    /// <summary>尝试创建一个工作线程, </summary>
+    /// <returns> true,成功创建一个工作线程.</returns>
+    /// <param name="pvIsTempWorker"> 临时工作线程 </param>
+    function CreateWorker(pvIsTempWorker: Boolean): Boolean;
 
     /// <summary>
     ///   开启IOCP引擎，创建工作线程
@@ -475,6 +481,7 @@ type
 
 
     property Active: Boolean read FActive;
+    property ActiveWorkerCount: Integer read FActiveWorkerCount;
 
     /// <summary>
     ///   core object, read only
@@ -931,7 +938,7 @@ begin
   Result := false;
   FWorkerLocker.lock;
   try
-    if FWorkerList.Count >= FMaxWorkerCount then exit;
+    if (FMaxWorkerCount > 0) and (FWorkerList.Count >= FMaxWorkerCount) then exit;
     for i := 0 to FWorkerList.Count -1 do
     begin
       if TIocpWorker(FWorkerList[i]).checkFlag(WORKER_ISWATING) then
@@ -1010,6 +1017,38 @@ begin
   FWorkerLocker.Free;
   FWorkerLocker := nil;
   inherited Destroy;
+end;
+
+function TIocpEngine.CreateWorker(pvIsTempWorker: Boolean): Boolean;
+var
+  i:Integer;
+  AWorker:TIocpWorker;
+begin
+  Result := false;
+  FWorkerLocker.lock;
+  try
+    if (FMaxWorkerCount > 0) and (FWorkerList.Count >= FMaxWorkerCount) then exit;
+
+    AWorker := TIocpWorker.Create(FIocpCore);
+    if pvIsTempWorker then
+    begin
+      AWorker.removeFlag(WORKER_RESERVED);
+    end else
+    begin
+      AWorker.setFlag(WORKER_RESERVED);
+    end;
+    AWorker.FIocpEngine := Self;
+    AWorker.FreeOnTerminate := True;
+    FWorkerList.Add(AWorker);
+    {$IFDEF UNICODE}
+    AWorker.Start;
+    {$ELSE}
+    AWorker.Resume;
+    {$ENDIF}
+
+  finally
+    FWorkerLocker.unLock;
+  end;
 end;
 
 function TIocpEngine.GetStateINfo: String;
@@ -1212,6 +1251,11 @@ begin
   InterlockedIncrement(FActiveWorkerCount);
 end;
 
+procedure TIocpEngine.PostAExitRequest;
+begin
+  FIocpCore.PostIOExitRequest;
+end;
+
 procedure TIocpEngine.PostRequest(pvRequest: TIocpRequest);
 begin
   /// post request to iocp queue
@@ -1243,12 +1287,31 @@ begin
 end;
 
 procedure TIocpEngine.SetWorkerCount(AWorkerCount: Integer);
+var
+  j:Integer;
+  i: Integer;
 begin
-  if FActive then SafeStop;
+  //if FActive then SafeStop;
   if AWorkerCount <= 0 then
     FWorkerCount := (GetCPUCount shl 1) -1
   else
-    FWorkerCount := AWorkerCount;   
+    FWorkerCount := AWorkerCount;
+
+  j := FWorkerCount - FActiveWorkerCount;
+  if j > 0 then
+  begin
+    for i := 0 to j - 1 do
+    begin
+      CreateWorker(False);
+    end;
+  end else
+  begin
+    j := -j;
+    for i := 0 to j - 1 do
+    begin
+      PostAExitRequest;
+    end;
+  end;
 
 end;
 
