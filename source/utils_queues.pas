@@ -293,7 +293,9 @@ begin
     {$ENDIF}
       queueDataPool.Push(FHead);
       FHead := ANext;
-    end; 
+    end;
+    FHead := nil;
+    FTail := nil;
     FCount := 0;
   finally
     FLocker.Leave;
@@ -592,6 +594,8 @@ begin
     queueDataPool.Push(FHead);
     FHead := ANext;
   end;
+  FTail := nil;
+  FHead := nil;
   FCount := 0; 
 end;
 
