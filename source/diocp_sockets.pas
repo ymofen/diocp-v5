@@ -1768,6 +1768,8 @@ constructor TDiocpCustom.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
 
+  UseObjectPool := True;
+
   FOperaOptions := 0;
 
   FContextPool := TSafeQueue.Create;
@@ -1801,6 +1803,8 @@ begin
   FWSARecvBufferSize := 1024 * 4;
 
   FWSASendBufferSize := 1024 * 8;
+
+
 end;
 
 function TDiocpCustom.DecRefCounter: Integer;
@@ -2835,16 +2839,25 @@ function TIocpRecvRequest.PostRequest(pvBuffer: PAnsiChar;
 var
   lvRet:Integer;
   lpNumberOfBytesRecvd: Cardinal;
+  lvDataMonitor:TIocpDataMonitor;
+  lvOwner:TDiocpCustom;
 begin
   Result := false;
-  
+
   lpNumberOfBytesRecvd := 0;
   FRecvdFlag := 0;
 
   FRecvBuffer.buf := pvBuffer;
   FRecvBuffer.len := len;
 
-
+  lvDataMonitor := nil;
+  lvOwner := FOwner;
+  // 保存对象到本地变量，避免对象在响应成功后(Self)释放
+  if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then
+  begin
+    lvDataMonitor := FOwner.FDataMoniter;
+  end;
+  
 
   //if FContext.incReferenceCounter('TIocpRecvRequest.WSARecvRequest.Post', Self) then
   if FContext.incReferenceCounter(STRING_EMPTY, Self) then
@@ -2870,31 +2883,28 @@ begin
       if not Result then
       begin
         {$IFDEF DEBUG_ON}
-        FOwner.logMessage(strRecvPostError, [FContext.SocketHandle, lvRet]);
+        lvOwner.logMessage(strRecvPostError, [FContext.SocketHandle, lvRet]);
         InterlockedDecrement(FOverlapped.refCount);
         {$ENDIF}
         // trigger error event
-        FOwner.DoClientContextError(FContext, lvRet);
+        lvOwner.DoClientContextError(FContext, lvRet);
 
         // decReferenceCounter
         FContext.decReferenceCounterAndRequestDisconnect(
         'TIocpRecvRequest.WSARecvRequest.Error', Self);
-
-
       end else
       begin
-        if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then
+        if lvDataMonitor <> nil then
         begin
-          FOwner.FDataMoniter.incPostWSARecvCounter;
+          lvDataMonitor.incPostWSARecvCounter;
         end;
       end;
     end else
     begin
-      Result := True;
-    
-      if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then
+      Result := True;    
+       if lvDataMonitor <> nil then
       begin
-        FOwner.FDataMoniter.incPostWSARecvCounter;
+        lvDataMonitor.incPostWSARecvCounter;
       end;
     end;
   end;
@@ -3077,8 +3087,7 @@ begin
   lpNumberOfBytesSent := 0;
 
   // maybe on HandleResonse and release self
-  lvOwner := FOwner;
-
+  lvOwner := FOwner;  
   lvContext := FContext;
   if lvContext.incReferenceCounter('InnerPostRequest::WSASend_Start', self) then
   try

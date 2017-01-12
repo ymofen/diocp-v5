@@ -4122,10 +4122,13 @@ function TIocpRecvRequest.PostRecvRequest(pvBuffer:PAnsiChar; len:Cardinal):
 var
   lvRet, lvDNACounter:Integer;
   lpNumberOfBytesRecvd: Cardinal;
+  lvOwner:TDiocpTcpServer;
 begin
   Result := False;
   lpNumberOfBytesRecvd := 0;
   FRecvdFlag := 0;
+
+  lvOwner := self.FOwner;
 
   FRecvBuffer.buf := pvBuffer;
   FRecvBuffer.len := len;
@@ -4156,14 +4159,14 @@ begin
       if not Result then
       begin
         {$IFDEF WRITE_LOG}
-        FOwner.logMessage(strRecvPostError, [FClientContext.SocketHandle, lvRet]);
+        lvOwner.logMessage(strRecvPostError, [FClientContext.SocketHandle, lvRet]);
         {$ENDIF}
         {$IFDEF DEBUG_ON}
         InterlockedDecrement(FOverlapped.refCount);
         {$ENDIF}
 
         // trigger error event
-        FOwner.DoClientContextError(FClientContext, lvRet);
+        lvOwner.DoClientContextError(FClientContext, lvRet);
 
         // decReferenceCounter
         FClientContext.DecReferenceCounterAndRequestDisconnect(
@@ -4171,18 +4174,18 @@ begin
 
       end else
       begin
-        if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then
+        if (lvOwner <> nil) and (lvOwner.FDataMoniter <> nil) then
         begin
-          FOwner.FDataMoniter.incPostWSARecvCounter;
+          lvOwner.FDataMoniter.incPostWSARecvCounter;
         end;
       end;
     end else
     begin
       Result := True;
     
-      if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then
+      if (lvOwner <> nil) and (lvOwner.FDataMoniter <> nil) then
       begin
-        FOwner.FDataMoniter.incPostWSARecvCounter;
+        lvOwner.FDataMoniter.incPostWSARecvCounter;
       end;
     end;   
   end;
