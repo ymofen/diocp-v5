@@ -2858,9 +2858,11 @@ begin
     lvDataMonitor := FOwner.FDataMoniter;
   end;
   
-
-  //if FContext.incReferenceCounter('TIocpRecvRequest.WSARecvRequest.Post', Self) then
+{$IFDEF DEBUG_ON}
+  if FContext.incReferenceCounter('TIocpRecvRequest.WSARecvRequest.Post', Self) then
+{$ELSE}
   if FContext.incReferenceCounter(STRING_EMPTY, Self) then
+{$ENDIF}
   begin
     {$IFDEF DEBUG_ON}
     InterlockedIncrement(FOverlapped.refCount);
@@ -2890,8 +2892,13 @@ begin
         lvOwner.DoClientContextError(FContext, lvRet);
 
         // decReferenceCounter
+        {$IFDEF DEBUG_ON}
         FContext.decReferenceCounterAndRequestDisconnect(
         'TIocpRecvRequest.WSARecvRequest.Error', Self);
+        {$ELSE}
+        FContext.decReferenceCounterAndRequestDisconnect(
+        STRING_EMPTY, Self);
+        {$ENDIF}
       end else
       begin
         if lvDataMonitor <> nil then
@@ -2945,9 +2952,11 @@ begin
     try
       FOwner.ReleaseRecvRequest(Self);
     finally
-      //lvContext.DecReferenceCounter('TIocpRecvRequest.WSARecvRequest.Response Done', Self);
-
+      {$IFDEF DEBUG_ON}
+      lvContext.DecReferenceCounter('TIocpRecvRequest.WSARecvRequest.Response Done', Self);
+      {$ELSE}
       lvContext.DecReferenceCounter(STRING_EMPTY, Self);
+      {$ENDIF}
     end;
   end;  
 end;

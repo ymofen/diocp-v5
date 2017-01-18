@@ -159,6 +159,9 @@ type
     property Tag: Integer read FTag write FTag;
 
 
+    function OverlappedPtr: POVERLAPPEDEx;
+
+
 
 
 
@@ -1691,6 +1694,11 @@ end;
 procedure TIocpRequest.HandleResponse;
 begin
   
+end;
+
+function TIocpRequest.OverlappedPtr: POVERLAPPEDEx;
+begin
+  Result := POVERLAPPEDEx(@FOverlapped);
 end;
 
 procedure TIocpRequest.ResponseDone;
