@@ -27,6 +27,7 @@ uses
 {$if CompilerVersion >= 18}
   , types
 {$ifend}
+  , diocp_winapi_winsock2
 
   , ComObj, ActiveX, utils_locker;
 
@@ -98,16 +99,14 @@ type
 
     //post request to iocp queue.
     FOverlapped: OVERLAPPEDEx;
-
-    FBytesTransferred:NativeUInt;
-    FCompletionKey:NativeUInt;
-
+    FBytesTransferred: NativeUInt;
+    FCompletionKey: NativeUInt;
 
   protected
 
     procedure HandleResponse; virtual;
 
-    function GetStateINfo: String; virtual;
+    function GetStateInfo: String; virtual;
 
     /// <summary>
     ///   响应请求最后完成,在IOCP线程,执行请求时执行
@@ -138,8 +137,12 @@ type
 
     property OnResponseDone: TNotifyEvent read FOnResponseDone write FOnResponseDone;
 
+    property BytesTransferred: NativeUInt read FBytesTransferred;
+    property CompletionKey: NativeUInt read FCompletionKey;
     property ErrorCode: Integer read FErrorCode;
-    
+
+    procedure CancelIoEx(const pvHandle: THandle);
+
 
 
     /// <summary>
@@ -438,7 +441,7 @@ type
 
 
     /// <summary>
-    ///   set worker count, will clear and stop all workers
+    ///   set worker count, don't clear workers
     /// </summary>
     procedure SetWorkerCount(AWorkerCount: Integer);
 
@@ -1656,6 +1659,14 @@ begin
   end;
 end;
 
+procedure TIocpRequest.CancelIoEx(const pvHandle: THandle);
+begin
+  if Assigned(DiocpCancelIoEx) then
+  begin
+    DiocpCancelIoEx(pvHandle, LPWSAOVERLAPPED(OverlappedPtr));
+  end;
+end;
+
 procedure TIocpRequest.CheckThreadIn;
 begin
   if FThreadID <> 0 then
@@ -1676,7 +1687,7 @@ begin
   FThreadID := 0;  
 end;
 
-function TIocpRequest.GetStateINfo: String;
+function TIocpRequest.GetStateInfo: String;
 begin
   Result :=Format('%s %s', [Self.ClassName, FRemark]);
   if FResponding then

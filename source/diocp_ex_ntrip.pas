@@ -596,9 +596,12 @@ begin
     
     FMountPoint := LeftUntil(P, [' ']);
 
-    if FMountPoint <> '' then
+    if Length(FMountPoint) > 0 then
     begin
-      FMountPoint := StrPas(PChar(@FMountPoint[2]));
+      if PChar(FMountPoint)^ in ['/', '\'] then
+      begin
+        Delete(FMountPoint, 1, 1);
+      end;
     end;
 
 

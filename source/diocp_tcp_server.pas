@@ -3444,14 +3444,14 @@ begin
         lvBucket:= lvNextBucket;
       end;
     end;
-
-    for i := 0 to j - 1 do
-    begin
-      lvKickOutList[i].RequestDisconnect('超时检测主动断开');   
-    end;
   finally
     FLocker.unLock;
   end;
+  for i := 0 to j - 1 do
+  begin
+    lvKickOutList[i].RequestDisconnect('超时检测主动断开');
+  end;
+
   {$ELSE}
   FLocker.lock('KickOut');
   try

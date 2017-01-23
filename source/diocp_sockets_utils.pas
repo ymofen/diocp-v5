@@ -45,7 +45,7 @@ type
 
   TIocpDisconnectEx = function(const hSocket: TSocket; lpOverlapped: LPWSAOVERLAPPED; const dwFlags: DWORD; const dwReserved: DWORD): BOOL; stdcall;
 
-
+  TDiocpCancelIoEx =  function(hFile: THandle; lpOverlapped: LPWSAOVERLAPPED): BOOL; stdcall;
 
 
 
@@ -68,6 +68,7 @@ var
   IocpConnectEx: TIocpConnectEx;
   IocpDisconnectEx: TIocpDisconnectEx;
   IocpGetAcceptExSockaddrs: TIocpGetAcceptExSockAddrs;
+  DiocpCancelIoEx:TDiocpCancelIoEx;
 
 function GetSocketAddr(pvAddr: string; pvPort: Integer): TSockAddrIn;
 
@@ -108,6 +109,9 @@ implementation
 
 uses
   DateUtils;
+
+var
+  hHandle: HMODULE;
 
 const
   SIO_KEEPALIVE_VALS = IOC_IN or IOC_VENDOR or 4;
@@ -508,6 +512,19 @@ initialization
   __CheckWinSocketStart := False;
   __startTime :=  Now();
   __DiocpHandle := 1;
+
+  hHandle := LoadLibrary(kernel32);
+  if hHandle <> 0 then
+  begin
+    DiocpCancelIoEx := TDiocpCancelIoEx(GetProcAddress(hHandle, 'CancelIoEx'));
+  end else
+  begin
+    DiocpCancelIoEx := nil;
+  end;
+
+finalization
+  if hHandle <> 0 then
+    FreeLibrary(hHandle);
 
 end.
 

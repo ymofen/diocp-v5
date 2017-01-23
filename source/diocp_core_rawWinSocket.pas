@@ -19,7 +19,7 @@ unit diocp_core_rawWinSocket;
 interface
 
 uses
-  windows, SysUtils, diocp_winapi_winsock2;
+  windows, SysUtils, diocp_winapi_winsock2, diocp_sockets_utils;
 
 
 
@@ -510,8 +510,13 @@ end;
 
 function TRawSocket.CancelIOEx: Boolean;
 begin
-  CancelIO
-  //Result := ;
+  if Assigned(DiocpCancelIoEx) then
+  begin
+    Result := DiocpCancelIoEx(self.FSocketHandle, nil);
+  end else
+  begin
+    Result := False;
+  end;
 end;
 
 procedure TRawSocket.DoInitialize;
