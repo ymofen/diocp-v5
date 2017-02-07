@@ -947,7 +947,10 @@ begin
     else if FHttpVersionValue = 11 then  FKeepAlive := 1;
 
     lvConnection := Headers.GetValueByName('Connection', '');
-    if SameText(lvConnection, 'keep-alive') then FKeepAlive := 1; 
+    if Length(lvConnection) > 0 then
+    begin         // 有设定Connection属性
+      if SameText(lvConnection, 'keep-alive') then FKeepAlive := 1 else FKeepAlive := 0;
+    end;
     
     
   end;

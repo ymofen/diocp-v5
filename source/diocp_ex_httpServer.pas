@@ -523,6 +523,9 @@ type
   TDiocpHttpClientContext = class(TIocpClientContext)
   private
     __free_flag:Integer;
+
+    FCurrentStream:TStream;
+    FCurrentStreamRemainSize:Integer;
     
     /// <summary>
     ///   0:普通 Http连接
@@ -575,7 +578,15 @@ type
     procedure PostWebSocketSendBuffer(pvBuffer: Pointer; len: Int64; opcode: Byte);
     procedure PostWebSocketData(const s:string; pvConvertToUtf8:Boolean);
     procedure PostWebSocketPing();
+  public
+    /// <summary>
+    ///   准备发送一个流(依次读取发送),如果还有未发送任务，则抛出异常
+    /// </summary>
+    procedure PostWriteAStream(pvStream:TStream; pvSize:Integer);
+
+  public
     property ContextType: Integer read FContextType write SetContextType;
+
   protected
     /// <summary>
     /// 归还到对象池，进行清理工作
@@ -1993,6 +2004,23 @@ begin
     lvWSFrame.Free;
   end;
   
+end;
+
+procedure TDiocpHttpClientContext.PostWriteAStream(pvStream: TStream;
+  pvSize: Integer);
+begin
+  self.Lock;
+  try
+    if FCurrentStream <> nil then
+    begin
+      raise Exception.Create('存在未发送完成任务！');
+    end;
+    FCurrentStream := pvStream;
+    FCurrentStreamRemainSize := pvSize;
+    
+  finally
+    self.UnLock;
+  end;
 end;
 
 procedure TDiocpHttpClientContext.SetContextType(const Value: Integer);
