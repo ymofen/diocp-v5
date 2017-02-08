@@ -642,9 +642,10 @@ begin
     pvRequest.Response.ClearContent;
     lvExt :=LowerCase(ExtractFileExt(lvDefaultFile));
     pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
-    pvRequest.Response.LoadFromFile(lvDefaultFile);
-    pvRequest.SendResponse();
-    pvRequest.DoResponseEnd;
+    pvRequest.ResponseAFile(lvDefaultFile);
+//    pvRequest.Response.LoadFromFile(lvDefaultFile);
+//    pvRequest.SendResponse();
+    //pvRequest.DoResponseEnd;
     Result := True;
   end else
   begin

@@ -25,6 +25,10 @@ object frmMain: TfrmMain
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -76,6 +80,10 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -114,6 +122,10 @@ object frmMain: TfrmMain
     object tsWebSocket: TTabSheet
       Caption = 'WebSocket'
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object mmoWebSocketData: TMemo
         Left = 3
         Top = 3

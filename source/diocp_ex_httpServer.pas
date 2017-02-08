@@ -52,6 +52,8 @@ const
   SESSIONID = 'diocp_sid';
   BLOCK_BUFFER_TAG = 10000;
 
+  BLOCK_STREAM_BUFFER_TAG = 1000;
+
   Context_Type_WebSocket = 1;
 
 type
@@ -388,6 +390,16 @@ type
     procedure SendResponse(pvContentLength: Integer = 0);
 
     /// <summary>
+    ///   直接发送一个文件
+    /// </summary>
+    procedure ResponseAFile(pvFileName:string);
+
+    /// <summary>
+    ///   直接发送一个流
+    /// </summary>
+    procedure ResponseAStream(const pvStream:TStream);
+
+    /// <summary>
     ///   直接发送数据
     /// </summary>
     procedure SendResponseBuffer(pvBuffer:PByte; pvLen:Cardinal);
@@ -544,6 +556,8 @@ type
     ///   必须单线程操作
     /// </summary>
     FBlockBuffer: TBlockBuffer;
+    FBufferPool: PBufferPool;
+
     FHttpState: TDiocpHttpState;
     FCurrentRequest: TDiocpHttpRequest;
 
@@ -571,6 +585,11 @@ type
         pvErrorCode: Integer); override;
     procedure SetContextType(const Value: Integer);
 
+    /// <summary>
+    ///  发送一块数据
+    /// </summary>
+    procedure CheckSendStreamBlock();
+
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -583,6 +602,8 @@ type
     ///   准备发送一个流(依次读取发送),如果还有未发送任务，则抛出异常
     /// </summary>
     procedure PostWriteAStream(pvStream:TStream; pvSize:Integer);
+
+    procedure SetBufferPool(ABufferPool: PBufferPool);
 
   public
     property ContextType: Integer read FContextType write SetContextType;
@@ -1191,6 +1212,21 @@ begin
   FDecodeState := Result;
 end;
 
+procedure TDiocpHttpRequest.ResponseAFile(pvFileName: string);
+var
+  lvFileStream:TFileStream;
+begin
+  lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
+  ResponseAStream(lvFileStream);
+end;
+
+procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream);
+begin
+  SendResponse(pvStream.Size);
+  pvStream.Position := 0;
+  Connection.PostWriteAStream(pvStream, pvStream.Size);
+end;
+
 procedure TDiocpHttpRequest.ResponseEnd;
 begin
   SendResponse();
@@ -1571,6 +1607,24 @@ begin
   inherited Destroy;
 end;
 
+procedure TDiocpHttpClientContext.CheckSendStreamBlock;
+var
+  lvBuffer:PByte;
+  l, r:Integer;
+begin
+  self.Lock;
+  try
+    lvBuffer := GetBuffer(FBufferPool);
+    l := FBufferPool.FBlockSize;
+    r := self.FCurrentStream.Read(lvBuffer^, l);
+    AddRef(lvBuffer);
+    Dec(self.FCurrentStreamRemainSize, r);
+    PostWSASendRequest(lvBuffer, r, False, BLOCK_STREAM_BUFFER_TAG);
+  finally
+    self.UnLock;
+  end;
+end;
+
 procedure TDiocpHttpClientContext.ClearTaskListRequest;
 var
   lvTask:TDiocpHttpRequest;
@@ -1665,13 +1719,34 @@ begin
   begin
     r := ReleaseRef(pvBuffer, Format('- DoSendBufferCompleted(%d)', [pvBufferTag]));
     PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
+  end else if pvBufferTag = BLOCK_STREAM_BUFFER_TAG then
+  begin
+    r := ReleaseRef(pvBuffer, Format('- DoSendBufferCompleted(%d)', [pvBufferTag]));
+    PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
   end;
   {$ELSE}
   if pvBufferTag >= BLOCK_BUFFER_TAG then
   begin
     ReleaseRef(pvBuffer);
+  end else if pvBufferTag = BLOCK_STREAM_BUFFER_TAG then
+  begin
+    ReleaseRef(pvBuffer);
   end;
   {$ENDIF}
+
+  if pvBufferTag = BLOCK_STREAM_BUFFER_TAG then
+  begin
+    if FCurrentStreamRemainSize > 0 then
+    begin
+      CheckSendStreamBlock;
+    end else
+    begin
+      FCurrentStream.Free;
+      FCurrentStream := nil;
+      FCurrentStreamRemainSize := 0;
+      PostWSACloseRequest;
+    end;
+  end;
 end;
 
 procedure TDiocpHttpClientContext.FlushResponseBuffer;
@@ -2017,10 +2092,17 @@ begin
     end;
     FCurrentStream := pvStream;
     FCurrentStreamRemainSize := pvSize;
-    
   finally
     self.UnLock;
   end;
+
+  CheckSendStreamBlock;
+end;
+
+procedure TDiocpHttpClientContext.SetBufferPool(ABufferPool: PBufferPool);
+begin
+  FBufferPool := ABufferPool;
+  FBlockBuffer.SetBufferPool(FBufferPool);
 end;
 
 procedure TDiocpHttpClientContext.SetContextType(const Value: Integer);
@@ -2298,7 +2380,7 @@ procedure TDiocpHttpServer.OnCreateClientContext(const context:
     TIocpClientContext);
 begin
   inherited;
-  TDiocpHttpClientContext(context).FBlockBuffer.SetBufferPool(Self.FBlockBufferPool);
+  TDiocpHttpClientContext(context).SetBufferPool(Self.FBlockBufferPool);
 end;
 
 function TDiocpHttpServer.OnCreateSessionObject: TObject;
