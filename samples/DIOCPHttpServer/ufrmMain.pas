@@ -14,7 +14,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, ExtCtrls
-  , utils_safeLogger, StrUtils,
+  , utils_safeLogger, StrUtils, 
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
   utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools,
   diocp_task;
@@ -56,6 +56,8 @@ type
     tmrInfoRefresh: TTimer;
     edtWorkCount: TEdit;
     chkWebSocketEcho: TCheckBox;
+    btnParseRange: TButton;
+    chkAccessControl: TCheckBox;
     procedure actOpenExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnInfoClick(Sender: TObject);
@@ -63,6 +65,7 @@ type
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
+    procedure btnParseRangeClick(Sender: TObject);
     procedure btnURLDecodeClick(Sender: TObject);
     procedure btnURLEncodeClick(Sender: TObject);
     procedure btnWebSocketPushClick(Sender: TObject);
@@ -305,6 +308,13 @@ begin
     end;
     Exit;
   end;
+
+  if chkAccessControl.Checked then
+  begin       // 跨域访问
+    pvRequest.Response.Header.ForceByName('Access-Control-Allow-Origin').AsString := '*';
+    pvRequest.Response.Header.ForceByName('Access-Control-Allow-Methods').AsString := 'POST, GET, OPTIONS, DELETE';
+    pvRequest.Response.Header.ForceByName('Access-Control-Allow-Headers').AsString := 'x-requested-with,content-type';
+  end;
   
   if DoLoadFile(pvRequest) then Exit;
   
@@ -317,7 +327,7 @@ begin
     pvRequest.DoResponseEnd;
     Exit;
   end;
-
+                      
 
 
   if pvRequest.RequestURI = '/json' then
@@ -586,6 +596,27 @@ begin
 
 end;
 
+procedure TfrmMain.btnParseRangeClick(Sender: TObject);
+var
+  s:String;
+  lvRange:THttpRange;
+begin
+  //表示头500个字节：bytes=0-499
+  //　　表示第二个500字节：bytes=500-999
+  //　　表示最后500个字节：bytes=-500
+  //　　表示500字节以后的范围：bytes=500-  
+  //　　第一个和最后一个字节：bytes=0-0,-1
+  //　　同时指定几个范围：bytes=500-600,601-999
+  lvRange := THttpRange.Create;
+  try
+    s := 'bytes=500-999';
+    lvRange.ParseRange(s);
+    ShowMessage(Format('%d, %d', [lvRange.IndexOf(0).VStart, lvRange.IndexOf(0).VEnd]));
+  finally
+    lvRange.Free;
+  end;
+end;
+
 procedure TfrmMain.btnURLDecodeClick(Sender: TObject);
 begin
   mmoURLOutput.Lines.Text := diocp_ex_http_common.URLDecode(mmoURLInput.Lines.Text);
@@ -642,6 +673,7 @@ begin
     pvRequest.Response.ClearContent;
     lvExt :=LowerCase(ExtractFileExt(lvDefaultFile));
     pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
+    //pvRequest.Response.SetResponseFileName('x.file');
     pvRequest.ResponseAFile(lvDefaultFile);
 //    pvRequest.Response.LoadFromFile(lvDefaultFile);
 //    pvRequest.SendResponse();

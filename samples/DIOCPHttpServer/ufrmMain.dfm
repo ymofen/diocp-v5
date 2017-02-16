@@ -25,10 +25,6 @@ object frmMain: TfrmMain
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = #30417#25511#38754#26495
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object pnlMonitor: TPanel
         Left = 0
         Top = 0
@@ -76,14 +72,19 @@ object frmMain: TfrmMain
         TabOrder = 1
         OnClick = btnInfoClick
       end
+      object btnParseRange: TButton
+        Left = 3
+        Top = 128
+        Width = 99
+        Height = 25
+        Caption = 'btnParseRange'
+        TabOrder = 2
+        OnClick = btnParseRangeClick
+      end
     end
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -122,10 +123,6 @@ object frmMain: TfrmMain
     object tsWebSocket: TTabSheet
       Caption = 'WebSocket'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoWebSocketData: TMemo
         Left = 3
         Top = 3
@@ -248,6 +245,14 @@ object frmMain: TfrmMain
       Checked = True
       State = cbChecked
       TabOrder = 10
+    end
+    object chkAccessControl: TCheckBox
+      Left = 680
+      Top = 56
+      Width = 97
+      Height = 17
+      Caption = #36328#22495#35775#38382
+      TabOrder = 11
     end
   end
   object mmoLog: TMemo
