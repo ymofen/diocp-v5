@@ -38,6 +38,43 @@ type
   TBytes = utils_strings.TBytes;
 {$ifend}
 
+  PRange = ^TRangeRec;
+  TRangeRec = record
+    VStart:Int64;
+    VEnd:Int64;
+  end;
+
+  THttpRange = class(TObject)
+  private
+    FRanges:array[0..7] of Int64;
+    FCount: Integer;
+  public
+
+    constructor Create;
+    /// <summary>
+    ///    未进行完整解析
+    /// </summary>
+    /// <returns>
+    ///  -1: 非法
+    ///   0: 正常
+    /// </returns>
+    /// <param name="rangeHeader">
+    ///    Range的值(bytes=123-567)
+    ///    Range: bytes=123-567
+    /// </param>
+    function ParseRange(const rangeHeader:string): Integer;
+
+    procedure Clear;
+
+
+
+    function IndexOf(const pvIndex:Integer): PRange;
+    property Count: Integer read FCount;
+
+
+
+  end;
+
   TDHttpCookie = class;
   THttpRequest = class(TObject)
   private
@@ -1773,6 +1810,101 @@ begin
         Exit;
       end;
     end;
+  end;
+end;
+
+constructor THttpRange.Create;
+begin
+  inherited Create;
+  Clear;
+end;
+
+procedure THttpRange.Clear;
+begin
+  FCount := -1;
+end;
+
+function THttpRange.IndexOf(const pvIndex:Integer): PRange;
+var
+  i:Integer;
+begin
+  i := pvIndex * 2;
+  if i > 7 then raise Exception.Create('Out of THttpRange Bound');
+  
+  Result := PRange(@FRanges[i]);
+end;
+
+function THttpRange.ParseRange(const rangeHeader:string): Integer;
+var
+  lvPtr:PChar;
+  lvStr:String;
+  lvStart, lvEnd:Int64;
+const
+  bytesPtr: String = 'bytes';
+  bytesLength = 5;
+begin
+  FCount := 0;
+  if Length(rangeHeader) = 0 then
+  begin
+    Result := -1;
+    Exit;
+  end;
+  // bytes=29210093-
+  lvPtr := PChar(rangeHeader);
+  SkipChars(lvPtr, [#9, ' ']);
+
+  if StrLIComp(lvPtr, PChar(bytesPtr), bytesLength) = 0 then
+  begin
+    Inc(lvPtr, bytesLength);
+    SkipChars(lvPtr, [' ', #9, '=']);
+    if LeftUntil(lvPtr, ['-'], lvStr) = 0 then
+    begin
+      if Length(lvStr) > 0 then
+      begin
+        lvStart := StrToInt64Def(lvStr, 0);
+      end;
+      Inc(lvPtr);
+      if LeftUntil(lvPtr, [',', ' '], lvStr) = 0 then
+      begin // 有','
+        lvEnd := StrToInt64Def(lvStr, -1);
+      end else
+      begin
+        lvStr := lvPtr;
+        if Length(lvStr) = 0 then
+        begin   // 没有last-pos
+          lvEnd := 0;
+        end else
+        begin
+          lvEnd := StrToInt64Def(lvStr, -1);
+        end;
+      end;
+
+      if lvEnd <> 0 then
+      begin
+        if lvEnd = -1 then
+        begin
+          Result := -1;
+          Exit;
+        end;
+
+        if lvEnd < lvStart then
+        begin
+          Result := -1;
+          Exit;
+        end;
+      end;
+
+      FRanges[0] := lvStart;
+      FRanges[1] := lvEnd;
+
+      FCount := 1;
+
+      Result := 0;
+    end else
+    begin
+      Result := -1;
+    end;
+
   end;
 end;
 

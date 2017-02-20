@@ -56,6 +56,8 @@ const
 
   Context_Type_WebSocket = 1;
 
+  SEND_BLOCK_SIZE = 1024*4;
+
 type
   TDiocpHttpState = (hsCompleted, hsRequest { 接收请求 } , hsRecvingPost { 接收数据 } );
   TDiocpHttpResponse = class;
@@ -116,6 +118,15 @@ type
     property DValues: TDValue read FDValues;
   end;
 
+  TDiocpHttpResponseStream = class(TObject)
+  private
+    FStream:TStream;
+    FRange:THttpRange;
+  public
+    
+    
+  end;
+
 
   TDiocpHttpRequest = class(TObject)
   private
@@ -123,6 +134,7 @@ type
 
     FDecodeState:Integer;
 
+    FRange:THttpRange;
 
     FOwnerPool:TSafeQueue;
 
@@ -206,6 +218,9 @@ type
     destructor Destroy; override;
 
   public
+
+    function CheckIsRangeRequest: Boolean;
+
 
     /// <summary>
     ///   设置Request暂时不进行释放
@@ -467,6 +482,8 @@ type
 
     function AddCookie: TDiocpHttpCookie; overload;
 
+    procedure SetResponseFileName(const pvFile:String);
+
     procedure LoadFromFile(pvFile:string);
 
     function LoadFromStream(pvStream: TStream; pvSize: Integer): Integer;
@@ -492,6 +509,8 @@ type
     property ContentBody: TDBufferBuilder read GetContentBody;
 
     property ContentType: String read GetContentType write SetContentType;
+
+
 
     property Header: TDValue read GetHeader;
 
@@ -538,6 +557,8 @@ type
 
     FCurrentStream:TStream;
     FCurrentStreamRemainSize:Integer;
+    // 0是关闭, 1:不关闭
+    FCurrentStreamEndAction:Byte;
     
     /// <summary>
     ///   0:普通 Http连接
@@ -833,6 +854,7 @@ end;
 
 procedure TDiocpHttpRequest.Clear;
 begin
+  if FRange <> nil then FRange.Clear;
   FResponse.Clear;
   FReleaseLater := false;
   FInnerRequest.DoCleanUp;
@@ -895,6 +917,11 @@ end;
 
 destructor TDiocpHttpRequest.Destroy;
 begin
+  if FRange <> nil then
+  begin
+    FreeAndNil(FRange);
+    FRange := nil;
+  end;
   FreeAndNil(FResponse);
   FDebugStrings.Free;
 
@@ -955,6 +982,22 @@ begin
     FSessionID := SESSIONID + '_' + DeleteChars(CreateClassID, ['-', '{', '}']);
     Response.AddCookie(SESSIONID, FSessionID);
   end;
+end;
+
+function TDiocpHttpRequest.CheckIsRangeRequest: Boolean;
+var
+  s:string;
+begin
+  if (FRange = nil) then
+    FRange := THttpRange.Create; 
+
+  if (FRange.Count = -1) then
+  begin
+    s := Header.GetValueByName('Range', STRING_EMPTY);
+    FRange.ParseRange(s);
+  end;
+
+  Result := FRange.Count > 0; 
 end;
 
 function TDiocpHttpRequest.CheckIsWebSocketRequest: Boolean;
@@ -1218,13 +1261,62 @@ var
 begin
   lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
   ResponseAStream(lvFileStream);
+
+
 end;
 
 procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream);
+var
+  lvSize:Int64;
+  lvRange:PRange;
+  lvIsRangeResonse:Boolean;
 begin
-  SendResponse(pvStream.Size);
-  pvStream.Position := 0;
-  Connection.PostWriteAStream(pvStream, pvStream.Size);
+  if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
+  begin
+    FDiocpContext.FCurrentStreamEndAction := 1;
+  end else if not FInnerRequest.CheckKeepAlive then
+  begin
+    FDiocpContext.FCurrentStreamEndAction := 1;
+  end else if SameText(FResponse.Header.ForceByName('Connection').AsString, 'close') then
+  begin
+    FDiocpContext.FCurrentStreamEndAction := 1;
+  end else
+  begin
+    FDiocpContext.FCurrentStreamEndAction := 0;
+  end;
+
+  lvIsRangeResonse := False;
+  if CheckIsRangeRequest then
+  begin
+    lvRange := FRange.IndexOf(0);
+    lvSize := pvStream.Size;
+    if lvRange.VEnd = 0 then
+    begin
+      lvRange.VEnd := lvRange.VStart + SEND_BLOCK_SIZE - 1;
+    end;
+
+    if (lvRange.VStart < lvSize) then
+    begin 
+      if lvRange.VEnd > lvSize then
+      begin
+        lvRange.VEnd := lvSize -1;
+      end;
+      Response.Header.ForceByName('Content-Range').AsString := Format(' bytes %d-%d/%d', [
+         lvRange.VStart, lvRange.VEnd, lvSize]);
+      Response.SetResponseCode(206);  // 206 Partial Content
+      pvStream.Position := lvRange.VStart;
+      lvIsRangeResonse := True;
+      SendResponse(lvRange.VEnd - lvRange.VStart + 1);
+      Connection.PostWriteAStream(pvStream, lvRange.VEnd - lvRange.VStart + 1);
+      Exit;
+    end;
+  end;
+  if (not lvIsRangeResonse) then
+  begin
+    SendResponse(pvStream.Size);
+    pvStream.Position := 0;
+    Connection.PostWriteAStream(pvStream, pvStream.Size);
+  end;
 end;
 
 procedure TDiocpHttpRequest.ResponseEnd;
@@ -1576,6 +1668,11 @@ begin
   FInnerResponse.ResponseCode := Value;
 end;
 
+procedure TDiocpHttpResponse.SetResponseFileName(const pvFile:String);
+begin
+  Header.Add('Content-Disposition','attachment; filename="' + pvFile + '"');
+end;
+
 procedure TDiocpHttpResponse.SetResponseID(const Value: string);
 begin
   FInnerResponse.ResponseID := Value;
@@ -1662,6 +1759,8 @@ begin
   // 清理待处理请求队列
   ClearTaskListRequest;
 
+  FCurrentStreamEndAction := 0;
+
   inherited DoCleanUp;
 end;
 
@@ -1744,7 +1843,13 @@ begin
       FCurrentStream.Free;
       FCurrentStream := nil;
       FCurrentStreamRemainSize := 0;
-      PostWSACloseRequest;
+      if FCurrentStreamEndAction = 0 then
+      begin
+        PostWSACloseRequest;
+      end else
+      begin
+        
+      end;
     end;
   end;
 end;
@@ -2141,7 +2246,7 @@ begin
   RegisterSessionClass(TDiocpHttpDValueSession);
 
   // 4K, 每次投递4k
-  FBlockBufferPool := newBufferPool(1024 * 4);
+  FBlockBufferPool := newBufferPool(SEND_BLOCK_SIZE);
 end;
 
 destructor TDiocpHttpServer.Destroy;
