@@ -1292,7 +1292,7 @@ begin
     lvSize := pvStream.Size;
     if lvRange.VEnd = 0 then
     begin
-      lvRange.VEnd := lvRange.VStart + SEND_BLOCK_SIZE - 1;
+      lvRange.VEnd := lvSize - 1;
     end;
 
     if (lvRange.VStart < lvSize) then
@@ -1308,7 +1308,8 @@ begin
       Response.SetResponseCode(206);  // 206 Partial Content
       pvStream.Position := lvRange.VStart;
       lvIsRangeResonse := True;
-      SendResponse(pvStream.Size);
+      //SendResponse(pvStream.Size);
+      SendResponse(lvRange.VEnd-lvRange.VEnd - lvRange.VStart + 1);
       Connection.PostWriteAStream(pvStream, lvRange.VEnd - lvRange.VStart + 1);
       Exit;
     end;
