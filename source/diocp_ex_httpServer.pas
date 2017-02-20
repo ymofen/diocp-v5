@@ -1309,7 +1309,7 @@ begin
       pvStream.Position := lvRange.VStart;
       lvIsRangeResonse := True;
       //SendResponse(pvStream.Size);
-      SendResponse(lvRange.VEnd-lvRange.VEnd - lvRange.VStart + 1);
+      SendResponse(lvRange.VEnd - lvRange.VStart + 1);
       Connection.PostWriteAStream(pvStream, lvRange.VEnd - lvRange.VStart + 1);
       Exit;
     end;

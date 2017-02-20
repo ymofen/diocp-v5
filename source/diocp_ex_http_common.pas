@@ -362,7 +362,7 @@ type
     function GetCookie(pvCookieName:string): TDHttpCookie;
     procedure ClearCookies;
     
-    procedure EncodeHeader(pvContentLength: Integer);
+    procedure EncodeHeader(pvContentLength: Int64);
     procedure ChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
 
     procedure ChunkedBufferStart;
@@ -1575,10 +1575,11 @@ begin
   FResponseCodeStr := '';
 end;
 
-procedure THttpResponse.EncodeHeader(pvContentLength: Integer);
+procedure THttpResponse.EncodeHeader(pvContentLength: Int64);
 begin
   FHeaderBuilder.Clear;
   InnerBuildHeader(FHeaderBuilder);
+ 
 
   FHeaderBuilder.AppendRawStr('Content-Length: ').AppendRawStr(IntToStr(pvContentLength)).AppendBreakLineBytes;
   FHeaderBuilder.AppendBreakLineBytes;
