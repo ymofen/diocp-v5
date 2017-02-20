@@ -1308,7 +1308,7 @@ begin
       Response.SetResponseCode(206);  // 206 Partial Content
       pvStream.Position := lvRange.VStart;
       lvIsRangeResonse := True;
-      SendResponse(lvRange.VEnd - lvRange.VStart + 1);
+      SendResponse(pvStream.Size);
       Connection.PostWriteAStream(pvStream, lvRange.VEnd - lvRange.VStart + 1);
       Exit;
     end;
