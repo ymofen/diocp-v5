@@ -1292,7 +1292,7 @@ begin
     lvSize := pvStream.Size;
     if lvRange.VEnd = 0 then
     begin
-      lvRange.VEnd := lvRange.VStart + SEND_BLOCK_SIZE - 1;
+      lvRange.VEnd := lvRange.VStart + SEND_BLOCK_SIZE * 10 - 1;
     end;
 
     if (lvRange.VStart < lvSize) then
@@ -1716,7 +1716,10 @@ begin
     r := self.FCurrentStream.Read(lvBuffer^, l);
     AddRef(lvBuffer);
     Dec(self.FCurrentStreamRemainSize, r);
-    PostWSASendRequest(lvBuffer, r, False, BLOCK_STREAM_BUFFER_TAG);
+    if not PostWSASendRequest(lvBuffer, r, False, BLOCK_STREAM_BUFFER_TAG) then
+    begin
+      ReleaseRef(lvBuffer);
+    end;
   finally
     self.UnLock;
   end;
@@ -1759,7 +1762,14 @@ begin
   // 清理待处理请求队列
   ClearTaskListRequest;
 
+  if FCurrentStream <> nil then
+  begin           // 中断了发送
+    FCurrentStream.Free;
+    FCurrentStream := nil;
+  end;
+  FCurrentStreamRemainSize := 0;
   FCurrentStreamEndAction := 0;
+
 
   inherited DoCleanUp;
 end;
