@@ -220,7 +220,7 @@ var
 var
   lvBytes:TBytes;
   lvDValue:TDValue;
-  lvUpgrade :String;
+  lvUpgrade, lvNowString :String;
   n:Integer;
 begin
   //Randomize;
@@ -231,243 +231,252 @@ begin
 //  pvRequest.SendResponse();
 //  pvRequest.DoResponseEnd;
 //  Exit;
-
-  if chkRecord2File.Checked then
-  begin
-    pvRequest.SaveToFile(Format('DiocpHttpRequest_%s.req', [FormatDateTime('MMddhhnnsszzz', Now)]));
-  end;
-
-
-
-
-  if pvRequest.CheckIsWebSocketRequest then
-  begin    // 检测是否为WebSocket的接入请求
-
-    // 响应WebSocket握手
-    pvRequest.ResponseForWebSocketShake;
-
-    // 设置连接为WebSocket类型
-    pvRequest.Connection.ContextType := Context_Type_WebSocket;
-
-    s := Format('欢迎测试WebSocket协议%s本服务已经运行:%s, 当前在线用户:%d%s  <a href="http://www.diocp.org" target="_bank">本测试环境由DIOCP提供</a>',
-      ['<br>', TRunTimeINfoTools.GetRunTimeINfo, self.GetWebSocketCounter(nil), '<br>']);
-
-    pvRequest.Connection.PostWebSocketData(s, true);
-    Exit;
-  end;
-
-  if pvRequest.Connection.ContextType = Context_Type_WebSocket then
-  begin   // 如果连接为WebSocket类型
-    // 接收到的WebSocket数据侦
-//    s := TByteTools.varToHexString(pvRequest.InnerWebSocketFrame.Buffer.Memory^, pvRequest.InnerWebSocketFrame.Buffer.Length);
-//    sfLogger.logMessage(s);
-
-    try
-      s := pvRequest.WebSocketContentBuffer.DecodeUTF8;
-
-      // 提取字符串数据
-      s := Format('来自:%s:%d的消息:%s',
-          [pvRequest.Connection.RemoteAddr,
-          pvRequest.Connection.RemotePort,
-          s]);
-    except
-      on e:Exception do
-      begin
-        s := '解码失败:' + e.Message;
-        // 发送字符串给客户端
-        pvRequest.Connection.PostWebSocketData(s, true);
-        Exit;
-      end;
+  try
+    if chkRecord2File.Checked then
+    begin
+      lvNowString := FormatDateTime('MMddhhnnsszzz', Now);
+      pvRequest.SaveToFile(Format('DiocpHttpRequest_%d_%s.req', [pvRequest.Connection.SocketHandle, lvNowString]));
     end;
 
 
-    if chkWebSocketEcho.Checked then
-    begin
-      // 发送字符串给客户端
+
+
+    if pvRequest.CheckIsWebSocketRequest then
+    begin    // 检测是否为WebSocket的接入请求
+
+      // 响应WebSocket握手
+      pvRequest.ResponseForWebSocketShake;
+
+      // 设置连接为WebSocket类型
+      pvRequest.Connection.ContextType := Context_Type_WebSocket;
+
+      s := Format('欢迎测试WebSocket协议%s本服务已经运行:%s, 当前在线用户:%d%s  <a href="http://www.diocp.org" target="_bank">本测试环境由DIOCP提供</a>',
+        ['<br>', TRunTimeINfoTools.GetRunTimeINfo, self.GetWebSocketCounter(nil), '<br>']);
+
       pvRequest.Connection.PostWebSocketData(s, true);
-    end else
-    begin 
+      Exit;
+    end;
 
-      if Length(s) > 1024 then
+    if pvRequest.Connection.ContextType = Context_Type_WebSocket then
+    begin   // 如果连接为WebSocket类型
+      // 接收到的WebSocket数据侦
+  //    s := TByteTools.varToHexString(pvRequest.InnerWebSocketFrame.Buffer.Memory^, pvRequest.InnerWebSocketFrame.Buffer.Length);
+  //    sfLogger.logMessage(s);
+
+      try
+        s := pvRequest.WebSocketContentBuffer.DecodeUTF8;
+
+        // 提取字符串数据
+        s := Format('来自:%s:%d的消息:%s',
+            [pvRequest.Connection.RemoteAddr,
+            pvRequest.Connection.RemotePort,
+            s]);
+      except
+        on e:Exception do
+        begin
+          s := '解码失败:' + e.Message;
+          // 发送字符串给客户端
+          pvRequest.Connection.PostWebSocketData(s, true);
+          Exit;
+        end;
+      end;
+
+
+      if chkWebSocketEcho.Checked then
       begin
-        s := Format('您的消息(%d)超过1024,服务器已经收到了,但是不给你转发。', [n]);
-
         // 发送字符串给客户端
         pvRequest.Connection.PostWebSocketData(s, true);
       end else
-      begin
-        //sfLogger.logMessage(s);
+      begin 
 
-        n := WebSocketPush(s, pvRequest.Connection);
+        if Length(s) > 1024 then
+        begin
+          s := Format('您的消息(%d)超过1024,服务器已经收到了,但是不给你转发。', [n]);
 
-        s := Format('您的消息已经广播给%d个终端', [n]);
+          // 发送字符串给客户端
+          pvRequest.Connection.PostWebSocketData(s, true);
+        end else
+        begin
+          //sfLogger.logMessage(s);
 
-        // 发送字符串给客户端
-        pvRequest.Connection.PostWebSocketData(s, true);
+          n := WebSocketPush(s, pvRequest.Connection);
+
+          s := Format('您的消息已经广播给%d个终端', [n]);
+
+          // 发送字符串给客户端
+          pvRequest.Connection.PostWebSocketData(s, true);
+        end;
       end;
+      Exit;
     end;
-    Exit;
-  end;
 
-  if chkAccessControl.Checked then
-  begin       // 跨域访问
-    pvRequest.Response.Header.ForceByName('Access-Control-Allow-Origin').AsString := '*';
-    pvRequest.Response.Header.ForceByName('Access-Control-Allow-Methods').AsString := 'POST, GET, OPTIONS, DELETE';
-    pvRequest.Response.Header.ForceByName('Access-Control-Allow-Headers').AsString := 'x-requested-with,content-type';
-  end;
+    if chkAccessControl.Checked then
+    begin       // 跨域访问
+      pvRequest.Response.Header.ForceByName('Access-Control-Allow-Origin').AsString := '*';
+      pvRequest.Response.Header.ForceByName('Access-Control-Allow-Methods').AsString := 'POST, GET, OPTIONS, DELETE';
+      pvRequest.Response.Header.ForceByName('Access-Control-Allow-Headers').AsString := 'x-requested-with,content-type';
+    end;
   
-  if DoLoadFile(pvRequest) then Exit;
+    if DoLoadFile(pvRequest) then Exit;
   
-  if pvRequest.RequestURI = '/weixin' then
-  begin
-    //pvRequest.DecodeURLParam(nil);
-    s := pvRequest.GetRequestParam('echostr');
-    pvRequest.Response.WriteString(s);
-    pvRequest.SendResponse;
-    pvRequest.DoResponseEnd;
-    Exit;
-  end;
+    if pvRequest.RequestURI = '/weixin' then
+    begin
+      //pvRequest.DecodeURLParam(nil);
+      s := pvRequest.GetRequestParam('echostr');
+      pvRequest.Response.WriteString(s);
+      pvRequest.SendResponse;
+      pvRequest.DoResponseEnd;
+      Exit;
+    end;
                       
 
 
-  if pvRequest.RequestURI = '/json' then
-  begin
-    pvRequest.Response.ContentType := 'text/json';
-    //s := '{"ab":"1111111111111111111111111111111111111111111111111111111111111111111"}';
-    lvDValue := TDValue.Create;
-    lvDValue.ForceByName('title').AsString := 'DIOCP-V5 Http 服务演示';
-    lvDValue.ForceByName('author').AsString := 'D10.天地弦';
-    lvDValue.ForceByName('time').AsString := DateTimeToStr(Now());
-    s := JSONEncode(lvDValue);
-    lvDValue.Free;
-    pvRequest.Response.WriteString(s);
-    pvRequest.SendResponse;
-    pvRequest.DoResponseEnd;
-    Exit;
-  end;
-
-  if pvRequest.RequestURI = '/CHUNKED' then
-  begin
-    // Context Type                        返回的是UTF-8的编码
-    pvRequest.Response.ContentType := 'text/html; charset=utf-8';
-    pvRequest.Response.SetChunkedStart;
-    pvRequest.Response.SetChunkedUtf8('Chunked编码测试1<BR>');
-    pvRequest.Response.SetChunkedUtf8('================================<BR>');
-    pvRequest.Response.ChunkedFlush;
-    
-    pvRequest.Response.SetChunkedUtf8('Chunked编码测试2<BR>');
-    pvRequest.Response.SetChunkedUtf8('================================<BR>');
-    pvRequest.Response.SetChunkedEnd;
-    pvRequest.Response.ChunkedFlush;
-    pvRequest.CloseContext;
-
-    Exit;
-  end;
-
-//  if pvRequest.RequestURI = '/favicon.ico' then
-//  begin
-//    // Context Type                        
-//    pvRequest.Response.ContentType := 'application/oct stream;
-//    pvRequest.Response.SetChunkedStart;
-//    pvRequest.Response.SetChunkedUtf8('Chunked编码测试1<BR>');
-//    pvRequest.Response.SetChunkedUtf8('================================<BR>');
-//    pvRequest.Response.ChunkedFlush;
-//
-//    pvRequest.Response.SetChunkedUtf8('Chunked编码测试2<BR>');
-//    pvRequest.Response.SetChunkedUtf8('================================<BR>');
-//    pvRequest.Response.SetChunkedEnd;
-//    pvRequest.Response.ChunkedFlush;
-//    pvRequest.CloseContext;
-//
-//    Exit;
-//  end;
-
-  // Context Type                        返回的是UTF-8的编码
-  pvRequest.Response.ContentType := 'text/html; charset=utf-8';
-
-  // 解码Post数据参数
-  {$IFDEF UNICODE}
-  pvRequest.DecodePostDataParam(nil);
-  pvRequest.DecodeURLParam(nil);
-  {$ELSE}
-  // 使用UTF8方式解码
-  pvRequest.DecodePostDataParam(True);
-  pvRequest.DecodeURLParam(True);
-  {$ENDIF}
-
-
-  // 输出客户端IP信息
-  pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,
-    pvRequest.Connection.RemotePort]));
-
-  pvRequest.Response.WriteString('请求方法:' + pvRequest.RequestMethod);
-  pvRequest.Response.WriteString('<br>');
-  WriteLogOutUrl();
-  pvRequest.Response.WriteString('=======================================<br>');
-
-  lvSession := nil;
-  if FChkSession then
-  begin 
-    lvSession := TDiocpSimpleMsgPackSession(pvRequest.GetSession);
-    if pvRequest.RequestURI = '/login' then
+    if pvRequest.RequestURI = '/json' then
     begin
-      lvSession.MsgPack.B['login'] := true;
-      pvRequest.Response.WriteString('登陆成功<br>');
-      WriteNormalPage();
-    end else if (not lvSession.MsgPack.B['login']) then
-    begin
-      WriteLoginForm();
-    end;
-  end;
-  if pvRequest.RequestURI = '/diocp-v5' then
-  begin  // 输出diocp运行信息
-    Sleep(1000);
-    pvRequest.Response.WriteString('DIOCP运行信息<br>');
-    s := FTcpServer.GetStateInfo;
-    s := ReplaceText(s, sLineBreak, '<br>');
-    pvRequest.Response.WriteString(s);
-    pvRequest.Response.WriteString('<br>');
-
-    pvRequest.Response.WriteString('IOCP线程信息<br>');
-    s := FTcpServer.IocpEngine.GetStateINfo;
-    s := ReplaceText(s, sLineBreak, '<br>');
-    pvRequest.Response.WriteString(s);
-  end else if pvRequest.RequestURI = '/logout' then
-  begin
-    lvSession.MsgPack.B['login'] := false;
-    WriteLoginForm();
-  end else if pvRequest.RequestURI = '/redirect' then
-  begin                                       //重新定向
-    s := pvRequest.GetRequestParam('url');
-    if s = '' then
-    begin
-      pvRequest.Response.WriteString('重定向例子:<a href="/redirect?url=http://www.diocp.org">' +
-       '/redirect?url=http://www.diocp.org</a>');
-    end else
-    begin
-      pvRequest.Response.RedirectURL(s);
-      pvRequest.CloseContext;
+      pvRequest.Response.ContentType := 'text/json';
+      //s := '{"ab":"1111111111111111111111111111111111111111111111111111111111111111111"}';
+      lvDValue := TDValue.Create;
+      lvDValue.ForceByName('title').AsString := 'DIOCP-V5 Http 服务演示';
+      lvDValue.ForceByName('author').AsString := 'D10.天地弦';
+      lvDValue.ForceByName('time').AsString := DateTimeToStr(Now());
+      s := JSONEncode(lvDValue);
+      lvDValue.Free;
+      pvRequest.Response.WriteString(s);
+      pvRequest.SendResponse;
+      pvRequest.DoResponseEnd;
       Exit;
     end;
-  end else if pvRequest.RequestURI = '/input' then
-  begin  // 输出diocp运行信息
-    pvRequest.Response.WriteString('DIOCP HTTP 表单提交测试<br>');
-    pvRequest.Response.WriteString('<form id="form1" name="form1" method="post" action="/post?param1=''汉字''&time=' + DateTimeToStr(Now()) +'">');
-    pvRequest.Response.WriteString('<table width="50%" border="1" align="center">');
-    pvRequest.Response.WriteString('<tr><td width="35%">请输入你的名字:</td>');
-    pvRequest.Response.WriteString('<td width="35%"><input name="a" type="text" value="DIOCP-V5" /></td></tr>');
-    pvRequest.Response.WriteString('<tr><td width="35%">请输入你的爱好:</td>');
-    pvRequest.Response.WriteString('<td width="35%"><input name="b" type="text" value="LOL英雄联盟" /></td></tr>');
-    pvRequest.Response.WriteString('<tr><td width="35%">操作:</td>');
-    pvRequest.Response.WriteString('<td width="35%"><input type="submit" name="Submit" value="提交"/></td></tr>');
-    pvRequest.Response.WriteString('</table></form>');
-  end else
-  begin
-    WriteNormalPage();
-  end;
 
-  // 应答完毕，发送会客户端
-  pvRequest.ResponseEnd;
+    if pvRequest.RequestURI = '/CHUNKED' then
+    begin
+      // Context Type                        返回的是UTF-8的编码
+      pvRequest.Response.ContentType := 'text/html; charset=utf-8';
+      pvRequest.Response.SetChunkedStart;
+      pvRequest.Response.SetChunkedUtf8('Chunked编码测试1<BR>');
+      pvRequest.Response.SetChunkedUtf8('================================<BR>');
+      pvRequest.Response.ChunkedFlush;
+    
+      pvRequest.Response.SetChunkedUtf8('Chunked编码测试2<BR>');
+      pvRequest.Response.SetChunkedUtf8('================================<BR>');
+      pvRequest.Response.SetChunkedEnd;
+      pvRequest.Response.ChunkedFlush;
+      pvRequest.CloseContext;
+
+      Exit;
+    end;
+
+  //  if pvRequest.RequestURI = '/favicon.ico' then
+  //  begin
+  //    // Context Type                        
+  //    pvRequest.Response.ContentType := 'application/oct stream;
+  //    pvRequest.Response.SetChunkedStart;
+  //    pvRequest.Response.SetChunkedUtf8('Chunked编码测试1<BR>');
+  //    pvRequest.Response.SetChunkedUtf8('================================<BR>');
+  //    pvRequest.Response.ChunkedFlush;
+  //
+  //    pvRequest.Response.SetChunkedUtf8('Chunked编码测试2<BR>');
+  //    pvRequest.Response.SetChunkedUtf8('================================<BR>');
+  //    pvRequest.Response.SetChunkedEnd;
+  //    pvRequest.Response.ChunkedFlush;
+  //    pvRequest.CloseContext;
+  //
+  //    Exit;
+  //  end;
+
+    // Context Type                        返回的是UTF-8的编码
+    pvRequest.Response.ContentType := 'text/html; charset=utf-8';
+
+    // 解码Post数据参数
+    {$IFDEF UNICODE}
+    pvRequest.DecodePostDataParam(nil);
+    pvRequest.DecodeURLParam(nil);
+    {$ELSE}
+    // 使用UTF8方式解码
+    pvRequest.DecodePostDataParam(True);
+    pvRequest.DecodeURLParam(True);
+    {$ENDIF}
+
+
+    // 输出客户端IP信息
+    pvRequest.Response.WriteString(Format('<div>ip:%s:%d</div><br>', [pvRequest.Connection.RemoteAddr,
+      pvRequest.Connection.RemotePort]));
+
+    pvRequest.Response.WriteString('请求方法:' + pvRequest.RequestMethod);
+    pvRequest.Response.WriteString('<br>');
+    WriteLogOutUrl();
+    pvRequest.Response.WriteString('=======================================<br>');
+
+    lvSession := nil;
+    if FChkSession then
+    begin 
+      lvSession := TDiocpSimpleMsgPackSession(pvRequest.GetSession);
+      if pvRequest.RequestURI = '/login' then
+      begin
+        lvSession.MsgPack.B['login'] := true;
+        pvRequest.Response.WriteString('登陆成功<br>');
+        WriteNormalPage();
+      end else if (not lvSession.MsgPack.B['login']) then
+      begin
+        WriteLoginForm();
+      end;
+    end;
+    if pvRequest.RequestURI = '/diocp-v5' then
+    begin  // 输出diocp运行信息
+      Sleep(1000);
+      pvRequest.Response.WriteString('DIOCP运行信息<br>');
+      s := FTcpServer.GetStateInfo;
+      s := ReplaceText(s, sLineBreak, '<br>');
+      pvRequest.Response.WriteString(s);
+      pvRequest.Response.WriteString('<br>');
+
+      pvRequest.Response.WriteString('IOCP线程信息<br>');
+      s := FTcpServer.IocpEngine.GetStateINfo;
+      s := ReplaceText(s, sLineBreak, '<br>');
+      pvRequest.Response.WriteString(s);
+    end else if pvRequest.RequestURI = '/logout' then
+    begin
+      lvSession.MsgPack.B['login'] := false;
+      WriteLoginForm();
+    end else if pvRequest.RequestURI = '/redirect' then
+    begin                                       //重新定向
+      s := pvRequest.GetRequestParam('url');
+      if s = '' then
+      begin
+        pvRequest.Response.WriteString('重定向例子:<a href="/redirect?url=http://www.diocp.org">' +
+         '/redirect?url=http://www.diocp.org</a>');
+      end else
+      begin
+        pvRequest.Response.RedirectURL(s);
+        pvRequest.CloseContext;
+        Exit;
+      end;
+    end else if pvRequest.RequestURI = '/input' then
+    begin  // 输出diocp运行信息
+      pvRequest.Response.WriteString('DIOCP HTTP 表单提交测试<br>');
+      pvRequest.Response.WriteString('<form id="form1" name="form1" method="post" action="/post?param1=''汉字''&time=' + DateTimeToStr(Now()) +'">');
+      pvRequest.Response.WriteString('<table width="50%" border="1" align="center">');
+      pvRequest.Response.WriteString('<tr><td width="35%">请输入你的名字:</td>');
+      pvRequest.Response.WriteString('<td width="35%"><input name="a" type="text" value="DIOCP-V5" /></td></tr>');
+      pvRequest.Response.WriteString('<tr><td width="35%">请输入你的爱好:</td>');
+      pvRequest.Response.WriteString('<td width="35%"><input name="b" type="text" value="LOL英雄联盟" /></td></tr>');
+      pvRequest.Response.WriteString('<tr><td width="35%">操作:</td>');
+      pvRequest.Response.WriteString('<td width="35%"><input type="submit" name="Submit" value="提交"/></td></tr>');
+      pvRequest.Response.WriteString('</table></form>');
+    end else
+    begin
+      WriteNormalPage();
+    end;
+
+    // 应答完毕，发送会客户端
+    pvRequest.ResponseEnd;
+  finally
+    if chkRecord2File.Checked then
+    begin
+      WriteStringToUtf8NoBOMFile(
+        Format('DiocpHttpRequest_%d_%s.resp', [pvRequest.Connection.SocketHandle, lvNowString]),
+        pvRequest.Response.GetResponseHeaderAsString);
+    end;
+  end;
 end;
 
 destructor TfrmMain.Destroy;

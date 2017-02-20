@@ -1277,7 +1277,7 @@ begin
   end else if not FInnerRequest.CheckKeepAlive then
   begin
     FDiocpContext.FCurrentStreamEndAction := 1;
-  end else if SameText(FResponse.Header.ForceByName('Connection').AsString, 'close') then
+  end else if SameText(FResponse.Header.GetValueByName('Connection', STRING_EMPTY), 'close') then
   begin
     FDiocpContext.FCurrentStreamEndAction := 1;
   end else
@@ -1292,7 +1292,7 @@ begin
     lvSize := pvStream.Size;
     if lvRange.VEnd = 0 then
     begin
-      lvRange.VEnd := lvRange.VStart + SEND_BLOCK_SIZE * 10 - 1;
+      lvRange.VEnd := lvRange.VStart + SEND_BLOCK_SIZE - 1;
     end;
 
     if (lvRange.VStart < lvSize) then
@@ -1301,8 +1301,10 @@ begin
       begin
         lvRange.VEnd := lvSize -1;
       end;
+      
       Response.Header.ForceByName('Content-Range').AsString := Format(' bytes %d-%d/%d', [
          lvRange.VStart, lvRange.VEnd, lvSize]);
+
       Response.SetResponseCode(206);  // 206 Partial Content
       pvStream.Position := lvRange.VStart;
       lvIsRangeResonse := True;
