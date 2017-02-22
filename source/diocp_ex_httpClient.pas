@@ -755,17 +755,26 @@ begin
     // 进行域名解析
     lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
 
-    {$IFDEF MSWINDOWS}
-    if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
-    begin
-      raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+    try
+      {$IFDEF MSWINDOWS}
+      if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
+      begin
+        raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+      end;
+      {$ELSE}
+      if not FRawSocket.Connect(lvIpAddr, pvPort) then
+      begin
+        RaiseLastOSError;
+      end;
+      {$ENDIF}
+    except
+      on e:exception do
+      begin
+        raise Exception.Create(Format('连接服务器(%s:%d)异常:%s', [lvIpAddr, pvPort, e.Message]));
+
+      end;
+
     end;
-    {$ELSE}
-    if not FRawSocket.Connect(lvIpAddr, pvPort) then
-    begin
-      RaiseLastOSError;
-    end;
-    {$ENDIF}
 
     Inc(FReConnectCounter);
   end;

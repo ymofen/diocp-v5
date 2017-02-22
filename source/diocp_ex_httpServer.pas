@@ -1260,9 +1260,8 @@ var
   lvFileStream:TFileStream;
 begin
   lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
-  ResponseAStream(lvFileStream);
-
-
+  Response.SetResponseFileName(ExtractFileName(pvFileName));
+  ResponseAStream(lvFileStream);                            
 end;
 
 procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream);
