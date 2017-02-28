@@ -675,7 +675,18 @@ var
   lvDefaultFile:string;
   lvExt:string;
 begin
-  lvDefaultFile := ExtractFilePath(ParamStr(0)) + '\webroot\' + pvRequest.RequestURI;
+  pvRequest.DecodeURLParam(True);
+  lvDefaultFile := pvRequest.URLParams.GetValueByName('downfile', STRING_EMPTY);
+  if Length(lvDefaultFile) > 0 then
+  begin
+    lvDefaultFile := StringReplace(lvDefaultFile, '/', '\', [rfReplaceAll]);
+  end;
+  if not FileExists(lvDefaultFile) then
+  begin
+    lvDefaultFile := pvRequest.RequestURI;
+    if not FileExists(lvDefaultFile) then
+      lvDefaultFile := ExtractFilePath(ParamStr(0)) + '\webroot\' + pvRequest.RequestURI;
+  end;
 
   if FileExists(lvDefaultFile) then
   begin
