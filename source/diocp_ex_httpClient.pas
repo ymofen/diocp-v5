@@ -72,6 +72,7 @@ type
     FResponseBody: TMemoryStream;
     FResponseContentType: String;
     FResponseContentEncoding:String;
+    FResponseCookie:String;
     FResponseHeader: TStringList;
     FResponseSize: Integer;
     FResponseHttpVersionValue: Integer;
@@ -512,7 +513,7 @@ procedure TDiocpHttpClient.InnerExecuteRecvResponse;
 var
   lvRawHeader, lvBytes:TBytes;
   x, l:Integer;
-  lvTempStr, lvRawHeaderStr:String;
+  lvTempStr, lvRawHeaderStr, lvCookie:String;
   lvBuffer:PByte;
 
   lvTempBuffer:array[0.. BLOCK_SIZE -1] of Byte;
@@ -532,8 +533,19 @@ var
 
         FResponseHeader.Text := lvRawHeaderStr;
         FResponseContentType := StringsValueOfName(FResponseHeader, 'Content-Type', [':'], True);
-        lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
+        lvCookie := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
+        if Length(lvCookie) > 0 then
+        begin
+          lvCookie :=Trim(StringReplace(lvCookie, 'Path=/;', '', [rfReplaceAll, rfIgnoreCase]));
+          lvCookie :=Trim(StringReplace(lvCookie, 'HttpOnly', '', [rfReplaceAll, rfIgnoreCase]));
+          FResponseCookie := lvCookie;
+        end;
         FResponseContentEncoding :=StringsValueOfName(FResponseHeader, 'Content-Encoding', [':'], True);
+
+        lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
+
+
+        
         l := StrToIntDef(lvTempStr, 0);
         if l = 0  then
         begin
@@ -619,15 +631,6 @@ begin
 {$ENDIF}
 
 
-
-
-  lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
-  if lvTempStr <> '' then
-  begin  
-    FRawCookie := lvTempStr;
-  end;
-
-
   FLastActivity := GetTickCount;
   FLastResponseTick := GetTickCount;
   DoAfterResponse;
@@ -636,7 +639,7 @@ end;
 procedure TDiocpHttpClient.Post(pvURL: String);
 var
   r, len:Integer;
-  lvIpAddr:string;
+  lvIpAddr, lvCookie:string;
 {$IFDEF UNICODE}
   lvRawHeader:TBytes;
 {$ELSE}
@@ -660,9 +663,15 @@ begin
     FRequestHeader.Add('Connection: keep-alive');
   end;
 
-  if FRawCookie <> '' then
+  lvCookie := self.FResponseCookie;
+  if Length(FRawCookie) > 0 then
   begin
-    FRequestHeader.Add('Cookie:' + FRawCookie);
+    lvCookie := lvCookie + FRawCookie;
+  end;
+  
+  if Length(lvCookie) > 0 then
+  begin
+    FRequestHeader.Add('Cookie:' + lvCookie);
   end;
 
   FRequestHeader.Add(Format('Host: %s', [FURL.RawHostStr]));
@@ -1009,12 +1018,7 @@ begin
     Move(FReponseBuilder.Memory^, FResponseBody.Memory^, l); 
   end;
 
-  lvTempStr := StringsValueOfName(FResponseHeader, 'Set-Cookie', [':'], True);
 
-  if lvTempStr <> '' then
-  begin  
-    FRawCookie := lvTempStr;
-  end;
 
 
   DoAfterResponse; 
