@@ -187,6 +187,7 @@ type
     procedure InnerAddToDebugStrings(pvMsg:String); overload;
     procedure InnerAddToDebugStrings(pvMsg: string; const args: array of const);
         overload;
+
     procedure ReleaseBack;
   protected
     /// <summary>
@@ -1535,7 +1536,7 @@ begin
     FOwner.RemoveFromOnOnlineList(Self);
 
     // ≥¢ ‘πÈªπµΩ≥ÿ
-    ReleaseBack;        
+    ReleaseBack;
   end;
 end;
 

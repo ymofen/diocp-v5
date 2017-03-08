@@ -27,6 +27,9 @@ uses
   , utils_buffer, utils_queues, SyncObjs;
 
 type
+  /// <summary>
+  ///   如果是getFromPool不能进Server的List列表
+  /// </summary>
   TIocpRemoteContext = class(TDiocpCustomContext)
   private
     FLastDisconnectTime:Cardinal;
@@ -154,6 +157,11 @@ type
     procedure DoASyncWork(pvFileWritter: TSingleFileWriter; pvASyncWorker:
         TASyncWorker); override;
     procedure SetDisableAutoConnect(const Value: Boolean);
+
+    /// <summary>
+    ///   occur on create instance
+    /// </summary>
+    procedure OnCreateContext(const pvContext: TDiocpCustomContext); override;
   private
   {$IFDEF UNICODE}
     FList: TObjectList<TIocpRemoteContext>;
@@ -631,6 +639,11 @@ begin
   finally
     lvStrings.Free;
   end;
+end;
+
+procedure TDiocpTcpClient.OnCreateContext(const pvContext: TDiocpCustomContext);
+begin
+  inherited;
 end;
 
 procedure TDiocpTcpClient.DoASyncWork(pvFileWritter: TSingleFileWriter;
