@@ -846,6 +846,7 @@ type
   public
     /// <summary>
     ///   从池中获取一个连接对象
+    ///   从池中获取的连接不能进行重连(关闭时自动进入了池)
     /// </summary>
     function GetContextFromPool: TDiocpCustomContext;
 
