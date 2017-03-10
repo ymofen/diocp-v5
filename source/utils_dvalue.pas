@@ -950,6 +950,10 @@ begin
         New(ADValue.Value.AsGuid);
       vdtString:
         New(ADValue.Value.AsString);
+{$IFDEF HAVE_ASNI_STRING}
+      vdtStringA:
+        New(ADValue.Value.vdtStringA);
+{$ENDIF}
       vdtStringW:
         New(ADValue.Value.AsStringW);
       vdtInterface:

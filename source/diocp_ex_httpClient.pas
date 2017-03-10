@@ -440,6 +440,7 @@ procedure TDiocpHttpClient.Cleaup;
 begin
   FRequestBody.Clear;
   FResponseBody.Clear;
+  FResponseCookie := STRING_EMPTY;
 end;
 
 procedure TDiocpHttpClient.Close;
@@ -712,6 +713,8 @@ begin
     len := Length(lvRawHeader);
     FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
   {$ENDIF}
+    WriteStringToUtf8NoBOMFile('request.dat', lvRawHeader);
+
 
     // 发送请求数据体
     if FRequestBody.Size > 0 then
