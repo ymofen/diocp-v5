@@ -62,7 +62,8 @@ type
 
 
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
-    vdtInteger, vdtInt64, vdtUInt64, vdtCurrency, vdtGuid, vdtDateTime, vdtStringA,
+    vdtInteger, vdtInt64, vdtUInt64, vdtCurrency, vdtGuid, vdtDateTime,
+    vdtStringA,
     vdtString, vdtStringW, vdtStream, vdtInterface, vdtPtr, vdtObject, vdtArray);
 
   TDValueDataTypes = set of TDValueDataType;
@@ -98,10 +99,10 @@ type
         (AsDateTime: TDateTime);
       7:
         (AsString: PString);
-      {$IF (not Defined(NEXTGEN))}
+      {$IFDEF HAVE_ASNI_STRING}
       8:
         (AsStringA: PAnsiString);
-      {$IFEND}
+      {$ENDIF}
       9:
         (AsStringW: PDStringW);
       15:
@@ -952,7 +953,7 @@ begin
         New(ADValue.Value.AsString);
 {$IFDEF HAVE_ASNI_STRING}
       vdtStringA:
-        New(ADValue.Value.vdtStringA);
+        New(ADValue.Value.AsStringA);
 {$ENDIF}
       vdtStringW:
         New(ADValue.Value.AsStringW);
