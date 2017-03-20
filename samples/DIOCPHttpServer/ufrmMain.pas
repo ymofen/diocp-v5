@@ -680,6 +680,11 @@ begin
   if Length(lvDefaultFile) > 0 then
   begin
     lvDefaultFile := StringReplace(lvDefaultFile, '/', '\', [rfReplaceAll]);
+    pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
+    pvRequest.Response.SetResponseFileName(ExtractFileName(lvDefaultFile));
+    pvRequest.ResponseAFile(lvDefaultFile);
+    Result := True;
+    Exit;
   end;
   if not FileExists(lvDefaultFile) then
   begin
@@ -694,10 +699,10 @@ begin
     lvExt :=LowerCase(ExtractFileExt(lvDefaultFile));
     pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
     //pvRequest.Response.SetResponseFileName('x.file');
-    pvRequest.ResponseAFile(lvDefaultFile);
-//    pvRequest.Response.LoadFromFile(lvDefaultFile);
-//    pvRequest.SendResponse();
-    //pvRequest.DoResponseEnd;
+    //pvRequest.ResponseAFile(lvDefaultFile);
+    pvRequest.Response.LoadFromFile(lvDefaultFile);
+    pvRequest.SendResponse();
+    pvRequest.DoResponseEnd;
     Result := True;
   end else
   begin

@@ -1260,7 +1260,6 @@ var
   lvFileStream:TFileStream;
 begin
   lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
-  Response.SetResponseFileName(ExtractFileName(pvFileName));
   ResponseAStream(lvFileStream);                            
 end;
 
