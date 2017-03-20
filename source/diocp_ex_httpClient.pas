@@ -1,4 +1,9 @@
 unit diocp_ex_httpClient;
+{*
+ *
+ * cleanup()   清理参数 不清理Cookie
+ * reset()     清理参数，清理cookie
+*}
 
 interface
 
@@ -105,7 +110,16 @@ type
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   public
+    /// <summary>
+    ///   不清理Cookie
+    /// </summary>
     procedure Cleaup;
+
+    /// <summary>
+    ///   复位，清理Cookie
+    /// </summary>
+    procedure Reset();
+
 
     
 
@@ -440,7 +454,6 @@ procedure TDiocpHttpClient.Cleaup;
 begin
   FRequestBody.Clear;
   FResponseBody.Clear;
-  FResponseCookie := STRING_EMPTY;
 end;
 
 procedure TDiocpHttpClient.Close;
@@ -1039,6 +1052,12 @@ begin
     FRawSocket.Close();
     raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
   end;
+end;
+
+procedure TDiocpHttpClient.Reset;
+begin
+  self.Cleaup;
+  FResponseCookie := STRING_EMPTY;
 end;
 
 procedure TDiocpHttpClient.ResetState;
