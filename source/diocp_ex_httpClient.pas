@@ -721,12 +721,16 @@ begin
     lvRawHeader := TEncoding.Default.GetBytes(FRequestHeaderBuilder.ToString());
     len := Length(lvRawHeader);
     FBufferWriter.Append(PByte(@lvRawHeader[0]), len);
+
   {$ELSE}
     lvRawHeader := FRequestHeaderBuilder.ToString();
     len := Length(lvRawHeader);
     FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
-  {$ENDIF}
+    {$IFDEF DEBUG}
     WriteStringToUtf8NoBOMFile('request.dat', lvRawHeader);
+    {$ENDIF}
+  {$ENDIF}
+
 
 
     // 发送请求数据体
