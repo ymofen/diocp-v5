@@ -189,7 +189,7 @@ function GetAttachDataAsObject(pvBuffer:Pointer): TObject;
 /// <summary>
 ///  检测池中内存块越界情况
 /// </summary>
-function CheckBufferBounds(ABuffPool:PBufferPool): Integer; 
+function CheckBufferBounds(ABuffPool:PBufferPool): Integer;
 
 /// <summary>
 ///   检测单个内存块是否越界
@@ -218,6 +218,8 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 procedure FreeObject(AObject: TObject); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
+function GetBufferPoolDebugInfo(ABuffPool:PBufferPool): string;
 
 
 
@@ -826,6 +828,11 @@ begin
   {$ENDIF}
 
 
+end;
+
+function GetBufferPoolDebugInfo(ABuffPool:PBufferPool): string;
+begin
+  Result := Format('name:%s, get:%d, put:%d, addRef:%d, releaseRef:%d, size:%d', [ABuffPool.FName, ABuffPool.FGet, ABuffPool.FPut, ABuffPool.FAddRef, ABuffPool.FReleaseRef, ABuffPool.FSize]);;
 end;
 
 

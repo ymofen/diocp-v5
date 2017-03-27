@@ -188,7 +188,7 @@ type
     /// <summary>
     ///  获取池的使用情况
     /// </summary>
-    function GetPoolInfo: String;
+    function GetPoolInfo(pvSpliteStr: String = sLineBreak): String;
   end;
 
 implementation
@@ -438,10 +438,10 @@ begin
   lvBucket := PDHashData(sender);
   lvItem := TMaxPoolItem(lvBucket.Data);
   lvSB.Append(lvBucket.Key).Append(':');
-  lvSB.Append('max:').Append(lvItem.FMax);
+  lvSB.Append('use:').Append(lvItem.FCount).Append('/').Append(lvItem.FMax).Append(lvSB.LineBreak);
 end;
 
-function TMaxObjectPool.GetPoolInfo: String;
+function TMaxObjectPool.GetPoolInfo(pvSpliteStr: String = sLineBreak): String;
 var
   lvSB:TDStringBuilder;
 begin
@@ -450,6 +450,7 @@ begin
   try
     lvSB := TDStringBuilder.Create;
     try
+      lvSB.LineBreak := pvSpliteStr;
       FObjMap.ForEach(InnerGetPoolInfo, Pointer(lvSB));
       Result := lvSB.ToString;
     finally
