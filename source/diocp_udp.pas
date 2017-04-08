@@ -277,6 +277,8 @@ begin
 
   FSendRequestPool.FreeDataObject;
   FSendRequestPool.Free;
+
+  CheckDoDestroyEngine;
   inherited Destroy;
 end;
 
@@ -395,6 +397,8 @@ begin
       Assert(False);
     end;
     FDefaultListener.Stop();
+
+    
 
     /// ÇÐ»»µ½¹Ø±Õ×´Ì¬
     FActive := false;
