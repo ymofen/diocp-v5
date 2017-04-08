@@ -252,7 +252,6 @@ implementation
 constructor TDiocpUdp.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FIocpEngine := TIocpEngine.Create();
   FDefaultListener := TDiocpUdpListener.Create;
   FDefaultListener.Owner := Self;
   FSessions := TDHashTableSafe.Create;
@@ -380,7 +379,7 @@ end;
 
 procedure TDiocpUdp.Start;
 begin
-  FIocpEngine.Start();
+  FIocpEngine.CheckStart();
   FDefaultListener.Start();
   FIocpEngine.IocpCore.Bind2IOCPHandle(FDefaultListener.FRawSocket.SocketHandle, 0);
   FDefaultListener.PostRecvRequest(10, 1024 * 4);

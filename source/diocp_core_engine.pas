@@ -1303,6 +1303,8 @@ begin
   else
     FWorkerCount := AWorkerCount;
 
+  if not FActive then Exit;
+
   j := FWorkerCount - FActiveWorkerCount;
   if j > 0 then
   begin
