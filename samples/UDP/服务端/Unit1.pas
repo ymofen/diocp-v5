@@ -56,6 +56,7 @@ begin
   begin
     
     FDiocpUdp.DefaultListener.Port := StrToInt(Edit1.Text);
+    FDiocpUdp.IocpEngine.SetWorkerCount(15);
     FDiocpUdp.Start();
     Button1.Caption := 'µã»÷¹Ø±Õ';
   end;

@@ -89,6 +89,7 @@ type
   TDiocpHttpSession = class(TObject)
   private
     FLastActivity: Integer; 
+    FSessionID: String;
     procedure SetSessionTimeOut(const Value: Integer);
   protected
     FSessionTimeOut: Integer;
@@ -96,12 +97,17 @@ type
   public
     constructor Create; virtual;
     property LastActivity: Integer read FLastActivity;
+    
+    property SessionID: String read FSessionID;
+
     property SessionTimeOut: Integer read FSessionTimeOut write SetSessionTimeOut;
 
     /// <summary>
     ///  Á¢¼´Ê§Ð§
     /// </summary>
     procedure Invalidate;
+
+
   end;
 
   /// <summary>
@@ -2451,7 +2457,9 @@ begin
       Result := TDiocpHttpSession(FSessionObjectPool.GetObject);
       Result.DoCleanup;
       Result.SessionTimeOut := self.FSessionTimeOut;
+      Result.FSessionID := pvSessionID;
       FSessionList.ValueMap[pvSessionID] := Result;
+
     end;
     Result.FLastActivity := GetTickCount;
   finally
