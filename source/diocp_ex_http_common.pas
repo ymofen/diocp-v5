@@ -190,6 +190,11 @@ type
     /// </summary>
     procedure DecodeURLParam(pvUseUtf8Decode:Boolean); overload;
 
+    /// <summary>
+    ///  IE的Url参数，未进行任何的编码
+    /// </summary>
+    procedure DecodeURLParamAsIE;
+
     {$IFDEF UNICODE}
     procedure DecodeURLParam(pvEncoding:TEncoding); overload;
     {$ENDIF}
@@ -1306,7 +1311,43 @@ begin
     lvStrings.Free;
   end;
 end;
+
 {$ENDIF}
+
+procedure THttpRequest.DecodeURLParamAsIE;
+var
+  lvRawData : String;
+  s, lvName:String;
+  i:Integer;
+  lvStrings:TStrings;
+begin
+  // 解析URL参数
+  if Length(FRequestRawURLParamStr) = 0 then exit;
+
+  lvStrings := TStringList.Create;
+  try
+    lvStrings.Delimiter := '&';
+    lvStrings.DelimitedText := FRequestRawURLParamStr;
+
+    for i := 0 to lvStrings.Count - 1 do
+    begin
+      lvRawData := lvStrings.ValueFromIndex[i];
+      if lvRawData<> '' then
+      begin
+
+        // 只有这部分不同与 DecodeURLParam(pvUseUtf8Decode:Boolean)
+        s := lvRawData;
+
+        lvName := lvStrings.Names[i];
+        FURLParams.ForceByName(lvName).AsString := s;
+        FRequestParams.ForceByName(lvName).AsString := s;
+      end;
+    end;
+  finally
+    lvStrings.Free;
+  end;
+end;
+
 
 procedure THttpRequest.DoCleanUp;
 begin

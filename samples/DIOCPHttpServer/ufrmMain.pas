@@ -17,7 +17,7 @@ uses
   , utils_safeLogger, StrUtils, 
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
   utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools,
-  diocp_task;
+  diocp_task, System.Actions;
 
 type
   TfrmMain = class(TForm)
@@ -179,7 +179,7 @@ var
     pvRequest.Response.WriteString('=======================================<br>');
     pvRequest.Response.WriteString('  关于URL的编码问题说明<br>');
     pvRequest.Response.WriteString('URI, IE和其他浏览器进行了URLEncode编码和UTF8编码，所以后台进行了统一处理<br>');
-    pvRequest.Response.WriteString('URL中的参数, IE为进行任何编码, 其他浏览器(FireFox和360极速浏览器)进行了URLEncode编码和UTF8编码<br>');
+    pvRequest.Response.WriteString('URL中的参数, IE未进行任何编码, 其他浏览器(FireFox和360极速浏览器)进行了URLEncode编码和UTF8编码<br>');
     pvRequest.Response.WriteString('   所以后台参数中只进行了URLDecode的解码，需要开发时进行去单独处理<br>');
     pvRequest.Response.WriteString('*****************************************<br>');
 

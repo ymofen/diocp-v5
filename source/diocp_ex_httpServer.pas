@@ -269,6 +269,13 @@ type
     /// </summary>
     procedure DecodeURLParam(pvUseUtf8Decode:Boolean); overload;
 
+    /// <summary>
+    ///   解码IE URL中的参数，放到参数列表中
+    ///   在OnDiocpHttpRequest中调用
+    ///   IE参数未进行任何编码
+    /// </summary>
+    procedure DecodeURLParamAsIE(); overload;
+
     {$IFDEF UNICODE}
     /// <summary>
     ///   解码URL中的参数，放到参数列表中
@@ -1078,7 +1085,13 @@ procedure TDiocpHttpRequest.DecodeURLParam(pvEncoding:TEncoding);
 begin
   FInnerRequest.DecodeURLParam(pvEncoding);
 end;
+
 {$ENDIF}
+
+procedure TDiocpHttpRequest.DecodeURLParamAsIE;
+begin
+  FInnerRequest.DecodeURLParamAsIE;
+end;
 
 procedure TDiocpHttpRequest.DecodeURLParam(pvUseUtf8Decode:Boolean);
 begin
