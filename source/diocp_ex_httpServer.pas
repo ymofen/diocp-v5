@@ -139,6 +139,7 @@ type
     __free_flag:Integer;
 
     FDecodeState:Integer;
+    FDecodeMsg:string;
 
     FRange:THttpRange;
 
@@ -874,6 +875,7 @@ begin
   FInnerWebSocketFrame.DoCleanUp;
   FWebSocketContentBuffer.Clear;
   FDecodeState := 0;
+  FDecodeMsg := STRING_EMPTY;
 end;
 
 procedure TDiocpHttpRequest.Close;
@@ -2086,8 +2088,18 @@ begin
       // 记录当前contextDNA，异步任务时做检测
       FCurrentRequest.FContextDNA := self.ContextDNA;
     end;
-    
-    r := FCurrentRequest.InputBuffer(lvTmpBuf^);
+
+
+    try
+      r := FCurrentRequest.InputBuffer(lvTmpBuf^);
+    except
+      on e:Exception do
+      begin
+        r := -1;
+        FCurrentRequest.FDecodeState := -2;
+        FCurrentRequest.FDecodeMsg := e.Message;
+      end;
+    end;
 
     if r = -1 then
     begin                             
@@ -2115,7 +2127,16 @@ begin
 
     if r = -2 then
     begin
-      self.RequestDisconnect('HTTP请求头数据过大', self);
+      FCurrentRequest.FDecodeMsg := '请求头超过大小限制';
+
+      lvTempRequest := FCurrentRequest;
+
+      // 避免断开后还回对象池，造成重复还回
+      FCurrentRequest := nil;
+
+      DoRequest(lvTempRequest);
+
+
       Exit;
     end;
 
@@ -2354,6 +2375,13 @@ begin
           pvRequest.Response.FInnerResponse.ResponseCode := 400;
           pvRequest.ResponseEnd;
           Exit;
+        end;
+
+        if pvRequest.FDecodeState = -2 then
+        begin
+          pvRequest.Response.WriteString(pvRequest.FDecodeMsg);
+          pvRequest.Response.FInnerResponse.ResponseCode := 503;
+          pvRequest.ResponseEnd;
         end;
         
         if lvContext.ContextType = Context_Type_WebSocket then
