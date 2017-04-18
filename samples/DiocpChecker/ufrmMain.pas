@@ -5,8 +5,8 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, ExtCtrls, StdCtrls, diocp_core_engine, diocp_core_rawWinSocket,
-  diocp_sockets, utils_safeLogger, diocp_winapi_winsock2, utils_sync_object,
-  diocp_sockets_utils, diocp_tcp_server;
+  diocp_sockets, utils_safeLogger, diocp_winapi_winsock2,
+  diocp_sockets_utils, diocp_tcp_server, utils_async;
 
 type
   TfrmMain = class(TForm)

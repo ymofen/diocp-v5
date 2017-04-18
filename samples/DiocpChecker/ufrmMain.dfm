@@ -34,7 +34,7 @@ object frmMain: TfrmMain
       Top = 17
       Width = 75
       Height = 25
-      Caption = 'btnStart'
+      Caption = '1.btnStart'
       TabOrder = 1
       OnClick = btnStartClick
     end
@@ -43,7 +43,7 @@ object frmMain: TfrmMain
       Top = 112
       Width = 169
       Height = 25
-      Caption = 'btnCreateClientSocket'
+      Caption = '2.btnCreateClientSocket'
       TabOrder = 2
       OnClick = btnCreateClientSocketClick
     end
@@ -68,7 +68,7 @@ object frmMain: TfrmMain
       Top = 112
       Width = 137
       Height = 25
-      Caption = 'btnPostRecvRequest'
+      Caption = '3.btnPostRecvRequest'
       TabOrder = 5
       OnClick = btnPostRecvRequestClick
     end
@@ -77,7 +77,7 @@ object frmMain: TfrmMain
       Top = 112
       Width = 129
       Height = 25
-      Caption = 'btnCloseSocket'
+      Caption = '4.btnCloseSocket'
       TabOrder = 6
       OnClick = btnCloseSocketClick
     end

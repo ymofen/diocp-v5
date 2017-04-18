@@ -29,6 +29,7 @@ type
     FDataObj: TObject;
     FDataTag: Integer;
     FOnAsyncEvent: TOnASyncEvent;
+    FOnNotifyEvent: TNotifyEvent;
     procedure SetDataObj(const Value: TObject);
   public
     constructor Create(AOnAsyncEvent: TOnASyncEvent);
@@ -77,6 +78,8 @@ type
 
 function ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
     pvDataObject: TObject = nil; pvDataTag: Integer = 0): TASyncWorker;
+
+procedure ASyncExecute(const pvCallBack: TNotifyEvent; const pvSender: TObject);
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 
@@ -229,6 +232,20 @@ begin
   Result := v = pvExcept;
 end;
 
+procedure ASyncExecute(const pvCallBack: TNotifyEvent; const pvSender: TObject);
+var
+  lvWorker:TASyncWorker;
+begin
+  lvWorker := TASyncWorker.Create(nil);
+  lvWorker.FOnNotifyEvent := pvCallBack;
+  lvWorker.DataObj := pvSender;
+  {$IFDEF UNICODE}
+  lvWorker.Start;
+  {$ELSE}
+  lvWorker.Resume;
+  {$ENDIF}
+end;
+
 constructor TASyncWorker.Create(AOnAsyncEvent: TOnASyncEvent);
 begin
   inherited Create(True);
@@ -241,6 +258,10 @@ begin
   if Assigned(FOnAsyncEvent) then
   begin
     FOnAsyncEvent(Self);
+  end;
+  if Assigned(FOnNotifyEvent) then
+  begin
+    FOnNotifyEvent(FDataObj);
   end;
 end;
 
