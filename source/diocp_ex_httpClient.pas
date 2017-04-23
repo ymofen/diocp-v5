@@ -135,6 +135,8 @@ type
     procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
         Boolean);
 
+    function GetResponseBodyAsString: string;
+
     property Active: Boolean read GetActive;
     /// <summary>
     ///   是否检测线程安全，只能在创建线程中使用
@@ -952,6 +954,17 @@ end;
 function TDiocpHttpClient.GetActive: Boolean;
 begin
   Result := FRawSocket.SocketValid;
+end;
+
+function TDiocpHttpClient.GetResponseBodyAsString: string;
+begin
+  if StrStrIgnoreCase(PChar(FResponseContentType), 'utf-8') <> nil then
+  begin
+    Result := ReadStringFromStream(FResponseBody, True);
+  end else
+  begin
+    Result := ReadStringFromStream(FResponseBody, False);
+  end;
 end;
 
 function TDiocpHttpClient.GetResponseResultCode: Integer;
