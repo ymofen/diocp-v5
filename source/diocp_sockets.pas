@@ -307,6 +307,7 @@ type
 
 
     procedure SetMaxSendingQueueSize(pvSize:Integer);
+
     /// <summary>
     ///  是否已经连接
     /// </summary>

@@ -153,6 +153,7 @@ type
     ///    间隔最少5秒以上
     /// </summary>
     procedure DoASyncCycle(pvASyncWorker:TASyncWorker);
+    procedure SetTrigerDisconnectEventAfterNoneConnected(const Value: Boolean);
   protected
     procedure DoASyncWork(pvFileWritter: TSingleFileWriter; pvASyncWorker:
         TASyncWorker); override;
@@ -169,6 +170,7 @@ type
     FList: TObjectList;
   {$ENDIF}
     FListLocker: TCriticalSection;
+    FTrigerDisconnectEventAfterNoneConnected: Boolean;
   protected
     procedure DoAfterOpen;override;
     procedure DoAfterClose; override; 
@@ -194,6 +196,10 @@ type
 
     
     function GetStateInfo: String;
+
+
+
+
     /// <summary>
     ///  禁止重连
     ///    请求断开所有
@@ -209,6 +215,7 @@ type
 
     /// <summary>
     ///   禁止所有连接对象自动重连
+    ///   默认是不禁止
     /// </summary>
     property DisableAutoConnect: Boolean read FDisableAutoConnect write
         SetDisableAutoConnect;
@@ -217,6 +224,13 @@ type
     ///    通过位置索引获取其中的一个连接
     /// </summary>
     property Items[pvIndex: Integer]: TIocpRemoteContext read GetItems; default;
+
+    /// <summary>
+    ///  为true时: 即使连接失败的情况下，触发OnDisconnected事件, 默认为true
+    /// </summary>
+    property TrigerDisconnectEventAfterNoneConnected: Boolean read
+        FTrigerDisconnectEventAfterNoneConnected write
+        SetTrigerDisconnectEventAfterNoneConnected;
 
   end;
 
@@ -345,7 +359,7 @@ end;
 
 procedure TIocpRemoteContext.ConnectASync;
 begin
-  if not Owner.Active then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
+  if (Owner <> nil) and (not Owner.Active) then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
 
   if SocketState <> ssDisconnected then raise Exception.Create(Format(strCannotConnect, [TSocketStateCaption[SocketState]]));
 
@@ -353,7 +367,11 @@ begin
 
   if not PostConnectRequest then
   begin
-    OnDisconnected;    
+    if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
+    begin
+      DoNotifyDisconnected;
+    end;
+    //OnDisconnected;
   end;
 end;
 
@@ -378,8 +396,9 @@ begin
       {$ENDIF}
 
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
-            
-      DoNotifyDisconnected;
+
+      if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
+        DoNotifyDisconnected;
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;
@@ -388,7 +407,7 @@ end;
 
 procedure TIocpRemoteContext.OnDisconnected;
 begin
-  inherited;
+  inherited OnDisconnected;
 end;
 
 procedure TIocpRemoteContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
@@ -700,6 +719,12 @@ begin
   begin
     FDisableAutoConnect := Value;
   end;
+end;
+
+procedure TDiocpTcpClient.SetTrigerDisconnectEventAfterNoneConnected(const
+    Value: Boolean);
+begin
+  FTrigerDisconnectEventAfterNoneConnected := Value;
 end;
 
 

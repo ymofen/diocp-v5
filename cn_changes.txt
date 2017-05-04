@@ -220,6 +220,8 @@ DIOCP-v5 0.0.2
 46: 2017-01-12 10:18:03
   * 修复底层queue在Clear后，无法取出的bug,感谢brice(66943345)反馈
   
-46: 2017-01-12 15:22:16
+47: 2017-01-12 15:22:16
   * 修复在不使用对象池时的在进行计数操作时访问的对象无效(会导致AV异常,客户端默认不使用对象池),感谢brice(66943345)反馈和配合调试
    
+48: 2017-05-04 09:09:02-22
+  * 添加DiocpTcpClient.TrigerDisconnectEventAfterNoneConnected属性, 为true时: 即使连接失败的情况下，触发OnDisconnected事件, 默认为true
