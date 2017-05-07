@@ -41,6 +41,47 @@ type
     VEnd: Int64;
   end;
 
+  THttpHeaderBuilder = class(TObject)
+  private
+    FHeaders: TDValue;
+    FHttpVer: string;
+    FMethod: string;
+    FURI: string;
+  public
+
+    constructor Create;
+    destructor Destroy; override;
+
+    procedure Build(outHeader: TStrings); overload;
+
+    function Build: string; overload;
+
+    procedure MergeHeaders(pvHeader:TStrings);
+
+    procedure SetHeader(const pvKey:String; pvValue:String);
+
+    /// <summary>
+    ///   Http版本默认, HTTP 1.1
+    /// </summary>
+    property HttpVer: string read FHttpVer write FHttpVer;
+
+    /// <summary>
+    ///   HTTP方法, GET, POST, PUT...
+    /// </summary>
+    property Method: string read FMethod write FMethod;
+
+
+    /// <summary>
+    ///   包含参数部分
+    /// </summary>
+    property URI: string read FURI write FURI;
+
+
+
+
+
+  end;
+
   THttpRange = class(TObject)
   private
     FRanges: array [0 .. 7] of Int64;
@@ -2122,6 +2163,64 @@ begin
     end;
 
   end;
+end;
+
+constructor THttpHeaderBuilder.Create;
+begin
+  inherited Create;
+  FHeaders := TDValue.Create;
+  FHttpVer := 'HTTP 1.1';
+end;
+
+destructor THttpHeaderBuilder.Destroy;
+begin
+  FreeAndNil(FHeaders);
+  inherited Destroy;
+end;
+
+procedure THttpHeaderBuilder.Build(outHeader: TStrings);
+var
+  i: Integer;
+begin
+  outHeader.Add(Format('%s %s %s', [FMethod, FURI, FHttpVer]));
+  for i := 0 to FHeaders.Count - 1 do
+  begin
+    outHeader.Add(FHeaders.Items[i].Name.AsString + ':' + FHeaders.Items[i].AsString)
+  end;
+  outHeader.Add(sLineBreak);
+end;
+
+function THttpHeaderBuilder.Build: string;
+var
+  lvHeader:TStrings;
+begin
+  lvHeader := TStringList.Create;
+  try
+    Build(lvHeader); 
+    Result := lvHeader.Text;
+  finally
+    lvHeader.Free;
+  end;
+end;
+
+procedure THttpHeaderBuilder.MergeHeaders(pvHeader:TStrings);
+var
+  i: Integer;
+  lvVal:String;
+begin
+  for i := 0 to pvHeader.Count - 1 do
+  begin
+    lvVal := pvHeader.ValueFromIndex[i];
+    if Length(lvVal) > 0 then
+    begin
+      FHeaders.ForceByName(pvHeader.Names[i]).AsString := pvHeader.ValueFromIndex[i];
+    end;
+  end;
+end;
+
+procedure THttpHeaderBuilder.SetHeader(const pvKey:String; pvValue:String);
+begin
+  FHeaders.ForceByName(pvKey).AsString := pvValue;
 end;
 
 end.

@@ -43,7 +43,7 @@ uses
   , diocp_ex_http_common
   , diocp_res
   , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
-  utils_BufferPool,  utils_websocket;
+  utils_BufferPool,  utils_websocket, SHA, utils_base64;
 
 
 
@@ -808,6 +808,8 @@ type
 
   end;
 
+function GetWebSocketAccept(pvWebSocketKey:AnsiString): AnsiString;
+
 
 
 implementation
@@ -864,6 +866,16 @@ begin
   Result := Result + 'Server: DIOCP-V5/1.0'#13#10;
 
 end;      
+
+function GetWebSocketAccept(pvWebSocketKey:AnsiString): AnsiString;
+var
+  Key: AnsiString;
+  Bin: TBytes;
+begin
+  Key := pvWebSocketKey + MHSTR;
+  Bin := TBytes(SHA1Bin(Key));
+  Result := Base64Encode(@Bin[0], Length(Bin));
+end;
 
 
 procedure TDiocpHttpRequest.Clear;

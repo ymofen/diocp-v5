@@ -62,6 +62,8 @@ type
 
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
 
+    procedure CheckCanConnect;
+
   public
     /// <summary>
     ///   进行重连连接，
@@ -282,6 +284,11 @@ end;
 function TIocpRemoteContext.CanAutoReConnect: Boolean;
 begin
   Result := FAutoReConnect and (Owner.Active) and (not TDiocpTcpClient(Owner).DisableAutoConnect);
+end;
+
+procedure TIocpRemoteContext.CheckCanConnect;
+begin
+   if SocketState <> ssDisconnected then raise Exception.Create(Format(strCannotConnect, [TSocketStateCaption[SocketState]]));
 end;
 
 procedure TIocpRemoteContext.CheckDestroyBindingHandle;

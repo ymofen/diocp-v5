@@ -1633,7 +1633,7 @@ begin
     vdtCurrency:
       Result := TDateTime(ADValue.Value.AsCurrency);
     vdtString:
-      Result := StrToFloat(ADValue.Value.AsString^)
+      Result := StrToDateTime(ADValue.Value.AsString^)
   else
     raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
       DValueTypeName[vdtFloat]]);

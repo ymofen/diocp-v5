@@ -32,7 +32,7 @@ type
     procedure SetURL(pvURL:String);
 
     /// <summary>
-    ///   协议, http, https, ftp
+    ///   协议, http, https, ftp, ws
     /// </summary>
     property Protocol: string read FProtocol write FProtocol;
 

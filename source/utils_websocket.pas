@@ -1,9 +1,10 @@
 unit utils_websocket;
 
+
 interface
 
 uses
-  utils_strings, SysUtils, SHA, utils_base64, utils_byteTools;
+  utils_strings, SysUtils, utils_base64, utils_byteTools;
 
 const
   MHSTR: AnsiString = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
@@ -77,19 +78,9 @@ type
     property ContentLength: Int64 read FContentLength;
   end;
 
-function GetWebSocketAccept(pvWebSocketKey:AnsiString): AnsiString;
+
 
 implementation
-
-function GetWebSocketAccept(pvWebSocketKey:AnsiString): AnsiString;
-var
-  Key: AnsiString;
-  Bin: TBytes;
-begin
-  Key := pvWebSocketKey + MHSTR;
-  Bin := TBytes(SHA1Bin(Key));
-  Result := Base64Encode(@Bin[0], Length(Bin));
-end;
 
 constructor TDiocpWebSocketFrame.Create;
 begin
@@ -126,6 +117,7 @@ end;
 function TDiocpWebSocketFrame.DecodeByte12: Integer;
 begin
   FHeadLength := 2;
+  // $7F = 0111 1111
   FPlayload := FBuffer.MemoryBuffer(1)^ and $7F;
   if FPlayload < 126 then
   begin
