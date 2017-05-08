@@ -34,6 +34,7 @@ type
 
     procedure SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte);
 
+    property HeaderBuilder: THttpHeaderBuilder read FHeaderBuilder;
     property HttpBuffer: THttpBuffer read FHttpBuffer;
     property WebSocketContentBuffer: TDBufferBuilder read FWebSocketContentBuffer;
     property OnRecv: TNotifyEvent read FOnRecv write FOnRecv;

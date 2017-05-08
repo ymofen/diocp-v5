@@ -98,7 +98,8 @@ type
       buf:Pointer; len:cardinal; errCode:Integer) of object;
 
   TOnBufferEvent = procedure(pvContext: TIocpClientContext; pvBuff: Pointer; len:
-      Cardinal; pvBufferTag, pvErrorCode: Integer) of object;
+      Cardinal; pvBufferTag: Integer; pvTagData: Pointer; pvErrorCode: Integer)
+      of object;
 
   TOnContextAcceptEvent = procedure(pvSocket: THandle; pvAddr: String; pvPort:
       Integer; var vAllowAccept: Boolean) of object;
@@ -400,8 +401,8 @@ type
 
     procedure SetSocketState(pvState:TSocketState); virtual;
 
-    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag,
-        pvErrorCode: Integer); virtual;
+    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag:
+        Integer; pvTagData: Pointer; pvErrorCode: Integer); virtual;
 
     procedure RecordWorkerStartTick;
     procedure RecordWorkerEndTick;
@@ -1090,7 +1091,8 @@ type
     procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
 
     procedure DoSendBufferCompletedEvent(pvContext: TIocpClientContext; pvBuffer:
-        Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+        Pointer; len: Cardinal; pvBufferTag: Integer; pvTagData: Pointer;
+        pvErrorCode: Integer);
     procedure InnerAddToDebugStrings(pvMsg:String);
   public
 
@@ -2137,9 +2139,9 @@ begin
 end;
 
 procedure TIocpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
-    Cardinal; pvBufferTag, pvErrorCode: Integer);
+    Cardinal; pvBufferTag: Integer; pvTagData: Pointer; pvErrorCode: Integer);
 begin
-  
+
 end;
 
 procedure TIocpClientContext.DoSendRequestCompleted(pvRequest:
@@ -2925,7 +2927,8 @@ begin
     if pvObject.FBuf <> nil then
     begin
       /// Buff处理完成, 响应事件
-      DoSendBufferCompletedEvent(pvObject.FClientContext, pvObject.FBuf, pvObject.FLen, pvObject.Tag, pvObject.ErrorCode);
+      DoSendBufferCompletedEvent(pvObject.FClientContext, pvObject.FBuf, pvObject.FLen, pvObject.Tag, pvObject.Data,
+        pvObject.ErrorCode);
     end;
 
     // 清理Buffer
@@ -3125,13 +3128,13 @@ begin
 end;
 
 procedure TDiocpTcpServer.DoSendBufferCompletedEvent(pvContext:
-    TIocpClientContext; pvBuffer: Pointer; len: Cardinal; pvBufferTag,
-    pvErrorCode: Integer);
+    TIocpClientContext; pvBuffer: Pointer; len: Cardinal; pvBufferTag: Integer;
+    pvTagData: Pointer; pvErrorCode: Integer);
 begin
   if pvContext <> nil then
   begin
     try
-      pvContext.DoSendBufferCompleted(pvBuffer, len, pvBufferTag, pvErrorCode);
+      pvContext.DoSendBufferCompleted(pvBuffer, len, pvBufferTag, pvTagData, pvErrorCode);
     except
       on e:Exception do
       begin
@@ -3143,7 +3146,7 @@ begin
   if Assigned(FOnSendBufferCompleted) then
   begin
     try
-      FOnSendBufferCompleted(pvContext, pvBuffer, len, pvBufferTag, pvErrorCode);
+      FOnSendBufferCompleted(pvContext, pvBuffer, len, pvBufferTag, pvTagData, pvErrorCode);
     except
       on e:Exception do
       begin

@@ -57,6 +57,7 @@ end;
 
 procedure TForm1.btnConnectClick(Sender: TObject);
 begin
+  FWsClient.HeaderBuilder.SetHeader('subscribeid', '1007');
   FWsClient.Open(edtWsUrl.Text);
 end;
 

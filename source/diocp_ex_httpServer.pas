@@ -616,8 +616,8 @@ type
     procedure OnBlockBufferWrite(pvSender:TObject; pvBuffer:Pointer;
         pvLength:Integer);
 
-    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag,
-        pvErrorCode: Integer); override;
+    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag:
+        Integer; pvTagData: Pointer; pvErrorCode: Integer); override;
     procedure SetContextType(const Value: Integer);
 
     /// <summary>
@@ -1850,7 +1850,7 @@ begin
 end;
 
 procedure TDiocpHttpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
-    Cardinal; pvBufferTag, pvErrorCode: Integer);
+    Cardinal; pvBufferTag: Integer; pvTagData: Pointer; pvErrorCode: Integer);
 {$IFDEF DIOCP_DEBUG}
 var
   r:Integer;
