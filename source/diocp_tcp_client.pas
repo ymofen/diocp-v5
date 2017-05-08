@@ -377,6 +377,10 @@ begin
     if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
     begin
       DoNotifyDisconnected;
+    end else
+    begin
+       // 设置Socket状态
+      SetSocketState(ssDisconnected);
     end;
     //OnDisconnected;
   end;
@@ -405,7 +409,13 @@ begin
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
 
       if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
+      begin
         DoNotifyDisconnected;
+      end else
+      begin
+        // 状态一定要设定
+        SetSocketState(ssDisconnected);
+      end;
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;

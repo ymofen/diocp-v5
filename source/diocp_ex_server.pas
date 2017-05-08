@@ -17,7 +17,7 @@ interface
 
 uses
   diocp_tcp_server, utils_rawPackage, utils_safeLogger, SysUtils, Classes,
-  utils_strings;
+  utils_strings, diocp_res;
 
 type
   TDiocpExContext = class;
@@ -269,8 +269,23 @@ procedure TDiocpExContext.OnDataAction(pvData: Pointer; pvDataLen: Integer);
 var
   lvOwner:TDiocpExTcpServer;
 begin
-  lvOwner := TDiocpExTcpServer(Owner);
-  lvOwner.DoDataAction(self, pvData, pvDataLen);
+  try
+    lvOwner := TDiocpExTcpServer(Owner);
+    lvOwner.DoDataAction(self, pvData, pvDataLen);
+  except
+    on E:Exception do
+    begin
+      if Owner <> nil then
+      begin
+        Owner.LogMessage(strOnResponseException, [SocketHandle, 'OnDataAction', e.Message], '“Ï≥£', lgvError);
+
+        Owner.DoClientContextError(Self, -1);
+      end else
+      begin
+        __svrLogger.logMessage(strOnResponseException, [SocketHandle, 'OnDataAction', e.Message], '“Ï≥£', lgvError);
+      end;
+    end;
+  end;
 end;
 
 procedure TDiocpExContext.WriteData(pvData: Pointer; pvDataLen: Integer);

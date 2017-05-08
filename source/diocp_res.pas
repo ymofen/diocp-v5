@@ -41,7 +41,7 @@ resourcestring
   strPushFail      = '[%d]压入到待发送队列失败, 队列信息: %d/%d';
 
   strOnRecvBufferException = '[%d]响应OnRecvBuffer时出现了异常:%s。';
-
+  strOnResponseException = '[%d]响应%s时出现了异常:%s。';
 
   strConnectTimeOut = '建立连接超时(%s:%d)';
 
