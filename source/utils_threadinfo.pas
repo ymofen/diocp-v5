@@ -52,6 +52,8 @@ procedure StartRecordThreadInfo(pvInterval: Integer = 10000);
 
 function GetModuleID: String;
 
+procedure SleepInThread(pvInterval:Cardinal; pvThread:TThread);
+
 
 implementation
 
@@ -59,9 +61,10 @@ uses
   utils_fileWriter;
 
 type
+  TCrackThread = class(TThread);
   TRecordWorker = class(TThread)
   private
-    FInterval: Integer;
+    FInterval: Integer; 
   public
     constructor Create(AInterval: Integer = 10000);
     procedure Execute; override;
@@ -208,7 +211,14 @@ begin
   if __worker <> nil then
   begin
     __worker.Terminate;
-    __waitEvent.SetEvent;
+    if (__waitEvent.WaitFor(10000) = wrSignaled) then
+    begin
+      __waitEvent.Free;
+      __waitEvent := nil;
+    end else
+    begin
+      // warning....
+    end;
     __worker := nil;
   end;
   if __info_list <> nil then
@@ -250,6 +260,17 @@ var
 begin
   lvInfoObj := GetCurrentInfoObject;
   Result := lvInfoObj.GetHintInfo;
+end;
+
+procedure SleepInThread(pvInterval:Cardinal; pvThread:TThread);
+var
+  lvTick:Cardinal;
+begin
+  lvTick := GetTickCount;
+  while (not TCrackThread(pvThread).Terminated) and (tick_diff(lvTick, GetTickCount) < pvInterval) do
+  begin
+    Sleep(100);  
+  end;  
 end;
 
 
@@ -311,11 +332,13 @@ begin
   FInterval := AInterval;
 end;
 
+
 procedure TRecordWorker.Execute;
 var
   lvWriter:TSingleFileWriter;
   s:String;
 begin
+  __waitEvent.ResetEvent;
   lvWriter := TSingleFileWriter.Create;
   try
     lvWriter.CacheSize := 0;
@@ -341,15 +364,14 @@ begin
           lvWriter.LogMessage('ERR:¼ÇÂ¼×´Ì¬Ê§°Ü:' + e.Message);
         end;
       end;
-      __waitEvent.WaitFor(FInterval);
+      SleepInThread(FInterval, Self);
     end;
   finally
     __worker := nil;
-    FreeAndNil(__waitEvent);
     lvWriter.Free;
   end;
 
-
+  __waitEvent.SetEvent;
 end;
 
 

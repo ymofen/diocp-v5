@@ -22,9 +22,11 @@ type
     FOnShakeHand: TNotifyEvent;
 
     FRecvShakeHand:Byte;
+    FOnDisconnectedEvent: TNotifyEvent;
     procedure PostWebSocketRequest;
   protected
     procedure OnConnected; override;
+    procedure OnDisconnected; override;
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
   public
     constructor Create; override;
@@ -36,9 +38,15 @@ type
 
     property HeaderBuilder: THttpHeaderBuilder read FHeaderBuilder;
     property HttpBuffer: THttpBuffer read FHttpBuffer;
+    property OnDisconnectedEvent: TNotifyEvent read FOnDisconnectedEvent write
+        FOnDisconnectedEvent;
+
+
     property WebSocketContentBuffer: TDBufferBuilder read FWebSocketContentBuffer;
     property OnRecv: TNotifyEvent read FOnRecv write FOnRecv;
     property OnShakeHand: TNotifyEvent read FOnShakeHand write FOnShakeHand;
+
+
   end;
 
   TDiocpWebSocketTcpClient = class(TDiocpTcpClient)
@@ -103,6 +111,16 @@ begin
   PostWebSocketRequest;
   FHttpBuffer.DoCleanUp;
   FWsFrame.DoCleanUp;
+
+end;
+
+procedure TDiocpWebSocketContext.OnDisconnected;
+begin
+  inherited;
+  if Assigned(FOnDisconnectedEvent) then
+  begin
+    FOnDisconnectedEvent(Self);
+  end;
 end;
 
 procedure TDiocpWebSocketContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
