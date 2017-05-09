@@ -279,7 +279,7 @@ begin
       begin
         Owner.LogMessage(strOnResponseException, [SocketHandle, 'OnDataAction', e.Message], '“Ï≥£', lgvError);
 
-        Owner.DoClientContextError(Self, -1);
+        DoOwnerClientContext(-1);
       end else
       begin
         __svrLogger.logMessage(strOnResponseException, [SocketHandle, 'OnDataAction', e.Message], '“Ï≥£', lgvError);

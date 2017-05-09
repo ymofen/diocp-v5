@@ -100,8 +100,8 @@ type
     procedure OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
     {$ENDIF}
     procedure DoInnerJob(pvTaskObject: TDiocpTaskObject);
-    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag,
-        pvErrorCode: Integer); override;
+    procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag:
+        Integer; pvTagData: Pointer; pvErrorCode: Integer); override;
     procedure OnBlockBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   protected
@@ -382,7 +382,7 @@ begin
 end;
 
 procedure TIOCPCoderClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
-    Cardinal; pvBufferTag, pvErrorCode: Integer);
+    Cardinal; pvBufferTag: Integer; pvTagData: Pointer; pvErrorCode: Integer);
 {$IFDEF DIOCP_DEBUG}
 var
   r:Integer;

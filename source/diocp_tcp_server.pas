@@ -379,6 +379,8 @@ type
     /// </summary>
     procedure DoSendRequestRespnonse(pvRequest: TIocpSendRequest); virtual;
 
+    procedure DoOwnerClientContext(pvErrorCode: Integer);
+
     procedure InnerLock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     procedure InnerUnLock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     procedure Lock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
@@ -1034,6 +1036,7 @@ type
 
     procedure DoClientContextError(pvClientContext: TIocpClientContext;
         pvErrorCode: Integer);
+        
     function GetWorkerCount: Integer;
 
     procedure SetWorkerCount(const Value: Integer);
@@ -2099,6 +2102,11 @@ end;
 procedure TIocpClientContext.DoDisconnected;
 begin
   OnDisconnected;
+end;
+
+procedure TIocpClientContext.DoOwnerClientContext(pvErrorCode: Integer);
+begin
+  Owner.DoClientContextError(self, pvErrorCode);
 end;
 
 procedure TIocpClientContext.DoReceiveData(pvRecvRequest: TIocpRecvRequest);

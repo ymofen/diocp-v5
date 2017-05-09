@@ -70,7 +70,8 @@ type
         len:cardinal; errCode:Integer);
 
     procedure OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff: Pointer;
-        len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+        len: Cardinal; pvBufferTag: Integer; pvTagData: Pointer; pvErrorCode:
+        Integer);
 
     procedure OnAccept(pvSocket: THandle; pvAddr: String; pvPort: Integer; var
         vAllowAccept: Boolean);
@@ -342,7 +343,8 @@ begin
 end;
 
 procedure TfrmMain.OnSendBufferCompleted(pvContext: TIocpClientContext; pvBuff:
-    Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+    Pointer; len: Cardinal; pvBufferTag: Integer; pvTagData: Pointer;
+    pvErrorCode: Integer);
 {$IFNDEF SPEED_TEST}
 var
   r: Integer;
