@@ -28,6 +28,7 @@ type
     procedure OnConnected; override;
     procedure OnDisconnected; override;
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
+    procedure DoRecv();
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -104,6 +105,29 @@ begin
   inherited Destroy;
 end;
 
+procedure TDiocpWebSocketContext.DoRecv;
+var
+  lvOptCode:Integer;
+begin
+  lvOptCode :=FWsFrame.GetOptCode;
+  if lvOptCode = OPT_PING then
+  begin
+    PostWSASendRequest(@WS_MSG_PONG, 2, False);
+  end else if lvOptCode = OPT_PONG then
+  begin
+    ; // {noop}
+  end else if lvOptCode = OPT_CLOSE then
+  begin
+    RequestDisconnect(' ’µΩWebSocket-Close«Î«Û');
+  end else
+  begin
+    if Assigned(FOnRecv) then
+    begin
+      FOnRecv(Self);
+    end;
+  end;
+end;
+
 procedure TDiocpWebSocketContext.OnConnected;
 begin
   inherited;
@@ -158,10 +182,8 @@ begin
           FWsFrame.DoCleanUp();
         end else
         begin
-          if Assigned(FOnRecv) then
-          begin
-            FOnRecv(Self);
-          end;
+          DoRecv();
+
           FWsFrame.DoCleanUp;
           FWebSocketContentBuffer.Clear;
         end;      
