@@ -98,7 +98,7 @@ var
 implementation
 
 uses
-  uFMMonitor, diocp_core_engine, utils_strings, diocp.ex.SimpleMsgPackSession,
+  uFMMonitor, diocp_core_engine, utils_strings, 
   utils_dvalue;
 
 {$R *.dfm}
@@ -111,7 +111,6 @@ begin
   FTcpServer.SetMaxSendingQueueSize(10000);
   FTcpServer.createDataMonitor;
   FTcpServer.OnDiocpHttpRequest := OnHttpSvrRequest;
-  FTcpServer.RegisterSessionClass(TDiocpSimpleMsgPackSession);
   FTcpServer.WorkerCount := 5;
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
   
@@ -132,7 +131,7 @@ procedure TfrmMain.OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
 var
   s:String;
   lvRawData:AnsiString;
-  lvSession:TDiocpSimpleMsgPackSession;
+  lvSession:TDiocpHttpDValueSession;
   procedure WriteLoginForm();
   begin
     pvRequest.Response.WriteString('你还没有进行登陆，登陆成功后可以看到更多的演示(本功能借助服务端Session完成)<br>');
@@ -168,7 +167,8 @@ var
 
     // 获取头信息
     s := pvRequest.RequestRawHeaderString;
-    s := ReplaceText(s, sLineBreak, '<br>');
+
+    s := StringReplace(s, sLineBreak, '<br>', [rfReplaceAll]);
     pvRequest.Response.WriteString('头信息<br>');
     pvRequest.Response.WriteString('请求Url:' + pvRequest.RequestUrl + '<br>');
 
@@ -409,13 +409,13 @@ begin
     lvSession := nil;
     if FChkSession then
     begin 
-      lvSession := TDiocpSimpleMsgPackSession(pvRequest.GetSession);
+      lvSession :=TDiocpHttpDValueSession(pvRequest.GetSession);
       if pvRequest.RequestURI = '/login' then
       begin
-        lvSession.MsgPack.B['login'] := true;
+        lvSession.DValues.ForceByName('login').AsBoolean := true;
         pvRequest.Response.WriteString('登陆成功<br>');
         WriteNormalPage();
-      end else if (not lvSession.MsgPack.B['login']) then
+      end else if (not lvSession.DValues.ForceByName('login').AsBoolean) then
       begin
         WriteLoginForm();
       end;
@@ -425,17 +425,17 @@ begin
       Sleep(1000);
       pvRequest.Response.WriteString('DIOCP运行信息<br>');
       s := FTcpServer.GetStateInfo;
-      s := ReplaceText(s, sLineBreak, '<br>');
+      s := StringReplace(s, sLineBreak, '<br>', [rfReplaceAll]);
       pvRequest.Response.WriteString(s);
       pvRequest.Response.WriteString('<br>');
 
       pvRequest.Response.WriteString('IOCP线程信息<br>');
       s := FTcpServer.IocpEngine.GetStateINfo;
-      s := ReplaceText(s, sLineBreak, '<br>');
+      s := StringReplace(s, sLineBreak, '<br>', [rfReplaceAll]);
       pvRequest.Response.WriteString(s);
     end else if pvRequest.RequestURI = '/logout' then
     begin
-      lvSession.MsgPack.B['login'] := false;
+      lvSession.DValues.ForceByName('login').AsBoolean := false;
       WriteLoginForm();
     end else if pvRequest.RequestURI = '/redirect' then
     begin                                       //重新定向

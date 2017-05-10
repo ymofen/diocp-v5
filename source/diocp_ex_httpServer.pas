@@ -35,7 +35,7 @@ interface
 
 
 uses
-  Classes, StrUtils, SysUtils, utils_strings 
+  Classes, StrUtils, SysUtils, SHA, utils_strings 
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
@@ -43,7 +43,7 @@ uses
   , diocp_ex_http_common
   , diocp_res
   , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
-  utils_BufferPool,  utils_websocket, SHA, utils_base64;
+  utils_BufferPool,  utils_websocket,  utils_base64;
 
 
 
