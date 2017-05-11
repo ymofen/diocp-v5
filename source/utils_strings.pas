@@ -385,8 +385,8 @@ function LeftUntilStr(var P: PChar; pvSpliter: PChar; pvIgnoreCase: Boolean =
 /// <param name="s"> 源字符串 </param>
 /// <param name="pvStrings"> 输出到的字符串列表 </param>
 /// <param name="pvSpliterChars"> 分隔符 </param>
-function SplitStrings(s:String; pvStrings:TStrings; pvSpliterChars
-    :TSysCharSet): Integer;
+function SplitStrings(const s: String; pvStrings: TStrings; pvSpliterChars:
+    TSysCharSet): Integer;
 
 
 /// <summary>
@@ -400,7 +400,8 @@ function SplitStrings(s:String; pvStrings:TStrings; pvSpliterChars
 /// <param name="pvSpliterStr"> (string) </param>
 /// <param name="s1"> (String) </param>
 /// <param name="s2"> (String) </param>
-function SplitStr(s:string; pvSpliterStr:string; var s1, s2:String): Boolean;
+function SplitStr(const s: string; pvSpliterStr: string; var s1, s2: String):
+    Boolean;
 
 /// <summary>
 ///   URL数据解码,
@@ -421,7 +422,7 @@ function URLDecode(const ASrc: URLString; pvIsPostData: Boolean = true):URLStrin
 /// </returns>
 /// <param name="S"> 需要编码的数据 </param>
 /// <param name="pvIsPostData"> Post的原始数据中原始的空格经过UrlEncode后变成+号 </param>
-function URLEncode(S: URLString; pvIsPostData: Boolean = true): URLString;
+function URLEncode(const S: URLString; pvIsPostData: Boolean = true): URLString;
 
 
 /// <summary>
@@ -521,12 +522,13 @@ function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
 /// <summary>
 ///  转换字符串到Bytes
 /// </summary>
-function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;overload;
+function StringToUtf8Bytes(const pvData: String; pvBytes: TBytes): Integer;
+    overload;
 function StringToUtf8Bytes(const pvData: string; pvProcessEndByte: Boolean = false): TBytes; overload;
 /// <summary>
 ///
 /// </summary>
-function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
+function Utf8BytesToString(const pvBytes: TBytes; pvOffset: Integer): String;
 
 function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
 
@@ -534,14 +536,15 @@ function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
 
 function WideBufferToStringW(pvBuffer:Pointer; pvBufLength:Integer): DStringW;
 
-function StringToBytes(pvData:String; pvBytes:TBytes): Integer; overload;
+function StringToBytes(const pvData: String; pvBytes: TBytes): Integer;
+    overload;
 
-function StringToBytes(pvData:string): TBytes; overload;
+function StringToBytes(const pvData: string): TBytes; overload;
 
 /// <summary>
 ///   请注意pvBytes后面不可预计字符串
 /// </summary>
-function BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
+function BytesToString(const pvBytes: TBytes; pvOffset: Integer): String;
 function ByteBufferToString(pvBuff:PByte; pvLen:Cardinal): string;
 
 /// <summary>
@@ -557,9 +560,9 @@ function SpanPointer(const pvStart, pvEnd: PByte): Integer;
 
 function IsHexChar(c: Char): Boolean;
 
-function HexValue(c: Char): Integer;
+function HexValue(const c: Char): Integer;
 
-function HexChar(V: Byte): Char;
+function HexChar(const V: Byte): Char;
 
 function HexToInt(const p:PChar; pvLength:Integer): Integer;
 
@@ -581,7 +584,7 @@ function ParseHex(var p: PChar; var Value: Int64): Integer;
 function ParseInt(var S: PChar; var ANum: Int64): Integer;
 
 {$if CompilerVersion < 20}
-function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
+function CharInSet(const C: Char; const CharSet: TSysCharSet): Boolean;
 {$ifend}
 
 function GetTickCount: Cardinal;
@@ -648,7 +651,7 @@ begin
 end;
 
 {$if CompilerVersion < 20}
-function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
+function CharInSet(const C: Char; const CharSet: TSysCharSet): Boolean;
 begin
   Result := C in CharSet;
 end;
@@ -660,7 +663,7 @@ begin
     ((c >= 'A') and (c <= 'F'));
 end;
 
-function HexValue(c: Char): Integer;
+function HexValue(const c: Char): Integer;
 begin
   if (c >= '0') and (c <= '9') then
     Result := Ord(c) - Ord('0')
@@ -670,7 +673,7 @@ begin
     Result := 10 + Ord(c) - Ord('A');
 end;
 
-function HexChar(V: Byte): Char;
+function HexChar(const V: Byte): Char;
 begin
   if V < 10 then
     Result := Char(V + Ord('0'))
@@ -978,8 +981,8 @@ begin
 end;
 
 
-function SplitStrings(s:String; pvStrings:TStrings; pvSpliterChars
-    :TSysCharSet): Integer;
+function SplitStrings(const s: String; pvStrings: TStrings; pvSpliterChars:
+    TSysCharSet): Integer;
 var
   p:PChar;
   lvValue : String;
@@ -1084,7 +1087,7 @@ end;
 
 
 
-function URLEncode(S: URLString; pvIsPostData: Boolean = true): URLString;
+function URLEncode(const S: URLString; pvIsPostData: Boolean = true): URLString;
 var
   i: Integer; // loops thru characters in string
   strTemp:String;
@@ -1415,7 +1418,8 @@ begin
   end;
 end;
 
-function SplitStr(s:string; pvSpliterStr:string; var s1, s2:String): Boolean;
+function SplitStr(const s: string; pvSpliterStr: string; var s1, s2: String):
+    Boolean;
 var
   pSource, pSpliter:PChar;
   lvTemp:string;
@@ -1442,7 +1446,7 @@ begin
 
 end;
 
-function StringToUtf8Bytes(pvData:String; pvBytes:TBytes): Integer;
+function StringToUtf8Bytes(const pvData: String; pvBytes: TBytes): Integer;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;
@@ -1486,7 +1490,7 @@ begin
 {$ENDIF}
 end;
 
-function Utf8BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
+function Utf8BytesToString(const pvBytes: TBytes; pvOffset: Integer): String;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;
@@ -1505,7 +1509,7 @@ end;
 
 
 
-function StringToBytes(pvData:String; pvBytes:TBytes): Integer;
+function StringToBytes(const pvData: String; pvBytes: TBytes): Integer;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;
@@ -1522,7 +1526,7 @@ end;
 
 
 
-function BytesToString(pvBytes: TBytes; pvOffset: Integer): String;
+function BytesToString(const pvBytes: TBytes; pvOffset: Integer): String;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;
@@ -2223,7 +2227,7 @@ begin
 {$ENDIF}
 end;
 
-function StringToBytes(pvData:string): TBytes;
+function StringToBytes(const pvData: string): TBytes;
 {$IFNDEF UNICODE}
 var
   lvRawStr:AnsiString;

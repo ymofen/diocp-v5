@@ -262,7 +262,7 @@ type
     /// <summary>
     ///   根据名称查找子节点
     /// </summary>
-    function IndexOf(pvName: string): Integer; overload;
+    function IndexOf(const pvName: string): Integer; overload;
 
     /// <summary>
     ///   根据名称查找子节点
@@ -337,7 +337,7 @@ type
     /// </summary>
     function CheckSetNodeType(pvType:TDValueObjectType): TDValue;
 
-    function FindByName(pvName:String): TDValue; overload;
+    function FindByName(const pvName: String): TDValue; overload;
 
     function FindByName(pvName:Integer): TDValue; overload;
 
@@ -376,7 +376,7 @@ type
 
 
     function Add(pvName: String; pvType: TDValueObjectType): TDValue; overload;
-    function Add(pvName:String): TDValue; overload;
+    function Add(const pvName: String): TDValue; overload;
     function Add(pvName:string; pvValue:string): TDValue; overload;
     function Add(pvName:string; pvValue:Integer): TDValue; overload;
     function Add(pvName:string; pvValue:Boolean): TDValue; overload;
@@ -482,7 +482,8 @@ type
     function GetIntValueByName(pvName: String; pvDefault: Int64): Int64;
     function GetFloatValueByName(pvName: String; pvDefault: Double): Double;
     
-    function GetValueByName(pvName: String; pvDefault: Int64): Int64;overload;
+    function GetValueByName(const pvName: String; pvDefault: Int64): Int64;
+        overload;
     function GetValueByName(pvName:string; pvDefault:string): String;overload;
     function GetValueByName(pvName:String; pvDefault:Boolean): Boolean; overload;
     function GetValueByName(pvName:String; pvDefault:Double): Double; overload;
@@ -1862,7 +1863,7 @@ begin
   FChildren.Add(Result);
 end;
 
-function TDValue.Add(pvName:String): TDValue;
+function TDValue.Add(const pvName: String): TDValue;
 begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(vntValue);
@@ -2182,7 +2183,7 @@ begin
   end;
 end;
 
-function TDValue.FindByName(pvName:String): TDValue;
+function TDValue.FindByName(const pvName: String): TDValue;
 var
   i:Integer;
 begin
@@ -2419,7 +2420,7 @@ begin
 
 end;
 
-function TDValue.GetValueByName(pvName: String; pvDefault: Int64): Int64;
+function TDValue.GetValueByName(const pvName: String; pvDefault: Int64): Int64;
 var
   lvItem:TDValue;
 begin
@@ -2529,12 +2530,12 @@ begin
 
 end;
 
-function TDValue.IndexOf(pvName: string): Integer;
+function TDValue.IndexOf(const pvName: string): Integer;
 var
   i:Integer;
 begin
   Result := -1;
-  if Assigned(FChildren) then   
+  if Assigned(FChildren) then
     for i := 0 to FChildren.Count - 1 do
     begin
       if CompareText(Items[i].FName.AsString, pvName) = 0 then

@@ -215,7 +215,7 @@ type
     function GetRequestURL: String;
     function GetRequestURLParamData: string;
     function GetURLParams: TDValue;
-    procedure InnerAddToDebugStrings(pvMsg:String);
+    procedure InnerAddToDebugStrings(const pvMsg: String);
     function GetCharset: string;
 
 
@@ -399,10 +399,11 @@ type
 
     
 
-    procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
+    procedure AddDebugStrings(const pvDebugInfo: String; pvAddTimePre: Boolean =
+        true);
     procedure CheckThreadIn;
 
-    procedure CheckThreadSetInfo(pvDebugInfo:string);
+    procedure CheckThreadSetInfo(const pvDebugInfo: string);
 
     procedure CheckThreadOut;
 
@@ -964,8 +965,8 @@ begin
   inherited Destroy;
 end;
 
-procedure TDiocpHttpRequest.AddDebugStrings(pvDebugInfo: String; pvAddTimePre:
-    Boolean = true);
+procedure TDiocpHttpRequest.AddDebugStrings(const pvDebugInfo: String;
+    pvAddTimePre: Boolean = true);
 var
   s:string;
 begin
@@ -1039,7 +1040,7 @@ begin
 
   lvUpgrade := Header.GetValueByName('Upgrade', '');
 
-  if lvUpgrade = 'websocket' then
+  if SameText(lvUpgrade, 'websocket') then
   begin
     Result := True;
 
@@ -1065,7 +1066,7 @@ begin
   FThreadID := 0;  
 end;
 
-procedure TDiocpHttpRequest.CheckThreadSetInfo(pvDebugInfo:string);
+procedure TDiocpHttpRequest.CheckThreadSetInfo(const pvDebugInfo: string);
 var
   lvThreadID:THandle;
   s:string;
@@ -1260,7 +1261,7 @@ begin
   Result := FInnerRequest.URLParams;
 end;
 
-procedure TDiocpHttpRequest.InnerAddToDebugStrings(pvMsg:String);
+procedure TDiocpHttpRequest.InnerAddToDebugStrings(const pvMsg: String);
 begin
   FDebugStrings.Add(pvMsg);
   if FDebugStrings.Count > 500 then FDebugStrings.Delete(0);
