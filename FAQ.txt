@@ -58,6 +58,16 @@ Q: Diocp如何关闭日志记录。
 A: Diocp在DEBUG模式会记录详细日志。可以把DEBUG模式关闭
    D2007工程为例： Project->Options->Directories/Conditionals->Conditional defines 中把DEBUG删除
    
+Q: Diocp如何把日志记录Memo。
+A: Diocp服务端的日志是采用safelogger进行记录，默认是记录到文件。
+   1>. 你可以自己创建一个SafeLogger，然后通过RegisterDiocpSvrLogger进行注册。
+   2>. 你可以通过TStringAppender改变safelogger的添加方式，注意添加到Memo要在主线程进行 
+    
+    你可以在程序初始化的地方，写下如下代码
+       sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
+       sfLogger.AppendInMainThread := true;
+       RegisterDiocpSvrLogger(sfLogger);
+   
 Q: 编码层逻辑处理的方式
 A: 编码层默认由接收数据的IOCP线程处理，这样会占用iocp接收网络io的资源，可以通过定义工程宏[QDAC_QWorker]由QWorker来处理逻辑(需要引用QWorkers单元)，[DIOCP_Task]有DiocpTask来处理逻辑(2016-07-19修改)
 
