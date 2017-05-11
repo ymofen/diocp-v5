@@ -26,7 +26,7 @@ type
   TIocpTaskRequest = class;
   TIocpTaskMananger = class;
 
-  TOnTaskWorkStrData = procedure(strData: String) of object;
+  TOnTaskWorkStrData = procedure(const strData: String) of object;
   TOnTaskWorkNoneData = procedure() of object;
   
   TOnTaskWork = procedure(pvTaskRequest: TIocpTaskRequest) of object;
