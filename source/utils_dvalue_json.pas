@@ -34,7 +34,7 @@ type
 
   end;
 
-function JSONParser(s: string; pvDValue: TDValue): Integer;
+function JSONParser(const s: string; pvDValue: TDValue): Integer;
 function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
     true; pvExceptValueTypes: TDValueDataTypes = [vdtInterface, vdtObject,
     vdtPtr]): String;
@@ -721,7 +721,7 @@ begin
   end;
 end;
 
-function JSONParser(s: string; pvDValue: TDValue): Integer;
+function JSONParser(const s: string; pvDValue: TDValue): Integer;
 var
   ptrData:PChar;
   j:Integer;

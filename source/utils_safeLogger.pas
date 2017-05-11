@@ -203,11 +203,11 @@ type
     procedure setAppender(pvAppender: TBaseAppender; pvOwnsAppender: Boolean =
         true);
 
-    procedure logMessage(pvMsg: string; pvMsgType: string = ''; pvLevel: TLogLevel
-        = lgvMessage); overload;
+    procedure logMessage(const pvMsg: string; const pvMsgType: string = '';
+        pvLevel: TLogLevel = lgvMessage); overload;
 
-    procedure logMessage(pvMsg: string; const args: array of const; pvMsgType:
-        string = ''; pvLevel: TLogLevel = lgvMessage); overload;
+    procedure logMessage(const pvMsg: string; const args: array of const;
+        pvMsgType: string = ''; pvLevel: TLogLevel = lgvMessage); overload;
 
     property Appender: TBaseAppender read FAppender;
 
@@ -242,7 +242,7 @@ var
   __ProcessIDStr :String;
   __GetThreadStackFunc: TThreadStackFunc;
 
-procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
+procedure SafeWriteFileMsg(const pvMsg, pvFilePre: String);
 
 {$if CompilerVersion < 18} //before delphi 2007
 function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint; Comperand: Longint): Longint stdcall; external kernel32 name 'InterlockedCompareExchange';
@@ -343,7 +343,7 @@ end;
 
 
 
-procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
+procedure SafeWriteFileMsg(const pvMsg, pvFilePre: String);
 var
   lvFileName, lvBasePath:String;
   lvLogFile: TextFile;
@@ -593,8 +593,8 @@ end;
 
 { TSafeLogger }
 
-procedure TSafeLogger.logMessage(pvMsg: string; pvMsgType: string = '';
-    pvLevel: TLogLevel = lgvMessage);
+procedure TSafeLogger.logMessage(const pvMsg: string; const pvMsgType: string =
+    ''; pvLevel: TLogLevel = lgvMessage);
 var
   lvPData:TLogDataObject;
 begin
@@ -664,8 +664,8 @@ begin
   end;
 end;
 
-procedure TSafeLogger.logMessage(pvMsg: string; const args: array of const;
-    pvMsgType: string = ''; pvLevel: TLogLevel = lgvMessage);
+procedure TSafeLogger.logMessage(const pvMsg: string; const args: array of
+    const; pvMsgType: string = ''; pvLevel: TLogLevel = lgvMessage);
 begin
   logMessage(Format(pvMsg, args), pvMsgType, pvLevel);
 end;

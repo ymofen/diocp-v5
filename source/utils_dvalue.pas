@@ -190,20 +190,20 @@ type
     {$ENDIF}
     function GetCount: Integer;
     function GetItems(pvIndex: Integer): TDValueObject;
-    function InnerAdd(pvValueName:string): TDValueObject;
+    function InnerAdd(const pvValueName: string): TDValueObject;
   public
     constructor Create();
     destructor Destroy; override;
     function Add(pvValueName:String): TDValueObject;
 
-    function FindByName(pvValueName:string): TDValueObject;
+    function FindByName(const pvValueName: string): TDValueObject;
 
-    function ParamByName(pvValueName:String): TDValueObject;
+    function ParamByName(const pvValueName: String): TDValueObject;
 
     /// <summary>
     ///   如果参数不存在会进行创建,如果存在直接返回
     /// </summary>
-    function ForceByName(pvValueName: String): TDValueObject;
+    function ForceByName(const pvValueName: String): TDValueObject;
 
     /// <summary>
     ///   清空所有的对象
@@ -341,15 +341,15 @@ type
 
     function FindByName(pvName:Integer): TDValue; overload;
 
-    function FindByPath(pvPath:string): TDValue;
+    function FindByPath(const pvPath: string): TDValue;
 
-    function ItemByName(pvName:string): TDValue;
+    function ItemByName(const pvName: string): TDValue;
 
-    function ForceByName(pvName:string): TDValue; overload;
+    function ForceByName(const pvName: string): TDValue; overload;
 
     function ForceByName(pvName:Integer): TDValue; overload;
 
-    function ForceByPath(pvPath:String): TDValue;
+    function ForceByPath(const pvPath: String): TDValue;
 
     /// <summary>
     ///   将子节点整理成字符串列表
@@ -375,27 +375,28 @@ type
     function Add: TDValue; overload;
 
 
-    function Add(pvName: String; pvType: TDValueObjectType): TDValue; overload;
+    function Add(const pvName: String; pvType: TDValueObjectType): TDValue;
+        overload;
     function Add(const pvName: String): TDValue; overload;
-    function Add(pvName:string; pvValue:string): TDValue; overload;
-    function Add(pvName:string; pvValue:Integer): TDValue; overload;
-    function Add(pvName:string; pvValue:Boolean): TDValue; overload;
-    function Add(pvName:string; pvValue:Double): TDValue; overload;
+    function Add(const pvName, pvValue: string): TDValue; overload;
+    function Add(const pvName: string; pvValue: Integer): TDValue; overload;
+    function Add(const pvName: string; pvValue: Boolean): TDValue; overload;
+    function Add(const pvName: string; pvValue: Double): TDValue; overload;
 
-    function AddVar(pvName:string; pvValue:Variant): TDValue;
+    function AddVar(const pvName: string; const pvValue: Variant): TDValue;
 
 
     /// <summary>
     ///   直接绑定, 拥有该对象的生命周期
     /// </summary>
-    procedure AttachDValue(pvName: String; pvDValue: TDValue);
+    procedure AttachDValue(const pvName: String; pvDValue: TDValue);
 
     /// <summary>
     ///   根据名称移除掉一个子对象
     ///   (对应的对象将被销毁)
     ///   请使用Delete
     /// </summary>
-    function RemoveByName(pvName:String): Integer;
+    function RemoveByName(const pvName: String): Integer;
 
     function RemoveByPath(const pvPath: String): Boolean;
 
@@ -432,7 +433,7 @@ type
     ///   根据名称移除掉一个子对象
     ///   (对应的对象将被销毁)
     /// </summary>
-    function Delete(pvName:String): Integer; overload;
+    function Delete(const pvName: String): Integer; overload;
 
     /// <summary>
     ///   根据索引移除一个子对象(对应的对象不会被销毁)
@@ -478,22 +479,30 @@ type
     /// </summary>
     function SizeOf: Integer;
 
-    function GetStrValueByName(pvName:string; pvDefault:string): String;
+    function GetStrValueByName(const pvName, pvDefault: string): String;
     function GetIntValueByName(pvName: String; pvDefault: Int64): Int64;
     function GetFloatValueByName(pvName: String; pvDefault: Double): Double;
     
     function GetValueByName(const pvName: String; pvDefault: Int64): Int64;
         overload;
-    function GetValueByName(pvName:string; pvDefault:string): String;overload;
-    function GetValueByName(pvName:String; pvDefault:Boolean): Boolean; overload;
-    function GetValueByName(pvName:String; pvDefault:Double): Double; overload;
-    function GetValueByName(pvName:String; pvDefault:TObject): TObject; overload;
+    function GetValueByName(const pvName, pvDefault: string): String; overload;
+    function GetValueByName(const pvName: String; pvDefault: Boolean): Boolean;
+        overload;
+    function GetValueByName(const pvName: String; pvDefault: Double): Double;
+        overload;
+    function GetValueByName(const pvName: String; pvDefault: TObject): TObject;
+        overload;
 
-    function GetValueByPath(pvPath:string; pvDefault:string): string; overload;
-    function GetValueByPath(pvPath: string; pvDefault: Int64): Int64; overload;
-    function GetValueByPath(pvPath:string; pvDefault:Boolean): Boolean; overload;
-    function GetValueByPath(pvPath:string; pvDefault:Double): Double; overload;
-    function GetValueByPath(pvPath:string; pvDefault:TObject): TObject; overload;
+    function GetValueByPath(const pvPath: string; pvDefault: string): string;
+        overload;
+    function GetValueByPath(const pvPath: string; pvDefault: Int64): Int64;
+        overload;
+    function GetValueByPath(const pvPath: string; pvDefault: Boolean): Boolean;
+        overload;
+    function GetValueByPath(const pvPath: string; pvDefault: Double): Double;
+        overload;
+    function GetValueByPath(const pvPath: string; pvDefault: TObject): TObject;
+        overload;
 
     /// <summary>
     ///   把流进行Base64编码赋值给Value
@@ -1739,7 +1748,7 @@ begin
   Result :=TDValueObject(FList[pvIndex]);
 end;
 
-function TDValueList.FindByName(pvValueName:string): TDValueObject;
+function TDValueList.FindByName(const pvValueName: string): TDValueObject;
 var
   i:Integer;
   lvItem:TDValueObject;
@@ -1756,20 +1765,20 @@ begin
   end;
 end;
 
-function TDValueList.ForceByName(pvValueName: String): TDValueObject;
+function TDValueList.ForceByName(const pvValueName: String): TDValueObject;
 begin
   Result := FindByName(pvValueName);
   if Result = nil then Result := InnerAdd(pvValueName);
 end;
 
-function TDValueList.InnerAdd(pvValueName:string): TDValueObject;
+function TDValueList.InnerAdd(const pvValueName: string): TDValueObject;
 begin
   Result := TDValueObject.Create;
   Result.Name := pvValueName;
   FList.Add(Result);
 end;
 
-function TDValueList.ParamByName(pvValueName:String): TDValueObject;
+function TDValueList.ParamByName(const pvValueName: String): TDValueObject;
 begin
   Result := FindByName(pvValueName);
   if Result = nil then
@@ -1872,7 +1881,7 @@ begin
   FChildren.Add(Result);
 end;
 
-function TDValue.Add(pvName:string; pvValue:string): TDValue;
+function TDValue.Add(const pvName, pvValue: string): TDValue;
 begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(vntValue);
@@ -1882,7 +1891,7 @@ begin
   FChildren.Add(Result);
 end;
 
-function TDValue.Add(pvName:string; pvValue:Integer): TDValue;
+function TDValue.Add(const pvName: string; pvValue: Integer): TDValue;
 begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(vntValue);
@@ -1892,7 +1901,7 @@ begin
   FChildren.Add(Result);
 end;
 
-function TDValue.Add(pvName:string; pvValue:Boolean): TDValue;
+function TDValue.Add(const pvName: string; pvValue: Boolean): TDValue;
 begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(vntValue);
@@ -1902,7 +1911,7 @@ begin
   FChildren.Add(Result);
 end;
 
-function TDValue.Add(pvName:string; pvValue:Double): TDValue;
+function TDValue.Add(const pvName: string; pvValue: Double): TDValue;
 begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(vntValue);
@@ -1912,7 +1921,7 @@ begin
   FChildren.Add(Result);
 end;
 
-function TDValue.Add(pvName: String; pvType: TDValueObjectType): TDValue;
+function TDValue.Add(const pvName: String; pvType: TDValueObjectType): TDValue;
 begin
   CheckSetNodeType(vntObject);
   Result := TDValue.Create(pvType);
@@ -1936,7 +1945,7 @@ begin
   FChildren.Add(pvDValue);
 end;
 
-function TDValue.AddVar(pvName:string; pvValue:Variant): TDValue;
+function TDValue.AddVar(const pvName: string; const pvValue: Variant): TDValue;
 var
   lvVarType:TVarType;
 begin
@@ -1951,7 +1960,7 @@ begin
   end;
 end;
 
-procedure TDValue.AttachDValue(pvName: String; pvDValue: TDValue);
+procedure TDValue.AttachDValue(const pvName: String; pvDValue: TDValue);
 begin
   CheckSetNodeType(vntObject);
   pvDValue.FParent := Self;
@@ -2026,7 +2035,7 @@ begin
   end;
 end;
 
-function TDValue.ItemByName(pvName:string): TDValue;
+function TDValue.ItemByName(const pvName: string): TDValue;
 begin
   Result := FindByName(pvName);
   if Result = nil then raise TDValueException.CreateFmt(SItemNotFound, [pvName]);
@@ -2174,7 +2183,7 @@ begin
   FChildren.Delete(pvIndex);
 end;
 
-function TDValue.Delete(pvName:String): Integer;
+function TDValue.Delete(const pvName: String): Integer;
 begin
   Result := IndexOf(pvName);
   if Result >= 0 then
@@ -2199,7 +2208,7 @@ begin
   if i = -1 then Result := nil else Result := Items[i];
 end;
 
-function TDValue.FindByPath(pvPath:string): TDValue;
+function TDValue.FindByPath(const pvPath: string): TDValue;
 var
   lvParent:TDValue;
   j:Integer;
@@ -2207,7 +2216,7 @@ begin
   Result := InnerFindByPath(pvPath, lvParent, j);
 end;
 
-function TDValue.ForceByName(pvName:string): TDValue;
+function TDValue.ForceByName(const pvName: string): TDValue;
 begin
   Result := FindByName(pvName);
   if Result = nil then
@@ -2233,7 +2242,7 @@ begin
   end;
 end;
 
-function TDValue.ForceByPath(pvPath:String): TDValue;
+function TDValue.ForceByPath(const pvPath: String): TDValue;
 var
   lvName:string;
   s:string;
@@ -2329,7 +2338,8 @@ begin
   end;
 end;
 
-function TDValue.GetValueByName(pvName:String; pvDefault:Boolean): Boolean;
+function TDValue.GetValueByName(const pvName: String; pvDefault: Boolean):
+    Boolean;
 var
   lvItem:TDValue;
 begin
@@ -2362,7 +2372,7 @@ begin
   Result := TDValue(FChildren[pvIndex]);
 end;
 
-function TDValue.GetStrValueByName(pvName:string; pvDefault:string): String;
+function TDValue.GetStrValueByName(const pvName, pvDefault: string): String;
 var
   lvItem:TDValue;
 begin
@@ -2376,7 +2386,8 @@ begin
   end;
 end;
 
-function TDValue.GetValueByName(pvName:String; pvDefault:Double): Double;
+function TDValue.GetValueByName(const pvName: String; pvDefault: Double):
+    Double;
 var
   lvItem:TDValue;
 begin
@@ -2390,7 +2401,7 @@ begin
   end;
 end;
 
-function TDValue.GetValueByPath(pvPath: string; pvDefault: Int64): Int64;
+function TDValue.GetValueByPath(const pvPath: string; pvDefault: Int64): Int64;
 var
   lvItem:TDValue;
 begin
@@ -2405,7 +2416,8 @@ begin
 
 end;
 
-function TDValue.GetValueByPath(pvPath: string; pvDefault: Boolean): Boolean;
+function TDValue.GetValueByPath(const pvPath: string; pvDefault: Boolean):
+    Boolean;
 var
   lvItem:TDValue;
 begin
@@ -2434,7 +2446,7 @@ begin
   end;
 end;
 
-function TDValue.GetValueByName(pvName, pvDefault: string): String;
+function TDValue.GetValueByName(const pvName, pvDefault: string): String;
 var
   lvItem:TDValue;
 begin
@@ -2450,7 +2462,8 @@ begin
 
 end;
 
-function TDValue.GetValueByName(pvName:String; pvDefault:TObject): TObject;
+function TDValue.GetValueByName(const pvName: String; pvDefault: TObject):
+    TObject;
 var
   lvItem:TDValue;
 begin
@@ -2464,7 +2477,8 @@ begin
   end;
 end;
 
-function TDValue.GetValueByPath(pvPath: string; pvDefault: Double): Double;
+function TDValue.GetValueByPath(const pvPath: string; pvDefault: Double):
+    Double;
 var
   lvItem:TDValue;
 begin
@@ -2479,7 +2493,8 @@ begin
 
 end;
 
-function TDValue.GetValueByPath(pvPath:string; pvDefault:string): string;
+function TDValue.GetValueByPath(const pvPath: string; pvDefault: string):
+    string;
 var
   lvItem:TDValue;
 begin
@@ -2493,7 +2508,8 @@ begin
   end;
 end;
 
-function TDValue.GetValueByPath(pvPath:string; pvDefault:TObject): TObject;
+function TDValue.GetValueByPath(const pvPath: string; pvDefault: TObject):
+    TObject;
 var
   lvItem:TDValue;
 begin
@@ -2624,8 +2640,8 @@ begin
   ClearChildren();
 end;
 
-function TDValue.RemoveByName(pvName:String): Integer;
-begin  
+function TDValue.RemoveByName(const pvName: String): Integer;
+begin
   Result := IndexOf(pvName);
   if Result >= 0 then
   begin

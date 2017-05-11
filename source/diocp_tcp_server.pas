@@ -213,20 +213,22 @@ type
     /// </returns>
     /// <param name="pvDebugInfo"> 调试记录信息 </param>
     /// <param name="pvObj"> 调试记录对象 </param>
-    function IncReferenceCounter(pvDebugInfo: string; pvObj: TObject): Boolean;
+    function IncReferenceCounter(const pvDebugInfo: string; pvObj: TObject):
+        Boolean;
 
     /// <summary>
     ///  减少引用计数
     ///  当引用计数器 = 0和请求关闭标志为true时，会调用断开函数(InnerCloseContext)
     /// </summary>
-    function DecReferenceCounter(pvDebugInfo: string; pvObj: TObject): Integer;
+    function DecReferenceCounter(const pvDebugInfo: string; pvObj: TObject):
+        Integer;
 
     /// <summary>
     ///   减少引用计数，并请求关闭
     ///   当引用计数器 = 0时，会调用断开函数(InnerCloseContext)
     /// </summary>
-    procedure DecReferenceCounterAndRequestDisconnect(pvDebugInfo: string; pvObj:
-        TObject);
+    procedure DecReferenceCounterAndRequestDisconnect(const pvDebugInfo: string;
+        pvObj: TObject);
 
 
   {$IFDEF SOCKET_REUSE}
@@ -410,7 +412,7 @@ type
     procedure RecordWorkerEndTick;
   public
     
-    procedure AddDebugString(pvString:string);
+    procedure AddDebugString(const pvString: string);
 
     /// <summary>
     ///   检测当前正在工作耗用时间
@@ -440,10 +442,10 @@ type
     ///   锁定Context连接，避免关闭归还到Context对象池
     ///    锁定成功返回True, 否则返回False(连接已经被断开或者申请断开)
     /// </summary>
-    function LockContext(pvDebugInfo: string; pvObj: TObject): Boolean;
+    function LockContext(const pvDebugInfo: string; pvObj: TObject): Boolean;
 
 
-    procedure UnLockContext(pvDebugInfo: string; pvObj: TObject);
+    procedure UnLockContext(const pvDebugInfo: string; pvObj: TObject);
 
     /// <summary>
     ///   投递关闭请求
@@ -451,7 +453,7 @@ type
     /// </summary>
     procedure PostWSACloseRequest();
 
-    procedure RequestDisconnect(pvReason: string = ''; pvObj: TObject = nil);
+    procedure RequestDisconnect(const pvReason: string = ''; pvObj: TObject = nil);
 
     /// <summary>
     ///  post send request to iocp queue, if post successful return true.
@@ -481,9 +483,9 @@ type
     /// <summary>
     ///   设置当前的接收线程信息
     /// </summary>
-    procedure SetRecvWorkerHint(pvHintStr: String); overload;
-    procedure SetRecvWorkerHint(pvFmtMsg: string; const args: array of const);
-        overload;
+    procedure SetRecvWorkerHint(const pvHintStr: String); overload;
+    procedure SetRecvWorkerHint(const pvFmtMsg: string; const args: array of
+        const); overload;
 
     property Active: Boolean read FActive;
 
@@ -1096,7 +1098,7 @@ type
     procedure DoSendBufferCompletedEvent(pvContext: TIocpClientContext; pvBuffer:
         Pointer; len: Cardinal; pvBufferTag: Integer; pvTagData: Pointer;
         pvErrorCode: Integer);
-    procedure InnerAddToDebugStrings(pvMsg:String);
+    procedure InnerAddToDebugStrings(const pvMsg: String);
   public
 
     /// <summary>
@@ -1121,11 +1123,12 @@ type
     /// </summary>
     function GetContextWorkingInfo(pvTimeOut:Cardinal = 3000): String;
 
-    procedure LogMessage(pvMsg: string; pvMsgType: string = ''; pvLevel: TLogLevel
-        = lgvMessage); overload;
+    
+    procedure LogMessage(const pvMsg: string; const pvMsgType: string = '';
+        pvLevel: TLogLevel = lgvMessage); overload;
 
-    procedure LogMessage(pvMsg: string; const args: array of const; pvMsgType:
-        string = ''; pvLevel: TLogLevel = lgvMessage); overload;
+    procedure LogMessage(const pvMsg: string; const args: array of const; const
+        pvMsgType: string = ''; pvLevel: TLogLevel = lgvMessage); overload;
 
 
     constructor Create(AOwner: TComponent); override;
@@ -1136,7 +1139,8 @@ type
     procedure SetMaxSendingQueueSize(pvSize:Integer);
 
 
-    procedure AddDebugStrings(pvDebugInfo: String; pvAddTimePre: Boolean = true);
+    procedure AddDebugStrings(const pvDebugInfo: String; pvAddTimePre: Boolean =
+        true);
 
     /// <summary>
     ///   根据SocketHandle在在线列表中查找对应的Context实例
@@ -1597,13 +1601,14 @@ begin
   FContextLocker.lock();
 end;
 
-function TIocpClientContext.LockContext(pvDebugInfo: string; pvObj: TObject):
-    Boolean;
+function TIocpClientContext.LockContext(const pvDebugInfo: string; pvObj:
+    TObject): Boolean;
 begin
   Result := IncReferenceCounter(pvDebugInfo, pvObj);
 end;
 
-procedure TIocpClientContext.unLockContext(pvDebugInfo: string; pvObj: TObject);
+procedure TIocpClientContext.UnLockContext(const pvDebugInfo: string; pvObj:
+    TObject);
 begin
   if Self = nil then
   begin
@@ -1714,8 +1719,8 @@ begin
   {$ENDIF}
 end;
 
-function TIocpClientContext.IncReferenceCounter(pvDebugInfo: string; pvObj:
-    TObject): Boolean;
+function TIocpClientContext.IncReferenceCounter(const pvDebugInfo: string;
+    pvObj: TObject): Boolean;
 begin
   InnerLock;
   try
@@ -1739,7 +1744,7 @@ begin
 end;
 
 
-procedure TIocpClientContext.AddDebugString(pvString:string);
+procedure TIocpClientContext.AddDebugString(const pvString: string);
 begin
   if __free_flag = FREE_FLAG then
   begin
@@ -1749,8 +1754,8 @@ begin
   if FDebugStrings.Count > 40 then FDebugStrings.Delete(0);
 end;
 
-function TIocpClientContext.DecReferenceCounter(pvDebugInfo: string; pvObj:
-    TObject): Integer;
+function TIocpClientContext.DecReferenceCounter(const pvDebugInfo: string;
+    pvObj: TObject): Integer;
 var
   lvCloseContext:Boolean;
 begin
@@ -1801,7 +1806,7 @@ begin
   if lvCloseContext then InnerCloseContext;
 end;
 
-procedure TIocpClientContext.DecReferenceCounterAndRequestDisconnect(
+procedure TIocpClientContext.DecReferenceCounterAndRequestDisconnect(const
     pvDebugInfo: string; pvObj: TObject);
 var
   lvCloseContext:Boolean;
@@ -1858,8 +1863,8 @@ begin
   Result := FOwner.ReleaseSendRequest(pvObject);
 end;
 
-procedure TIocpClientContext.RequestDisconnect(pvReason: string = ''; pvObj:
-    TObject = nil);
+procedure TIocpClientContext.RequestDisconnect(const pvReason: string = '';
+    pvObj: TObject = nil);
 var
   lvCloseContext:Boolean;
 begin
@@ -2298,8 +2303,8 @@ begin
 end;
 
 
-procedure TIocpClientContext.SetRecvWorkerHint(pvFmtMsg: string; const args:
-    array of const);
+procedure TIocpClientContext.SetRecvWorkerHint(const pvFmtMsg: string; const
+    args: array of const);
 begin
   SetRecvWorkerHint(Format(pvFmtMsg, args));
 end;
@@ -2421,7 +2426,7 @@ begin
   {$ENDIF}
 end;
 
-procedure TIocpClientContext.SetRecvWorkerHint(pvHintStr: String);
+procedure TIocpClientContext.SetRecvWorkerHint(const pvHintStr: String);
 begin
 //  if FRecvRequest <> nil then
 //    FRecvRequest.SetWorkHintInfo(pvHintStr);
@@ -2566,8 +2571,8 @@ begin
   inherited Destroy;
 end;
 
-procedure TDiocpTcpServer.AddDebugStrings(pvDebugInfo: String; pvAddTimePre:
-    Boolean = true);
+procedure TDiocpTcpServer.AddDebugStrings(const pvDebugInfo: String;
+    pvAddTimePre: Boolean = true);
 var
   s:string;
 begin
@@ -2625,8 +2630,8 @@ begin
 end;
 
 
-procedure TDiocpTcpServer.LogMessage(pvMsg: string; const args: array of const;
-    pvMsgType: string = ''; pvLevel: TLogLevel = lgvMessage);
+procedure TDiocpTcpServer.LogMessage(const pvMsg: string; const args: array of
+    const; const pvMsgType: string = ''; pvLevel: TLogLevel = lgvMessage);
 begin
   if LogCanWrite then
   begin
@@ -2634,8 +2639,8 @@ begin
   end;
 end;
 
-procedure TDiocpTcpServer.LogMessage(pvMsg: string; pvMsgType: string = '';
-    pvLevel: TLogLevel = lgvMessage);
+procedure TDiocpTcpServer.LogMessage(const pvMsg: string; const pvMsgType:
+    string = ''; pvLevel: TLogLevel = lgvMessage);
 begin
   if LogCanWrite then
   begin
@@ -3404,7 +3409,7 @@ begin
   end;
 end;
 
-procedure TDiocpTcpServer.InnerAddToDebugStrings(pvMsg:String);
+procedure TDiocpTcpServer.InnerAddToDebugStrings(const pvMsg: String);
 begin
   FDebugStrings.Add(pvMsg);
   if FDebugStrings.Count > 500 then FDebugStrings.Delete(0);

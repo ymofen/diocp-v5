@@ -187,8 +187,8 @@ type
     function DecodeRequestMethod: Integer;
 
     function DecodeHeader: Integer;
-    procedure DecodeHeaderLine(pvLine: string);
-    function DecodeFirstLine(pvLine: string): Integer;
+    procedure DecodeHeaderLine(const pvLine: string);
+    function DecodeFirstLine(const pvLine: string): Integer;
     function GetContentLength: Int64;
     function GetContentAsMemory: PByte;
 
@@ -235,7 +235,7 @@ type
     /// <summary>
     /// 读取传入的Cookie值
     /// </summary>
-    function GetCookie(pvCookieName: string): String;
+    function GetCookie(const pvCookieName: string): String;
 
     /// <summary>THttpRequest.InputBuffer
     /// </summary>
@@ -248,7 +248,7 @@ type
     /// <param name="pvByte"> (Byte) </param>
     function InputBuffer(const pvByte: Byte): Integer;
 
-    procedure ContentSaveToFile(pvFile: String);
+    procedure ContentSaveToFile(const pvFile: String);
 
     /// <summary>
     /// 方法为POST, PUT时，保存的为提交的数据
@@ -375,7 +375,7 @@ type
     constructor Create;
     destructor Destroy; override;
     function AddCookie: TDHttpCookie; overload;
-    function AddCookie(pvName: String; pvValue: string): TDHttpCookie; overload;
+    function AddCookie(const pvName, pvValue: String): TDHttpCookie; overload;
 
     property ContentBuffer: TDBufferBuilder read FContentBuffer;
 
@@ -391,7 +391,7 @@ type
     /// <summary>
     /// 读取传入的Cookie值
     /// </summary>
-    function GetCookie(pvCookieName: string): TDHttpCookie;
+    function GetCookie(const pvCookieName: string): TDHttpCookie;
     procedure ClearCookies;
 
     procedure EncodeHeader(pvContentLength: Int64);
@@ -445,7 +445,7 @@ procedure ZDecompressBufferBuilder(pvBuilder: TDBufferBuilder);
 
 procedure ZCompressBufferBuilder(pvBuilder: TDBufferBuilder);
 
-function GetContentTypeFromFileExt(pvFileExt, pvDefault: string): String;
+function GetContentTypeFromFileExt(const pvFileExt, pvDefault: string): String;
 
 {$IFDEF USE_ZLIBExGZ}
 procedure GZCompressBufferBuilder(pvBuilder: TDBufferBuilder);
@@ -471,8 +471,8 @@ function BufferURLEncode(pvBuff: PByte; pvLen: Integer): string;
 /// <returns>
 /// >0 表示解码长度
 /// </returns>
-function BufferURLDecode(pvInputStr: string; pvOutBuffer: PByte;
-  pvOutBufferLen: Integer): Integer;
+function BufferURLDecode(const pvInputStr: string; pvOutBuffer: PByte;
+    pvOutBufferLen: Integer): Integer;
 
 /// <summary>
 /// urlencodestr -> raw buffer
@@ -482,20 +482,21 @@ function BufferURLDecode(pvInputStr: string; pvOutBuffer: PByte;
 /// >0 表示解码长度
 /// -1: 解码失败
 /// </returns>
-function BufferURLDecodeSilence(pvInputStr: string; pvOutBuffer: PByte;
-  pvOutBufferLen: Integer): Integer;
+function BufferURLDecodeSilence(const pvInputStr: string; pvOutBuffer: PByte;
+    pvOutBufferLen: Integer): Integer;
 
 /// <summary>
 /// urldecode -> utf8
 /// </summary>
-function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true)
-  : String; overload;
+function URLDecode(const pvInputStr: string; pvConvertUtf8: Boolean = true):
+    String; overload;
 
 {$IFDEF UNICODE}
 /// <summary>
 /// urldecode -> TEncoding
 /// </summary>
-function URLDecode(pvInputStr: string; pvEncoding: TEncoding): String; overload;
+function URLDecode(const pvInputStr: string; pvEncoding: TEncoding): String;
+    overload;
 {$ENDIF}
 
 implementation
@@ -879,7 +880,8 @@ begin
   Result := BufferURLEncode(@lvBytes[0], length(lvBytes));
 end;
 
-function URLDecode(pvInputStr: string; pvConvertUtf8: Boolean = true): String;
+function URLDecode(const pvInputStr: string; pvConvertUtf8: Boolean = true):
+    String;
 var
   lvBytes: TBytes;
   l: Integer;
@@ -902,8 +904,8 @@ begin
   end;
 end;
 
-function BufferURLDecode(pvInputStr: string; pvOutBuffer: PByte;
-  pvOutBufferLen: Integer): Integer;
+function BufferURLDecode(const pvInputStr: string; pvOutBuffer: PByte;
+    pvOutBufferLen: Integer): Integer;
 
   function DecodeHexChar(const C: Char): Byte;
   begin
@@ -985,7 +987,7 @@ begin
   Result := I;
 end;
 
-function GetContentTypeFromFileExt(pvFileExt, pvDefault: string): String;
+function GetContentTypeFromFileExt(const pvFileExt, pvDefault: string): String;
 var
   lvExt: String;
 begin
@@ -1021,7 +1023,7 @@ begin
 end;
 
 {$IFDEF UNICODE}
-function URLDecode(pvInputStr: string; pvEncoding: TEncoding): String; overload;
+function URLDecode(const pvInputStr: string; pvEncoding: TEncoding): String;
 var
   lvBytes: TBytes;
   l: Integer;
@@ -1046,8 +1048,8 @@ end;
 {$ENDIF}
 
 
-function BufferURLDecodeSilence(pvInputStr: string; pvOutBuffer: PByte;
-  pvOutBufferLen: Integer): Integer;
+function BufferURLDecodeSilence(const pvInputStr: string; pvOutBuffer: PByte;
+    pvOutBufferLen: Integer): Integer;
 
   function DecodeHexChar(const C: Char): Byte;
   begin
@@ -1189,7 +1191,7 @@ begin
   Result := FKeepAlive = 1;
 end;
 
-procedure THttpRequest.ContentSaveToFile(pvFile: String);
+procedure THttpRequest.ContentSaveToFile(const pvFile: String);
 begin
   FContentBuilder.SaveToFile(pvFile);
 end;
@@ -1224,7 +1226,7 @@ begin
   Result := 0;
 end;
 
-procedure THttpRequest.DecodeHeaderLine(pvLine: string);
+procedure THttpRequest.DecodeHeaderLine(const pvLine: string);
 var
   lvPtr: PChar;
   lvKey: string;
@@ -1246,7 +1248,7 @@ begin
   FHeaders.ForceByName(lvKey).AsString := lvPtr;
 end;
 
-function THttpRequest.DecodeFirstLine(pvLine: string): Integer;
+function THttpRequest.DecodeFirstLine(const pvLine: string): Integer;
 var
   lvPtr, lvTempPtr: PChar;
 begin
@@ -1605,7 +1607,7 @@ begin
   Result := FContentType;
 end;
 
-function THttpRequest.GetCookie(pvCookieName: string): String;
+function THttpRequest.GetCookie(const pvCookieName: string): String;
 begin
   Result := StringsValueOfName(RequestCookieList, pvCookieName, ['='], true);
 end;
@@ -1794,7 +1796,7 @@ begin
   FCookies.AddArrayChild.BindObject(Result);
 end;
 
-function THttpResponse.AddCookie(pvName: String; pvValue: string): TDHttpCookie;
+function THttpResponse.AddCookie(const pvName, pvValue: String): TDHttpCookie;
 begin
   Result := AddCookie;
   Result.Name := pvName;
@@ -1827,7 +1829,7 @@ begin
   FHeaderBuilder.AppendBreakLineBytes;
 end;
 
-function THttpResponse.GetCookie(pvCookieName: string): TDHttpCookie;
+function THttpResponse.GetCookie(const pvCookieName: string): TDHttpCookie;
 var
   I: Integer;
   lvCookie: TDHttpCookie;

@@ -123,7 +123,7 @@ type
     /// <summary>
     ///   设置线程内部信息, 请在线程内部执行
     /// </summary>
-    procedure SetWorkHintInfo(pvHint:String);
+    procedure SetWorkHintInfo(const pvHint: String);
 
     constructor Create;
 
@@ -431,7 +431,7 @@ type
     /// <summary>
     ///  获取工作线程信息
     /// </summary>
-    function GetWorkersHtmlInfo(pvTableID: String = ''): String;
+    function GetWorkersHtmlInfo(const pvTableID: String = ''): String;
 
     /// <summary>
     ///   get thread call stack
@@ -535,7 +535,7 @@ function CreateNewDiocpEngine(const pvWorkerNum:Integer): TIocpEngine;
 procedure SetDiocpEngineWorkerNum(const pvWorkerNum:Integer);
 
 function IsDebugMode: Boolean;
-procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
+procedure SafeWriteFileMsg(const pvMsg, pvFilePre: String);
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
 function TraceDateString(pvDate:TDateTime): String;
@@ -565,7 +565,7 @@ begin
 
 end;
 
-procedure SafeWriteFileMsg(pvMsg:String; pvFilePre:string);
+procedure SafeWriteFileMsg(const pvMsg, pvFilePre: String);
 var
   lvFileName, lvBasePath:String;
   lvLogFile: TextFile;
@@ -1070,7 +1070,7 @@ begin
   end;
 end;
 
-function TIocpEngine.GetWorkersHtmlInfo(pvTableID: String = ''): String;
+function TIocpEngine.GetWorkersHtmlInfo(const pvTableID: String = ''): String;
 var
   lvStrings :TStrings;
   i:Integer;
@@ -1719,7 +1719,7 @@ begin
   
 end;
 
-procedure TIocpRequest.SetWorkHintInfo(pvHint:String);
+procedure TIocpRequest.SetWorkHintInfo(const pvHint: String);
 var
   lvThreadID:THandle;
 begin
