@@ -244,7 +244,8 @@ type
     function MemoryBuffer(const pvIndex: Integer): PByte;
 
     function Read(var Buffer; Count: Longint): Longint; override;
-    function Seek(Offset: Longint; Origin: Word): Longint; override;
+    function Seek(Offset: Longint; Origin: Word): Longint; overload; override;
+    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload;  override;
     function Write(const Buffer; Count: Longint): Integer; override;
     procedure SetSize(NewSize: Longint); override;
 
@@ -254,6 +255,7 @@ type
     function ReArrange: TDBufferBuilder;
 
     function GetInstanceSize: Integer;
+
 
 
     /// <summary>
@@ -2107,6 +2109,20 @@ end;
 function TDBufferBuilder.GetInstanceSize: Integer;
 begin
   Result := FCapacity;
+end;
+
+function TDBufferBuilder.Seek(const Offset: Int64; Origin: TSeekOrigin): Int64;
+begin
+  case Origin of
+    soBeginning: FPosition := Offset;
+    soCurrent: Inc(FPosition, Offset);
+    soEnd: FPosition := FSize + Offset;
+  end;
+  if FPosition > FSize then
+  begin
+    FPosition := FSize;
+  end;
+  Result := FPosition;
 end;
 
 function TDBufferBuilder.ToBytes: TBytes;
