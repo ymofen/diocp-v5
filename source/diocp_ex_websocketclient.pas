@@ -4,11 +4,12 @@ interface
 
 uses
   diocp_tcp_client, diocp_ex_http_common, SysUtils, Classes, utils_url,
-  utils_websocket, utils_strings;
+  utils_websocket, utils_strings, diocp_core_rawWinSocket;
 
 type
   TDiocpWebSocketContext = class(TIocpRemoteContext)
   private
+    FSendPingTick:Cardinal;
     FURL: TURL;
     FHeaderBuilder: THttpHeaderBuilder;
     /// <summary>
@@ -34,6 +35,10 @@ type
     destructor Destroy; override;
   public
     procedure Open(WsUrl:string);
+
+    procedure SendPing;
+
+    procedure CheckSendPing(pvInterval: Cardinal = 20000);
 
     procedure SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte);
 
@@ -105,6 +110,17 @@ begin
   inherited Destroy;
 end;
 
+procedure TDiocpWebSocketContext.CheckSendPing(pvInterval: Cardinal = 20000);
+begin
+  if self.SocketState <> ssConnected then Exit;
+
+  if tick_diff(FSendPingTick, GetTickCount) > pvInterval then
+  begin
+    SendPing;
+    FSendPingTick := GetTickCount;
+  end;
+end;
+
 procedure TDiocpWebSocketContext.DoRecv;
 var
   lvOptCode:Integer;
@@ -115,6 +131,7 @@ begin
     PostWSASendRequest(@WS_MSG_PONG, 2, False);
   end else if lvOptCode = OPT_PONG then
   begin
+    Assert(lvOptCode = OPT_PONG);
     ; // {noop}
   end else if lvOptCode = OPT_CLOSE then
   begin
@@ -135,6 +152,7 @@ begin
   PostWebSocketRequest;
   FHttpBuffer.DoCleanUp;
   FWsFrame.DoCleanUp;
+  FSendPingTick := GetTickCount;
 
 end;
 
@@ -248,6 +266,11 @@ begin
     lvWSFrame.Free;
   end;
   
+end;
+
+procedure TDiocpWebSocketContext.SendPing;
+begin
+  PostWSASendRequest(@WS_MSG_PING, 2, False);
 end;
 
 constructor TDiocpWebSocketTcpClient.Create(AOwner: TComponent);

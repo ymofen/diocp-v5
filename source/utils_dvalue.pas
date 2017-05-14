@@ -155,6 +155,7 @@ const
 type
   TDValueItem = class;
   TDValue = class;
+  TOnDValueNotifyEvent = procedure(Sender:TObject; pvVal:TDValue) of object;
   TDValueObject = class(TObject)
   private
     FName: String;

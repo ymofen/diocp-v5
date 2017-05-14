@@ -182,7 +182,7 @@ type
 
     procedure SetOwner(const Value: TDiocpCustom);
 
-    procedure KickOut();
+    procedure InnerKickOut;
 
     procedure InnerAddToDebugStrings(pvMsg:String); overload;
     procedure InnerAddToDebugStrings(pvMsg: string; const args: array of const);
@@ -285,6 +285,8 @@ type
     destructor Destroy; override;
 
     function CheckActivityTimeOut(pvTimeOut:Integer): Boolean;
+
+    procedure CheckKickOut(pvTimeOut:Integer);
 
 
     
@@ -2336,7 +2338,7 @@ begin
       {$IFDEF DEBUG}
       Self.AddDebugStrings(Format('%d, 执行KickOut', [lvKickOutList[i].SocketHandle]));
       {$ENDIF}
-      lvKickOutList[i].KickOut();
+      lvKickOutList[i].InnerKickOut();
       Inc(Result);
     end;
 
@@ -3617,6 +3619,14 @@ begin
   Result := (FLastActivity <> 0) and (tick_diff(FLastActivity, GetTickCount) > Cardinal(pvTimeOut));
 end;
 
+procedure TDiocpCustomContext.CheckKickOut(pvTimeOut:Integer);
+begin
+  if CheckActivityTimeOut(pvTimeOut) then
+  begin
+    InnerKickOut;
+  end;
+end;
+
 procedure TDiocpCustomContext.DecRefernece;
 begin
   FContextLocker.lock('DecRefernece');
@@ -3699,7 +3709,7 @@ begin
   end;
 end;
 
-procedure TDiocpCustomContext.KickOut;
+procedure TDiocpCustomContext.InnerKickOut;
 var
   lvCloseContext:Boolean;
   pvDebugInfo:String;
@@ -3707,7 +3717,7 @@ var
 begin
   InterlockedIncrement(FKickCounter);
 
-  AddDebugStrings(Format('*(%d):[%d]进入->KickOut', [self.FReferenceCounter, self.SocketHandle]));
+  AddDebugStrings(Format('*(%d):[%d]进入->InnerKickOut', [self.FReferenceCounter, self.SocketHandle]));
 
   pvDebugInfo := '超时主动断开连接';
   pvObj := nil;
@@ -3751,7 +3761,7 @@ begin
     FContextLocker.UnLock;
   end; 
 
-  AddDebugStrings(Format('*(%d):%d执行完成->KickOut', [self.FReferenceCounter, self.SocketHandle]));
+  AddDebugStrings(Format('*(%d):%d执行完成->InnerKickOut', [self.FReferenceCounter, self.SocketHandle]));
   if lvCloseContext then
   begin
     InnerCloseContext
@@ -3759,6 +3769,8 @@ begin
     FRawSocket.Close(False);  // 丢弃掉未处理的数据
 
 end;
+
+
 
 function TDiocpCustomContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
     pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer
