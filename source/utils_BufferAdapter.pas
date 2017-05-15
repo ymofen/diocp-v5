@@ -6,11 +6,14 @@ uses
   Classes, SysUtils;
 
 type
+  {$IF CompilerVersion<=25}
+  IntPtr=Integer;
+  {$IFEND}
   TBufferAdapterStream = class(TStream)
   private
     FMaxSize:Integer;
     FMemory: Pointer;
-    FSize, FPosition: Longint;
+    FSize, FPosition: Int64;
   protected
     procedure SetPointer(Ptr: Pointer; Size: Longint);
   public
@@ -41,7 +44,7 @@ begin
     if Result > 0 then
     begin
       if Result > Count then Result := Count;
-      Move(Pointer(Longint(FMemory) + FPosition)^, Buffer, Result);
+      Move(Pointer(IntPtr(FMemory) + FPosition)^, Buffer, Result);
       Inc(FPosition, Result);
       Exit;
     end;
@@ -109,7 +112,7 @@ begin
       begin
         if Pos > FMaxSize then raise Exception.Create('TBufferAdapterStream::overflow');
       end;
-      System.Move(Buffer, Pointer(Longint(FMemory) + FPosition)^, Count);
+      System.Move(Buffer, Pointer(IntPtr(FMemory) + FPosition)^, Count);
       FPosition := Pos;
       Result := Count;
       Exit;
