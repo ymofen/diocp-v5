@@ -27,6 +27,7 @@ type
   TIocpTaskMananger = class;
 
   TOnTaskWorkStrData = procedure(const strData: String) of object;
+  TOnTaskWorkActionIDStrData = procedure(pvActionID:Integer; const strData: String) of object;
   TOnTaskWorkNoneData = procedure() of object;
   
   TOnTaskWork = procedure(pvTaskRequest: TIocpTaskRequest) of object;
@@ -67,10 +68,12 @@ type
     FEndTime: Cardinal;
     FOwner:TIocpTaskMananger;
     FMessageEvent: TEvent;
+    FActionID:Integer;
     FStrData:String;
     FOnTaskWork: TOnTaskWork;
     FOnTaskWorkProc :TOnTaskWorkProc;
     FOnTaskWorkStrData :TOnTaskWorkStrData;
+    FOnTaskWorkActionIdData:TOnTaskWorkActionIDStrData;
     FOnTaskWorkNoneData :TOnTaskWorkNoneData;
 
     FRunInMainThread: Boolean;
@@ -131,12 +134,15 @@ type
     procedure PostATask(pvTaskWork:TOnTaskWorkNoneData; pvRunInMainThread:Boolean =
         False; pvRunType:TRunInMainThreadType = rtSync); overload;
 
-    procedure PostATask(pvTaskWork:TOnTaskWorkStrData; pvStrData:string;
-        pvRunInMainThread:Boolean = False; pvRunType:TRunInMainThreadType =
+    procedure PostATask(pvTaskWork: TOnTaskWorkStrData; const pvStrData: string;
+        pvRunInMainThread: Boolean = False; pvRunType: TRunInMainThreadType =
         rtSync); overload;
 
-    procedure PostATask(pvTaskWork:TOnTaskWork; pvStrData:string;
-        pvRunInMainThread:Boolean = False; pvRunType:TRunInMainThreadType =
+    procedure PostATask(pvTaskWork: TOnTaskWorkActionIDStrData; const pvActionID:
+        Integer; const pvStrData: string; pvRunInMainThread: Boolean = False;
+        pvRunType: TRunInMainThreadType = rtSync); overload;
+    procedure PostATask(pvTaskWork: TOnTaskWork; const pvStrData: string;
+        pvRunInMainThread: Boolean = False; pvRunType: TRunInMainThreadType =
         rtSync); overload;
 
     procedure PostATask(pvTaskWork:TOnTaskWork;
@@ -147,6 +153,7 @@ type
     procedure PostATask(pvTaskWorkProc: TOnTaskWorkProc; pvTaskData: Pointer = nil;
         pvRunInMainThread: Boolean = False; pvRunType: TRunInMainThreadType =
         rtSync); overload;
+
 
 
     /// <summary>
@@ -389,9 +396,9 @@ begin
   end;
 end;
 
-procedure TIocpTaskMananger.PostATask(pvTaskWork: TOnTaskWork;
-  pvStrData: string; pvRunInMainThread: Boolean;
-  pvRunType: TRunInMainThreadType);
+procedure TIocpTaskMananger.PostATask(pvTaskWork: TOnTaskWork; const pvStrData:
+    string; pvRunInMainThread: Boolean = False; pvRunType: TRunInMainThreadType
+    = rtSync);
 var
   lvRequest:TIocpTaskRequest;
 begin
@@ -418,9 +425,9 @@ begin
 
 end;
 
-procedure TIocpTaskMananger.PostATask(pvTaskWork:TOnTaskWorkStrData;
-    pvStrData:string; pvRunInMainThread:Boolean = False;
-    pvRunType:TRunInMainThreadType = rtSync);
+procedure TIocpTaskMananger.PostATask(pvTaskWork: TOnTaskWorkStrData; const
+    pvStrData: string; pvRunInMainThread: Boolean = False; pvRunType:
+    TRunInMainThreadType = rtSync);
 var
   lvRequest:TIocpTaskRequest;
 begin
@@ -504,6 +511,37 @@ begin
     if lvRequest <> nil then requestPool.EnQueue(lvRequest);
     raise;
   end;
+end;
+
+procedure TIocpTaskMananger.PostATask(pvTaskWork: TOnTaskWorkActionIDStrData;
+    const pvActionID: Integer; const pvStrData: string; pvRunInMainThread:
+    Boolean = False; pvRunType: TRunInMainThreadType = rtSync);
+var
+  lvRequest:TIocpTaskRequest;
+begin
+  if not FEnable then Exit;
+  lvRequest := TIocpTaskRequest(requestPool.DeQueue);
+  try
+    if lvRequest = nil then
+    begin
+      lvRequest := TIocpTaskRequest.Create;
+    end;
+    lvRequest.DoCleanUp;
+
+    lvRequest.FOwner := self;
+    lvRequest.FOnTaskWorkActionIdData := pvTaskWork;
+    lvRequest.FActionID := pvActionID;
+    lvRequest.FStrData := pvStrData;
+    lvRequest.FRunInMainThread := pvRunInMainThread;
+    lvRequest.FRunInMainThreadType := pvRunType;
+
+    InnerPostTask(lvRequest);
+  except
+    // if occur exception, push to requestPool.
+    if lvRequest <> nil then requestPool.EnQueue(lvRequest);
+    raise;
+  end;
+
 end;
 
 procedure TIocpTaskMananger.SetActive(const Value: Boolean);
@@ -705,6 +743,9 @@ begin
     end else if Assigned(FOnTaskWorkStrData) then
     begin
       FOnTaskWorkStrData(FStrData);
+    end else if Assigned(FOnTaskWorkActionIdData) then
+    begin
+      FOnTaskWorkActionIdData(FActionID, FStrData);
     end else if Assigned(FOnTaskWorkNoneData) then
     begin
       FOnTaskWorkNoneData();
