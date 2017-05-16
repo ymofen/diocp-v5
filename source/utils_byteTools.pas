@@ -501,17 +501,22 @@ end;
 class function TByteTools.verifyStream(pvStream:TStream; len:Cardinal):
     Cardinal;
 var
-  l, j:Cardinal;
+  l, j, m:Cardinal;
   lvBytes:TBytes;
 begin
   SetLength(lvBytes, 1024);
 
+  m := pvStream.Size - pvStream.Position;
   if len = 0 then
   begin
-    j := pvStream.Size - pvStream.Position;
+    j := m;
   end else
   begin
     j := len;
+    if j > m then
+    begin
+      j := m;
+    end;
   end;
 
   Result := 0;
