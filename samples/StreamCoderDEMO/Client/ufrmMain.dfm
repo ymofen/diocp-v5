@@ -65,4 +65,12 @@ object frmMain: TfrmMain
       'this message will send to server')
     TabOrder = 5
   end
+  object chkEchoData: TCheckBox
+    Left = 368
+    Top = 15
+    Width = 97
+    Height = 17
+    Caption = 'chkEchoData'
+    TabOrder = 6
+  end
 end

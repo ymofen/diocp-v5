@@ -16,6 +16,7 @@ type
     edtPort: TEdit;
     btnSendObject: TButton;
     mmoData: TMemo;
+    chkEchoData: TCheckBox;
     procedure btnConnectClick(Sender: TObject);
     procedure btnSendObjectClick(Sender: TObject);
   private
@@ -114,7 +115,7 @@ begin
     exit;
   end;
 
-  sfLogger.logMessage('disconnected');
+  sfLogger.logMessage('disconnected: ' + pvContext.DisconnectedReason);
 end;
 
 procedure TfrmMain.OnRecvObject(const pvObject: Pointer);
@@ -127,7 +128,12 @@ begin
   lvStream.Position := 0;
   lvStream.Read(s[1], lvStream.Size);
 
-  sfLogger.logMessage('recv msg from server:' + sLineBreak + '    ' + s);
+  if chkEchoData.Checked then
+  begin
+    FDiocpContext.WriteObject(lvStream);
+  end;
+
+  //sfLogger.logMessage('recv msg from server:' + sLineBreak + '    ' + s);
   //sfLogger.logMessage('');
  end;
 

@@ -8,7 +8,7 @@ uses
 
 begin
   {$IF CompilerVersion> 18}
-  ReportMemoryLeaksOnShutdown := DebugHook = 1;
+  ReportMemoryLeaksOnShutdown := True;
   {$IFEND}
   Application.Initialize;
   Application.MainFormOnTaskbar := True;

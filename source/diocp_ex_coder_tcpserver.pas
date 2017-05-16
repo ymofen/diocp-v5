@@ -319,23 +319,29 @@ begin
   // 已经不是当初投递的连接
   if self.ContextDNA <> pvTaskObj.FContextDNA then Exit;
 
-  if self.LockContext('处理逻辑', Self) then
+  self.CheckThreadIn;
   try
+    if self.LockContext('处理逻辑', Self) then
     try
-      // 执行Owner的事件
-      if Assigned(TDiocpCoderTcpServer(Owner).FOnContextAction) then
-        TDiocpCoderTcpServer(Owner).FOnContextAction(Self, lvObj);
-      DoContextAction(lvObj);
-    except
-     on E:Exception do
-      begin
-        FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+
+      try
+        // 执行Owner的事件
+        if Assigned(TDiocpCoderTcpServer(Owner).FOnContextAction) then
+          TDiocpCoderTcpServer(Owner).FOnContextAction(Self, lvObj);
+        DoContextAction(lvObj);
+      except
+       on E:Exception do
+        begin
+          FOwner.LogMessage('截获处理逻辑异常:' + e.Message);
+        end;
       end;
+      Result := S_OK;
+    finally
+      self.UnLockContext('处理逻辑', Self);
     end;
-    Result := S_OK;
   finally
-    self.UnLockContext('处理逻辑', Self);
-  end; 
+    self.CheckThreadOut;
+  end;
 end;
 
 procedure TIOCPCoderClientContext.DoInnerJob(pvTaskObject: TDiocpTaskObject);

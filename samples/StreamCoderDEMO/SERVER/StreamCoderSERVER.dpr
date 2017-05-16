@@ -1,7 +1,7 @@
 program StreamCoderSERVER;
 
 uses
-  memchecker,
+  //memchecker,
   Forms,
   ufrmMain in 'ufrmMain.pas' {frmMain},
   uDIOCPStreamCoder in '..\..\diocpCoders\uDIOCPStreamCoder.pas',
