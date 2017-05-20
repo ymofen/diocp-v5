@@ -64,6 +64,7 @@ end;
 destructor TfrmMain.Destroy;
 begin
   sfLogger.Enable := false;
+  FCoderTcpClient.DisableAutoConnect := True;
   FCoderTcpClient.DisconnectAll;
   FCoderTcpClient.Free;
   inherited Destroy;
@@ -78,9 +79,10 @@ begin
     sfLogger.logMessage('already connected...');
     Exit;
   end;
+  FDiocpContext.AutoReConnect := true;
   FDiocpContext.Host := edtHost.Text;
   FDiocpContext.Port := StrToInt(edtPort.Text);
-  FDiocpContext.Connect;
+  FDiocpContext.ConnectASync;
 
   mmoRecvMessage.Clear;
 
@@ -131,10 +133,10 @@ begin
   if chkEchoData.Checked then
   begin
     FDiocpContext.WriteObject(lvStream);
+  end else
+  begin
+    sfLogger.logMessage('recv msg from server:' + sLineBreak + '    ' + s);
   end;
-
-  //sfLogger.logMessage('recv msg from server:' + sLineBreak + '    ' + s);
-  //sfLogger.logMessage('');
  end;
 
 end.

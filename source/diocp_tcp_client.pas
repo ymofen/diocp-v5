@@ -49,7 +49,9 @@ type
     /// </returns>
     function PostConnectRequest: Boolean;
     procedure ReCreateSocket;
+
     function CanAutoReConnect:Boolean;
+
     procedure CheckDestroyBindingHandle;
   protected
     procedure OnConnecteExResponse(pvObject:TObject);
@@ -435,7 +437,10 @@ begin
 end;
 
 function TIocpRemoteContext.PostConnectRequest: Boolean;
+var
+  lvPosted:Boolean;
 begin
+  lvPosted := false;
   Result := False;
   if FHost = '' then
   begin
@@ -456,6 +461,7 @@ begin
         FIsConnecting := false;
       end else
       begin
+        lvPosted := True;
         Result := True;
       end;
     end else
@@ -464,7 +470,7 @@ begin
       sfLogger.logMessage('TIocpRemoteContext.PostConnectRequest:: 正在进行连接...');
     end;
   finally
-    if not Result then
+    if not lvPosted then
     begin
        if Owner <> nil then Owner.DecRefCounter;
     end;
@@ -555,7 +561,9 @@ begin
         if pvASyncWorker.Terminated then Break;
 
         lvContext := TIocpRemoteContext(FList[i]);
-        if lvContext.FAutoReConnect and lvContext.CheckActivityTimeOut(10000) then
+        if (lvContext.FAutoReConnect)
+          and lvContext.CheckActivityTimeOut(10000)
+          then
         begin
           lvContext.CheckDoReConnect;
         end;

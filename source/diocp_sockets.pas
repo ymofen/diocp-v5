@@ -2394,7 +2394,10 @@ begin
     begin
       try
         DoASyncWork(lvFileWriter, pvASyncWorker);
-        self.FASyncInvoker.WaitForSleep(5000);
+        if not pvASyncWorker.Terminated then
+        begin
+          self.FASyncInvoker.WaitForSleep(5000);
+        end;
       except
         on e:Exception do
         begin
