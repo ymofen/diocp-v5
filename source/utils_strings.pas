@@ -390,6 +390,18 @@ function LeftUntilStr(var P: PChar; pvSpliter: PChar; pvIgnoreCase: Boolean =
 function SplitStrings(const s: String; pvStrings: TStrings; pvSpliterChars:
     TSysCharSet): Integer;
 
+/// <summary>
+///   根据SpliterChars中提供的字符，进行分割字符串，放入到Array of String中
+/// </summary>
+/// <returns>
+///   返回分割的个数
+/// </returns>
+/// <param name="s"> 源字符串 </param>
+/// <param name="pvStrings"> 输出到的字符串列表 </param>
+/// <param name="pvSpliterChars"> 分隔符 </param>
+function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet):
+    TArrayStrings;
+
 
 /// <summary>
 ///  将一个字符串分割成2个字符串
@@ -1014,6 +1026,52 @@ begin
       // 添加到列表中
       pvStrings.Add(lvValue);
       inc(Result);
+    end;
+  end;
+end;
+
+function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet):
+    TArrayStrings;
+var
+  p:PChar;
+  lvValue : String;
+  l, idx, r:Integer;
+  procedure checkLength();
+  begin
+    if idx <= l then
+    begin
+      if idx < 8 then l := 8
+      else if idx < 64 then l := 64
+      else if idx < 128 then l := 128
+      else l := idx + 1024;           
+      SetLength(Result, l);
+    end;
+  end;
+begin
+  p := PChar(s);
+  l := 0;
+  idx := 0;
+  while True do
+  begin
+    // 跳过开头
+    r := LeftUntil(P, pvSpliterChars, lvValue);
+
+    if r = -1 then
+    begin    // 没有匹配到
+      if P^ <> #0 then
+      begin  // 最后一个字符
+        // 添加到列表中
+        SetLength(Result, idx + 1);
+        Result[idx] := P;
+        Inc(idx);
+      end;
+      Exit;
+    end else
+    begin
+      // 匹配成功
+      checkLength();
+      Result[idx] := lvValue;
+      Inc(idx);
     end;
   end;
 end;
@@ -2434,6 +2492,8 @@ begin
   SetLength(Result, pvBufLength shr 1);
   Move(pvBuffer^, PDCharW(Result)^, pvBufLength);
 end;
+
+
 
 
 
