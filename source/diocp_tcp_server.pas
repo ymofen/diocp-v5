@@ -36,6 +36,8 @@ unit diocp_tcp_server;
 // 详细记录发送信息
 {.$DEFINE TRACE_IOCP_SEND}
 
+{.$DEFINE DIRECT_SEND}
+
 
 {$IFDEF DIOCP_HIGH_SPEED}
   {$UNDEF WRITE_LOG}
@@ -1511,6 +1513,7 @@ procedure TIocpClientContext.InnerCloseContext;
 var
   s:String;
 begin
+{$IFDEF DIOCP_DEBUG}
   if FOwner = nil then
   begin
     s := FDebugStrings.Text;
@@ -1519,6 +1522,7 @@ begin
     sfLogger.logMessage(s, 'core_debug', lgvWarning);
     Assert(FOwner <> nil);
   end;
+{$ENDIF}
 
 
 {$IFDEF WRITE_LOG}
@@ -1547,8 +1551,10 @@ begin
     CheckReleaseRes;
 
     try
+      {$IFDEF DIOCP_DEBUG}
       CheckThreadIn;
       try
+      {$ENDIF}
         if FOwner.Active then
         begin
           if Assigned(FOwner.FOnContextDisconnected) then
@@ -1557,9 +1563,11 @@ begin
           end;
           DoDisconnected;
         end;
+      {$IFDEF DIOCP_DEBUG}
       finally
         CheckThreadOut;
       end;
+      {$ENDIF}
     except
       on e:Exception do
       begin
@@ -1628,7 +1636,9 @@ var
   lvRequest:TIocpSendRequest;
   r:Integer;
 begin
+{$IFDEF DIOCP_DEBUG}
   Assert(FOwner <> nil);
+{$ENDIF}
 
   InnerLock;
   try
@@ -2004,8 +2014,10 @@ end;
 
 procedure TIocpClientContext.DoCleanUp;
 begin
+  {$IFDEF DIOCP_DEBUG}
   CheckThreadIn;
   try
+  {$ENDIF}
     FLastActivity := 0;
     FRequestClose := 0;
 
@@ -2027,9 +2039,11 @@ begin
       Assert(FReferenceCounter = 0, Format('TIocpClientContext.DoCleanUp::FReferenceCounter=%d', [FReferenceCounter]));
       Assert(not FActive, 'DoCleanUp::Context is active');
     end;
+{$IFDEF DIOCP_DEBUG}
   finally
     CheckThreadOut;
   end;
+{$ENDIF}
 
 
 //  if FActive then
@@ -2337,21 +2351,56 @@ function TIocpClientContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
     Boolean;
 var
   lvBuf: PAnsiChar;
+{$IFDEF DIRECT_SEND}
+  lvRequest: TIocpSendRequest;
+{$ENDIF}
 begin
   if len = 0 then raise Exception.Create('PostWSASendRequest::request buf is zero!');
   if pvCopyBuf then
   begin
     GetMem(lvBuf, len);
     Move(buf^, lvBuf^, len);
+    {$IFDEF DIRECT_SEND}
+    lvRequest := GetSendRequest;
+    lvRequest.SetBuffer(lvBuf, len, dtFreeMem);
+    lvRequest.Tag := pvTag;
+    lvRequest.Data := pvTagData;
+    Result := lvRequest.ExecuteSend = 0;
+    if not Result then
+    begin
+      lvRequest.CheckClearSendBuffer;   
+      lvRequest.UnBindingSendBuffer;
+      Self.RequestDisconnect();   
+      FOwner.ReleaseSendRequest(lvRequest);
+    end;
+    {$ELSE}
     Result := PostWSASendRequest(lvBuf, len, dtFreeMem, pvTag, pvTagData);
     if not Result then
     begin            //post fail
       FreeMem(lvBuf);
     end;
+    {$ENDIF}
+
   end else
   begin
     lvBuf := buf;
+    {$IFDEF DIRECT_SEND}
+    lvRequest := GetSendRequest;
+    lvRequest.SetBuffer(lvBuf, len, dtNone);
+    lvRequest.Tag := pvTag;
+    lvRequest.Data := pvTagData;
+    Result := lvRequest.ExecuteSend = 0;
+    if not Result then
+    begin
+
+      lvRequest.UnBindingSendBuffer;
+      Self.RequestDisconnect();
+
+      FOwner.ReleaseSendRequest(lvRequest);
+    end;
+    {$ELSE}
     Result := PostWSASendRequest(lvBuf, len, dtNone, pvTag, pvTagData);
+    {$ENDIF}  
   end;
 
 end;
@@ -2373,6 +2422,15 @@ begin
         lvRequest.SetBuffer(buf, len, pvBufReleaseType);
         lvRequest.Tag := pvTag;
         lvRequest.Data := pvTagData;
+        {$IFDEF DIRECT_SEND}
+        Result := lvRequest.ExecuteSend = 0;
+        if not Result then
+        begin
+          lvRequest.UnBindingSendBuffer;
+          Self.RequestDisconnect();   
+          FOwner.ReleaseSendRequest(lvRequest);
+        end;
+        {$ELSE}
         Result := InnerPostSendRequestAndCheckStart(lvRequest);
         if not Result then
         begin
@@ -2385,6 +2443,7 @@ begin
 
           FOwner.ReleaseSendRequest(lvRequest);
         end;
+        {$ENDIF}
       finally
         self.DecReferenceCounter('PostWSASendRequest', Self);
       end;
@@ -2915,6 +2974,7 @@ end;
 
 function TDiocpTcpServer.ReleaseSendRequest(pvObject:TIocpSendRequest): Boolean;
 begin
+{$IFDEF DIOCP_DEBUG}
   if self = nil then
   begin
     Assert(False);
@@ -2929,7 +2989,7 @@ begin
   begin
     Assert(pvObject.FAlive)
   end;
-
+{$ENDIF}
   if lock_cmp_exchange(True, False, pvObject.FAlive) = True then
   begin
     if (FDataMoniter <> nil) then
@@ -3686,29 +3746,21 @@ begin
   Assert(FOwner <> nil);
 
   try
-    i := 0;
-    j := 0;
-    // post request
-
-    j := 1;
     lvRequest := GetRequestObject;
+{$IFDEF DIOCP_DEBUG}
     lvRequest.CheckThreadIn;
-    j := 2;
+{$ENDIF}
     lvRequest.FClientContext := GetClientContext;
     lvRequest.FAcceptorMgr := Self;
-    j := 3;
 
     if lvRequest.PostRequest then
     begin
-      j := 4;
       if (FOwner.FDataMoniter <> nil) then
       begin
         InterlockedIncrement(FOwner.FDataMoniter.FPostWSAAcceptExCounter);
       end;
-      j := 9;
     end else
     begin     // post fail
-      j := 100;
       Inc(i);
       try
         // 出现异常，直接释放Context
@@ -3718,18 +3770,15 @@ begin
         lvRequest.FClientContext := nil;
       except
       end;
-      j := 110;
       // 归还到对象池
       ReleaseRequestObject(lvRequest);
-      j := 111;
 
       FOwner.logMessage('TIocpAcceptorMgr.PostAcceptExRequest errCounter:%d', [i], CORE_LOG_FILE);
-      j := 199;
     end;
   except
     on E:Exception do
     begin
-       FOwner.logMessage('TIocpAcceptorMgr.PostAcceptExRequest(%d) Err:%s', [j, e.Message], CORE_LOG_FILE);
+       FOwner.logMessage('TIocpAcceptorMgr.PostAcceptExRequest Err:%s', [e.Message], CORE_LOG_FILE);
     end;
   end;
 end;
@@ -3780,7 +3829,9 @@ end;
 
 procedure TIocpAcceptorMgr.ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
 begin
+{$IFDEF DIOCP_DEBUG}
   pvRequest.CheckThreadOut;
+{$ENDIF}
   pvRequest.FAcceptorMgr := nil;
   pvRequest.FClientContext := nil;
   FAcceptExRequestPool.EnQueue(pvRequest);
@@ -4212,6 +4263,7 @@ var
   lvContext:TIocpClientContext;
 begin
   inherited;
+{$IFDEF DIOCP_DEBUG}
   if FOwner = nil then
   begin
     if IsDebugMode then
@@ -4220,6 +4272,7 @@ begin
       Assert(Self.FAlive);
     end;
   end else
+{$ENDIF}
   begin
     // fclientcontext is nil
     lvContext := FClientContext;
@@ -4372,7 +4425,10 @@ begin
 
       FClientContext.DoSendRequestCompleted(Self);
 
+      {$IFDEF DIRECT_SEND}
+      {$ELSE}
       FClientContext.PostNextSendRequest;
+      {$ENDIF}
     end;
   finally
 //    if FClientContext = nil then
@@ -4459,10 +4515,12 @@ begin
   finally
     if not Result then
     begin      // post fail, dec ref, if post succ, response dec ref
+      {$IFDEF DIOCP_DEBUG}
       if IsDebugMode then
       begin
         Assert(lvContext = FClientContext);
       end;
+     {$ENDIF}
       lvContext.decReferenceCounter(
         Format('InnerPostRequest::WSASend_Fail, ErrorCode:%d', [lvErrorCode])
          , Self);
@@ -4479,6 +4537,7 @@ var
   lvContext:TIocpClientContext;
 begin
   inherited;
+{$IFDEF DIOCP_DEBUG}
   if FOwner = nil then
   begin
     if IsDebugMode then
@@ -4487,6 +4546,7 @@ begin
       Assert(Self.FAlive);
     end;
   end else
+{$ENDIF}
   begin
     lvContext := FClientContext;
     try
