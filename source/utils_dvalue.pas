@@ -338,6 +338,8 @@ type
     /// </summary>
     function CheckSetNodeType(pvType:TDValueObjectType): TDValue;
 
+    function FindChild(const Key:string; pvKeyVal:string): TDValue;
+
     function FindByName(const pvName: String): TDValue; overload;
 
     function FindByName(pvName:Integer): TDValue; overload;
@@ -2746,6 +2748,24 @@ begin
   begin
     Parent.DoLastModify;
   end;
+end;
+
+function TDValue.FindChild(const Key:string; pvKeyVal:string): TDValue;
+var
+  i:Integer;
+  s1 : string;
+begin
+  Result := nil;
+  if Assigned(FChildren) then
+    for i := 0 to FChildren.Count - 1 do
+    begin
+      s1 := Items[i].GetValueByName(Key, STRING_EMPTY);
+      if CompareText(s1, pvKeyVal) = 0 then
+      begin
+        Result := Items[i];
+        Break;
+      end;
+    end;
 end;
 
 function TDValue.GetAsDateTime: TDateTime;
