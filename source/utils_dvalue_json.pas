@@ -282,7 +282,7 @@ begin
         pvBuilder.Append('"');
         pvBuilder.Append(':');
       end;
-      if v.Value.DataType in [vdtString, vdtStringW, vdtPtr, vdtObject, vdtGuid] then
+      if v.Value.DataType in [vdtString, vdtStringW, vdtPtr, vdtObject, vdtGuid, vdtDateTime] then
       begin
         pvBuilder.Append('"');
         if ADoEscape then
