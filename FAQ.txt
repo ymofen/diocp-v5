@@ -84,4 +84,10 @@ A: Diocp从2016-11-08号的版本，底层默认都使用__defaultDiocpEngine, �
    
 Q: 怎么设置服务器的最大并发连接数
 A: TDiocpTcpServer.AllowMaxOnlineCount := 10000, 默认为0，不进行限制。
+
+Q: 客户端类(TDiocpTcpClient)的连接过程是怎么样的？
+A: 客户端连接TIocpRemoteContext支持阻塞方式建立连接(Connect)和异步方式建立连接(ConnectASync)。
+   建立成功后都会触发OnConnected事件(Owner.FOnContextConnected -> OnConnected() -> FOnConnectedEvent -> 连接状态(ssConnected) -> 开始接受数据(PostWSARecvRequest))
+   Connect 建立连接失败后会抛出异常，不会触发其他事件。
+   ConnectASync，建立失败后会触发会依次触发(FOnConnectFail(事件) -> OnConnectFail(成员方法) ->DoNotifyDisconnected(如果Owner.TrigerDisconnectEventAfterNoneConnected为true)/连接状态(ssDisconnected));
    

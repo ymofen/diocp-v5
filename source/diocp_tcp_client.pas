@@ -39,8 +39,10 @@ type
     FAutoReConnect: Boolean;
     FConnectExRequest: TIocpConnectExRequest;
 
-    FHost: String;
+    FOnConnectFailEvent: TNotifyContextEvent;
     FOnASyncCycle: TNotifyContextEvent;
+
+    FHost: String;
     FPort: Integer;
     /// <summary>TIocpRemoteContext.PostConnectRequest
     /// </summary>
@@ -53,12 +55,16 @@ type
     function CanAutoReConnect:Boolean;
 
     procedure CheckDestroyBindingHandle;
+
+    procedure DoConnectFail;
   protected
     procedure OnConnecteExResponse(pvObject:TObject);
 
     procedure OnDisconnected; override;
 
     procedure OnConnected; override;
+
+    procedure OnConnectFail; virtual;
 
     procedure SetSocketState(pvState:TSocketState); override;
 
@@ -88,7 +94,7 @@ type
     /// <summary>
     ///  请求异步连接
     ///    连接状态变化: ssDisconnected -> ssConnecting -> ssConnected/ssDisconnected
-    ///  如果投递失败，或者连接失败会触发OnDisconnected
+    ///    如果投递失败，或者连接失败，如果Owner.TrigerDisconnectEventAfterNoneConnected为true触发OnDisconnected
     /// </summary>
     procedure ConnectASync;
 
@@ -102,6 +108,12 @@ type
     ///   由ASync线程, 循环执行
     /// </summary>
     property OnASyncCycle: TNotifyContextEvent read FOnASyncCycle write FOnASyncCycle;
+
+    /// <summary>
+    ///   连接失败事件
+    /// </summary>
+    property OnConnectFailEvent: TNotifyContextEvent read FOnConnectFailEvent write
+        FOnConnectFailEvent;
 
     property Host: String read FHost write FHost;
 
@@ -175,6 +187,7 @@ type
   {$ENDIF}
     FListLocker: TCriticalSection;
     FTrigerDisconnectEventAfterNoneConnected: Boolean;
+    FOnContextConnectFailEvent: TNotifyContextEvent;
   protected
     procedure DoAfterOpen;override;
     procedure DoAfterClose; override; 
@@ -235,6 +248,13 @@ type
     property TrigerDisconnectEventAfterNoneConnected: Boolean read
         FTrigerDisconnectEventAfterNoneConnected write
         SetTrigerDisconnectEventAfterNoneConnected;
+
+
+    /// <summary>
+    ///   连接失败
+    /// </summary>
+    property OnContextConnectFailEvent: TNotifyContextEvent read FOnContextConnectFailEvent
+        write FOnContextConnectFailEvent;
 
   end;
 
@@ -376,15 +396,35 @@ begin
 
   if not PostConnectRequest then
   begin
-    if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
+    DoConnectFail;
+  end;
+end;
+
+procedure TIocpRemoteContext.DoConnectFail;
+begin
+  OnConnectFail;
+
+  if Assigned(FOnConnectFailEvent) then
+  begin
+    FOnConnectFailEvent(Self);
+  end;
+
+  if (Owner <> nil) then
+  begin
+    if Assigned(TDiocpTcpClient(Owner).FOnContextConnectFailEvent)  then
     begin
-      DoNotifyDisconnected;
-    end else
-    begin
-       // 设置Socket状态
-      SetSocketState(ssDisconnected);
+      TDiocpTcpClient(Owner).FOnContextConnectFailEvent(Self);
     end;
-    //OnDisconnected;
+  end;
+
+
+  if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
+  begin
+    DoNotifyDisconnected;
+  end else
+  begin
+    // 状态一定要设定
+    SetSocketState(ssDisconnected);
   end;
 end;
 
@@ -410,18 +450,18 @@ begin
 
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
 
-      if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
-      begin
-        DoNotifyDisconnected;
-      end else
-      begin
-        // 状态一定要设定
-        SetSocketState(ssDisconnected);
-      end;
+      DoConnectFail;
+
+
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;
   end;
+end;
+
+procedure TIocpRemoteContext.OnConnectFail;
+begin
+
 end;
 
 procedure TIocpRemoteContext.OnDisconnected;
