@@ -427,7 +427,8 @@ type
     /// <summary>
     ///   直接发送一个流
     /// </summary>
-    procedure ResponseAStream(const pvStream:TStream);
+    procedure ResponseAStream(const pvStream: TStream; pvDoneCallBack:
+        TWorkDoneCallBack);
 
     /// <summary>
     ///   直接发送数据
@@ -572,8 +573,11 @@ type
 
     FCurrentStream:TStream;
     FCurrentStreamRemainSize:Integer;
-    // 0是关闭, 1:不关闭
+    // 是否关闭连接 0是关闭, 1:不关闭
     FCurrentStreamEndAction:Byte;
+    
+    // 完成回调事件
+    FCurrentStreamDoneCallBack: TWorkDoneCallBack;
     
     /// <summary>
     ///   0:普通 Http连接
@@ -626,6 +630,8 @@ type
     /// </summary>
     procedure CheckSendStreamBlock();
 
+    procedure InnerDoSendStreamDone(pvCode:Integer);
+
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -637,7 +643,8 @@ type
     /// <summary>
     ///   准备发送一个流(依次读取发送),如果还有未发送任务，则抛出异常
     /// </summary>
-    procedure PostWriteAStream(pvStream:TStream; pvSize:Integer);
+    procedure PostWriteAStream(pvStream: TStream; pvSize, pvCloseAction: Integer;
+        pvDoneCallBack: TWorkDoneCallBack);
 
     procedure SetBufferPool(ABufferPool: PBufferPool);
 
@@ -1294,27 +1301,29 @@ var
   lvFileStream:TFileStream;
 begin
   lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
-  ResponseAStream(lvFileStream);                            
+  ResponseAStream(lvFileStream, nil);                            
 end;
 
-procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream);
+procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream;
+    pvDoneCallBack: TWorkDoneCallBack);
 var
   lvSize:Int64;
   lvRange:PRange;
   lvIsRangeResonse:Boolean;
+  lvCloseAction:Integer;
 begin
   if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
-    FDiocpContext.FCurrentStreamEndAction := 1;
+    lvCloseAction := 1;
   end else if not FInnerRequest.CheckKeepAlive then
   begin
-    FDiocpContext.FCurrentStreamEndAction := 1;
+    lvCloseAction := 1;
   end else if SameText(FResponse.Header.GetValueByName('Connection', STRING_EMPTY), 'close') then
   begin
-    FDiocpContext.FCurrentStreamEndAction := 1;
+    lvCloseAction := 1;
   end else
   begin
-    FDiocpContext.FCurrentStreamEndAction := 0;
+    lvCloseAction := 0;
   end;
 
   lvIsRangeResonse := False;
@@ -1342,15 +1351,16 @@ begin
       lvIsRangeResonse := True;
       //SendResponse(pvStream.Size);
       SendResponse(lvRange.VEnd - lvRange.VStart + 1);
-      Connection.PostWriteAStream(pvStream, lvRange.VEnd - lvRange.VStart + 1);
+      Connection.PostWriteAStream(pvStream, lvRange.VEnd - lvRange.VStart + 1, lvCloseAction, pvDoneCallBack);
       Exit;
     end;
   end;
+  
   if (not lvIsRangeResonse) then
   begin
     SendResponse(pvStream.Size);
     pvStream.Position := 0;
-    Connection.PostWriteAStream(pvStream, pvStream.Size);
+    Connection.PostWriteAStream(pvStream, pvStream.Size, lvCloseAction, pvDoneCallBack);
   end;
 end;
 
@@ -1754,6 +1764,7 @@ begin
     if not PostWSASendRequest(lvBuffer, r, False, BLOCK_STREAM_BUFFER_TAG) then
     begin
       ReleaseRef(lvBuffer);
+      InnerDoSendStreamDone(-1);
     end;
   finally
     self.UnLock;
@@ -1799,8 +1810,7 @@ begin
 
   if FCurrentStream <> nil then
   begin           // 中断了发送
-    FCurrentStream.Free;
-    FCurrentStream := nil;
+    InnerDoSendStreamDone(-1);
   end;
   FCurrentStreamRemainSize := 0;
   FCurrentStreamEndAction := 0;
@@ -1880,21 +1890,27 @@ begin
 
   if pvBufferTag = BLOCK_STREAM_BUFFER_TAG then
   begin
-    if FCurrentStreamRemainSize > 0 then
+    if pvErrorCode = 0 then
     begin
-      CheckSendStreamBlock;
-    end else
-    begin
-      FCurrentStream.Free;
-      FCurrentStream := nil;
-      FCurrentStreamRemainSize := 0;
-      if FCurrentStreamEndAction = 0 then
+      if FCurrentStreamRemainSize > 0 then
       begin
-        PostWSACloseRequest;
+        CheckSendStreamBlock;
       end else
       begin
+        InnerDoSendStreamDone(0);
+        FCurrentStreamRemainSize := 0;
+        if FCurrentStreamEndAction = 0 then
+        begin
+          PostWSACloseRequest;
+        end else
+        begin
         
+        end;
       end;
+    end else
+    begin
+      InnerDoSendStreamDone(-1);
+      FCurrentStreamRemainSize := 0;
     end;
   end;
 end;
@@ -1916,9 +1932,8 @@ begin
     // 连接已经断开, 放弃处理逻辑
     if (FOwner = nil) then Exit;
 
-    lvObj.CheckThreadIn;
-
     {$IFDEF DIOCP_DEBUG}
+    lvObj.CheckThreadIn;
     lvObj.AddDebugStrings('DoRequest::' + pvRequest.RequestURI);
     {$ENDIF}
 
@@ -1936,7 +1951,9 @@ begin
      self.UnLockContext('HTTP逻辑处理...', Self);
     end;
   finally
+    {$IFDEF DIOCP_DEBUG}
     lvObj.CheckThreadOut;
+    {$ENDIF}
     // 归还HttpRequest到池
     if not lvObj.FReleaseLater then
     begin
@@ -1944,6 +1961,18 @@ begin
       lvObj.Close;
     end;
   end;
+end;
+
+procedure TDiocpHttpClientContext.InnerDoSendStreamDone(pvCode:Integer);
+begin
+  if Assigned(FCurrentStreamDoneCallBack) then
+  begin
+    FCurrentStreamDoneCallBack(FCurrentStream, pvCode);
+  end else
+  begin
+    FCurrentStream.Free;
+  end;
+  FCurrentStream := nil;
 end;
 
 procedure TDiocpHttpClientContext.OnBlockBufferWrite(pvSender:TObject;
@@ -2250,17 +2279,26 @@ begin
   
 end;
 
-procedure TDiocpHttpClientContext.PostWriteAStream(pvStream: TStream;
-  pvSize: Integer);
+procedure TDiocpHttpClientContext.PostWriteAStream(pvStream: TStream; pvSize,
+    pvCloseAction: Integer; pvDoneCallBack: TWorkDoneCallBack);
 begin
   self.Lock;
   try
     if FCurrentStream <> nil then
     begin
+      if Assigned(pvDoneCallBack) then
+      begin
+        pvDoneCallBack(pvStream, -1);
+      end else
+      begin
+        pvStream.Free;
+      end;
       raise Exception.Create('存在未发送完成任务！');
     end;
     FCurrentStream := pvStream;
     FCurrentStreamRemainSize := pvSize;
+    FCurrentStreamEndAction := pvCloseAction;
+    FCurrentStreamDoneCallBack := pvDoneCallBack;
   finally
     self.UnLock;
   end;

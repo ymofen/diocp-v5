@@ -86,6 +86,8 @@ type
         TDiocpHttpClientContext): Integer;
 
     function GetWebSocketCounter(pvExceptContext:TDiocpHttpClientContext): Integer;
+
+    procedure OnResposeStreamDone(pvData:Pointer; pvCode:Integer);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -700,6 +702,7 @@ begin
     pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
     //pvRequest.Response.SetResponseFileName('x.file');
     //pvRequest.ResponseAFile(lvDefaultFile);
+ //   pvRequest.ResponseAStream(TFileStream.Create(lvDefaultFile, fmOpenRead), OnResposeStreamDone);
     pvRequest.Response.LoadFromFile(lvDefaultFile);
     pvRequest.SendResponse();
     pvRequest.DoResponseEnd;
@@ -744,6 +747,13 @@ begin
   finally
     lvList.Free;
   end;
+end;
+
+procedure TfrmMain.OnResposeStreamDone(pvData:Pointer; pvCode:Integer);
+begin
+  sfLogger.logMessage('数据流发送完成:%d', [TStream(pvData).Size]);
+  TStream(pvData).Free;                                                   
+  
 end;
 
 procedure TfrmMain.tmrHeartTimer(Sender: TObject);

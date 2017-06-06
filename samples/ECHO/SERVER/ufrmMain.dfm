@@ -77,6 +77,24 @@ object frmMain: TfrmMain
         Action = actPushToAll
         TabOrder = 1
       end
+      object btnASyncPush: TButton
+        Left = 448
+        Top = 72
+        Width = 129
+        Height = 25
+        Caption = 'btnASyncPush'
+        TabOrder = 2
+        OnClick = btnASyncPushClick
+      end
+      object btnFill4K: TButton
+        Left = 3
+        Top = 144
+        Width = 75
+        Height = 25
+        Caption = 'btnFill4K'
+        TabOrder = 3
+        OnClick = btnFill4KClick
+      end
     end
   end
   object pnlTop: TPanel

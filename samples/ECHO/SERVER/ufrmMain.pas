@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
-  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter;
+  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter, utils_async;
 
 type
   TfrmMain = class(TForm)
@@ -40,9 +40,13 @@ type
     chkSaveToFile: TCheckBox;
     chkUseContextPool: TCheckBox;
     chkUseBufferPool: TCheckBox;
+    btnASyncPush: TButton;
+    btnFill4K: TButton;
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
+    procedure btnASyncPushClick(Sender: TObject);
+    procedure btnFill4KClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
     procedure btnPoolInfoClick(Sender: TObject);
@@ -76,6 +80,8 @@ type
     procedure OnAccept(pvSocket: THandle; pvAddr: String; pvPort: Integer; var
         vAllowAccept: Boolean);
     procedure OnDisconnected(pvClientContext: TIocpClientContext);
+
+    procedure OnASyncWorker(pvSender:TObject);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -169,6 +175,20 @@ procedure TfrmMain.actStopExecute(Sender: TObject);
 begin
   FTcpServer.SafeStop;
   RefreshState;
+end;
+
+procedure TfrmMain.btnASyncPushClick(Sender: TObject);
+begin
+  ASyncExecute(OnASyncWorker, nil);
+end;
+
+procedure TfrmMain.btnFill4KClick(Sender: TObject);
+var
+  s:string;
+begin
+  SetLength(s, 4096);
+  FillChar(PChar(s)^, 4096, '1');
+  mmoPushData.Lines.Text := s;
 end;
 
 procedure TfrmMain.btnFindContextClick(Sender: TObject);
@@ -272,11 +292,41 @@ begin
 
 end;
 
+procedure TfrmMain.OnASyncWorker(pvSender:TObject);
+var
+  ansiStr:AnsiString;
+var
+  lvList:TList;
+  i:Integer;
+  lvContext:TIocpClientContext;
+begin
+  ansiStr := mmoPushData.Lines.Text;
+  while self.FTcpServer.Active do
+  begin
+    lvList := TList.Create;
+    try
+      FTcpServer.getOnlineContextList(lvList);
+      for i:=0 to lvList.Count -1 do
+      begin
+        lvContext := TIocpClientContext(lvList[i]);
+        lvContext.PostWSASendRequest(PAnsiChar(ansiStr), Length(ansiStr));
+      end;
+    finally
+      lvList.Free;
+    end;
+    Sleep(1);
+  end;
+end;
+
 procedure TfrmMain.OnDisconnected(pvClientContext: TIocpClientContext);
 begin
-  sfLogger.logMessage(Format('%s:%d-%s', [pvClientContext.RemoteAddr, pvClientContext.RemotePort, pvClientContext.DisconnectedReason]));
+  if chkLogDetails.Checked then
+  begin
+    sfLogger.logMessage(Format('%s:%d-%s', [pvClientContext.RemoteAddr, pvClientContext.RemotePort, pvClientContext.DisconnectedReason]));
+  end;
   if pvClientContext.Data <> nil then
   begin
+    //TSingleFileWriter(pvClientContext.Data).Flush;
     TObject(pvClientContext.Data).Free;
     pvClientContext.Data := nil;
   end;
@@ -327,7 +377,7 @@ begin
       end;
     end;
 
-    if FChkShowInMemo then
+    if chkSaveToFile.Checked then
     begin
       lvFileWriter := TSingleFileWriter(pvClientContext.Data);
       if lvFileWriter = nil then
@@ -373,7 +423,7 @@ end;
 
 procedure TfrmMain.tmrInfoTimer(Sender: TObject);
 begin
-  self.Caption := Format('DIOCP ≤‚ ‘:%d, %d', [__DebugWSACreateCounter, __DebugWSACloseCounter]);
+  //self.Caption := Format('DIOCP ≤‚ ‘:%d, %d', [__DebugWSACreateCounter, __DebugWSACloseCounter]);
 end;
 
 procedure TfrmMain.tmrKickOutTimer(Sender: TObject);

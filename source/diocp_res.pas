@@ -9,6 +9,9 @@ const
   BytePerMB = BytePerKB * 1024;
   BytePerGB = BytePerMB * 1024;
 
+type
+  TWorkDoneCallBack = procedure(pvData:Pointer; pvCode:Integer) of object;
+
 
 resourcestring
   /// iocpTcpServer »’÷æ

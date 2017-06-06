@@ -1,10 +1,10 @@
 object frmMain: TfrmMain
   Left = 391
   Top = 275
-  Width = 872
-  Height = 599
   BorderIcons = [biSystemMenu]
   Caption = 'diocp-v5 http server'
+  ClientHeight = 561
+  ClientWidth = 856
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 80
     Width = 856
     Height = 312
-    ActivePage = tsTester
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
