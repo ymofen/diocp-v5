@@ -4110,7 +4110,7 @@ begin
   try
     lvDNACounter := Self.FCounter;
 
-    {$IFDEF DEBUG_ON}
+    {$IFDEF DIOCP_DEBUG}
     InterlockedDecrement(FOverlapped.RefCount);
     if FOverlapped.RefCount <> 0 then
     begin        // 引用计数异常
@@ -4118,11 +4118,9 @@ begin
       begin
         Assert(FOverlapped.RefCount <>0);
       end;
-      {$IFDEF WRITE_LOG}
       FOwner.logMessage(strRecvResponseErr,
           [Integer(self.FClientContext), Integer(Self), FOverlapped.RefCount],
           CORE_LOG_FILE, lgvError);
-      {$ENDIF}
     end;
     {$ENDIF}
 
@@ -4224,7 +4222,7 @@ begin
     on E:Exception do
     begin
       __svrLogger.logMessage(
-        Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, step:%d, refcount:%d, emsg:%s',
+        Format('TIocpRecvRequest.WSARecvRequest.HandleResponse, DNACounter:%d, debugInfo:%s, step:%d, overlapped.refcount:%d, emsg:%s',
           [lvDNACounter, FDebugInfo, lvDebugStep, FOverlapped.refCount, e.Message]));
     end;
 
@@ -4275,7 +4273,7 @@ begin
         {$IFDEF WRITE_LOG}
         lvOwner.logMessage(strRecvPostError, [FClientContext.SocketHandle, lvRet]);
         {$ENDIF}
-        {$IFDEF DEBUG_ON}
+        {$IFDEF DIOCP_DEBUG}
         InterlockedDecrement(FOverlapped.refCount);
         {$ENDIF}
 
