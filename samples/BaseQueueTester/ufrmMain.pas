@@ -20,8 +20,10 @@ type
     Label1: TLabel;
     edtSleep: TEdit;
     edtObjCounter: TEdit;
+    Button1: TButton;
     procedure btnStartClick(Sender: TObject);
     procedure btnThreadInfoClick(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
   public
@@ -130,6 +132,20 @@ begin
   mmoInfo.Lines.Add(Format('in:%d, out:%d', [__inCounter, __outCounter]));
   mmoInfo.Lines.Add(GetThreadsHintInfo);
 
+end;
+
+procedure TfrmMain.Button1Click(Sender: TObject);
+var
+  lvQue:TSafeQueue;
+  i: Integer;
+begin
+  lvQue := TSafeQueue.Create;
+  for i := 0 to 102400 do
+  begin
+    lvQue.EnQueue(Self);
+  end;
+  lvQue.Clear;
+  lvQue.Free;
 end;
 
 procedure TfrmMain.OnASyncWorker(pvWorker:TASyncWorker);

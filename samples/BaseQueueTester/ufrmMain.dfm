@@ -18,7 +18,7 @@ object frmMain: TfrmMain
     Top = 0
     Width = 636
     Height = 177
-    ActivePage = TabSheet1
+    ActivePage = TabSheet2
     Align = alTop
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -84,6 +84,15 @@ object frmMain: TfrmMain
     object TabSheet2: TTabSheet
       Caption = 'TabSheet2'
       ImageIndex = 1
+      object Button1: TButton
+        Left = 48
+        Top = 48
+        Width = 75
+        Height = 25
+        Caption = 'Button1'
+        TabOrder = 0
+        OnClick = Button1Click
+      end
     end
   end
   object mmoInfo: TMemo
