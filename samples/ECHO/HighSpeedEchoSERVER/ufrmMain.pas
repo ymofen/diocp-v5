@@ -14,6 +14,7 @@ type
     actStop: TAction;
     edtPort: TEdit;
     tmrInfo: TTimer;
+    edtWorkCount: TEdit;
     procedure actStartExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure tmrInfoTimer(Sender: TObject);
@@ -51,8 +52,11 @@ end;
 
 procedure TfrmMain.actStartExecute(Sender: TObject);
 begin
+
   FTcpSvr.Port := StrToInt(edtPort.Text);
   FTcpSvr.OnDataReceived := OnRecv;
+  FTcpSvr.UseObjectPool := False;
+  FTcpSvr.WorkerCount := StrToInt(edtWorkCount.Text);
   FTcpSvr.Open;
   btnAction.Action := actStop;
 end;

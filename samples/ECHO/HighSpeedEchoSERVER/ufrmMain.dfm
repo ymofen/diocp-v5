@@ -29,6 +29,14 @@ object frmMain: TfrmMain
     TabOrder = 1
     Text = '9983'
   end
+  object edtWorkCount: TEdit
+    Left = 216
+    Top = 16
+    Width = 121
+    Height = 21
+    TabOrder = 2
+    Text = '3'
+  end
   object actlstMain: TActionList
     Left = 320
     Top = 56
