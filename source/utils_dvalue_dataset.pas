@@ -6,13 +6,24 @@ uses
   DB, SysUtils, utils_dvalue;
 
 procedure ConvertDataSetToDValue(pvDataSet: TDataSet; pvDataList: TDValue);
+    overload;
+procedure ConvertDataSetToDValue(pvDataSet: TDataSet; pvDataList: TDValue;
+    pvFields:string); overload;
 procedure ConvertCurrentRecordToDValue(pvDataSet: TDataSet; pvJsonRecord:
-    TDValue);
+    TDValue); overload;
+
+procedure ConvertCurrentRecordToDValue(pvDataSet: TDataSet; pvJsonRecord:
+    TDValue; pvFields:string); overload;
+
+procedure AddAFieldValue(pvVal: TDValue; pvField: TField);
 
 procedure AppendFromDValueList(pvDataSet: TDataSet; pvDataList: TDValue);
 procedure AssignRecordFromDValue(pvDataSet: TDataSet; pvJsonRecord:TDValue);
 
 implementation
+
+uses
+  utils_strings;
 
 procedure ConvertDataSetToDValue(pvDataSet: TDataSet; pvDataList: TDValue);
 var
@@ -24,7 +35,7 @@ begin
     lvItem := pvDataList.Add();
     ConvertCurrentRecordToDValue(pvDataSet, lvItem);
     pvDataSet.Next;
-  end;            
+  end;
 end;
 
 procedure ConvertCurrentRecordToDValue(pvDataSet: TDataSet; pvJsonRecord:
@@ -36,18 +47,8 @@ begin
   for i := 0 to pvDataSet.FieldCount - 1 do
   begin
     lvField := pvDataSet.Fields[i];
-    case lvField.DataType of
-      ftInteger, ftWord, ftSmallint, ftLargeint:
-        pvJsonRecord.Add(lvField.FieldName, lvField.AsInteger);
-      ftBCD, ftFMTBcd, ftFloat, ftCurrency:
-        pvJsonRecord.Add(lvField.FieldName, lvField.AsFloat);
-      ftBoolean:
-        pvJsonRecord.Add(lvField.FieldName, lvField.AsBoolean);
-      ftDate, ftDateTime, ftTime:
-        pvJsonRecord.Add(lvField.FieldName, FormatDateTime('yyyy-MM-dd hh:nn.ss.zzz', lvField.AsDateTime));
-    else
-      pvJsonRecord.Add(lvField.FieldName, lvField.AsString);
-    end; 
+    AddAFieldValue(pvJsonRecord, lvField);
+
   end;
 end;
 
@@ -91,6 +92,54 @@ begin
   begin
     pvDataSet.Append;
     AssignRecordFromDValue(pvDataSet, pvDataList[i]);
+  end;
+end;
+
+procedure ConvertCurrentRecordToDValue(pvDataSet: TDataSet; pvJsonRecord:
+    TDValue; pvFields:string); overload;
+var
+  lvStrs:TArrayStrings;
+  i: Integer;
+  lvField:TField;
+begin
+  lvStrs := SplitToArrayStr(pvFields, [';', ',']);
+  for i := 0 to Length(lvStrs) - 1 do
+  begin
+    lvField := pvDataSet.FindField(lvStrs[i]);
+    if lvField <> nil then
+    begin
+      AddAFieldValue(pvJsonRecord, lvField);
+    end;
+  end;
+end;
+
+procedure AddAFieldValue(pvVal: TDValue; pvField: TField);
+begin
+  case pvField.DataType of
+    ftInteger, ftWord, ftSmallint, ftLargeint:
+      pvVal.Add(pvField.FieldName, pvField.AsInteger);
+    ftBCD, ftFMTBcd, ftFloat, ftCurrency:
+      pvVal.Add(pvField.FieldName, pvField.AsFloat);
+    ftBoolean:
+      pvVal.Add(pvField.FieldName, pvField.AsBoolean);
+    ftDate, ftDateTime, ftTime:
+      pvVal.Add(pvField.FieldName, FormatDateTime('yyyy-MM-dd hh:nn.ss.zzz', pvField.AsDateTime));
+  else
+    pvVal.Add(pvField.FieldName, pvField.AsString);
+  end;
+end;
+
+procedure ConvertDataSetToDValue(pvDataSet: TDataSet; pvDataList: TDValue;
+    pvFields:string); overload;
+var
+  lvItem:TDValue;
+begin
+  pvDataSet.First;
+  while not pvDataSet.Eof do
+  begin
+    lvItem := pvDataList.Add();
+    ConvertCurrentRecordToDValue(pvDataSet, lvItem, pvFields);
+    pvDataSet.Next;
   end;
 end;
 

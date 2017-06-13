@@ -1072,6 +1072,7 @@ begin
       checkLength();
       Result[idx] := lvValue;
       Inc(idx);
+      Inc(P);
     end;
   end;
 end;

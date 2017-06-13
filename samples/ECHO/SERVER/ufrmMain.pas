@@ -5,7 +5,8 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
-  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter, utils_async;
+  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter, utils_async,
+  System.Actions;
 
 type
   TfrmMain = class(TForm)
@@ -46,6 +47,7 @@ type
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnASyncPushClick(Sender: TObject);
+    procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFill4KClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
     procedure btnGetWorkerStateClick(Sender: TObject);
@@ -180,6 +182,11 @@ end;
 procedure TfrmMain.btnASyncPushClick(Sender: TObject);
 begin
   ASyncExecute(OnASyncWorker, nil);
+end;
+
+procedure TfrmMain.btnDisconectAllClick(Sender: TObject);
+begin
+  FTcpServer.DisconnectAll;
 end;
 
 procedure TfrmMain.btnFill4KClick(Sender: TObject);
