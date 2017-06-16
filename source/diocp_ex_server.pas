@@ -11,9 +11,12 @@
  *      2015-08-17 14:25:56
 
 *)
+
 unit diocp_ex_server;
 
 interface
+
+{$DEFINE StartEndCut}
 
 uses
   diocp_tcp_server, utils_rawPackage, utils_safeLogger, SysUtils, Classes,
@@ -170,8 +173,12 @@ begin
     inc(lvPtr);
     if r = 1 then
     begin
+{$IFDEF StartEndCut}
       // 去掉头尾
       OnDataAction(@FCacheBuffer.FRawBytes[lvStartDataLen], FCacheBuffer.FRawLength - lvStartDataLen - lvEndDataLen);
+{$ELSE}
+      OnDataAction(@FCacheBuffer.FRawBytes[0], FCacheBuffer.FRawLength );
+{$ENDIF}
       ResetPacakge(@FCacheBuffer);
     end;
 
@@ -305,12 +312,21 @@ var
   lvSendBuffer:array of byte;  
 begin
   lvOwner := TDiocpExTcpServer(Owner);
+{$IFDEF StartEndCut}
+      // 去掉头尾
   lvStartData := @lvOwner.FStartData[0];
   lvStartDataLen := lvOwner.FStartDataLen;
   lvEndData := @lvOwner.FEndData[0];
   lvEndDataLen := lvOwner.FEndDataLen;
-
   j := lvStartDataLen + pvDataLen + lvEndDataLen;
+{$ELSE}
+  lvStartDataLen:=0;
+  lvEndDataLen:=0;
+  j := pvDataLen;
+{$ENDIF}
+
+
+
   SetLength(lvSendBuffer, j);
   if lvStartDataLen > 0 then
   begin
@@ -394,7 +410,7 @@ end;
 
 procedure TDiocpStringContext.WriteAnsiString(pvData:AnsiString);
 begin
-  WriteData(PAnsiChar(pvData), Length(pvData));    
+  WriteData(PAnsiChar(pvData), Length(pvData));
 end;
 
 end.
