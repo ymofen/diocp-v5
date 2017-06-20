@@ -176,6 +176,8 @@ type
 
     function GetLocalPort: Word;
 
+    function GetLocalAddress: String;
+
     /// <summary>
     ///   -2:  ³¬Ê±
     /// </summary>
@@ -556,6 +558,16 @@ begin
 //  end;
 
   Result :=string(inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^));
+end;
+
+function TRawSocket.GetLocalAddress: String;
+var
+  lvSockAddr: TSockAddr;
+  Size: Integer;
+begin
+  Size := SizeOf(TSockAddr);
+  getsockname(SocketHandle, lvSockAddr, Size);
+  Result := string(inet_ntoa(lvSockAddr.sin_addr));
 end;
 
 function TRawSocket.GetLocalPort: Word;
