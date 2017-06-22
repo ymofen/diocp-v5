@@ -5,8 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp_tcp_server, ExtCtrls,
-  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter, utils_async,
-  System.Actions;
+  ComCtrls, utils_safeLogger, utils_BufferPool, utils_fileWriter, utils_async;
 
 type
   TfrmMain = class(TForm)
@@ -43,10 +42,13 @@ type
     chkUseBufferPool: TCheckBox;
     btnASyncPush: TButton;
     btnFill4K: TButton;
+    btnTest: TButton;
+    btnASyncStop: TButton;
     procedure actOpenExecute(Sender: TObject);
     procedure actPushToAllExecute(Sender: TObject);
     procedure actStopExecute(Sender: TObject);
     procedure btnASyncPushClick(Sender: TObject);
+    procedure btnASyncStopClick(Sender: TObject);
     procedure btnDisconectAllClick(Sender: TObject);
     procedure btnFill4KClick(Sender: TObject);
     procedure btnFindContextClick(Sender: TObject);
@@ -54,6 +56,7 @@ type
     procedure btnPoolInfoClick(Sender: TObject);
     procedure btnPostWSACloseClick(Sender: TObject);
     procedure btnReOpenTestClick(Sender: TObject);
+    procedure btnTestClick(Sender: TObject);
     procedure chkEchoClick(Sender: TObject);
     procedure chkLogDetailsClick(Sender: TObject);
     procedure chkSaveToFileClick(Sender: TObject);
@@ -99,6 +102,9 @@ uses
   uFMMonitor, diocp_core_engine, diocp_core_rawWinSocket;
 
 {$R *.dfm}
+
+type
+  TCrackTcpSvr = class(TDiocpTcpServer);
 
 constructor TfrmMain.Create(AOwner: TComponent);
 begin
@@ -181,7 +187,13 @@ end;
 
 procedure TfrmMain.btnASyncPushClick(Sender: TObject);
 begin
+  btnASyncPush.Tag := 1;
   ASyncExecute(OnASyncWorker, nil);
+end;
+
+procedure TfrmMain.btnASyncStopClick(Sender: TObject);
+begin
+  btnASyncPush.Tag := 0;
 end;
 
 procedure TfrmMain.btnDisconectAllClick(Sender: TObject);
@@ -258,6 +270,38 @@ begin
   tmrTest.Enabled := not tmrTest.Enabled;
 end;
 
+procedure TfrmMain.btnTestClick(Sender: TObject);
+var
+  lvRequest:TIocpSendRequest;
+  i: Integer;
+  lvList:TList;
+  lvBuf:Pointer;
+  ansiStr:AnsiString;
+begin
+  ansiStr := mmoPushData.Lines.Text;
+  lvList := TList.Create;
+  try
+    for i := 0 to 102400 - 1 do
+    begin
+      lvRequest := TCrackTcpSvr(FTcpServer).GetSendRequest;
+      GetMem(lvBuf, Length(ansiStr));
+      lvRequest.SetBuffer(lvBuf, Length(ansiStr), dtFreeMem);
+
+      lvList.Add(lvRequest);
+    end;
+
+    for i := 0 to lvList.Count - 1 do
+    begin
+      TCrackTcpSvr(FTcpServer).ReleaseSendRequest(TIocpSendRequest(lvList[i]));
+    end;
+
+    TCrackTcpSvr(FTcpServer).DoCleanUpSendRequest;
+  finally
+    lvList.Free;
+  end;
+
+end;
+
 
 
 procedure TfrmMain.chkLogDetailsClick(Sender: TObject);
@@ -308,7 +352,7 @@ var
   lvContext:TIocpClientContext;
 begin
   ansiStr := mmoPushData.Lines.Text;
-  while self.FTcpServer.Active do
+  while self.FTcpServer.Active and (btnASyncPush.Tag = 1) do
   begin
     lvList := TList.Create;
     try

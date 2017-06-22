@@ -1056,6 +1056,8 @@ type
     FKeepAliveTime: Cardinal;
     FOwnerEngine:Boolean;
     procedure CheckDoDestroyEngine;
+    procedure CheckCreatePoolObjects;
+    function InnerCreateSendRequest: TIocpSendRequest;
   protected
     FLocker:TIocpLocker;
 
@@ -1085,6 +1087,8 @@ type
     procedure DoAfterOpen; virtual;
 
     procedure DoAfterClose; virtual;
+
+    procedure DoCleanUpSendRequest;
 
   private
     /// <summary>
@@ -2667,6 +2671,23 @@ begin
   FOwnerEngine := pvOwner;
 end;
 
+procedure TDiocpTcpServer.CheckCreatePoolObjects;
+var
+  i:Integer;
+begin
+  // 预先创建对象，避免和其他内存块共用内存
+  {$IFDEF DIRECT_SEND}
+  for i := FSendRequestPool.Size to 100000 - 1 do
+  {$ELSE}
+  for i := FSendRequestPool.Size to 10000 - 1 do
+  {$ENDIF}
+  begin
+    FSendRequestPool.EnQueue(InnerCreateSendRequest);
+  end;
+
+  
+end;
+
 
 
 procedure TDiocpTcpServer.DisconnectAll;
@@ -3164,6 +3185,11 @@ begin
 
       FActive := True;
 
+      if UseObjectPool then
+      begin
+        CheckCreatePoolObjects;
+      end;
+
       DoAfterOpen;
       if Assigned(FOnAfterOpen) then FOnAfterOpen(Self);
     end else
@@ -3212,6 +3238,21 @@ begin
   end;
 end;
 
+function TDiocpTcpServer.InnerCreateSendRequest: TIocpSendRequest;
+begin
+  if FIocpSendRequestClass <> nil then
+  begin
+    Result := FIocpSendRequestClass.Create;
+  end else
+  begin
+    Result := TIocpSendRequest.Create;
+  end;
+  if (FDataMoniter <> nil) then
+  begin
+    InterlockedIncrement(FDataMoniter.FSendRequestCreateCounter);
+  end;
+end;
+
 procedure TDiocpTcpServer.DoAfterClose;
 begin
   
@@ -3220,6 +3261,12 @@ end;
 procedure TDiocpTcpServer.DoAfterOpen;
 begin
 
+end;
+
+procedure TDiocpTcpServer.DoCleanUpSendRequest;
+begin
+  FSendRequestPool.FreeDataObject;
+  FSendRequestPool.Clear;
 end;
 
 procedure TDiocpTcpServer.DoSendBufferCompletedEvent(pvContext:
@@ -3375,17 +3422,7 @@ begin
   end;
   if Result = nil then
   begin
-    if FIocpSendRequestClass <> nil then
-    begin
-      Result := FIocpSendRequestClass.Create;
-    end else
-    begin
-      Result := TIocpSendRequest.Create;
-    end;
-    if (FDataMoniter <> nil) then
-    begin
-      InterlockedIncrement(FDataMoniter.FSendRequestCreateCounter);
-    end;
+    Result := InnerCreateSendRequest;
   end;
   Result.Tag := 0;
   Result.FAlive := true;

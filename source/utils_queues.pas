@@ -25,6 +25,8 @@ uses
   {$DEFINE DEBUG_ON}
 {$ENDIF}
 
+{.$DEFINE USE_QUEUE_POOL}
+
 type
   TDataReleaseAction = (raNone, raObjectFree, raDispose, raFreeMem);
 
@@ -112,10 +114,7 @@ type
     FPushCounter:Integer;
     {$ENDIF}
 
-    /// <summary>
-    ///   清空所有数据
-    /// </summary>
-    procedure Clear;
+
     function InnerPop: PQueueData;
     procedure InnerAddToTail(AData: PQueueData);
   public
@@ -129,9 +128,14 @@ type
     function DeQueue(var outPointer:Pointer): Boolean; overload;
 
     /// <summary>
+    ///   清空所有数据
+    /// </summary>
+    procedure Clear;
+
+    /// <summary>
     ///   add to tail
     /// </summary>
-    procedure EnQueue(AData: Pointer);
+    procedure EnQueue(AData: Pointer; pvReleaseAction: TDataReleaseAction = raNone);
 
     /// <summary>
     ///  invoke Only Data Pointer is TObject
@@ -193,7 +197,7 @@ end;
 
 procedure __ReleaseQueueData(pvQueueData:PQueueData);
 begin
-  try
+//  try
 
     if pvQueueData = nil then Exit;
     if pvQueueData.ReleaseAction = raNone then Exit;
@@ -214,8 +218,8 @@ begin
         raDispose : Dispose(pvQueueData.Data);
       end;
     end;
-  except
-  end;
+//  except
+//  end;
   pvQueueData.Data := nil;
 end;
 
@@ -291,7 +295,11 @@ begin
     {$IFDEF DEBUG_ON}
       Inc(FPopCounter);
     {$ENDIF}
+      {$IFDEF USE_QUEUE_POOL}
       queueDataPool.Push(FHead);
+      {$ELSE}
+      Dispose(FHead);
+      {$ENDIF} 
       FHead := ANext;
     end;
     FHead := nil;
@@ -339,7 +347,11 @@ begin
   if lvTemp <> nil then
   begin
     Result := lvTemp.Data;
+    {$IFDEF USE_QUEUE_POOL}
     queueDataPool.Push(lvTemp);
+    {$ELSE}
+    Dispose(lvTemp);
+    {$ENDIF} 
   end;
 end;
 
@@ -352,7 +364,11 @@ begin
   if lvTemp <> nil then
   begin
     outPointer := lvTemp.Data;
+    {$IFDEF USE_QUEUE_POOL}
     queueDataPool.Push(lvTemp);
+    {$ELSE}
+    Dispose(lvTemp);
+    {$ENDIF}
     Result := true;
   end;
 end;
@@ -367,7 +383,11 @@ begin
   begin
     Result := lvTemp.AsObject;
     lvTemp.AsObject := nil;
+    {$IFDEF USE_QUEUE_POOL}
     queueDataPool.Push(lvTemp);
+    {$ELSE}
+    Dispose(lvTemp);
+    {$ENDIF}
   end;
 end;
 
@@ -376,7 +396,11 @@ procedure TBaseQueue.EnQueue(AData: Pointer; pvReleaseAction:
 var
   lvTemp:PQueueData;
 begin
+{$IFDEF USE_QUEUE_POOL}
   lvTemp := queueDataPool.Pop;
+{$ELSE}
+  New(lvTemp);
+{$ENDIF}
   lvTemp.Data := AData;
   lvTemp.AsObject := nil;
   lvTemp.ReleaseAction := pvReleaseAction;
@@ -388,7 +412,11 @@ procedure TBaseQueue.EnQueueObject(AData: TObject; pvReleaseAction:
 var
   lvTemp:PQueueData;
 begin
+{$IFDEF USE_QUEUE_POOL}
   lvTemp := queueDataPool.Pop;
+{$ELSE}
+  New(lvTemp);
+{$ENDIF}
   lvTemp.Data := nil;
   lvTemp.AsObject := AData;
   lvTemp.ReleaseAction := pvReleaseAction;
@@ -449,10 +477,21 @@ end;
 { TQueueDataPool }
 
 constructor TQueueDataPool.Create(AMaxSize: Integer = 2048);
+var
+  i: Integer;
+  lvBlock:PQueueData;
 begin
   inherited Create;
   FSize := AMaxSize;
   FLocker := TCriticalSection.Create;
+
+
+  // 预先分配好，避免与其他内存块一起分配(内存堆积)
+  for i := 0 to AMaxSize - 1 do
+  begin
+    New(lvBlock);
+    Push(lvBlock);
+  end;
 end;
 
 destructor TQueueDataPool.Destroy;
@@ -506,7 +545,6 @@ var
   ADoFree: Boolean;
 begin
   Assert(pvQueueData <> nil);
-
   FLocker.Enter;
   try
     ADoFree := (FCount >= FSize);
@@ -591,7 +629,13 @@ begin
   while FHead <> nil do
   begin
     ANext := FHead.Next;
+    __ReleaseQueueData(FHead);
+
+    {$IFDEF USE_QUEUE_POOL}
     queueDataPool.Push(FHead);
+    {$ELSE}
+    Dispose(FHead);
+    {$ENDIF}
     FHead := ANext;
   end;
   FTail := nil;
@@ -636,7 +680,13 @@ begin
   if lvTemp <> nil then
   begin
     Result := lvTemp.Data;
+    {$IFDEF USE_QUEUE_POOL}
+    lvTemp.Data := nil;
     queueDataPool.Push(lvTemp);
+    {$ELSE}
+    Dispose(lvTemp);
+    {$ENDIF}
+
   end;
 end;
 
@@ -649,17 +699,28 @@ begin
   if lvTemp <> nil then
   begin
     outPointer := lvTemp.Data;
+    {$IFDEF USE_QUEUE_POOL}
     queueDataPool.Push(lvTemp);
+    {$ELSE}
+    Dispose(lvTemp);
+    {$ENDIF}
     Result := true;
   end;
 end;
 
-procedure TSimpleQueue.EnQueue(AData: Pointer);
+procedure TSimpleQueue.EnQueue(AData: Pointer; pvReleaseAction:
+    TDataReleaseAction = raNone);
 var
   lvTemp:PQueueData;
 begin
+{$IFDEF USE_QUEUE_POOL}
   lvTemp := queueDataPool.Pop;
+{$ELSE}
+  New(lvTemp);
+{$ENDIF}
   lvTemp.Data := AData;
+  lvTemp.AsObject := nil;
+  lvTemp.ReleaseAction := pvReleaseAction;
   InnerAddToTail(lvTemp);
 end;
 
@@ -699,7 +760,7 @@ begin
   Inc(FCount);
 
   {$IFDEF DEBUG_ON}
-    Inc(FPushCounter);
+  Inc(FPushCounter);
   {$ENDIF}
 
 end;

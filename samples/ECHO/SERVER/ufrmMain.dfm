@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 91
     Width = 812
     Height = 364
-    ActivePage = TabSheet1
+    ActivePage = tsOperator
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -86,6 +86,24 @@ object frmMain: TfrmMain
         Caption = 'btnFill4K'
         TabOrder = 3
         OnClick = btnFill4KClick
+      end
+      object btnTest: TButton
+        Left = 232
+        Top = 208
+        Width = 75
+        Height = 25
+        Caption = 'btnTest'
+        TabOrder = 4
+        OnClick = btnTestClick
+      end
+      object btnASyncStop: TButton
+        Left = 616
+        Top = 72
+        Width = 97
+        Height = 25
+        Caption = 'btnASyncStop'
+        TabOrder = 5
+        OnClick = btnASyncStopClick
       end
     end
   end

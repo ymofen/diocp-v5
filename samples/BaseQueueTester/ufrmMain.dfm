@@ -93,6 +93,24 @@ object frmMain: TfrmMain
         TabOrder = 0
         OnClick = Button1Click
       end
+      object btnPushN: TButton
+        Left = 272
+        Top = 48
+        Width = 75
+        Height = 25
+        Caption = 'btnPushN'
+        TabOrder = 1
+        OnClick = btnPushNClick
+      end
+      object btnGetMem: TButton
+        Left = 272
+        Top = 96
+        Width = 75
+        Height = 25
+        Caption = 'btnGetMem'
+        TabOrder = 2
+        OnClick = btnGetMemClick
+      end
     end
   end
   object mmoInfo: TMemo

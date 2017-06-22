@@ -225,3 +225,8 @@ DIOCP-v5 0.0.2
    
 48: 2017-05-04 09:09:02-22
   * 添加DiocpTcpClient.TrigerDisconnectEventAfterNoneConnected属性, 为true时: 即使连接失败的情况下，触发OnDisconnected事件, 默认为true
+  
+  
+49: 2017-06-22 15:13:42
+    1.修改utils_queues默认不使用PQueueData池,可以定义编译宏[USE_QUEUE_POOL]继续使用，
+    2.使用对象池时，预创建了一些对象。避免与业务共用内存块。

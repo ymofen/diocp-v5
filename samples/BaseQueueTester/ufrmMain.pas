@@ -21,6 +21,10 @@ type
     edtSleep: TEdit;
     edtObjCounter: TEdit;
     Button1: TButton;
+    btnPushN: TButton;
+    btnGetMem: TButton;
+    procedure btnGetMemClick(Sender: TObject);
+    procedure btnPushNClick(Sender: TObject);
     procedure btnStartClick(Sender: TObject);
     procedure btnThreadInfoClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
@@ -85,6 +89,45 @@ begin
 
 end;
 
+
+procedure TfrmMain.btnGetMemClick(Sender: TObject);
+var
+  lvQue:TList;
+  i: Integer;
+  lvBlock:Pointer;
+begin
+  lvQue := TList.Create;
+  for i := 0 to 102400 do
+  begin
+    GetMem(lvBlock, 4096);
+    lvQue.Add(lvBlock);
+  end;
+
+  for i := 0 to 102400 do
+  begin
+    FreeMem(lvQue[i]);
+  end;
+  lvQue.Clear;
+  lvQue.Free;
+
+end;
+
+procedure TfrmMain.btnPushNClick(Sender: TObject);
+var
+  lvQue:TSimpleQueue;
+  i: Integer;
+  lvBlock:Pointer;
+begin
+  lvQue := TSimpleQueue.Create;
+  for i := 0 to 102400 do
+  begin
+    GetMem(lvBlock, 4096);
+    lvQue.EnQueue(lvBlock, raFreeMem);
+  end;
+  lvQue.Clear;
+  lvQue.Free;
+
+end;
 
 procedure TfrmMain.btnStartClick(Sender: TObject);
 var
