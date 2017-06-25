@@ -42,6 +42,8 @@ type
 
     procedure SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte);
 
+    procedure SendText(const s:string);
+
     property HeaderBuilder: THttpHeaderBuilder read FHeaderBuilder;
     property HttpBuffer: THttpBuffer read FHttpBuffer;
     property OnDisconnectedEvent: TNotifyEvent read FOnDisconnectedEvent write
@@ -271,6 +273,14 @@ end;
 procedure TDiocpWebSocketContext.SendPing;
 begin
   PostWSASendRequest(@WS_MSG_PING, 2, False);
+end;
+
+procedure TDiocpWebSocketContext.SendText(const s:string);
+var
+  lvBytes:TBytes;
+begin
+  lvBytes := StringToUtf8Bytes(s);
+  SendBuffer(@lvBytes[0], Length(lvBytes), OPT_TEXT);
 end;
 
 constructor TDiocpWebSocketTcpClient.Create(AOwner: TComponent);

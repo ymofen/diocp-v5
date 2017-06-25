@@ -48,6 +48,7 @@ const
 {$IFDEF MSWINDOWS}
   STRING_EMPTY_A :AnsiString = '';
 {$ENDIF}
+  STRING_EMPTY_W: WideString = '';
 
 type
 {$IFDEF MSWINDOWS}
