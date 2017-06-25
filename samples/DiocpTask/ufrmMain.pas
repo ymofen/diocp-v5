@@ -4,8 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
-  Controls, Forms, Dialogs, diocp_task, StdCtrls, Vcl.ExtCtrls, utils_async,
-  utils_queues;
+  Controls, Forms, Dialogs, diocp_task, StdCtrls, utils_async,
+  utils_queues, Vcl.ExtCtrls;
 
 type
   TfrmMain = class(TForm)
@@ -35,7 +35,7 @@ type
     FMaxCounter:Integer;
     FSpeedCounter:Integer;
     { Private declarations }
-    procedure onLogMsg(pvStrData: string);
+    procedure onLogMsg(const pvStrData: string);
 
     procedure logMessage(pvMsg: string);
     procedure DoPostSpeedTask(ASync:TASyncWorker);
@@ -113,7 +113,7 @@ begin
   FLogTask.PostATask(onLogMsg, pvMsg, true, rtPostMessage);
 end;
 
-procedure TfrmMain.onLogMsg(pvStrData: string);
+procedure TfrmMain.onLogMsg(const pvStrData: string);
 begin
   Memo1.Lines.Add(pvStrData);
 end;
