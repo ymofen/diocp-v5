@@ -10,6 +10,8 @@ unit utils_safeLogger;
 
 interface
 
+{.$DEFINE USE_QUEUE_POOL}
+
 uses
   Classes, utils_queues, SysUtils, SyncObjs
   {$IFDEF MSWINDOWS}
@@ -35,6 +37,8 @@ const
 
   LogAllLevels = [lgvError, lgvWarning, lgvHint, lgvMessage, lgvDebug, lgvWriteFile];
 
+  STRING_EMPTY = '';
+
 type
   TSafeLogger = class;
   TLogDataObject = class;
@@ -52,6 +56,8 @@ type
     FMsg:string;
     FMsgType:string;
     FLogProc:TLogProc;
+
+    procedure DoCleanUp;
   end;
 
   TBaseAppender = class(TObject)
@@ -255,8 +261,10 @@ resourcestring
   STRING_ERR_POSTLOGERR = '投递日志信息[%s]时出现了异常:%s';
   STRING_ERR_LOGERR = '记录日志信息时出现了异常:%s';
 
+{$IFDEF USE_QUEUE_POOL}
 var
   __dataObjectPool:TBaseQueue;
+{$ENDIF}
   {$IFDEF MSWINDOWS}
   {$ELSE}
   {$ENDIF}
@@ -443,8 +451,12 @@ begin
     lvPData :=TLogDataObject(FDataQueue.DeQueueObject);
     if lvPData = nil then Break;
     InterlockedDecrement(__logCounter);
-
+    {$IFDEF USE_QUEUE_POOL}
+    lvPData.DoCleanUp;
     __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+    {$ELSE}
+    lvPData.Free;
+    {$ENDIF}
   end;
 end;
 
@@ -493,7 +505,12 @@ begin
     except
       IncErrorCounter;
     end;
+   {$IFDEF USE_QUEUE_POOL}
+    lvPData.DoCleanUp;
     __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+    {$ELSE}
+    lvPData.Free;
+    {$ENDIF}
   end;
 end;
 
@@ -606,9 +623,13 @@ begin
 
     try
       SetCurrentThreadInfo(Name +  ':logMessage START - 1.0');
+      {$IFDEF USE_QUEUE_POOL}
       lvPData :=TLogDataObject(__dataObjectPool.DeQueueObject);
       SetCurrentThreadInfo(Name +  ':logMessage START - 1.1');
       if lvPData = nil then lvPData:=TLogDataObject.Create;
+      {$ELSE}
+      lvPData:=TLogDataObject.Create;
+      {$ENDIF}
     {$IFDEF MSWINDOWS}
       lvPData.FThreadID := GetCurrentThreadId;
     {$ELSE}
@@ -806,8 +827,12 @@ begin
                     FSafeLogger.IncErrorCounter;
                   end;
                 end;
-                /// push back to logData pool
+               {$IFDEF USE_QUEUE_POOL}
+                lvPData.DoCleanUp;
                 __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+                {$ELSE}
+                lvPData.Free;
+                {$ENDIF}
               end else
               begin
                 break;
@@ -1043,12 +1068,37 @@ begin
   
 end;
 
+{$IFDEF USE_QUEUE_POOL}
+procedure InnerPushPoolObjects();
+var
+  i: Integer;
+  lvPData:TLogDataObject;
+begin
+
+  for i := 0 to 102400 - 1 do
+  begin
+    lvPData:=TLogDataObject.Create;
+    __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
+  end;
+
+end;
+{$ENDIF}
+
+procedure TLogDataObject.DoCleanUp;
+begin
+  FMsg := STRING_EMPTY;
+  FMsgType := STRING_EMPTY;
+end;
+
 initialization
   __logCounter := 0;
   __ProcessIDStr := IntToStr(GetCurrentProcessId);
   __GetThreadStackFunc := nil;
+  {$IFDEF USE_QUEUE_POOL}
   __dataObjectPool := TBaseQueue.Create;
   __dataObjectPool.Name := 'safeLogger.LogDataPool';
+  InnerPushPoolObjects;
+  {$ENDIF}
   sfLogger := TSafeLogger.Create();
   sfLogger.Name := 'defaultLogger';
   sfLogger.setAppender(TLogFileAppender.Create(True));
@@ -1059,9 +1109,9 @@ initialization
 finalization
   sfLogger.Free;
 
-  //
+  {$IFDEF USE_QUEUE_POOL}
   __dataObjectPool.Free;
-
+  {$ENDIF}
 
   {$IFDEF MSWINDOWS}
   {$ELSE}

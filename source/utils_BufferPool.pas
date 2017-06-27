@@ -15,7 +15,7 @@ interface
 {$DEFINE SPINLOCK_SLEEP}
 
 /// Ê¹ÓÃÄÚ´æ³Ø
-{$DEFINE USE_MEM_POOL}
+{.$DEFINE USE_MEM_POOL}
 
 uses
   SyncObjs, SysUtils, Classes

@@ -158,6 +158,7 @@ type
     FAutoConnectTick:Cardinal;
 
   private
+    procedure CheckCreatePoolObjects;
     /// <summary>
     ///  检测使用重新连接 ,单线程使用，仅供DoAutoReconnect调用
     ///    间隔最少5秒以上
@@ -636,6 +637,17 @@ begin
   else
     Result := TIocpRemoteContext(pvContext);
 end;
+
+procedure TDiocpTcpClient.CheckCreatePoolObjects;
+var
+  i: Integer;
+begin
+  for i := 0 to 20000 -1 do
+  begin
+
+  end;
+end;
+
 
 function TDiocpTcpClient.GetCount: Integer;
 begin

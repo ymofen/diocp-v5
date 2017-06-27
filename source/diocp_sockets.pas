@@ -72,6 +72,7 @@ type
   /// </summary>
   TDiocpCustomContext = class(TObject)
   private
+    FReleaseBack:TNotifyContextEvent;
     FCreateSN:Integer;
     // 如果使用池，关闭后将会回归到池中
     FOwnePool:TSafeQueue;
@@ -771,6 +772,10 @@ type
     /// </summary>
     function GetSendRequest: TIocpSendRequest;
 
+    function InnerCreateSendRequest: TIocpSendRequest;
+
+    function InnerCreateRecvRequest: TIocpRecvRequest;
+
     /// <summary>
     ///   push back to pool
     /// </summary>
@@ -823,7 +828,6 @@ type
     procedure AddToOnlineList(pvObject: TDiocpCustomContext);
 
 
-
     /// <summary>
     ///   从在线列表中移除
     /// </summary>
@@ -852,6 +856,8 @@ type
     ///   从池中获取的连接不能进行重连(关闭时自动进入了池)
     /// </summary>
     function GetContextFromPool: TDiocpCustomContext;
+
+    procedure ReleaseContext(pvContext:TDiocpCustomContext);
 
     /// <summary>
     ///   原子操作添加引用计数(一定要有对应的DecRefCounter);
@@ -979,6 +985,7 @@ type
     ///   true: 释放时这个引擎会一起释放
     /// </param>
     procedure BindDiocpEngine(const pvEngine: TIocpEngine; pvOwner: Boolean = true);
+    procedure CheckCreatePoolObjects(pvMaxConnection: Integer);
     procedure IncOperaOptions(const pvFlag:Integer);
     procedure DecOperaOptions(const pvFlag:Integer);
     function CheckOperaFlag(const pvFlag:Integer): Boolean;
@@ -1827,8 +1834,6 @@ begin
 
   if FDataMoniter <> nil then FDataMoniter.Free;
 
-  FSendRequestPool.FreeDataObject;
-  FRecvRequestPool.FreeDataObject;
 
   FOnlineContextList.Free;
 
@@ -1895,6 +1900,26 @@ begin
     
   FIocpEngine := pvEngine;
   FOwnerEngine := pvOwner;
+end;
+
+procedure TDiocpCustom.CheckCreatePoolObjects(pvMaxConnection: Integer);
+var
+  i: Integer;
+begin
+  for i := 0 to pvMaxConnection -1 do
+  begin
+    FContextPool.EnQueueObject(CreateContext, raObjectFree);
+  end;
+
+  for i := 0 to pvMaxConnection -1 do
+  begin
+    self.FSendRequestPool.EnQueueObject(InnerCreateSendRequest, raObjectFree);
+  end;
+
+  for i := 0 to pvMaxConnection -1 do
+  begin
+    self.FRecvRequestPool.EnQueueObject(InnerCreateRecvRequest, raObjectFree);
+  end;
 end;
 
 procedure TDiocpCustom.CheckDoDestroyEngine;
@@ -2061,7 +2086,13 @@ begin
     
     pvObject.DoCleanUp;
     pvObject.FOwner := nil;
-    FSendRequestPool.EnQueue(pvObject);
+    if self.UseObjectPool then
+    begin
+      FSendRequestPool.EnQueueObject(pvObject, raObjectFree);
+    end else
+    begin
+      pvObject.Free;
+    end;
     Result := true;
   end else
   begin
@@ -2264,16 +2295,15 @@ end;
 
 function TDiocpCustom.GetSendRequest: TIocpSendRequest;
 begin
-  Result := TIocpSendRequest(FSendRequestPool.DeQueue);
+  if FUseObjectPool then
+  begin
+    Result := TIocpSendRequest(FSendRequestPool.DeQueueObject);
+  end else
+  begin
+    result := nil;
+  end;
   if Result = nil then
   begin
-    if FIocpSendRequestClass <> nil then
-    begin
-      Result := FIocpSendRequestClass.Create;
-    end else
-    begin
-      Result := TIocpSendRequest.Create;
-    end;
     if (FDataMoniter <> nil) then
       FDataMoniter.IncSendRequestCreateCounter;
   end;
@@ -2422,25 +2452,42 @@ end;
 
 function TDiocpCustom.GetContextFromPool: TDiocpCustomContext;
 begin
-  Result := TDiocpCustomContext(FContextPool.DeQueueObject);
+  if self.UseObjectPool then
+  begin
+    Result := TDiocpCustomContext(FContextPool.DeQueueObject);
+  end else
+  begin
+    Result := nil;
+  end;
   if Result = nil then
   begin
     Result := CreateContext;
-    Result.Owner := Self;
   end;
+  Result.Owner := Self;
+  Result.FReleaseBack := self.ReleaseContext;
   Result.FOwnePool := FContextPool;
   Result.FObjectAlive := True;
+end;
+
+procedure TDiocpCustom.ReleaseContext(pvContext:TDiocpCustomContext);
+begin
+  if self.UseObjectPool then
+  begin
+    self.FContextPool.EnQueueObject(pvContext, raObjectFree);
+  end else
+  begin
+    pvContext.Free;
+  end;
 end;
 
 function TDiocpCustom.GetRecvRequest: TIocpRecvRequest;
 begin
   if UseObjectPool then
   begin
-    Result := TIocpRecvRequest(FRecvRequestPool.DeQueue);
+    Result := TIocpRecvRequest(FRecvRequestPool.DeQueueObject);
     if Result = nil then
     begin
-      Result := TIocpRecvRequest.Create;
-      if FDataMoniter <> nil then FDataMoniter.IncRecvRequestCreateCounter;
+      Result := InnerCreateRecvRequest;
     end;
     Result.Tag := 0;
     Result.FAlive := true;
@@ -2506,8 +2553,7 @@ begin
       // 清理Buffer
      // pvObject.DoCleanUp;
       pvObject.FContext := nil;
-    
-      FRecvRequestPool.EnQueue(pvObject);
+      FRecvRequestPool.EnQueueObject(pvObject, raObjectFree);
       Result := true;
     end else
     begin
@@ -2587,10 +2633,29 @@ begin
   Result := ((FOperaOptions and FOperaOptions) <> 0);
 end;
 
+function TDiocpCustom.InnerCreateRecvRequest: TIocpRecvRequest;
+begin
+  Result := TIocpRecvRequest.Create;
+  if FDataMoniter <> nil then FDataMoniter.IncRecvRequestCreateCounter;
+end;
+
+function TDiocpCustom.InnerCreateSendRequest: TIocpSendRequest;
+begin
+  if FIocpSendRequestClass <> nil then
+  begin
+    Result := FIocpSendRequestClass.Create;
+  end else
+  begin
+    Result := TIocpSendRequest.Create;
+  end;
+end;
+
 procedure TDiocpCustom.OnCreateContext(const pvContext: TDiocpCustomContext);
 begin
 
 end;
+
+
 
 function TDiocpCustom.WaitForContext(pvTimeOut: Cardinal): Boolean;
 var
@@ -3817,12 +3882,11 @@ end;
 
 procedure TDiocpCustomContext.ReleaseBack;
 begin
-  if FOwnePool <> nil then
-  begin
-    Assert(FObjectAlive=True, '请勿重复进行归还池操作');
-    Self.FObjectAlive := False;
-    FOwnePool.EnQueueObject(Self, raObjectFree);
-  end;
+  Assert(FObjectAlive=True, '请勿重复进行归还池操作');
+  Self.FObjectAlive := False;
+  FReleaseBack(self);
+
+
 end;
 
 procedure TDiocpCustomContext.SetMaxSendingQueueSize(pvSize:Integer);
