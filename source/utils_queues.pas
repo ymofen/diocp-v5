@@ -492,6 +492,9 @@ begin
     New(lvBlock);
     Push(lvBlock);
   end;
+
+  FPushCounter := 0;
+  FPopCounter := 0;
 end;
 
 destructor TQueueDataPool.Destroy;
@@ -500,7 +503,9 @@ var
 begin
   {$IFDEF DEBUG_ON}
   if IsDebugMode then
+  begin
     Assert(FPopCounter = FPushCounter, ('PopCounter <> PushCounter'));
+  end;
   {$ENDIF}
 
   FLocker.Enter;
