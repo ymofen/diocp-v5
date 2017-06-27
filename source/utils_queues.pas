@@ -492,9 +492,11 @@ begin
     New(lvBlock);
     Push(lvBlock);
   end;
-
+  
+  {$IFDEF DEBUG_ON}
   FPushCounter := 0;
   FPopCounter := 0;
+  {$ENDIF}
 end;
 
 destructor TQueueDataPool.Destroy;
