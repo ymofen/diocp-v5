@@ -1093,6 +1093,7 @@ resourcestring
 var
   __innerLogger:TSafeLogger;
   __create_sn:Integer;
+  __diocp_counter:Integer;
 
 type
   TContextDoublyLinked = class(TObject)
@@ -1778,8 +1779,18 @@ begin
 end;
 
 constructor TDiocpCustom.Create(AOwner: TComponent);
+var
+  r:Integer;
 begin
   inherited Create(AOwner);
+  if Length(Name) = 0 then
+  begin
+    r := InterlockedIncrement(__diocp_counter);
+
+    Name := Format('%s_%d', [self.ClassName, r]);
+  end;
+
+
 
   UseObjectPool := True;
 
@@ -3883,9 +3894,12 @@ end;
 
 procedure TDiocpCustomContext.ReleaseBack;
 begin
-  Assert(FObjectAlive=True, '请勿重复进行归还池操作');
-  Self.FObjectAlive := False;
-  FReleaseBack(self);
+  if Assigned(FReleaseBack) then
+  begin    // 只有GetFromPool的才需要进行归还到池
+    Assert(FObjectAlive=True, '请勿重复进行归还池操作');
+    Self.FObjectAlive := False;
+    FReleaseBack(self);
+  end;
 
 
 end;
