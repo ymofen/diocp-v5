@@ -2304,6 +2304,7 @@ begin
   end;
   if Result = nil then
   begin
+    Result := self.InnerCreateSendRequest;
     if (FDataMoniter <> nil) then
       FDataMoniter.IncSendRequestCreateCounter;
   end;
