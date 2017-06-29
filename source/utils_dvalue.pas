@@ -386,6 +386,11 @@ type
     function Add(const pvName: string; pvValue: Boolean): TDValue; overload;
     function Add(const pvName: string; pvValue: Double): TDValue; overload;
 
+    /// <summary>
+    ///  添加一个DValue,如果pvValue为null不进行添加
+    /// </summary>
+    function Add(const pvName: string; pvValue: TDValue): TDValue; overload;
+
     function AddVar(const pvName: string; const pvValue: Variant): TDValue;
 
 
@@ -1924,6 +1929,19 @@ begin
   FChildren.Add(Result);
 end;
 
+function TDValue.Add(const pvName: string; pvValue: TDValue): TDValue;
+begin
+  if pvValue = nil then Exit;
+  CheckSetNodeType(vntObject);
+
+  Result := TDValue.Create();
+  Result.CloneValueFrom(pvValue);
+  Result.FParent := Self;
+  Result.FName.AsString := pvName;
+  FChildren.Add(Result);  
+end;
+
+
 function TDValue.Add(const pvName: String; pvType: TDValueObjectType): TDValue;
 begin
   CheckSetNodeType(vntObject);
@@ -3075,5 +3093,6 @@ function TDValueItem.SizeOf: Integer;
 begin
   Result := GetDValueSize(@FRawValue);
 end;
+
 
 end.
