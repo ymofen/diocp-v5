@@ -182,6 +182,11 @@ type
 
     procedure GetEntrySetList(pvList:TList);
 
+    /// <summary>
+    ///  进行一个赋值，如果键值存在，则不进行赋值， 返回false
+    /// </summary>
+    function TrySetValue(pvKey:String; const Value: Pointer): Boolean;
+
     property Buckets[AIndex: Cardinal]: PDHashData read GetBuckets;
 
     property BucketSize: Cardinal read FBucketSize;
@@ -918,6 +923,45 @@ begin
     end;
   end;
 
+end;
+
+function TDHashTable.TrySetValue(pvKey:String; const Value: Pointer): Boolean;
+var
+  lvPData, lvBucket, lvCurrData:PDHashData;
+  lvIndex, lvHashValue:Cardinal;
+  lvDataKey  : String;
+begin
+  Result := False;
+  lvPData := nil;
+  lvDataKey   := LowerCase(pvKey);
+  lvHashValue := hashOf(lvDataKey);
+  
+  lvIndex:=lvHashValue mod FBucketSize;
+  lvCurrData:=FBuckets[lvIndex];
+
+  while Assigned(lvCurrData) do
+  begin
+    //compare hash value
+    if (lvCurrData.Hash = lvHashValue) and (SameText(lvDataKey, lvCurrData.Key)) then
+    begin
+      lvPData := lvCurrData;
+      Exit;
+    end;
+    lvCurrData:=lvCurrData.Next;
+  end;
+
+
+  // add
+  CreateHashData(lvBucket);
+  lvBucket.Data:=Value;
+  lvBucket.Hash:=lvHashValue;
+  lvBucket.Key := pvKey;
+
+  lvBucket.Next:=FBuckets[lvIndex];
+  FBuckets[lvIndex]:=lvBucket;
+
+  Inc(FCount);
+  Result := True;
 end;
 
 end.
