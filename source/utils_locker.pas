@@ -42,7 +42,7 @@ type
     constructor Create(pvName: String = '');
     destructor Destroy; override;
 
-    procedure lock(pvDebugInfo: String = '');
+    procedure lock(const pvDebugInfo: String = '');
     procedure unLock;
 
     property EnterCount: Integer read GetEnterCount;
@@ -94,7 +94,7 @@ begin
   {$ENDIF}
 end;
 
-procedure TIocpLocker.lock(pvDebugInfo: String = '');
+procedure TIocpLocker.lock(const pvDebugInfo: String = '');
 begin
 // unsafe
 //  FTryEnterInfo := pvDebugInfo;

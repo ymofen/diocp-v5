@@ -574,6 +574,8 @@ type
     /// </summary>
     function PostRecvRequest(pvBuffer:PAnsiChar; len:Cardinal): Boolean; overload;
 
+    procedure CheckCreateRecvBuffer;
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -754,12 +756,16 @@ type
 
     FCount: Integer;
 
-    // sendRequest pool
+    // AcceptEx
     FAcceptExRequestPool: TBaseQueue;
     // clientContext pool
     FContextPool: TBaseQueue;  
 
     FListenSocket: TRawSocket;
+
+    function InnerCreateAcceptExRequest: TIocpAcceptExRequest;
+
+    function InnerCreateClientContext: TIocpClientContext;
   protected
     FClientContextClass: TIocpClientContextClass;
     /// <summary>
@@ -770,6 +776,8 @@ type
     ///   释放连接对象，归还到对象池
     /// </summary>
     function ReleaseClientContext(pvObject:TIocpClientContext): Boolean;
+
+    procedure CheckCreatePoolObjects(pvMaxNum: Integer);
   public
     constructor Create(AOwner: TDiocpTcpServer);
 
@@ -799,6 +807,8 @@ type
     procedure ClearObjects;
 
     property ListenSocket: TRawSocket read FListenSocket;
+
+
 
   end;
 
@@ -1056,8 +1066,8 @@ type
     FKeepAliveTime: Cardinal;
     FOwnerEngine:Boolean;
     procedure CheckDoDestroyEngine;
-    procedure CheckCreatePoolObjects;
     function InnerCreateSendRequest: TIocpSendRequest;
+    function InnerCreateRecvRequest: TIocpRecvRequest;
   protected
     FLocker:TIocpLocker;
 
@@ -1106,6 +1116,8 @@ type
         pvErrorCode: Integer);
     procedure InnerAddToDebugStrings(const pvMsg: String);
   public
+
+    procedure CheckCreatePoolObjects(pvMaxNum:Integer);
 
     /// <summary>
     ///   绑定一个Iocp引擎
@@ -2671,21 +2683,29 @@ begin
   FOwnerEngine := pvOwner;
 end;
 
-procedure TDiocpTcpServer.CheckCreatePoolObjects;
+procedure TDiocpTcpServer.CheckCreatePoolObjects(pvMaxNum:Integer);
 var
-  i:Integer;
+  i, j:Integer;
+  lvRecv:TIocpRecvRequest;
 begin
+  FDefaultListener.FAcceptorMgr.CheckCreatePoolObjects(pvMaxNum);
+
   // 预先创建对象，避免和其他内存块共用内存
-  {$IFDEF DIRECT_SEND}
-  for i := FSendRequestPool.Size to 100000 - 1 do
-  {$ELSE}
-  for i := FSendRequestPool.Size to 10000 - 1 do
-  {$ENDIF}
+  j := pvMaxNum * 10;
+  for i := FSendRequestPool.Size to j - 1 do
   begin
     FSendRequestPool.EnQueue(InnerCreateSendRequest);
   end;
 
-  
+
+  // 预先创建对象，避免和其他内存块共用内存
+  j := pvMaxNum * 2;
+  for i := FRecvRequestPool.Size to j - 1 do
+  begin
+    lvRecv := InnerCreateRecvRequest;
+    lvRecv.CheckCreateRecvBuffer;
+    FRecvRequestPool.EnQueue(lvRecv);
+  end;
 end;
 
 
@@ -3167,8 +3187,6 @@ begin
       // 开启IOCP引擎
       FIocpEngine.CheckStart;
 
-      if FDataMoniter <> nil then FDataMoniter.clear;
-
       if FListeners.FList.Count = 0 then
       begin
         FDefaultListener.FListenAddress := FDefaultListenAddress;
@@ -3176,7 +3194,6 @@ begin
         FDefaultListener.FIPVersion := IP_V4;
         FDefaultListener.Start(FIocpEngine);
         FDefaultListener.PostAcceptExRequest(100);
-
       end else
       begin
         FListeners.Start(FIocpEngine);
@@ -3184,11 +3201,6 @@ begin
       end;
 
       FActive := True;
-
-      if UseObjectPool then
-      begin
-        CheckCreatePoolObjects;
-      end;
 
       DoAfterOpen;
       if Assigned(FOnAfterOpen) then FOnAfterOpen(Self);
@@ -3236,6 +3248,14 @@ begin
   begin
     FDataMoniter := TIocpDataMonitor.Create;
   end;
+end;
+
+function TDiocpTcpServer.InnerCreateRecvRequest: TIocpRecvRequest;
+begin
+  Result := TIocpRecvRequest.Create;
+  Result.FOwner := Self;
+  if FDataMoniter <> nil then FDataMoniter.IncRecvRequestCreateCounter;
+
 end;
 
 function TDiocpTcpServer.InnerCreateSendRequest: TIocpSendRequest;
@@ -3380,23 +3400,15 @@ begin
     Result := TIocpRecvRequest(FRecvRequestPool.DeQueue);
     if Result = nil then
     begin
-      Result := TIocpRecvRequest.Create;
-      if FDataMoniter <> nil then FDataMoniter.IncRecvRequestCreateCounter;
+      Result := InnerCreateRecvRequest;
     end;
-    Result.Tag := 0;
-    Result.FAlive := true;
-    //Result.DoCleanup;
-    Result.FOwner := Self;
-    if FDataMoniter <> nil then FDataMoniter.IncRecvRequestOutCounter;
   end else
   begin
-    Result := TIocpRecvRequest.Create;
-    if FDataMoniter <> nil then FDataMoniter.IncRecvRequestCreateCounter;
-    Result.Tag := 0;
-    Result.FAlive := true;
-    Result.FOwner := Self;
-    if FDataMoniter <> nil then FDataMoniter.IncRecvRequestOutCounter;
+    Result := InnerCreateRecvRequest;
   end;
+  Result.Tag := 0;
+  Result.FAlive := true;
+  if FDataMoniter <> nil then FDataMoniter.IncRecvRequestOutCounter;
 end;
 
 function TDiocpTcpServer.GetSendRequest: TIocpSendRequest;
@@ -3591,14 +3603,14 @@ begin
         lvBucket:= lvNextBucket;
       end;
     end;
+
+    for i := 0 to j - 1 do
+    begin
+      lvKickOutList[i].RequestDisconnect('超时检测主动断开');
+    end;
   finally
     FLocker.unLock;
   end;
-  for i := 0 to j - 1 do
-  begin
-    lvKickOutList[i].RequestDisconnect('超时检测主动断开');
-  end;
-
   {$ELSE}
   FLocker.lock('KickOut');
   try
@@ -3744,6 +3756,7 @@ begin
   FListenSocket := TRawSocket.Create;
 
   FAcceptExRequestPool := TBaseQueue.Create;
+
 end;
 
 destructor TIocpAcceptorMgr.Destroy;
@@ -3759,49 +3772,40 @@ begin
   inherited Destroy;
 end;
 
+procedure TIocpAcceptorMgr.CheckCreatePoolObjects(pvMaxNum: Integer);
+var
+  i: Integer;
+begin
+  for i := FAcceptExRequestPool.Size to 110 do
+  begin
+    self.FAcceptExRequestPool.EnQueue(InnerCreateAcceptExRequest);
+  end;
+
+  for i := FContextPool.Size to pvMaxNum + 200 -1 do
+  begin
+    FContextPool.EnQueue(InnerCreateClientContext);
+  end;
+end;
+
 function TIocpAcceptorMgr.GetClientContext: TIocpClientContext;
 var
   lvClientClass:TIocpClientContextClass;
 begin
   if not FOwner.FUseObjectPool then
   begin
-    lvClientClass := FClientContextClass;
-    if lvClientClass = nil then lvClientClass := FOwner.FClientContextClass;
-    if lvClientClass = nil then lvClientClass := TIocpClientContext;
-
-    Result := lvClientClass.Create;
-    Result.FAcceptorMgr := Self;
-    FOwner.OnCreateClientContext(Result);
-    if (FOwner.FDataMoniter <> nil) then
-    begin
-      InterlockedIncrement(FOwner.FDataMoniter.FContextCreateCounter);
-      InterlockedIncrement(FOwner.FDataMoniter.FContextOutCounter);
-    end;
-    Result.FSendRequestLink.SetMaxSize(FOwner.FMaxSendingQueueSize);
+    Result := InnerCreateClientContext;
   end else
   begin
     Result := TIocpClientContext(FContextPool.DeQueue);
     if Result = nil then
     begin
-      lvClientClass := FClientContextClass;
-      if lvClientClass = nil then lvClientClass := FOwner.FClientContextClass;
-      if lvClientClass = nil then lvClientClass := TIocpClientContext;
-
-      Result := lvClientClass.Create;
-      Result.FAcceptorMgr := Self;
-      FOwner.OnCreateClientContext(Result);
-
-      if (FOwner.FDataMoniter <> nil) then
-      begin
-        InterlockedIncrement(FOwner.FDataMoniter.FContextCreateCounter);
-      end;
-      Result.FSendRequestLink.SetMaxSize(FOwner.FMaxSendingQueueSize);
+      Result := InnerCreateClientContext;
     end;
-    if (FOwner.FDataMoniter <> nil) then
-      InterlockedIncrement(FOwner.FDataMoniter.FContextOutCounter);
-
   end;
-
+  if (FOwner.FDataMoniter <> nil) then
+  begin
+    InterlockedIncrement(FOwner.FDataMoniter.FContextOutCounter);
+  end;
   Result.FAlive := True;
   Result.DoCleanUp;
   Result.Owner := FOwner;
@@ -3856,7 +3860,7 @@ end;
 
 function TIocpAcceptorMgr.GetRequestObject: TIocpAcceptExRequest;
 begin
-  if FOwner.UseObjectPool then
+  if FOwner.FUseObjectPool then
   begin
     Result := TIocpAcceptExRequest(FAcceptExRequestPool.DeQueue);
   end else
@@ -3866,11 +3870,51 @@ begin
   
   if Result = nil then
   begin
-    Result := TIocpAcceptExRequest.Create(FOwner);
-    if (FOwner.FDataMoniter <> nil) then
-      FOwner.DataMoniter.IncAcceptExObjectCounter;
+    Result := InnerCreateAcceptExRequest;
   end;
   InterlockedIncrement(FCount);
+end;
+
+ procedure TIocpAcceptorMgr.ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
+ begin
+ {$IFDEF DIOCP_DEBUG}
+   pvRequest.CheckThreadOut;
+ {$ENDIF}
+   pvRequest.FAcceptorMgr := nil;
+   pvRequest.FClientContext := nil;
+   if FOwner.FUseObjectPool then
+   begin
+     FAcceptExRequestPool.EnQueue(pvRequest);
+   end else
+   begin
+     pvRequest.Free;
+   end;
+   InterlockedDecrement(FCount);
+ end;
+
+function TIocpAcceptorMgr.InnerCreateAcceptExRequest: TIocpAcceptExRequest;
+begin
+  Result := TIocpAcceptExRequest.Create(FOwner);
+  if (FOwner.FDataMoniter <> nil) then
+    FOwner.DataMoniter.IncAcceptExObjectCounter;
+end;
+
+function TIocpAcceptorMgr.InnerCreateClientContext: TIocpClientContext;
+var
+  lvClientClass:TIocpClientContextClass;
+begin
+  lvClientClass := FClientContextClass;
+  if lvClientClass = nil then lvClientClass := FOwner.FClientContextClass;
+  if lvClientClass = nil then lvClientClass := TIocpClientContext;
+
+  Result := lvClientClass.Create;
+  Result.FAcceptorMgr := Self;
+  FOwner.OnCreateClientContext(Result);
+  if (FOwner.FDataMoniter <> nil) then
+  begin
+    InterlockedIncrement(FOwner.FDataMoniter.FContextCreateCounter);
+  end;
+  Result.FSendRequestLink.SetMaxSize(FOwner.FMaxSendingQueueSize);
 end;
 
 procedure TIocpAcceptorMgr.RegisterContextClass(pvContextClass:
@@ -3905,22 +3949,6 @@ begin
   end;
 end;
 
-procedure TIocpAcceptorMgr.ReleaseRequestObject(pvRequest:TIocpAcceptExRequest);
-begin
-{$IFDEF DIOCP_DEBUG}
-  pvRequest.CheckThreadOut;
-{$ENDIF}
-  pvRequest.FAcceptorMgr := nil;
-  pvRequest.FClientContext := nil;
-  if FOwner.UseObjectPool then
-  begin
-    FAcceptExRequestPool.EnQueue(pvRequest);
-  end else
-  begin
-    pvRequest.Free;
-  end;             
-  InterlockedDecrement(FCount);
-end;
 
 function TIocpAcceptorMgr.WaitForCancel(pvTimeOut: Cardinal): Boolean;
 var
@@ -4115,6 +4143,16 @@ procedure TIocpAcceptExRequest.ResponseDone;
 begin
   inherited;
   FAcceptorMgr.ReleaseRequestObject(Self);
+end;
+
+procedure TIocpRecvRequest.CheckCreateRecvBuffer;
+begin
+  if FInnerBuffer.len <> FOwner.FWSARecvBufferSize then
+  begin
+    if FInnerBuffer.len > 0 then FreeMem(FInnerBuffer.buf);
+    FInnerBuffer.len := FOwner.FWSARecvBufferSize;
+    GetMem(FInnerBuffer.buf, FInnerBuffer.len);
+  end;
 end;
 
 constructor TIocpRecvRequest.Create;
