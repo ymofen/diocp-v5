@@ -197,8 +197,6 @@ type
     FRequestDisconnect:Boolean;
 
 
-    FManulPostWSARecvRequest:Boolean;
-
 
 
     FDebugInfo: string;
@@ -512,12 +510,6 @@ type
     ///   最后交互数据的时间点
     /// </summary>
     property LastActivity: Cardinal read FLastActivity;
-
-    /// <summary>
-    ///   手动投递PostRecv请求, 处理完接收请求收不自动投递接收请求(默认为false)
-    /// </summary>
-    property ManulPostWSARecvRequest: Boolean read FManulPostWSARecvRequest write
-        FManulPostWSARecvRequest;
 
     property Owner: TDiocpTcpServer read FOwner write SetOwner;
 
@@ -1568,7 +1560,7 @@ begin
 
     try
       {$IFDEF DIOCP_DEBUG}
-      CheckThreadIn;
+      CheckThreadIn('InnerCloseContext');
       try
       {$ENDIF}
         if FOwner.Active then
@@ -1725,6 +1717,8 @@ end;
 constructor TIocpClientContext.Create;
 begin
   inherited Create;
+  FWSARecvRef := 0;
+  
   FCreateSN := InterlockedIncrement(__create_sn);
 
   FDebugStrings := TStringList.Create;
@@ -2004,19 +1998,21 @@ begin
   inherited Destroy;
 end;
 
-procedure TIocpClientContext.CheckThreadIn;
+procedure TIocpClientContext.CheckThreadIn(const pvDebugInfo: string);
 begin
   if FCheckThreadId <> 0 then
   begin
     //s := GetDebugString;
-    raise Exception.CreateFmt('(%d,%d)当前对象已经被其他线程正在使用',
-       [utils_strings.GetCurrentThreadID, FCheckThreadId]);
+    raise Exception.CreateFmt('%s=>(%d,%d)当前对象已经被其他线程正在使用',
+       [pvDebugInfo, utils_strings.GetCurrentThreadID, FCheckThreadId]);
   end;
   FCheckThreadId := utils_strings.GetCurrentThreadID;
+  FDebugInfo := pvDebugInfo;
 end;
 
 procedure TIocpClientContext.CheckThreadOut;
 begin
+  FDebugInfo := STRING_EMPTY;
   FCheckThreadId := 0;
 end;
 
@@ -2032,18 +2028,37 @@ begin
   Result := tick_diff(FWorkerStartTick, GetTickCount);  
 end;
 
+procedure TIocpClientContext.DecRecvRef;
+var
+  j:Integer;
+begin
+  j := InterlockedDecrement(FWSARecvRef);
+  if j < 0 then
+  begin
+    Assert(false, 'error');
+  end;
+  if j = 0 then
+  begin
+    if (not FRequestDisconnect) then
+    begin 
+      PostWSARecvRequest;
+    end;
+  end;
+end;
+
 procedure TIocpClientContext.DoCleanUp;
 begin
   {$IFDEF DIOCP_DEBUG}
-  CheckThreadIn;
+  CheckThreadIn('DoCleanUp');
   try
   {$ENDIF}
     FLastActivity := 0;
     FRequestClose := 0;
 
+    FWSARecvRef := 0;
+
     FOwner := nil;
     FRequestDisconnect := false;
-    FManulPostWSARecvRequest := false;
     FSending := false;
 
     FWorkerEndTick := 0;
@@ -2236,6 +2251,14 @@ begin
   Result := FOwner.GetSendRequest;
   Assert(Result <> nil);
   Result.FClientContext := self;
+end;
+
+procedure TIocpClientContext.IncRecvRef;
+var
+  j:Integer;
+begin
+  j := InterlockedIncrement(FWSARecvRef);
+  Assert(j > 0, 'error IncRecvRef');
 end;
 
 
@@ -4185,6 +4208,10 @@ begin
   try
     lvDNACounter := Self.FCounter;
 
+    InterlockedIncrement(self.FClientContext.FRecvRequestCounter);
+    FClientContext.IncRecvRef;
+
+
     {$IFDEF DIOCP_DEBUG}
     InterlockedDecrement(FOverlapped.RefCount);
     if FOverlapped.RefCount <> 0 then
@@ -4263,11 +4290,12 @@ begin
     finally
       lvDebugInfo := FDebugInfo;
 
+      InterlockedDecrement(self.FClientContext.FRecvRequestCounter);
+
       // PostWSARecv before decReferenceCounter
-      if (not FClientContext.FManulPostWSARecvRequest) and (not FClientContext.FRequestDisconnect) then
-      begin                                   
-        FClientContext.PostWSARecvRequest;
-      end;
+      FClientContext.DecRecvRef;
+
+
 
       // response done中 Dec
       // may return to pool
