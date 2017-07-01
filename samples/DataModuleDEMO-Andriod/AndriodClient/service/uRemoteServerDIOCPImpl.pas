@@ -2,10 +2,18 @@ unit uRemoteServerDIOCPImpl;
 
 interface
 
+{$DEFINE USE_INDY}
+
 uses
   uIRemoteServer,
+  {$IFDEF USE_INDY}
+  IdTCPClient,
+  uDTcpClientCoderImpl,
+  {$ELSE}
   diocp_tcp_blockClient,
   uDTcpClientCoderImpl,
+  {$ENDIF}
+
   uStreamCoderSocket,
   SimpleMsgPack,
   Classes,
@@ -16,7 +24,11 @@ uses
 type
   TRemoteServerDIOCPImpl = class(TInterfacedObject, IRemoteServer)
   private
+    {$IFDEF USE_INDY}
+    FTcpClient: TIdTCPClient;
+    {$ELSE}
     FTcpClient: TDiocpBlockTcpClient;
+    {$ENDIF}
     FCoderSocket: ICoderSocket;
     FMsgPack:TSimpleMsgPack;
     FSendStream:TMemoryStream;
@@ -39,8 +51,13 @@ implementation
 constructor TRemoteServerDIOCPImpl.Create;
 begin
   inherited Create;
-  FTcpClient := TDiocpBlockTcpClient.Create(nil);
+  {$IFDEF USE_INDY}
+  FTcpClient := TIdTCPClient.Create(nil);
+  FCoderSocket := TIdTCPClientCoderImpl.Create(FTcpClient);
+  {$ELSE}
+  FTcpClient := TDiocpBlockTcpClient.Create(NIL);
   FCoderSocket := TDTcpClientCoderImpl.Create(FTcpClient);
+  {$ENDIF}
   
   FMsgPack := TSimpleMsgPack.Create;
   FRecvStream := TMemoryStream.Create;
