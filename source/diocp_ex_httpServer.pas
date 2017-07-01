@@ -618,6 +618,10 @@ type
     // 执行事件
     procedure DoRequest(pvRequest:TDiocpHttpRequest);
 
+    procedure InnerPushRequest(pvRequest:TDiocpHttpRequest);
+
+    procedure InnerTriggerDoRequest;
+
     procedure OnBlockBufferWrite(pvSender:TObject; pvBuffer:Pointer;
         pvLength:Integer);
 
@@ -1819,6 +1823,13 @@ begin
   inherited DoCleanUp;
 end;
 
+procedure TDiocpHttpClientContext.InnerPushRequest(
+  pvRequest: TDiocpHttpRequest);
+begin
+  FRequestQueue.EnQueue(pvRequest);
+end;
+
+
 procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
 begin
   {$IFDEF INNER_IOCP_PROCESSOR}
@@ -1826,7 +1837,7 @@ begin
   {$ELSE}
 
 
-  if FRequestQueue.Size > 20 then
+  if FRequestQueue.Size > 1000 then
   begin
     try
       pvRequest.Connection.RequestDisconnect('未处理的请求队列过大', pvRequest);
@@ -1975,6 +1986,47 @@ begin
   FCurrentStream := nil;
 end;
 
+procedure TDiocpHttpClientContext.InnerTriggerDoRequest;
+begin
+{$IFDEF INNER_IOCP_PROCESSOR}
+    while (Self.Active) do
+    begin
+      //取出一个任务
+      lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
+      if lvObj = nil then
+      begin
+        Break;;
+      end;
+      InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
+      InnerDoARequest(lvObj);
+    end;
+{$ELSE}
+
+
+    if FRequestQueue.Size > 1000 then
+    begin
+      RequestDisconnect('未处理的请求队列过大', nil);
+      Exit;
+    end;
+
+    {$IFDEF QDAC_QWorker}
+    self.IncRecvRef;
+    Workers.Post(OnExecuteJob, FRequestQueue);
+    {$ELSE}
+    {$IFDEF DIOCP_TASK}
+    self.IncRecvRef;
+    iocpTaskManager.PostATask(OnExecuteJob, FRequestQueue);
+    {$ELSE}
+    警告无处理处理逻辑方法，请定义处理宏// {$DEFINE DIOCP_TASK}
+    {$ENDIF}
+    {$ENDIF}
+
+  {$ENDIF}
+
+  
+end;
+
+
 procedure TDiocpHttpClientContext.OnBlockBufferWrite(pvSender:TObject;
     pvBuffer:Pointer; pvLength:Integer);
 {$IFDEF DIOCP_DEBUG}
@@ -2036,23 +2088,19 @@ begin
     while (Self.Active) do
     begin
       //取出一个任务
-      self.Lock;
-      try
-        lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
-        if lvObj = nil then
-        begin
-          FIsProcessRequesting := False;
-          Break;
-        end;
-        InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
-      finally
-        self.UnLock;
+      lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
+      if lvObj = nil then
+      begin
+        Break;;
       end;
+      InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
       InnerDoARequest(lvObj);
     end;
+    Self.DecRecvRef;
   finally
     self.UnLockContext('qworker httptask', nil);
   end;
+
 end;
 
 {$ENDIF}
@@ -2069,15 +2117,6 @@ begin
 
   if Self.LockContext('iocptask httptask', nil) then
   try 
-    //取出一个任务
-    self.Lock;
-    try
-      if FIsProcessRequesting then Exit;
-      FIsProcessRequesting := True;
-    finally
-      self.UnLock;
-    end;
-
     // 如果需要执行
     if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
       pvTaskRequest.iocpWorker.checkCoInitializeEx();
@@ -2085,23 +2124,19 @@ begin
     while (Self.Active) do
     begin
       //取出一个任务
-      self.Lock;
-      try
-        lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
-        if lvObj = nil then
-        begin
-          FIsProcessRequesting := False;
-          Break;
-        end;
-      finally
-        self.UnLock;
+      lvObj := TDiocpHttpRequest(FRequestQueue.DeQueue);
+      if lvObj = nil then
+      begin
+        Break;;
       end;
       InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
       InnerDoARequest(lvObj);
+
     end;
+    Self.DecRecvRef;
   finally
     self.UnLockContext('iocptask httptask', nil);
-  end;
+  end;    
 end;
 {$ENDIF}
 
@@ -2116,120 +2151,126 @@ var
   lvTempRequest: TDiocpHttpRequest;
 begin
   inherited;
+
   lvTmpBuf := PByte(buf);
-  lvRemain := len;
-  while (lvRemain > 0) do
-  begin
-    if FCurrentRequest = nil then
+  lvRemain := len;  
+  try
+    while (lvRemain > 0) do
     begin
-      FCurrentRequest := TDiocpHttpServer(Owner).GetHttpRequest;
-      FCurrentRequest.FDiocpContext := self;
-      FCurrentRequest.Response.FDiocpContext := self;
-      FCurrentRequest.Clear;
-
-      // 记录当前contextDNA，异步任务时做检测
-      FCurrentRequest.FContextDNA := self.ContextDNA;
-    end;
-
-
-    try
-      r := FCurrentRequest.InputBuffer(lvTmpBuf^);
-    except
-      on e:Exception do
+      if FCurrentRequest = nil then
       begin
-        r := -1;
-        FCurrentRequest.FDecodeState := -2;
-        FCurrentRequest.FDecodeMsg := e.Message;
+        FCurrentRequest := TDiocpHttpServer(Owner).GetHttpRequest;
+        FCurrentRequest.FDiocpContext := self;
+        FCurrentRequest.Response.FDiocpContext := self;
+        FCurrentRequest.Clear;
+
+        // 记录当前contextDNA，异步任务时做检测
+        FCurrentRequest.FContextDNA := self.ContextDNA;
       end;
-    end;
 
-    if r = -1 then
-    begin                             
+
+      try
+        r := FCurrentRequest.InputBuffer(lvTmpBuf^);
+      except
+        on e:Exception do
+        begin
+          r := -1;
+          FCurrentRequest.FDecodeState := -2;
+          FCurrentRequest.FDecodeMsg := e.Message;
+        end;
+      end;
+
+      if r = -1 then
+      begin                             
       ///  不能在这里处理, responseEnd会访问TBlockWriter，造成多线程访问
-//      lvTempRequest := FCurrentRequest;
-//      try
-//        FCurrentRequest := nil;
-//        lvTempRequest.Response.FInnerResponse.ResponseCode := 400;
-//        //lvTempRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
-//        lvTempRequest.ResponseEnd;
-//      finally
-//        lvTempRequest.Close;
-//      end;
+  //      lvTempRequest := FCurrentRequest;
+  //      try
+  //        FCurrentRequest := nil;
+  //        lvTempRequest.Response.FInnerResponse.ResponseCode := 400;
+  //        //lvTempRequest.Response.WriteString(PAnsiChar(lvTmpBuf) + '<BR>******<BR>******<BR>' + PAnsiChar(buf));
+  //        lvTempRequest.ResponseEnd;
+  //      finally
+  //        lvTempRequest.Close;
+  //      end;
 
-      lvTempRequest := FCurrentRequest;
-
-      // 避免断开后还回对象池，造成重复还回
-      FCurrentRequest := nil;
-
-      DoRequest(lvTempRequest);
-
-      //self.RequestDisconnect('无效的Http请求', self);
-      Exit;
-    end;
-
-    if r = -2 then
-    begin
-      FCurrentRequest.FDecodeMsg := '请求头超过大小限制';
-
-      lvTempRequest := FCurrentRequest;
-
-      // 避免断开后还回对象池，造成重复还回
-      FCurrentRequest := nil;
-
-      DoRequest(lvTempRequest);
-
-
-      Exit;
-    end;
-
-    if r = 0 then
-    begin
-      ; //需要更多的数据解码
-    end else
-    if r = 1 then
-    begin
-      if self.FContextType = Context_Type_WebSocket then
-      begin
         lvTempRequest := FCurrentRequest;
 
         // 避免断开后还回对象池，造成重复还回
         FCurrentRequest := nil;
 
-        DoRequest(lvTempRequest);
-      end else
+        InnerPushRequest(lvTempRequest);
+
+        //self.RequestDisconnect('无效的Http请求', self);
+        Exit;
+      end;
+
+      if r = -2 then
       begin
-        if SameText(FCurrentRequest.FInnerRequest.Method, 'POST') or
-            SameText(FCurrentRequest.FInnerRequest.Method, 'PUT') then
-        begin
-          if FCurrentRequest.FInnerRequest.ContentLength = 0 then
-          begin
-            self.RequestDisconnect('无效的POST/PUT请求数据', self);
-            Exit;
-          end;
-        end else
+        FCurrentRequest.FDecodeMsg := '请求头超过大小限制';
+
+        lvTempRequest := FCurrentRequest;
+
+        // 避免断开后还回对象池，造成重复还回
+        FCurrentRequest := nil;
+
+        InnerPushRequest(lvTempRequest);
+
+
+        Exit;
+      end;
+
+      if r = 0 then
+      begin
+        ; //需要更多的数据解码
+      end else
+      if r = 1 then
+      begin
+        if self.FContextType = Context_Type_WebSocket then
         begin
           lvTempRequest := FCurrentRequest;
 
           // 避免断开后还回对象池，造成重复还回
           FCurrentRequest := nil;
 
-          DoRequest(lvTempRequest);
+          InnerPushRequest(lvTempRequest);
+        end else
+        begin
+          if SameText(FCurrentRequest.FInnerRequest.Method, 'POST') or
+              SameText(FCurrentRequest.FInnerRequest.Method, 'PUT') then
+          begin
+            if FCurrentRequest.FInnerRequest.ContentLength = 0 then
+            begin
+              self.RequestDisconnect('无效的POST/PUT请求数据', self);
+              Exit;
+            end;
+          end else
+          begin
+            lvTempRequest := FCurrentRequest;
+
+            // 避免断开后还回对象池，造成重复还回
+            FCurrentRequest := nil;
+
+            InnerPushRequest(lvTempRequest);
+          end;
         end;
-      end;
-    end else
-    if r = 2 then
-    begin     // 解码到请求体
-      lvTempRequest := FCurrentRequest;
+      end else
+      if r = 2 then
+      begin     // 解码到请求体
+        lvTempRequest := FCurrentRequest;
 
-      // 避免断开后还回对象池，造成重复还回
-      FCurrentRequest := nil;
+        // 避免断开后还回对象池，造成重复还回
+        FCurrentRequest := nil;
 
-      // 触发事件
-      DoRequest(lvTempRequest);
-    end;   
+        // 触发事件
+        InnerPushRequest(lvTempRequest);
+      end;   
 
-    Dec(lvRemain);
-    Inc(lvTmpBuf);
+      Dec(lvRemain);
+      Inc(lvTmpBuf);
+    end;
+  finally
+    // 解码完成触发逻辑处理
+    InnerTriggerDoRequest;
   end;
 end;
 
@@ -2415,7 +2456,7 @@ var
   lvOptCode:Byte;
 begin
   lvContext := pvRequest.Connection;
-  lvContext.CheckThreadIn;
+  lvContext.CheckThreadIn('DoRequest');
   try
     lvContext.BeginBusy;
     SetCurrentThreadInfo('进入Http::DoRequest');

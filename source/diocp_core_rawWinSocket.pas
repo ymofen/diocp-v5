@@ -314,7 +314,10 @@ begin
   if tick_end >= tick_start then
     result := tick_end - tick_start
   else
+  begin
     result := High(Cardinal) - tick_start + tick_end;
+  end;
+
 end;
 
 function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;

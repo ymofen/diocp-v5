@@ -1265,7 +1265,7 @@ begin
   FObjectAlive := False;
   FRawSocket := TRawSocket.Create();
   FActive := false;
-  FSendRequestLink := TIocpRequestSingleLink.Create(10);
+  FSendRequestLink := TIocpRequestSingleLink.Create(1000);
 end;
 
 destructor TDiocpCustomContext.Destroy;

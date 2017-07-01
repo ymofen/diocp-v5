@@ -196,6 +196,8 @@ type
     /// </summary>
     FRequestDisconnect:Boolean;
 
+    FWSARecvRef:Integer;
+
 
 
 
@@ -319,6 +321,7 @@ type
     procedure SetOwner(const Value: TDiocpTcpServer);
     function GetDebugInfo: string;
 
+
     /// <summary>
     ///   πÈªπ Õ∑≈
     /// </summary>
@@ -387,6 +390,9 @@ type
     procedure InnerUnLock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     procedure Lock();{$IFDEF HAVE_INLINE} inline;{$ENDIF}
     procedure UnLock;
+
+    procedure DecRecvRef;
+    procedure IncRecvRef;
   protected
     procedure DoConnected;
 
@@ -433,7 +439,7 @@ type
 
     constructor Create; virtual;
     destructor Destroy; override;
-    procedure CheckThreadIn;
+    procedure CheckThreadIn(const pvDebugInfo: String);
     procedure CheckThreadOut;
 
     procedure DoDisconnect;
@@ -1998,7 +2004,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TIocpClientContext.CheckThreadIn(const pvDebugInfo: string);
+procedure TIocpClientContext.CheckThreadIn(const pvDebugInfo: String);
 begin
   if FCheckThreadId <> 0 then
   begin
@@ -4208,7 +4214,6 @@ begin
   try
     lvDNACounter := Self.FCounter;
 
-    InterlockedIncrement(self.FClientContext.FRecvRequestCounter);
     FClientContext.IncRecvRef;
 
 
@@ -4239,8 +4244,8 @@ begin
       lvDebugStep := 2;
       if (FOwner.FDataMoniter <> nil) then
       begin
-        FOwner.FDataMoniter.incResponseWSARecvCounter;
-        FOwner.FDataMoniter.incRecvdSize(FBytesTransferred);
+        FOwner.FDataMoniter.IncResponseWSARecvCounter;
+        FOwner.FDataMoniter.IncRecvdSize(FBytesTransferred);
       end;
 
       if not FOwner.Active then
@@ -4289,8 +4294,6 @@ begin
       end;
     finally
       lvDebugInfo := FDebugInfo;
-
-      InterlockedDecrement(self.FClientContext.FRecvRequestCounter);
 
       // PostWSARecv before decReferenceCounter
       FClientContext.DecRecvRef;
