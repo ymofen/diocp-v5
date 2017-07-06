@@ -4,7 +4,7 @@ interface
 
 uses
   diocp_tcp_client, diocp_ex_http_common, SysUtils, Classes, utils_url,
-  utils_websocket, utils_strings, diocp_core_rawWinSocket;
+  utils_websocket, utils_strings, diocp_core_rawWinSocket, diocp_core_engine;
 
 type
   TDiocpWebSocketContext = class(TIocpRemoteContext)
@@ -77,14 +77,23 @@ var
 
 procedure DoInitializeWebSocketClient;
 begin
-   __webtcpClient := TDiocpWebSocketTcpClient.Create(nil);
-   __webtcpClient.Open;
+  if __webtcpClient = nil then
+  begin
+     __webtcpClient := TDiocpWebSocketTcpClient.Create(nil);
+     __webtcpClient.Open;
+  end;
 end;
 
 procedure DoFinalizeWebSocketClient;
 begin
-  __webtcpClient.Close;
-  __webtcpClient.Free;
+  if __webtcpClient <> nil then
+  begin
+    Assert(__defaultDiocpEngine <> nil, 'iocp engine is null');
+
+    __webtcpClient.Close;
+    __webtcpClient.Free;
+    __webtcpClient := nil;
+  end;
 end;
 
 function NewWsClient: TDiocpWebSocketContext;
