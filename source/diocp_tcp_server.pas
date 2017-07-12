@@ -836,6 +836,8 @@ type
     // 最高在线数量
     FMaxOnlineCount:Integer;
 
+    FDisconnectedCounter: Integer;
+
     FSentSize:Int64;
     FRecvSize:Int64;
     FPostWSASendSize: Int64;
@@ -886,7 +888,7 @@ type
     procedure IncRecvRequestOutCounter;
     procedure IncRecvRequestReturnCounter;
 
-
+    procedure IncDisconnectedCounter;
 
 
 
@@ -895,6 +897,7 @@ type
     procedure incPushSendQueueCounter;
     procedure incPostSendObjectCounter();
     procedure incResponseSendObjectCounter();
+
     {$IFDEF SOCKET_REUSE}
     procedure incHandleCreateCounter;
     procedure incHandleDestroyCounter;
@@ -925,6 +928,7 @@ type
     property ContextCreateCounter: Integer read FContextCreateCounter;
     property ContextOutCounter: Integer read FContextOutCounter;
     property ContextReturnCounter: Integer read FContextReturnCounter;
+    property DisconnectedCounter: Integer read FDisconnectedCounter;
     property HandleCreateCounter: Integer read FHandleCreateCounter;
     property HandleDestroyCounter: Integer read FHandleDestroyCounter;
     property Locker: TCriticalSection read FLocker;
@@ -2161,6 +2165,8 @@ end;
 
 procedure TIocpClientContext.DoDisconnected;
 begin
+  if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then FOwner.FDataMoniter.IncDisconnectedCounter;
+  
   OnDisconnected;
 end;
 
@@ -3586,7 +3592,7 @@ end;
 
 procedure TDiocpTcpServer.KickOut(pvTimeOut:Cardinal = 60000);
 var
-  lvNowTickCount:Cardinal;
+  //lvNowTickCount:Cardinal;
   I, j:Integer;
   lvContext:TIocpClientContext;
   lvKickOutList: array of TIocpClientContext;
@@ -3597,7 +3603,7 @@ var
   lvNextContext :TIocpClientContext;
 {$ENDIF}
 begin
-  lvNowTickCount := GetTickCount;
+  //lvNowTickCount := GetTickCount;
   {$IFDEF USE_HASHTABLE}
   FLocker.lock('KickOut');
   try
@@ -3621,7 +3627,7 @@ begin
           if lvContext.FLastActivity <> 0 then
           begin
             if (lvContext.FBusingCounter = 0)    // 如果正在(>0), 就不进行KickOut
-               and (tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut) then
+               and (tick_diff(lvContext.FLastActivity, GetTickCount) > pvTimeOut) then
             begin
               // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
               lvKickOutList[j] := lvContext;
@@ -4822,6 +4828,8 @@ begin
     FLastSpeed_RecvSize := 0;
     FLastSpeed_WSASentSize := 0;
 
+    FDisconnectedCounter := 0;
+
 
 
     //FPostWSAAcceptExCounter:=0;
@@ -4848,6 +4856,11 @@ end;
 procedure TIocpDataMonitor.IncAcceptExObjectCounter;
 begin
    InterlockedIncrement(FAcceptExObjectCounter); 
+end;
+
+procedure TIocpDataMonitor.IncDisconnectedCounter;
+begin
+  InterlockedIncrement(FDisconnectedCounter);
 end;
 
 procedure TIocpDataMonitor.incPushSendQueueCounter;
