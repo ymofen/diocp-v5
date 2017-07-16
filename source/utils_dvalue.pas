@@ -526,6 +526,11 @@ type
     // 对Value的访问封装, 可以直接访问Value.AsXXXX
     procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
         faFree);
+    /// <summary>
+    ///   是否有值, 如果是字符串，为空，也会返回true
+    /// </summary>
+    function IsEmpty: Boolean;
+    function IsNull: Boolean;
 
 
 
@@ -643,6 +648,10 @@ type
 
     procedure BindObject(pvObject: TObject; pvFreeAction: TObjectFreeAction =
         faFree);
+    /// <summary>
+    ///   字符串，空，返回null
+    /// </summary>
+    function IsEmpty: Boolean;
 
 
     /// <summary>
@@ -705,7 +714,7 @@ function DValueGetAsUInt64(ADValue: PDRawValue): UInt64;
 
 procedure DValueSetAsInteger(ADValue:PDRawValue; pvValue:Integer);
 function DValueGetAsInteger(ADValue: PDRawValue): Integer;
-
+function DValueIsEmpty(ADValue:PDRawValue): Boolean;
 
 procedure DValueSetAsFloat(ADValue:PDRawValue; pvValue:Double);
 function DValueGetAsFloat(ADValue: PDRawValue): Double;
@@ -723,6 +732,8 @@ function BinToHex(p: Pointer; l: Integer; ALowerCase: Boolean): DStringW; overlo
 function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW; overload;
 
 procedure FreeObject(AObject: TObject);
+
+
 
 implementation
 
@@ -1655,6 +1666,25 @@ begin
   else
     raise EConvertError.CreateFmt(SConvertError, [DValueTypeName[ADValue.ValueType],
       DValueTypeName[vdtFloat]]);
+  end;
+end;
+
+function DValueIsEmpty(ADValue:PDRawValue): Boolean;
+begin
+  if (ADValue.ValueType in [vdtUnset, vdtNull]) then
+  begin
+    Result := True;
+  end else if (ADValue.ValueType in [vdtString]) then
+  begin
+    Result := Length(ADValue.Value.AsString^) = 0;
+  end else if (ADValue.ValueType in [vdtStringW]) then
+  begin
+    Result := Length(ADValue.Value.AsStringW^) = 0;
+  {$IFDEF HAVE_ASNI_STRING}
+  end else if (ADValue.ValueType in [vdtStringA]) then
+  begin
+    Result := Length(ADValue.Value.AsStringA^) = 0;
+ {$ENDIF}
   end;
 end;
 
@@ -2791,6 +2821,16 @@ begin
   Result := FValue.AsDateTime;
 end;
 
+function TDValue.IsEmpty: Boolean;
+begin
+  Result := FValue.IsEmpty; 
+end;
+
+function TDValue.IsNull: Boolean;
+begin
+  Result := FValue.FRawValue.ValueType in [vdtUnset, vdtNull];
+end;
+
 procedure TDValue.SetAsDateTime(const Value: TDateTime);
 begin
   CheckSetNodeType(vntValue);
@@ -3027,6 +3067,11 @@ end;
 function TDValueItem.GetDataType: TDValueDataType;
 begin
   Result := FRawValue.ValueType;
+end;
+
+function TDValueItem.IsEmpty: Boolean;
+begin
+  Result := DValueIsEmpty(@FRawValue);  
 end;
 
 procedure TDValueItem.SetArraySize(const Value: Integer);

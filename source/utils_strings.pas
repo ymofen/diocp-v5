@@ -816,7 +816,7 @@ begin
   end;
   if lvMatched = 0 then
   begin   // 没有匹配到
-    Result := '';
+    Result := STRING_EMPTY;
   end else
   begin   // 匹配到
     l := lvPTemp-P;
