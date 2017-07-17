@@ -1987,6 +1987,10 @@ begin
 end;
 
 procedure TDiocpHttpClientContext.InnerTriggerDoRequest;
+{$IFDEF INNER_IOCP_PROCESSOR}
+var
+  lvObj:TDiocpHttpRequest;
+{$ENDIF}
 begin
 {$IFDEF INNER_IOCP_PROCESSOR}
     while (Self.Active) do

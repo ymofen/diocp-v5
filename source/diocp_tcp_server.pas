@@ -1117,7 +1117,10 @@ type
         Pointer; len: Cardinal; pvBufferTag: Integer; pvTagData: Pointer;
         pvErrorCode: Integer);
     procedure InnerAddToDebugStrings(const pvMsg: String);
+
+    procedure DoInnerCreate(pvInitalizeNum: Integer);
   public
+    procedure CheckOpen(pvInitalizeNum:Integer);
 
     procedure CheckCreatePoolObjects(pvMaxNum:Integer);
 
@@ -2622,45 +2625,7 @@ end;
 constructor TDiocpTcpServer.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FKeepAliveTime := 10000;
-  FListeners := TDiocpListeners.Create(Self);
-  FDefaultListener := TDiocpListener.Create(Self);
-
-  FDebugStrings := TStringList.Create;
-  CheckWinSocketStart;
-  FUseObjectPool := true;
-  FContextDNA := 0;
-  FLocker := TIocpLocker.Create('diocp_tcp_server');
-  FLogger:=TSafeLogger.Create();
-  FLogger.setAppender(TLogFileAppender.Create(True));
-
-  // 默认不开启心跳选项
-  FKeepAlive := False;
-  
-
-  FSendRequestPool := TBaseQueue.Create;
-  FRecvRequestPool := TBaseQueue.Create;
-    
-
-  // 开启默认的Diocp引擎
-  StartDiocpEngine;
-  FOwnerEngine := False;
-
-  BindDiocpEngine(__defaultDiocpEngine, False);
-
-  FOnlineContextList := TDHashTable.Create(10949);
-
-
-  FMaxSendingQueueSize := 1000;
-
-  // post wsaRecv block size
-  FWSARecvBufferSize := 1024 * 4;
-
-  {$IFDEF DEBUG_ON}
-
-  {$ELSE}
-  FLogger.LogFilter := [lgvError];
-  {$ENDIF}
+  DoInnerCreate(1000);
 end;
 
 destructor TDiocpTcpServer.Destroy;
@@ -2741,6 +2706,32 @@ begin
     lvRecv.CheckCreateRecvBuffer;
     FRecvRequestPool.EnQueue(lvRecv);
   end;
+end;
+
+procedure TDiocpTcpServer.CheckOpen(pvInitalizeNum:Integer);
+begin
+  if FActive then Exit;
+  
+  // 开启IOCP引擎
+  FIocpEngine.CheckStart;
+
+  if FListeners.FList.Count = 0 then
+  begin
+    FDefaultListener.FListenAddress := FDefaultListenAddress;
+    FDefaultListener.FListenPort := FPort;
+    FDefaultListener.FIPVersion := IP_V4;
+    FDefaultListener.Start(FIocpEngine);
+    FDefaultListener.PostAcceptExRequest(pvInitalizeNum);
+  end else
+  begin
+    FListeners.Start(FIocpEngine);
+    FListeners.PostAcceptExRequest(pvInitalizeNum);
+  end;
+
+  FActive := True;
+
+  DoAfterOpen;
+  if Assigned(FOnAfterOpen) then FOnAfterOpen(Self);
 end;
 
 
@@ -3219,26 +3210,8 @@ begin
   begin
     if pvActive then
     begin
-      // 开启IOCP引擎
-      FIocpEngine.CheckStart;
+      CheckOpen(100);
 
-      if FListeners.FList.Count = 0 then
-      begin
-        FDefaultListener.FListenAddress := FDefaultListenAddress;
-        FDefaultListener.FListenPort := FPort;
-        FDefaultListener.FIPVersion := IP_V4;
-        FDefaultListener.Start(FIocpEngine);
-        FDefaultListener.PostAcceptExRequest(100);
-      end else
-      begin
-        FListeners.Start(FIocpEngine);
-        FListeners.PostAcceptExRequest(100);
-      end;
-
-      FActive := True;
-
-      DoAfterOpen;
-      if Assigned(FOnAfterOpen) then FOnAfterOpen(Self);
     end else
     begin
       SafeStop;
@@ -3322,6 +3295,49 @@ procedure TDiocpTcpServer.DoCleanUpSendRequest;
 begin
   FSendRequestPool.FreeDataObject;
   FSendRequestPool.Clear;
+end;
+
+procedure TDiocpTcpServer.DoInnerCreate(pvInitalizeNum: Integer);
+begin
+  FKeepAliveTime := 10000;
+  FListeners := TDiocpListeners.Create(Self);
+  FDefaultListener := TDiocpListener.Create(Self);
+
+  FDebugStrings := TStringList.Create;
+  CheckWinSocketStart;
+  FUseObjectPool := true;
+  FContextDNA := 0;
+  FLocker := TIocpLocker.Create('diocp_tcp_server');
+  FLogger:=TSafeLogger.Create();
+  FLogger.setAppender(TLogFileAppender.Create(True));
+
+  // 默认不开启心跳选项
+  FKeepAlive := False;
+  
+
+  FSendRequestPool := TBaseQueue.Create;
+  FRecvRequestPool := TBaseQueue.Create;
+    
+
+  // 开启默认的Diocp引擎
+  StartDiocpEngine;
+  FOwnerEngine := False;
+
+  BindDiocpEngine(__defaultDiocpEngine, False);
+
+  FOnlineContextList := TDHashTable.Create(10949);
+
+
+  FMaxSendingQueueSize := 1000;
+
+  // post wsaRecv block size
+  FWSARecvBufferSize := 1024 * 4;
+
+  {$IFDEF DEBUG_ON}
+
+  {$ELSE}
+  FLogger.LogFilter := [lgvError];
+  {$ENDIF}
 end;
 
 procedure TDiocpTcpServer.DoSendBufferCompletedEvent(pvContext:
