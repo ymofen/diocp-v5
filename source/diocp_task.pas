@@ -662,6 +662,10 @@ procedure TIocpTaskRequest.DoCleanUp;
 begin
   self.Remark := '';
   FOnTaskWork := nil;
+  FOnTaskWorkStrData := nil;
+  FOnTaskWorkProc := nil;
+  FOnTaskWorkNoneData := nil;
+  FOnTaskWorkActionIdData := nil;
   FRunInMainThreadType := rtSync;
   if FMessageEvent <> nil then FMessageEvent.ResetEvent;
   FOwner := nil;
