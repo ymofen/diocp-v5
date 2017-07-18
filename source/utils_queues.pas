@@ -774,7 +774,7 @@ end;
 
 
 initialization
-  queueDataPool := TQueueDataPool.Create(204800);
+  queueDataPool := TQueueDataPool.Create(819200);
 
 finalization
   queueDataPool.Free;

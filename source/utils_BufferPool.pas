@@ -15,7 +15,7 @@ interface
 {$DEFINE SPINLOCK_SLEEP}
 
 /// 使用内存池
-{.$DEFINE USE_MEM_POOL}
+{$DEFINE USE_MEM_POOL}
 
 uses
   SyncObjs, SysUtils, Classes
@@ -68,6 +68,8 @@ type
     FSize:Integer;
     FAddRef:Integer;
     FReleaseRef:Integer;
+
+    FPoolSize:Integer;
 
     {$IFDEF USE_SPINLOCK}
     FSpinLock:Integer;
@@ -147,11 +149,13 @@ const
   FREE_TYPE_OBJECTNONE = 4;
 
 
-function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
+function NewBufferPool(pvBlockSize: Integer = 1024; pvPoolSize:Integer = 0):
+    PBufferPool;
 procedure FreeBufferPool(buffPool:PBufferPool);
 procedure ClearBufferPool(buffPool:PBufferPool);
 
 function GetBuffer(ABuffPool:PBufferPool): PByte;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
 procedure FreeBuffer(const pvBuffer:PByte; const pvHint: string; pvReleaseAttachDataAtEnd:Boolean=True);overload; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 procedure FreeBuffer(const pvBuffer:PByte; pvReleaseAttachDataAtEnd:Boolean=True);overload;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
@@ -230,6 +234,49 @@ implementation
 var
   __debug_dna:Integer;
 {$ENDIF}
+
+
+procedure PushABlockBuffer(const pvBufBlock: PBufferBlock; const pvOwner:
+    PBufferPool); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+var
+  lvBuffer :PBufferBlock;
+begin
+  lvBuffer := pvOwner.FHead;
+  pvBufBlock.next := lvBuffer;
+  pvOwner.FHead := pvBufBlock;
+end;
+
+procedure CheckIntializePool(const pvBufPool:PBufferPool); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+var
+  i: Integer;
+  lvBuffer:PBufferBlock;
+begin
+  if pvBufPool.FPoolSize = 0 then Exit;
+
+  for i := 0 to pvBufPool.FPoolSize -1 do
+  begin
+    // + 2保护边界(可以检测内存越界写入)
+    GetMem(lvBuffer, BLOCK_HEAD_SIZE + pvBufPool.FBlockSize + protect_size);
+    {$IFDEF DEBUG}
+    FillChar(lvBuffer^, BLOCK_HEAD_SIZE + pvBufPool.FBlockSize + protect_size, 0);
+    {$ELSE}
+    FillChar(lvBuffer^, BLOCK_HEAD_SIZE, 0);
+    {$ENDIF}
+    lvBuffer.owner := pvBufPool;
+    lvBuffer.flag := block_flag;
+    lvBuffer.__debug_flag := 0;
+
+    {$IFDEF DIOCP_DEBUG}
+    lvBuffer.__debug_lock := 0;
+    lvBuffer.__debug_hint_pos := 0;
+    {$ENDIF}
+
+    PushABlockBuffer(lvBuffer, pvBufPool);
+
+
+    AtomicIncrement(pvBufPool.FSize);
+  end;
+end;
 
 procedure FreeObject(AObject: TObject);
 begin
@@ -416,20 +463,30 @@ function GetBuffer(ABuffPool:PBufferPool): PByte;
 var
   lvBuffer:PBufferBlock;
 begin
+
   {$IFDEF USE_MEM_POOL}
-  {$IFDEF USE_SPINLOCK}
-  SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
-  {$ELSE}
-  ABuffPool.FLocker.Enter;
-  {$ENDIF}
-  // 获取一个节点
-  lvBuffer := PBufferBlock(ABuffPool.FHead);
-  if lvBuffer <> nil then ABuffPool.FHead := lvBuffer.next;
-  {$IFDEF USE_SPINLOCK}
-  SpinUnLock(ABuffPool.FSpinLock);
-  {$ELSE}
-  ABuffPool.FLocker.Leave;
-  {$ENDIF}
+  if ABuffPool.FPoolSize > 0 then
+  begin
+    {$IFDEF USE_SPINLOCK}
+    SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
+    {$ELSE}
+    ABuffPool.FLocker.Enter;
+    {$ENDIF}
+
+    // 获取一个节点
+    lvBuffer := PBufferBlock(ABuffPool.FHead);
+    if lvBuffer <> nil then ABuffPool.FHead := lvBuffer.next;
+
+
+    {$IFDEF USE_SPINLOCK}
+    SpinUnLock(ABuffPool.FSpinLock);
+    {$ELSE}
+    ABuffPool.FLocker.Leave;
+    {$ENDIF}
+  end else
+  begin
+    lvBuffer := nil;
+  end;
   {$ELSE}
   lvBuffer := nil;
   {$ENDIF}
@@ -448,7 +505,7 @@ begin
     lvBuffer.owner := ABuffPool;
     lvBuffer.flag := block_flag;
     lvBuffer.__debug_flag := 0;
-    
+
     {$IFDEF DIOCP_DEBUG}
     lvBuffer.__debug_lock := 0;
     lvBuffer.__debug_hint_pos := 0;
@@ -492,19 +549,28 @@ begin
 
   lvOwner := pvBufBlock.owner;
   {$IFDEF USE_MEM_POOL}
-  {$IFDEF USE_SPINLOCK}
-  SpinLock(lvOwner.FSpinLock, lvOwner.FLockWaitCounter);
-  {$ELSE}
-  lvOwner.FLocker.Enter;
-  {$ENDIF}
-  lvBuffer := lvOwner.FHead;
-  pvBufBlock.next := lvBuffer;
-  lvOwner.FHead := pvBufBlock;
-  {$IFDEF USE_SPINLOCK}
-  SpinUnLock(lvOwner.FSpinLock);
-  {$ELSE}
-  lvOwner.FLocker.Leave;
-  {$ENDIF}
+  if lvOwner.FPoolSize > 0 then
+  begin
+    {$IFDEF USE_SPINLOCK}
+    SpinLock(lvOwner.FSpinLock, lvOwner.FLockWaitCounter);
+    {$ELSE}
+    lvOwner.FLocker.Enter;
+    {$ENDIF}
+    PushABlockBuffer(pvBufBlock, lvOwner);
+//    lvBuffer := lvOwner.FHead;
+//    pvBufBlock.next := lvBuffer;
+//    lvOwner.FHead := pvBufBlock;
+    {$IFDEF USE_SPINLOCK}
+    SpinUnLock(lvOwner.FSpinLock);
+    {$ELSE}
+    lvOwner.FLocker.Leave;
+    {$ENDIF}
+  end else
+  begin
+    ReleaseAttachData(pvBufBlock);
+    FreeMem(pvBufBlock);
+    AtomicDecrement(lvOwner.FSize);
+  end;
   {$ELSE}
   ReleaseAttachData(pvBufBlock);
   FreeMem(pvBufBlock);
@@ -586,7 +652,8 @@ begin
   end;
 end;
 
-function NewBufferPool(pvBlockSize: Integer = 1024): PBufferPool;
+function NewBufferPool(pvBlockSize: Integer = 1024; pvPoolSize:Integer = 0):
+    PBufferPool;
 begin
   New(Result);
   Result.FBlockSize := pvBlockSize;
@@ -603,7 +670,10 @@ begin
   Result.FPut := 0;
   Result.FAddRef := 0;
   Result.FReleaseRef :=0;
-  
+  Result.FPoolSize := pvPoolSize;
+
+  CheckIntializePool(Result);
+
 end;
 
 procedure FreeBufferPool(buffPool:PBufferPool);

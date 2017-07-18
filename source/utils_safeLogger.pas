@@ -10,7 +10,7 @@ unit utils_safeLogger;
 
 interface
 
-{.$DEFINE USE_QUEUE_POOL}
+{$DEFINE USE_QUEUE_POOL}
 
 uses
   Classes, utils_queues, SysUtils, SyncObjs
