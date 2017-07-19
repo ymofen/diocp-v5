@@ -3,7 +3,7 @@
       qdac.swish, d10.天地弦
  * 参考qdac中qvalue进行实现
  *
- * 1. android下面DValuelist使用 TList会有出现异常, 使用TList<TDValueObject>正常
+ * 1. android下面DValuelist使用 TList会有出现异常, 使用TList<TDValueObjectX>正常
  *    2015-11-15 16:08:04(感谢CP46反馈)
  * 2. SetArraySize, 进行申请的空间清理，避免ClearDValue造成类型混乱，出现内存操作混乱
  *　　2016-06-17 15:27:49(感谢J反馈)
@@ -27,14 +27,18 @@ unit utils_dvalue;
 {$DEFINE CHECK_DVALUE}
 {$ENDIF}
 
+{$DEFINE USE_DVALUE_POOL}
+
 interface
 
 
 uses classes, sysutils, variants,
 {$IFDEF HAVE_GENERICS}
-     System.Generics.Collections,
+  System.Generics.Collections,
 {$ENDIF}
-     varutils, math, utils_base64, utils_strings;
+  utils_BufferPool, utils_pool,
+
+  varutils, math, utils_base64, utils_strings;
 
 
 type
@@ -59,7 +63,6 @@ type
 
   // 指针释放动作
   TPtrReleaseAction = (praNone, praObjectFree, praDispose, praFreeMem);
-
 
   TDValueDataType = (vdtUnset, vdtNull, vdtBoolean, vdtSingle, vdtFloat,
     vdtInteger, vdtInt64, vdtUInt64, vdtCurrency, vdtGuid, vdtDateTime,
@@ -156,65 +159,7 @@ type
   TDValueItem = class;
   TDValue = class;
   TOnDValueNotifyEvent = procedure(Sender:TObject; pvVal:TDValue) of object;
-  TDValueObject = class(TObject)
-  private
-    FName: String;
-    FRawValue: TDRawValue;
-    function GetAsBoolean: Boolean;
-    function GetAsFloat: Double;
-    function GetAsInetger: Int64;
-    function GetAsString: String;
-    function GetDataType: TDValueDataType;
-    procedure SetAsBoolean(const Value: Boolean);
-    procedure SetAsFloat(const Value: Double);
-    procedure SetAsInetger(const Value: Int64);
-    procedure SetAsString(const Value: String);
-  public
-    destructor Destroy; override;
-    property AsFloat: Double read GetAsFloat write SetAsFloat;
-    property AsString: String read GetAsString write SetAsString;
-    property AsInetger: Int64 read GetAsInetger write SetAsInetger;
-    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
 
-    property DataType: TDValueDataType read GetDataType;
-
-    property Name: String read FName write FName;
-  end;
-
-
-  TDValueList = class(TObject)
-  private
-    {$IFDEF HAVE_GENERICS}
-    FList: TList<TDValueObject>;
-    {$ELSE}
-    FList: TList;
-    {$ENDIF}
-    function GetCount: Integer;
-    function GetItems(pvIndex: Integer): TDValueObject;
-    function InnerAdd(const pvValueName: string): TDValueObject;
-  public
-    constructor Create();
-    destructor Destroy; override;
-    function Add(pvValueName:String): TDValueObject;
-
-    function FindByName(const pvValueName: string): TDValueObject;
-
-    function ParamByName(const pvValueName: String): TDValueObject;
-
-    /// <summary>
-    ///   如果参数不存在会进行创建,如果存在直接返回
-    /// </summary>
-    function ForceByName(const pvValueName: String): TDValueObject;
-
-    /// <summary>
-    ///   清空所有的对象
-    /// </summary>
-    procedure Clear;    
-    
-    property Count: Integer read GetCount;
-
-    property Items[pvIndex: Integer]: TDValueObject read GetItems; default;
-  end;
 
 
   /// <summary>
@@ -229,6 +174,9 @@ type
     procedure __InitalizeCheckValue;
     {$ENDIF}
   private
+    {$IFDEF USE_DVALUE_POOL}
+    __refBlock:PValPoolBlock;
+    {$ENDIF}
     /// <summary>
     ///   最后修改时间
     /// </summary>
@@ -433,6 +381,11 @@ type
     procedure Clear;
 
     /// <summary>
+    ///  清理所有的
+    /// </summary>
+    procedure DoCleanUp();
+
+    /// <summary>
     ///   根据索引删除掉一个子对象(对应的对象将被销毁)
     /// </summary>
     procedure Delete(pvIndex:Integer); overload;
@@ -562,7 +515,8 @@ type
 
   TDValueItem = class(TObject)
   private
-    FRawValue: TDRawValue;
+
+    FRawValue: PDRawValue;
     function GetItems(pvIndex: Integer): TDValueItem;
     function GetSize: Integer;
     function GetAsBoolean: Boolean;
@@ -610,6 +564,8 @@ type
     ///    如果小于之前的尺寸，后面的值将会被清空
     /// </summary>
     procedure SetArraySize(const Value: Integer);
+
+    constructor Create();
 
     destructor Destroy; override;
 
@@ -668,6 +624,11 @@ type
 
 
 
+procedure DoInitializeDValueForPool(pvAllocNum:Integer);
+procedure DoFinalizeDValue;
+
+function CreateDValueObject: TDValue;
+procedure DisposeDValueObject(aVal:TDValue);
 
 
 function CompareDValue(pvDValue1: PDRawValue; pvDValue2:PDRawValue):
@@ -733,6 +694,12 @@ function BinToHex(const ABytes: TBytes; ALowerCase: Boolean): DStringW; overload
 
 procedure FreeObject(AObject: TObject);
 
+function GetDValueObjectCount: Integer;
+
+function GetDValuePrintDebugInfo: String;
+
+
+
 
 
 implementation
@@ -752,6 +719,29 @@ const
   DValueTypeName: array [TDValueDataType] of String = ('Unassigned', 'NULL',
     'Boolean', 'Single', 'Float', 'Integer', 'Int64', 'UInt64', 'Currency', 'Guid',
     'DateTime', 'AnsiString', 'String', 'StringW', 'Stream', 'Interface', 'Pointer', 'Object', 'Array');
+
+{$IFDEF DEBUG}
+var
+  __create_cnt:Integer;
+  __destroy_cnt:Integer;
+{$ENDIF}
+
+{$IFDEF USE_DVALUE_POOL}
+var
+  __raw_value_pool:PBufferPool;
+  __valPool:PValPool;
+
+function NewDValue(const pvValBlock:PValPoolBlock): PValPoolBlock;
+begin
+  pvValBlock.data := TDValue.Create();
+end;
+
+procedure DisposeDValue(const pvValBlock:PValPoolBlock);
+begin
+  TDValue(pvValBlock.data).Free;
+end;
+{$ENDIF}
+
 
 procedure FreeObject(AObject: TObject);
 begin
@@ -1059,15 +1049,15 @@ var
   function DTToStr(ADValue: PDRawValue): AnsiString;
   begin
     if Trunc(ADValue.Value.AsFloat) = 0 then
-      Result := FormatDateTime({$IF RTLVersion>=22} FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime)
+      Result :=AnsiString(FormatDateTime({$IF RTLVersion>=22} FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime))
     else if IsZero(ADValue.Value.AsFloat - Trunc(ADValue.Value.AsFloat)) then
-      Result := FormatDateTime
+      Result :=AnsiString(FormatDateTime
         ({$IF RTLVersion>=22}FormatSettings.{$IFEND}LongDateFormat,
-        ADValue.Value.AsDateTime)
+        ADValue.Value.AsDateTime))
     else
-      Result := FormatDateTime
+      Result := AnsiString(FormatDateTime
         ({$IF RTLVersion>=22}FormatSettings.{$IFEND}LongDateFormat + ' ' +
-{$IF RTLVersion>=22}FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime);
+{$IF RTLVersion>=22}FormatSettings.{$IFEND}LongTimeFormat, ADValue.Value.AsDateTime));
   end;
 
 begin
@@ -1077,40 +1067,40 @@ begin
       Result := ADValue.Value.AsStringA^;
 {$ENDIF}
     vdtString:
-      Result := ADValue.Value.AsString^;
+      Result := AnsiString(ADValue.Value.AsString^);
     vdtStringW:
-      Result := ADValue.Value.AsStringW^;
+      Result := AnsiString(ADValue.Value.AsStringW^);
     vdtUnset:
       Result := 'default';
     vdtNull:
       Result := 'null';
     vdtBoolean:
-      Result := BoolToStr(ADValue.Value.AsBoolean, True);
+      Result := AnsiString(BoolToStr(ADValue.Value.AsBoolean, True));
     vdtSingle:
-      Result := FloatToStr(ADValue.Value.AsSingle);
+      Result := AnsiString(FloatToStr(ADValue.Value.AsSingle));
     vdtFloat:
-      Result := FloatToStr(ADValue.Value.AsFloat);
+      Result := AnsiString(FloatToStr(ADValue.Value.AsFloat));
     vdtInteger:
-      Result := IntToStr(ADValue.Value.AsInteger);
+      Result := AnsiString(IntToStr(ADValue.Value.AsInteger));
     vdtInt64:
-      Result := IntToStr(ADValue.Value.AsInt64);
+      Result := AnsiString(IntToStr(ADValue.Value.AsInt64));
     vdtCurrency:
-      Result := CurrToStr(ADValue.Value.AsCurrency);
+      Result := AnsiString(CurrToStr(ADValue.Value.AsCurrency));
     vdtGuid:
-      Result := GuidToString(ADValue.Value.AsGuid^);
+      Result := AnsiString(GuidToString(ADValue.Value.AsGuid^));
     vdtDateTime:
-      Result := DTToStr(ADValue);
+      Result := AnsiString(DTToStr(ADValue));
     vdtObject:
-      Result := Format('@@object[$%p]', [ADValue.Value.AsPointer]);
+      Result := AnsiString(Format('@@object[$%p]', [ADValue.Value.AsPointer]));
     vdtPtr:
-      Result := Format('@@Ptr[$%p]', [ADValue.Value.AsPointer]);
+      Result :=AnsiString(Format('@@Ptr[$%p]', [ADValue.Value.AsPointer]));
     vdtInterface:
-      Result := Format('@@Interface[$%p]', [ADValue.Value.AsInterface]);
+      Result :=AnsiString(Format('@@Interface[$%p]', [ADValue.Value.AsInterface]));
     vdtStream:
       begin
-        SetLength(lvHexStr, TMemoryStream(ADValue.Value.AsStream).Size * 2);
-        lvHexStr := BinToHex(
-          TMemoryStream(ADValue.Value.AsStream).Memory, TMemoryStream(ADValue.Value.AsStream).Size, False);
+        //SetLength(lvHexStr, TMemoryStream(ADValue.Value.AsStream).Size * 2);
+        lvHexStr :=AnsiString(BinToHex(
+          TMemoryStream(ADValue.Value.AsStream).Memory, TMemoryStream(ADValue.Value.AsStream).Size, False));
 
         Result := lvHexStr;
       end;
@@ -1147,10 +1137,10 @@ begin
   case ADValue.ValueType of
 {$IF (not Defined(NEXTGEN))}
     vdtStringA:
-      Result := ADValue.Value.AsStringA^;
+      Result := DStringW(ADValue.Value.AsStringA^);
 {$IFEND}
     vdtString:
-      Result := ADValue.Value.AsString^;
+      Result := DStringW(ADValue.Value.AsString^);
     vdtStringW:
       Result := ADValue.Value.AsStringW^;
     vdtUnset:
@@ -1362,12 +1352,12 @@ begin
   case ADValue.ValueType of
 {$IF (not Defined(NEXTGEN))}
     vdtStringA:
-      Result := ADValue.Value.AsStringA^;
+      Result := String(ADValue.Value.AsStringA^);
 {$IFEND}  
     vdtString:
       Result := ADValue.Value.AsString^;
     vdtStringW:
-      Result := ADValue.Value.AsStringW^;
+      Result := string(ADValue.Value.AsStringW^);
     vdtUnset:
       Result := '';
     vdtNull:
@@ -1685,160 +1675,105 @@ begin
   begin
     Result := Length(ADValue.Value.AsStringA^) = 0;
  {$ENDIF}
-  end;
-end;
-
-destructor TDValueObject.Destroy;
-begin
-  ClearDValue(@FRawValue);
-  inherited;
-end;
-
-function TDValueObject.GetAsBoolean: Boolean;
-begin
-  Result := DValueGetAsBoolean(@FRawValue);
-end;
-
-function TDValueObject.GetAsFloat: Double;
-begin
-  Result := DValueGetAsFloat(@FRawValue);
-end;
-
-function TDValueObject.GetAsInetger: Int64;
-begin
-  Result := DValueGetAsInt64(@FRawValue);
-end;
-
-function TDValueObject.GetAsString: String;
-begin
-  Result := DValueGetAsString(@FRawValue);
-end;
-
-function TDValueObject.GetDataType: TDValueDataType;
-begin
-  Result := FRawValue.ValueType;
-end;
-
-procedure TDValueObject.SetAsBoolean(const Value: Boolean);
-begin
-  DValueSetAsBoolean(@FRawValue, Value);
-end;
-
-procedure TDValueObject.SetAsFloat(const Value: Double);
-begin
-  DValueSetAsFloat(@FRawValue, Value);
-end;
-
-procedure TDValueObject.SetAsInetger(const Value: Int64);
-begin
-  DValueSetAsInt64(@FRawValue, Value);
-end;
-
-procedure TDValueObject.SetAsString(const Value: String);
-begin
-  DValueSetAsString(@FRawValue, Value);
-end;
-
-function TDValueList.Add(pvValueName:String): TDValueObject;
-begin
-  if FindByName(pvValueName) <> nil then
-    raise Exception.CreateFmt(SItemExists, [pvValueName]);
-
-  Result := InnerAdd(pvValueName);
-end;
-
-procedure TDValueList.Clear;
-var
-  i: Integer;
-begin
-  for i := 0 to FList.Count - 1 do
+  end else if (ADValue.ValueType in [vdtDateTime]) then
   begin
-    TObject(FList[i]).Free;
+    Result := ADValue.Value.AsDateTime = 0;
+  end else if (ADValue.ValueType in [vdtObject, vdtPtr]) then
+  begin
+    Result := ADValue.Value.AsPointer = nil;
+  end else if (ADValue.ValueType in [vdtInterface]) then
+  begin
+    Result := ADValue.Value.AsInterface^ = nil;
+  end else
+  begin
+    Result := false;
   end;
-  FList.Clear;
 end;
 
-constructor TDValueList.Create;
+function GetDValueObjectCount: Integer;
 begin
-  inherited Create;
-{$IFDEF HAVE_GENERICS}
-  FList := TList<TDValueObject>.Create;
-{$ELSE}
-  FList := TList.Create;
+  {$IFDEF DEBUG}
+  Result := __create_cnt - __destroy_cnt;
+  {$ELSE}
+  Result := 0;
+  {$ENDIF}
+end;
+
+function CreateDValueObject: TDValue;
+var
+  __ref:PValPoolBlock;
+begin
+  {$IFDEF USE_DVALUE_POOL}
+  if Assigned(__valPool) then
+  begin
+    __ref := GetValBlockFromPool(__valPool);
+    AddValRef(__ref);
+    Result := TDValue(__ref.data);
+    Result.DoCleanUp;
+    Result.CheckSetNodeType(vntObject);
+    Result.__refBlock := __ref;
+
+
+  end else
+  begin
+    Result := TDValue.Create();
+  end;
+  {$ELSE}
+  Result := TDValue.Create();
+  {$ENDIF}
+end;
+
+procedure DisposeDValueObject(aVal:TDValue);
+{$IFDEF USE_DVALUE_POOL}
+var
+  __ref:PValPoolBlock;
 {$ENDIF}
-
-end;
-
-destructor TDValueList.Destroy;
 begin
-  Clear;
-  FList.Free;
-  inherited;
-end;
-
-function TDValueList.GetCount: Integer;
-begin
-  Result := FList.Count;
-end;
-
-function TDValueList.GetItems(pvIndex: Integer): TDValueObject;
-begin
-  Result :=TDValueObject(FList[pvIndex]);
-end;
-
-function TDValueList.FindByName(const pvValueName: string): TDValueObject;
-var
-  i:Integer;
-  lvItem:TDValueObject;
-begin
-  Result := nil;
-  for i := 0 to FList.Count - 1 do
+  {$IFDEF USE_DVALUE_POOL}
+  __ref := aVal.__refBlock;
+  if __ref <> nil then
   begin
-    lvItem := TDValueObject(FList[i]);
-    if SameText(lvItem.Name, pvValueName)  then
-    begin
-      Result := lvItem;
-      Break;    
-    end;
-  end;
-end;
-
-function TDValueList.ForceByName(const pvValueName: String): TDValueObject;
-begin
-  Result := FindByName(pvValueName);
-  if Result = nil then Result := InnerAdd(pvValueName);
-end;
-
-function TDValueList.InnerAdd(const pvValueName: string): TDValueObject;
-begin
-  Result := TDValueObject.Create;
-  Result.Name := pvValueName;
-  FList.Add(Result);
-end;
-
-function TDValueList.ParamByName(const pvValueName: String): TDValueObject;
-begin
-  Result := FindByName(pvValueName);
-  if Result = nil then
+    aVal.__refBlock := nil;
+    ReleaseValPoolRef(__ref);
+  end else
   begin
-    Raise Exception.CreateFmt(SItemNotFound, [pvValueName]);
+    FreeObject(aVal);
   end;
+  {$ELSE}
+  FreeObject(aVal);
+  {$ENDIF}
 end;
+
+
+
+
+
+
 
 procedure TDValue.ClearChildren;
 var
   i: Integer;
+  lvChild:TDValue;
 begin
   if Assigned(FChildren) then
   begin
     for i := 0 to FChildren.Count - 1 do
     begin
+      lvChild := FChildren[i];
+      {$IFDEF DIOCP_DEBUG}
       try
-        FLastMsg := Format('正在清理[%d/%d]:%s', [i, FChildren.Count, TObject(FChildren[i]).ClassName]);
+        FLastMsg := Format('正在清理[%d/%d]:%s', [i, FChildren.Count, TObject(lvChild).ClassName]);
       except
         FLastMsg := Format('正在清理[%d/%d],无法获取类名', [i, FChildren.Count]);
       end;
-      TDValueItem(FChildren[i]).Free;
+      {$ENDIF}
+
+      if lvChild.ObjectType in [vntArray, vntObject] then
+      begin
+        lvChild.ClearChildren;
+      end;
+
+      DisposeDValueObject(lvChild);
     end;
     FChildren.Clear;
   end;
@@ -1876,15 +1811,17 @@ end;
 
 procedure TDValue.DeleteName;
 begin
-  if Assigned(FName) then
-  begin
-    FName.Free;
-    FName := nil;
-  end;    
+  if Assigned(FName) then FName.Clear;
 end;
 
 destructor TDValue.Destroy;
 begin
+  if __refBlock <> nil then
+  begin
+    raise Exception.Create('please use DisposeDValueObject to release!');
+  end;
+
+
   if Assigned(FChildren) then
   begin
     ClearChildren();
@@ -1893,7 +1830,7 @@ begin
   end;
 
   if Assigned(FValue) then FValue.Free;
-  DeleteName;
+  if Assigned(FName) then FName.Free;
 
   {$IFDEF CHECK_DVALUE}
   __CheckValueOK();
@@ -1905,7 +1842,8 @@ end;
 function TDValue.Add: TDValue;
 begin
   CheckBeforeAddChild(vntObject);
-  Result := TDValue.Create(vntValue);
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(vntValue);
   Result.FParent := Self;
   FChildren.Add(Result);
 end;
@@ -1913,7 +1851,8 @@ end;
 function TDValue.Add(const pvName: String): TDValue;
 begin
   CheckSetNodeType(vntObject);
-  Result := TDValue.Create(vntValue);
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(vntValue);
   Result.FParent := Self;
   Result.FName.AsString := pvName;
   FChildren.Add(Result);
@@ -1922,7 +1861,8 @@ end;
 function TDValue.Add(const pvName, pvValue: string): TDValue;
 begin
   CheckSetNodeType(vntObject);
-  Result := TDValue.Create(vntValue);
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(vntValue);
   Result.FParent := Self;
   Result.FName.AsString := pvName;
   Result.AsString := pvValue;
@@ -1932,7 +1872,8 @@ end;
 function TDValue.Add(const pvName: string; pvValue: Integer): TDValue;
 begin
   CheckSetNodeType(vntObject);
-  Result := TDValue.Create(vntValue);
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(vntValue);
   Result.FParent := Self;
   Result.FName.AsString := pvName;
   Result.AsInteger := pvValue;
@@ -1942,7 +1883,8 @@ end;
 function TDValue.Add(const pvName: string; pvValue: Boolean): TDValue;
 begin
   CheckSetNodeType(vntObject);
-  Result := TDValue.Create(vntValue);
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(vntValue);
   Result.FParent := Self;
   Result.FName.AsString := pvName;
   Result.AsBoolean := pvValue;
@@ -1952,7 +1894,8 @@ end;
 function TDValue.Add(const pvName: string; pvValue: Double): TDValue;
 begin
   CheckSetNodeType(vntObject);
-  Result := TDValue.Create(vntValue);
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(vntValue);
   Result.FParent := Self;
   Result.FName.AsString := pvName;
   Result.AsFloat := pvValue;
@@ -1961,10 +1904,12 @@ end;
 
 function TDValue.Add(const pvName: string; pvValue: TDValue): TDValue;
 begin
+  Result := nil;
   if pvValue = nil then Exit;
   CheckSetNodeType(vntObject);
 
-  Result := TDValue.Create();
+  Result := CreateDValueObject();
+
   Result.CloneValueFrom(pvValue);
   Result.FParent := Self;
   Result.FName.AsString := pvName;
@@ -1975,7 +1920,10 @@ end;
 function TDValue.Add(const pvName: String; pvType: TDValueObjectType): TDValue;
 begin
   CheckSetNodeType(vntObject);
-  Result := TDValue.Create(pvType);
+
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(pvType);
+
   Result.FParent := Self;
   Result.FName.AsString := pvName;
   FChildren.Add(Result);
@@ -1984,7 +1932,8 @@ end;
 function TDValue.AddArrayChild: TDValue;
 begin
   CheckSetNodeType(vntArray);
-  Result := TDValue.Create(vntValue);
+  Result := CreateDValueObject();
+  Result.CheckSetNodeType(vntValue);
   Result.FParent := Self;
   FChildren.Add(Result);
 end;
@@ -2139,11 +2088,13 @@ var
   i: Integer;
   lvNow:Cardinal;
 begin
+  Result := 0;
   lvNow := GetTickCount;
   for i := Count - 1 downto 0 do
   begin
     if tick_diff(Items[i].FLastModify, lvNow) >= pvTimeOut then
     begin
+      Inc(Result);
       Delete(i);
     end;    
   end;
@@ -2229,8 +2180,13 @@ end;
 
 
 procedure TDValue.Delete(pvIndex:Integer);
+var
+  lvChild:TDValue;
 begin
-  TDValue(FChildren[pvIndex]).Free;
+  lvChild :=TDValue(FChildren[pvIndex]);
+  lvChild.DoCleanUp;
+
+  DisposeDValueObject(lvChild);
   FChildren.Delete(pvIndex);
 end;
 
@@ -2705,6 +2661,7 @@ var
   lvParent, lvDValue:TDValue;
   lvIndex:Integer;
 begin
+  Result := False;
   lvIndex := -1;
   InnerFindByPath(pvPath, lvParent, lvIndex);
   if lvIndex <> -1 then
@@ -2724,6 +2681,7 @@ begin
         lvDValue := lvParent;
       end;
     end;
+    Result := True;
   end;
 end;
 
@@ -2731,7 +2689,7 @@ end;
 function TDValue.RemoveFromParent: Boolean;
 begin
   Result := UnAttachFromParent;
-  if Result then Self.Free;
+  if Result then DisposeDValueObject(Self);
 end;
 
 {$IF (not Defined(NEXTGEN))}
@@ -2787,6 +2745,14 @@ procedure TDValue.SetAsUInt(const Value: UInt64);
 begin
   CheckSetNodeType(vntValue);
   FValue.SetAsUInt(Value);
+end;
+
+procedure TDValue.DoCleanUp;
+begin
+  Clear;
+  FName.Clear;
+  FParent := nil;
+  CheckSetNodeType(vntObject);
 end;
 
 procedure TDValue.DoLastModify;
@@ -2939,7 +2905,23 @@ end;
 
 destructor TDValueItem.Destroy;
 begin
-  ClearDValue(@FRawValue);
+  ClearDValue(FRawValue);
+
+ {$IFDEF DIOCP_DEBUG}
+ AtomicIncrement(__destroy_cnt);
+ {$ENDIF}
+
+ {$IFDEF USE_DVALUE_POOL}
+  if Assigned(__raw_value_pool) then
+  begin
+    ReleaseRef(PByte(FRawValue));
+  end else
+  begin
+    FreeMem(FRawValue);
+  end;
+ {$ELSE}
+ FreeMem(FRawValue);
+ {$ENDIF}
   inherited;
 end;
 
@@ -2947,25 +2929,46 @@ procedure TDValueItem.BindObject(pvObject: TObject; pvFreeAction:
     TObjectFreeAction = faFree);
 begin
   case pvFreeAction of
-    faNone: DValueBindObjectData(@FRawValue, pvObject, praNone);
-    faFree: DValueBindObjectData(@FRawValue, pvObject, praObjectFree);
+    faNone: DValueBindObjectData(FRawValue, pvObject, praNone);
+    faFree: DValueBindObjectData(FRawValue, pvObject, praObjectFree);
   end;
 end;
 
 procedure TDValueItem.Clear;
 begin
-  ClearDValue(@FRawValue);
+  ClearDValue(FRawValue);
 end;
 
 procedure TDValueItem.CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes:
     TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 begin
-  RawValueCopyFrom(@pvSource.FRawValue, @FRawValue, pvIgnoreValueTypes);
+  RawValueCopyFrom(pvSource.FRawValue, FRawValue, pvIgnoreValueTypes);
+end;
+
+constructor TDValueItem.Create;
+begin
+  {$IFDEF USE_DVALUE_POOL}
+  if Assigned(__raw_value_pool) then
+  begin
+    FRawValue:=PDRawValue(GetBuffer(__raw_value_pool));
+    ClearDValue(FRawValue);
+    AddRef(PByte(FRawValue));
+  end else
+  begin
+    GetMem(FRawValue, System.SizeOf(TDRawValue));
+  end;
+  {$ELSE}
+  GetMem(FRawValue, System.SizeOf(TDRawValue));
+  {$ENDIF}
+
+  {$IFDEF DEBUG}
+  AtomicIncrement(__create_cnt);
+  {$ENDIF}
 end;
 
 function TDValueItem.Equal(pvItem:TDValueItem): Boolean;
 begin
-  Result := CompareDValue(@FRawValue, @pvItem.FRawValue) = 0;
+  Result := CompareDValue(FRawValue, pvItem.FRawValue) = 0;
 end;
 
 function TDValueItem.GetItems(pvIndex: Integer): TDValueItem;
@@ -2979,7 +2982,7 @@ begin
 
 
 
-  lvObj := DValueGetAsObject(GetDValueItem(@FRawValue, pvIndex));
+  lvObj := DValueGetAsObject(GetDValueItem(FRawValue, pvIndex));
   Result := TDValueItem(lvObj);
 end;
 
@@ -2991,42 +2994,42 @@ end;
 
 function TDValueItem.GetAsBoolean: Boolean;
 begin
-  Result := DValueGetAsBoolean(@FRawValue);
+  Result := DValueGetAsBoolean(FRawValue);
 end;
 
 function TDValueItem.GetAsDateTime: TDateTime;
 begin
-  Result := DValueGetAsDateTime(@FRawValue);
+  Result := DValueGetAsDateTime(FRawValue);
 end;
 
 procedure TDValueItem.SetAsDateTime(const Value: TDateTime);
 begin
-  DValueSetAsDateTime(@FRawValue, Value);
+  DValueSetAsDateTime(FRawValue, Value);
 end;
 
 function TDValueItem.GetAsFloat: Double;
 begin
-  Result := DValueGetAsFloat(@FRawValue);
+  Result := DValueGetAsFloat(FRawValue);
 end;
 
 function TDValueItem.GetAsInteger: Int64;
 begin
-  Result := DValueGetAsInt64(@FRawValue);
+  Result := DValueGetAsInt64(FRawValue);
 end;
 
 function TDValueItem.GetAsInterface: IInterface;
 begin
-  Result := DValueGetAsInterface(@FRawValue);
+  Result := DValueGetAsInterface(FRawValue);
 end;
 
 function TDValueItem.GetAsObject: TObject;
 begin
-  Result := DValueGetAsObject(@FRawValue);
+  Result := DValueGetAsObject(FRawValue);
 end;
 
 function TDValueItem.GetAsStream: TMemoryStream;
 begin
-  CheckDValueSetType(@FRawValue, vdtStream);
+  CheckDValueSetType(FRawValue, vdtStream);
   Result :=  TMemoryStream(FRawValue.Value.AsStream);
   {$IFDEF NEXTGEN}
   // 移动平台下AData的计数需要增加，以避免自动释放
@@ -3039,29 +3042,29 @@ end;
 
 function TDValueItem.GetAsString: String;
 begin
-  Result := DValueGetAsString(@FRawValue);
+  Result := DValueGetAsString(FRawValue);
 end;
 
 {$IFNDEF NEXTGEN}
 procedure TDValueItem.SetAsStringA(const Value: AnsiString);
 begin
-  DValueSetAsStringA(@FRawValue, Value);
+  DValueSetAsStringA(FRawValue, Value);
 end;    
 
 function TDValueItem.GetAsStringA: AnsiString;
 begin
-  Result := DValueGetAsStringA(@FRawValue);
+  Result := DValueGetAsStringA(FRawValue);
 end;
 {$ENDIF}
 
 function TDValueItem.GetAsStringW: WideString;
 begin
-  Result := DValueGetAsStringW(@FRawValue);
+  Result := DValueGetAsStringW(FRawValue);
 end;
 
 function TDValueItem.GetAsUInt: UInt64;
 begin
-  Result := DValueGetAsUInt64(@FRawValue);
+  Result := DValueGetAsUInt64(FRawValue);
 end;
 
 function TDValueItem.GetDataType: TDValueDataType;
@@ -3071,7 +3074,7 @@ end;
 
 function TDValueItem.IsEmpty: Boolean;
 begin
-  Result := DValueIsEmpty(@FRawValue);  
+  Result := DValueIsEmpty(FRawValue);
 end;
 
 procedure TDValueItem.SetArraySize(const Value: Integer);
@@ -3084,60 +3087,109 @@ begin
   if lvOldSize <> Value then   // 原有尺寸与新尺寸大小不同
   begin
     // 设置新的尺寸大小，如果缩小会处理原有节点的数据清理
-    CheckDValueSetArrayLength(@FRawValue, Value);
+    CheckDValueSetArrayLength(FRawValue, Value);
     l := GetSize;
     if l > lvOldSize then
       for i := lvOldSize to l - 1 do
       begin
         lvDValueItem := TDValueItem.Create();
         // 设置Item为TDValueItem对象
-        DValueBindPointerData(GetDValueItem(@FRawValue, i), lvDValueItem, praObjectFree);
+        DValueBindPointerData(GetDValueItem(FRawValue, i), lvDValueItem, praObjectFree);
       end;
   end;
 end;
 
 procedure TDValueItem.SetAsBoolean(const Value: Boolean);
 begin
-  DValueSetAsBoolean(@FRawValue, Value);
+  DValueSetAsBoolean(FRawValue, Value);
 end;
 
 
 procedure TDValueItem.SetAsFloat(const Value: Double);
 begin
-  DValueSetAsFloat(@FRawValue, Value);
+  DValueSetAsFloat(FRawValue, Value);
 end;
 
 procedure TDValueItem.SetAsInteger(const Value: Int64);
 begin
-  DValueSetAsInt64(@FRawValue, Value);
+  DValueSetAsInt64(FRawValue, Value);
 end;
 
 procedure TDValueItem.SetAsInterface(const Value: IInterface);
 begin
-  DValueSetAsInterface(@FRawValue, Value);
+  DValueSetAsInterface(FRawValue, Value);
 end;
 
 procedure TDValueItem.SetAsString(const Value: String);
 begin
-  DValueSetAsString(@FRawValue, Value);
+  DValueSetAsString(FRawValue, Value);
 end;
 
 
 procedure TDValueItem.SetAsStringW(const Value: WideString);
 begin
-  DValueSetAsStringW(@FRawValue, Value);
+  DValueSetAsStringW(FRawValue, Value);
 
 end;
 
 procedure TDValueItem.SetAsUInt(const Value: UInt64);
 begin
-  DValueSetAsUInt64(@FRawValue, Value);
+  DValueSetAsUInt64(FRawValue, Value);
 end;
 
 function TDValueItem.SizeOf: Integer;
 begin
-  Result := GetDValueSize(@FRawValue);
+  Result := GetDValueSize(FRawValue);
 end;
+
+ procedure DoInitializeDValueForPool(pvAllocNum:Integer);
+ begin
+ {$IFDEF USE_DVALUE_POOL}
+   __raw_value_pool := NewBufferPool(SizeOf(TDRawValue), pvAllocNum * 2);
+   __valPool := NewValPool;
+   __valPool.FNewProc := @NewDValue;
+   __valPool.FDisposeProc := @DisposeDValue;
+   __valPool.FPoolSize := pvAllocNum;
+   CheckIntializeValPool(__valPool);
+ {$ELSE}
+   raise Exception.Create('DEFINE USE_DVALUE_POOL');
+ {$ENDIF}
+ end;
+
+procedure DoFinalizeDValue;
+begin
+  {$IFDEF USE_DVALUE_POOL}
+    if __valPool <> nil then
+    begin
+      FreeValPool(__valPool);
+      FreeBufferPool(__raw_value_pool);
+      __valPool := nil;
+    end;
+  {$ELSE}
+    raise Exception.Create('DEFINE USE_DVALUE_POOL');
+  {$ENDIF}
+end;
+
+function GetDValuePrintDebugInfo: String;
+begin
+  {$IFDEF USE_DVALUE_POOL}
+  Result := GetValPoolDebugInfo(__valPool);
+  {$ENDIF}
+end;
+
+
+initialization
+
+
+finalization
+{$IFDEF USE_DVALUE_POOL}
+  DoFinalizeDValue();
+{$ENDIF}
+
+
+{$IFDEF DEBUG}
+   Assert(__create_cnt = __destroy_cnt, Format('dvalue memory leak, create:%d, destroy:%d, leak:%d', [__create_cnt, __destroy_cnt, __create_cnt-__destroy_cnt]));
+{$ENDIF}
 
 
 end.

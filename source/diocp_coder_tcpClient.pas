@@ -118,6 +118,27 @@ type
   end;
 
 
+  TDiocpExRemoteContext = class(TIocpRemoteContext)
+  private
+    FOnBufferAction: TOnContextBufferNotifyEvent;
+  protected
+    FCacheBuffer: TBufferLink;
+    FEndBuffer: array [0..254] of Byte;
+    FEndBufferLen: Byte;
+    FStartBuffer: array [0..254] of Byte;
+    FStartBufferLen: Byte;
+
+    procedure DoCleanUp; override;
+    procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
+  public
+    constructor Create; override;
+    destructor Destroy; override;
+    procedure SetEnd(pvBuffer:Pointer; pvBufferLen:Byte);
+    procedure SetStart(pvBuffer:Pointer; pvBufferLen:Byte);
+    property OnBufferAction: TOnContextBufferNotifyEvent read FOnBufferAction write FOnBufferAction;
+  end;
+
+
 
 
 
@@ -385,6 +406,89 @@ begin
     FMemBlock := nil;
   end;
   inherited;
+end;
+
+constructor TDiocpExRemoteContext.Create;
+begin
+  inherited Create;
+  FCacheBuffer := TBufferLink.Create();
+end;
+
+destructor TDiocpExRemoteContext.Destroy;
+begin
+  FreeAndNil(FCacheBuffer);
+  inherited Destroy;
+end;
+
+procedure TDiocpExRemoteContext.DoCleanUp;
+begin
+  inherited;
+  FCacheBuffer.clearBuffer;
+end;
+
+procedure TDiocpExRemoteContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
+    ErrCode: WORD);
+var
+  j:Integer;
+  lvBuffer:array of byte;
+begin
+  FCacheBuffer.AddBuffer(buf, len);
+  while FCacheBuffer.validCount > 0 do
+  begin
+    // 标记读取的开始位置，如果数据不够，进行恢复，以便下一次解码
+    FCacheBuffer.markReaderIndex;
+
+    if FStartBufferLen > 0 then
+    begin
+      // 不够数据，跳出
+      if FCacheBuffer.validCount < FStartBufferLen + FEndBufferLen then Break;
+
+      j := FCacheBuffer.SearchBuffer(@FStartBuffer[0], FStartBufferLen);
+      if j = -1 then
+      begin  // 没有搜索到开始标志
+        FCacheBuffer.clearBuffer();
+        Exit;
+      end else
+      begin
+        FCacheBuffer.restoreReaderIndex;
+
+        // 跳过开头标志
+        FCacheBuffer.Skip(j + FStartBufferLen);
+      end;
+    end;
+
+    // 不够数据，跳出
+    if FCacheBuffer.validCount < FEndBufferLen then Break;
+
+    j := FCacheBuffer.SearchBuffer(@FEndBuffer[0], FEndBufferLen);
+    if j <> -1 then
+    begin
+      SetLength(lvBuffer, j);
+      FCacheBuffer.readBuffer(@lvBuffer[0], j);
+      if Assigned(FOnBufferAction) then
+      begin
+        FOnBufferAction(Self, @lvBuffer[0], j);
+      end;
+      FCacheBuffer.Skip(FEndBufferLen);
+    end else
+    begin      // 没有结束符
+      FCacheBuffer.restoreReaderIndex;
+      Break;
+    end;
+  end;
+  FCacheBuffer.clearHaveReadBuffer();
+end;
+
+procedure TDiocpExRemoteContext.SetEnd(pvBuffer:Pointer; pvBufferLen:Byte);
+begin
+  Move(pvBuffer^, FEndBuffer[0], pvBufferLen);
+  FEndBufferLen := pvBufferLen;
+end;
+
+procedure TDiocpExRemoteContext.SetStart(pvBuffer:Pointer; pvBufferLen:Byte);
+begin
+  Move(pvBuffer^, FStartBuffer[0], pvBufferLen);
+  FStartBufferLen := pvBufferLen;
 end;
 
 end.

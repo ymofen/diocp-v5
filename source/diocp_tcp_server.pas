@@ -4463,12 +4463,7 @@ end;
 
 function TIocpRecvRequest.PostRecvRequest: Boolean;
 begin
-  if FInnerBuffer.len <> FOwner.FWSARecvBufferSize then
-  begin
-    if FInnerBuffer.len > 0 then FreeMem(FInnerBuffer.buf);
-    FInnerBuffer.len := FOwner.FWSARecvBufferSize;
-    GetMem(FInnerBuffer.buf, FInnerBuffer.len);
-  end;
+  CheckCreateRecvBuffer;
   Result := PostRecvRequest(FInnerBuffer.buf, FInnerBuffer.len);
 end;
 

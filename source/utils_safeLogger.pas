@@ -10,7 +10,7 @@ unit utils_safeLogger;
 
 interface
 
-{$DEFINE USE_QUEUE_POOL}
+{.$DEFINE USE_QUEUE_POOL}
 
 uses
   Classes, utils_queues, SysUtils, SyncObjs
@@ -839,7 +839,8 @@ begin
               end;
             end;
           finally
-            FSafeLogger.Appender.NotifyOnceEnd(i);
+            if FSafeLogger.Appender <> nil then
+               FSafeLogger.Appender.NotifyOnceEnd(i);
           end;
         except
           on E:Exception do

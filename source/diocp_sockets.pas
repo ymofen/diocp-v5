@@ -3896,7 +3896,6 @@ procedure TDiocpCustomContext.InnerKickOut;
 var
   lvCloseContext:Boolean;
   pvDebugInfo:String;
-  pvObj: TObject;
 begin
   InterlockedIncrement(FKickCounter);
   {$IFDEF DIOCP_DEBUG}
@@ -3905,8 +3904,7 @@ begin
 
 
   pvDebugInfo := '超时主动断开连接';
-  pvObj := nil;
-  
+
   /// 与RequestDisconnect一致，
   /// 为了记录日志
   if not FActive then

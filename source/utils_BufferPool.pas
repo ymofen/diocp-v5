@@ -33,7 +33,7 @@ uses
 
 // ½øÐÐµ÷ÊÔ
 {.$UNDEF HAVE_INLINE}
-{.$DEFINE DIOCP_DEBUG}
+{.$DEFINE DIOCP_DEBUG_HINT}
 
 {$IFDEF DIOCP_HIGH_SPEED}
   {$UNDEF DIOCP_DEBUG}
@@ -51,8 +51,8 @@ const
   protect_size = 0;
 {$ENDIF}
 
-{$IFDEF DIOCP_DEBUG}
-  BLOCK_DEBUG_HINT_LENGTH = 4096;
+{$IFDEF DIOCP_DEBUG_HINT}
+  BLOCK_DEBUG_HINT_LENGTH = 128;
 {$ENDIF}
 
 type
@@ -93,7 +93,7 @@ type
     data: Pointer;
     data_free_type:Byte; // 0
 
-    {$IFDEF DIOCP_DEBUG}
+    {$IFDEF DIOCP_DEBUG_HINT}
     __debug_lock:Integer;
     __debug_hint:array[0..BLOCK_DEBUG_HINT_LENGTH -1] of Char;
     __debug_hint_pos:Integer;
@@ -266,7 +266,7 @@ begin
     lvBuffer.flag := block_flag;
     lvBuffer.__debug_flag := 0;
 
-    {$IFDEF DIOCP_DEBUG}
+    {$IFDEF DIOCP_DEBUG_HINT}
     lvBuffer.__debug_lock := 0;
     lvBuffer.__debug_hint_pos := 0;
     {$ENDIF}
@@ -296,7 +296,7 @@ begin
   {$ENDIF};
 end;
 
-{$IFDEF DIOCP_DEBUG}
+{$IFDEF DIOCP_DEBUG_HINT}
 procedure InnerAddBlockHint(const pvBlock:PBufferBlock; const pvHint:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 var
   lvPtr:PChar;
@@ -506,7 +506,7 @@ begin
     lvBuffer.flag := block_flag;
     lvBuffer.__debug_flag := 0;
 
-    {$IFDEF DIOCP_DEBUG}
+    {$IFDEF DIOCP_DEBUG_HINT}
     lvBuffer.__debug_lock := 0;
     lvBuffer.__debug_hint_pos := 0;
     {$ENDIF}
@@ -521,7 +521,7 @@ begin
 
   lvBuffer.__debug_flag := 1;
 
-  {$IFDEF DIOCP_DEBUG}
+  {$IFDEF DIOCP_DEBUG_HINT}
   InnerAddBlockHint(lvBuffer, '* GetBuffer');
   {$ENDIF}
 
@@ -543,7 +543,7 @@ begin
   end;
   pvBufBlock.__debug_flag := 0;
 
-  {$IFDEF DIOCP_DEBUG}
+  {$IFDEF DIOCP_DEBUG_HINT}
   InnerAddBlockHint(pvBufBlock, '# FreeBuff' + pvHint);
   {$ENDIF}
 
@@ -602,7 +602,7 @@ begin
   Result := AtomicIncrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FAddRef);
 
-  {$IFDEF DIOCP_DEBUG}
+  {$IFDEF DIOCP_DEBUG_HINT}
   InnerAddBlockHint(lvBlock, pvHint);
   {$ENDIF}
   
@@ -636,7 +636,7 @@ begin
   Result := AtomicDecrement(lvBlock.refcounter);
   AtomicIncrement(lvBlock.owner.FReleaseRef);
 
-  {$IFDEF DIOCP_DEBUG}
+  {$IFDEF DIOCP_DEBUG_HINT}
   InnerAddBlockHint(lvBlock, pvHint);
   {$ENDIF}
 
@@ -681,7 +681,7 @@ var
   lvBlock, lvNext:PBufferBlock;
 begin
   Assert(buffPool.FGet = buffPool.FPut,
-    Format('DBuffer-%s Leak, get:%d, put:%d', [buffPool.FName, buffPool.FGet, buffPool.FPut]));
+    Format('BufferPool-%s Leak, get:%d, put:%d', [buffPool.FName, buffPool.FGet, buffPool.FPut]));
 
   lvBlock := buffPool.FHead;
   while lvBlock <> nil do
