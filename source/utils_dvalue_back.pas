@@ -8,7 +8,7 @@
  * 2. SetArraySize, 进行申请的空间清理，避免ClearDValue造成类型混乱，出现内存操作混乱
  *　　2016-06-17 15:27:49(感谢J反馈)
 *)
-unit utils_dvalue;
+unit utils_dvalue_back;
 
 {$IF CompilerVersion>25}  // XE4(VER250)
   {$DEFINE HAVE_GENERICS}
