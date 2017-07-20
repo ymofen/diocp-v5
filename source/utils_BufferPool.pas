@@ -963,10 +963,10 @@ begin
 end;
 
 procedure TBlockBuffer.FlushBuffer;
-{$IFDEF DIOCP_DEBUG}
+{$IF Defined(DIOCP_DEBUG) or Defined(DEBUG)}
 var
   r, n:Integer;
-{$ENDIF}
+{$IFEND}
 begin
   if FBuffer = nil then Exit;
   try
