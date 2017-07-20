@@ -3927,7 +3927,7 @@ begin
     {$IFDEF DIOCP_DEBUG}
     if pvDebugInfo <> '' then
     begin
-      InnerAddToDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+      InnerAddToDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(Self), pvDebugInfo]));
     end;
     {$ENDIF}
 

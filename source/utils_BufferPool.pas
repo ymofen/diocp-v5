@@ -975,7 +975,9 @@ begin
       {$IFDEF DIOCP_DEBUG}n := AtomicIncrement(__debug_dna){$ENDIF};
       {$IFDEF DIOCP_DEBUG}r := {$ENDIF}AddRef(FBuffer{$IFDEF DIOCP_DEBUG}, Format('+ FlushBuffer(%d)', [n]){$ENDIF});    // 避免事件中没有使用引用计数，不释放buf
       try
-        {$IFDEF DIOCP_DEBUG}PrintDebugString(Format('+ FlushBuffer %2x: %d', [Cardinal(FBuffer), r]));{$ENDIF}
+        {$IFNDEF BIG_CONCURRENT}
+        {$IFDEF DEBUG}PrintDebugString(Format('+ FlushBuffer %2x: %d', [Cardinal(FBuffer), r]));{$ENDIF}
+        {$ENDIF}
         FOnBufferWrite(self, FBuffer, FSize);
       finally
         ReleaseRef(FBuffer{$IFDEF DIOCP_DEBUG}, Format('- FlushBuffer(%d)', [n]){$ENDIF});

@@ -27,7 +27,8 @@ unit utils_dvalue;
 {$DEFINE CHECK_DVALUE}
 {$ENDIF}
 
-{$DEFINE USE_DVALUE_POOL}
+{.$DEFINE USE_DVALUE_POOL}
+{.$DEFINE BIG_CONCURRENT}
 
 interface
 
@@ -627,7 +628,8 @@ type
 procedure DoInitializeDValueForPool(pvAllocNum:Integer);
 procedure DoFinalizeDValue;
 
-function CreateDValueObject: TDValue;
+function CreateDValueObject: TDValue; overload;
+function CreateDValueObject(pvType: TDValueObjectType): TDValue; overload;
 procedure DisposeDValueObject(aVal:TDValue);
 
 
@@ -1700,8 +1702,10 @@ begin
 end;
 
 function CreateDValueObject: TDValue;
+{$IFDEF USE_DVALUE_POOL}
 var
   __ref:PValPoolBlock;
+{$ENDIF}
 begin
   {$IFDEF USE_DVALUE_POOL}
   if Assigned(__valPool) then
@@ -1713,7 +1717,6 @@ begin
     Result.CheckSetNodeType(vntObject);
     Result.__refBlock := __ref;
 
-
   end else
   begin
     Result := TDValue.Create();
@@ -1722,6 +1725,30 @@ begin
   Result := TDValue.Create();
   {$ENDIF}
 end;
+
+ function CreateDValueObject(pvType: TDValueObjectType): TDValue; overload;
+ {$IFDEF USE_DVALUE_POOL}
+ var
+   __ref:PValPoolBlock;
+ {$ENDIF}
+ begin
+   {$IFDEF USE_DVALUE_POOL}
+   if Assigned(__valPool) then
+   begin
+     __ref := GetValBlockFromPool(__valPool);
+     AddValRef(__ref);
+     Result := TDValue(__ref.data);
+     Result.DoCleanUp;
+     Result.CheckSetNodeType(pvType);
+     Result.__refBlock := __ref;
+   end else
+   begin
+     Result := TDValue.Create(pvType);
+   end;
+   {$ELSE}
+   Result := TDValue.Create(pvType);
+   {$ENDIF}
+ end;
 
 procedure DisposeDValueObject(aVal:TDValue);
 {$IFDEF USE_DVALUE_POOL}
@@ -1816,10 +1843,12 @@ end;
 
 destructor TDValue.Destroy;
 begin
+  {$IFDEF USE_DVALUE_POOL}
   if __refBlock <> nil then
   begin
     raise Exception.Create('please use DisposeDValueObject to release!');
   end;
+  {$ENDIF}
 
 
   if Assigned(FChildren) then
@@ -2907,7 +2936,7 @@ destructor TDValueItem.Destroy;
 begin
   ClearDValue(FRawValue);
 
- {$IFDEF DIOCP_DEBUG}
+ {$IFDEF DEBUG}
  AtomicIncrement(__destroy_cnt);
  {$ENDIF}
 
@@ -2951,14 +2980,16 @@ begin
   if Assigned(__raw_value_pool) then
   begin
     FRawValue:=PDRawValue(GetBuffer(__raw_value_pool));
-    ClearDValue(FRawValue);
+    FillChar(FRawValue^, System.SizeOf(TDRawValue), 0);
     AddRef(PByte(FRawValue));
   end else
   begin
     GetMem(FRawValue, System.SizeOf(TDRawValue));
+    FillChar(FRawValue^, System.SizeOf(TDRawValue), 0);
   end;
   {$ELSE}
   GetMem(FRawValue, System.SizeOf(TDRawValue));
+  FillChar(FRawValue^, System.SizeOf(TDRawValue), 0);
   {$ENDIF}
 
   {$IFDEF DEBUG}
@@ -3173,9 +3204,16 @@ end;
 function GetDValuePrintDebugInfo: String;
 begin
   {$IFDEF USE_DVALUE_POOL}
-  Result := GetValPoolDebugInfo(__valPool);
+  if Assigned(__valPool) then
+    Result := GetValPoolDebugInfo(__valPool)
+  else
+    Result := STRING_EMPTY;
+  {$ELSE}
+  Result := STRING_EMPTY;
   {$ENDIF}
 end;
+
+
 
 
 initialization
@@ -3183,12 +3221,12 @@ initialization
 
 finalization
 {$IFDEF USE_DVALUE_POOL}
-  DoFinalizeDValue();
+DoFinalizeDValue();
 {$ENDIF}
 
 
 {$IFDEF DEBUG}
-   Assert(__create_cnt = __destroy_cnt, Format('dvalue memory leak, create:%d, destroy:%d, leak:%d', [__create_cnt, __destroy_cnt, __create_cnt-__destroy_cnt]));
+Assert(__create_cnt = __destroy_cnt, Format('dvalue memory leak, create:%d, destroy:%d, leak:%d', [__create_cnt, __destroy_cnt, __create_cnt-__destroy_cnt]));
 {$ENDIF}
 
 
