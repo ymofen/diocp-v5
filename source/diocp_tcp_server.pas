@@ -3673,7 +3673,7 @@ begin
       lvNextContext := lvContext.FNext;
       if lvContext.FLastActivity <> 0 then
       begin
-        if tick_diff(lvContext.FLastActivity, lvNowTickCount) > pvTimeOut then
+        if tick_diff(lvContext.FLastActivity, GetTickCount) > pvTimeOut then
         begin
           // 请求关闭(异步请求关闭,不直接用RequestDisconnect()避免直接移除FOnlineContextList列表)
           lvContext.PostWSACloseRequest();
@@ -4527,6 +4527,7 @@ begin
   FOwner := nil;
   FClientContext := nil;
   FReponseState := 0;
+  Tag := 0;
 
 
   //FMaxSize := 0;

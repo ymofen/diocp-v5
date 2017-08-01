@@ -1352,8 +1352,6 @@ end;
 
 procedure TDiocpCustomContext.DoCleanUp;
 begin
-  FSendBytesSize:=0;
-  FRecvBytesSize:= 0;
   FLastActivity := 0;
   FRequestDisconnect := false;
   FSending := false;
@@ -1610,7 +1608,8 @@ end;
 
 procedure TDiocpCustomContext.OnConnected;
 begin
-
+  FSendBytesSize:=0;
+  FRecvBytesSize:= 0;
 end;
 
 procedure TDiocpCustomContext.OnDisconnected;
