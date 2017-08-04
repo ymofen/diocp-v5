@@ -6,8 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, utils_DValue, utils_strings, ComCtrls,
   utils_dvalue_multiparts, utils_dvalue_msgpack, utils_base64, utils_dvalue_dataset,
-  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, utils_textfile,
-  qstring;
+  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, utils_textfile;
 
 type
   TForm1 = class(TForm)
@@ -288,9 +287,8 @@ begin
   lvDValue2 := lvDValue.UnAttach(0);
   ShowMessage(JSONEncode(lvDValue2));
 
-  lvDValue.Free;
-
-  lvDValue2.Free;
+  DisposeDValueObject(lvDValue);
+  DisposeDValueObject(lvDValue2);
 
 
 end;
@@ -439,15 +437,15 @@ procedure TForm1.btnLoadTextFromClick(Sender: TObject);
 var
   s, lvFileName:String;
 begin
-  lvFileName := ExtractFilePath(ParamStr(0)) + 'text.txt';
-  mmoLog.Clear;
-  s := LoadTextFromFile(lvFileName);
-  mmoLog.Lines.Add(s);
-
-  s := LoadTextA(lvFileName);
-
-  mmoLog.Lines.Add('=================');
-  mmoLog.Lines.Add(s);
+//  lvFileName := ExtractFilePath(ParamStr(0)) + 'text.txt';
+//  mmoLog.Clear;
+//  s := LoadTextFromFile(lvFileName);
+//  mmoLog.Lines.Add(s);
+//
+//  s := LoadTextA(lvFileName);
+//
+//  mmoLog.Lines.Add('=================');
+//  mmoLog.Lines.Add(s);
 
 end;
 
