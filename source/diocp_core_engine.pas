@@ -986,6 +986,7 @@ begin
   FWorkerLocker := TIocpLocker.Create;
 
   FWorkerCount := GetCPUCount shl 1 - 1;
+  if FWorkerCount <=1 then FWorkerCount := 2;
   FWorkerList := TList.Create();
   FIocpCore := TIocpCore.Create;
   FIocpCore.doInitialize;
