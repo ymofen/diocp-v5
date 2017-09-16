@@ -134,17 +134,18 @@ type
   public
     constructor Create;
     procedure Clear;
+    procedure ClearContent;
     function Append(c:Char): TDStringBuilder;  overload;
-    function Append(str:string): TDStringBuilder; overload;
-    function Append(str:string; pvLeftStr:string; pvRightStr:String):
-        TDStringBuilder; overload;
+    function Append(const str: string): TDStringBuilder; overload;
+    function Append(const str, pvLeftStr, pvRightStr: string): TDStringBuilder;
+        overload;
     function Append(v: Boolean; UseBoolStrs: Boolean = True): TDStringBuilder;
         overload;
     function Append(v:Integer): TDStringBuilder; overload;
     function Append(v:Double): TDStringBuilder; overload;
-    function AppendQuoteStr(str:string): TDStringBuilder;
-    function AppendSingleQuoteStr(str:string): TDStringBuilder;
-    function AppendLine(str:string): TDStringBuilder;
+    function AppendQuoteStr(const str: string): TDStringBuilder;
+    function AppendSingleQuoteStr(const str: string): TDStringBuilder;
+    function AppendLine(const str: string): TDStringBuilder;
 
     function ToString: string;{$IFDEF UNICODE}override;{$ENDIF}
     property Length: Integer read GetLength;
@@ -1693,7 +1694,7 @@ begin
   Result := Self;
 end;
 
-function TDStringBuilder.Append(str:string): TDStringBuilder;
+function TDStringBuilder.Append(const str: string): TDStringBuilder;
 var
   l:Integer;
 begin
@@ -1727,23 +1728,24 @@ begin
   Result := Append(FloatToStr(v));
 end;
 
-function TDStringBuilder.Append(str:string; pvLeftStr:string;
-    pvRightStr:String): TDStringBuilder;
+function TDStringBuilder.Append(const str, pvLeftStr, pvRightStr: string):
+    TDStringBuilder;
 begin
   Result := Append(pvLeftStr).Append(str).Append(pvRightStr);
 end;
 
-function TDStringBuilder.AppendLine(str:string): TDStringBuilder;
+function TDStringBuilder.AppendLine(const str: string): TDStringBuilder;
 begin
   Result := Append(Str).Append(FLineBreak);
 end;
 
-function TDStringBuilder.AppendQuoteStr(str:string): TDStringBuilder;
+function TDStringBuilder.AppendQuoteStr(const str: string): TDStringBuilder;
 begin
   Result := Append('"').Append(str).Append('"');
 end;
 
-function TDStringBuilder.AppendSingleQuoteStr(str:string): TDStringBuilder;
+function TDStringBuilder.AppendSingleQuoteStr(const str: string):
+    TDStringBuilder;
 begin
   Result := Append('''').Append(str).Append('''');
 end;
@@ -1768,6 +1770,15 @@ begin
   // 2017-01-10 17:36:13
   FCapacity := 0;
   SetLength(FData, 0);
+end;
+
+procedure TDStringBuilder.ClearContent;
+begin
+  FPosition := 0;
+  if FCapacity > 0 then
+  begin
+    FillChar(FData[0], FCapacity, 0);
+  end;
 end;
 
 function TDStringBuilder.GetLength: Integer;

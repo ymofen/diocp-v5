@@ -488,6 +488,8 @@ type
     /// </summary>
     function SizeOf: Integer;
 
+    procedure SetAsVariant(const pvValue: Variant);
+
     function GetStrValueByName(const pvName, pvDefault: string): String;
     function GetIntValueByName(pvName: String; pvDefault: Int64): Int64;
     function GetFloatValueByName(pvName: String; pvDefault: Double): Double;
@@ -555,10 +557,6 @@ type
     property AsObject: TObject read GetAsObject;
 
     property AsStream: TMemoryStream read GetAsStream;
-
-
-
-
   end;
 
   TDValueItem = class(TObject)
@@ -747,6 +745,9 @@ function GetDValuePrintDebugInfo: String;
 
 
 
+
+
+
 implementation
 
 {$IFDEF DEBUG}
@@ -754,6 +755,9 @@ var
  __create_cnt:Integer;
  __destroy_cnt:Integer;
 {$ENDIF}
+
+var
+  __DateTimeFormat:string;
 
 resourcestring
   SValueNotArray = '当前值不是数组类型，无法按数组方式访问。';
@@ -1387,9 +1391,9 @@ begin
     vdtStringW:
       Result := ADValue.Value.AsStringW^;
     vdtUnset:
-      Result := '';
+      Result := STRING_EMPTY;
     vdtNull:
-      Result := '';
+      Result := STRING_EMPTY;
     vdtBoolean:
       Result := BoolToStr(ADValue.Value.AsBoolean, True);
     vdtSingle:
@@ -2080,13 +2084,7 @@ var
 begin
   lvVarType := VarType(pvValue);
   Result := Add(pvName);
-  case lvVarType of
-    varSmallInt, varInteger, varShortInt: Result.AsInteger := pvValue;
-    varSingle, varDouble: Result.AsFloat := pvValue;
-    varDate: Result.AsString := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvValue);
-  else
-    Result.AsString := pvValue;
-  end;
+  Result.SetAsVariant(pvValue);
 end;
 
 procedure TDValue.AttachDValue(const pvName: String; pvDValue: TDValue);
@@ -2867,6 +2865,20 @@ begin
   FValue.SetAsUInt(Value);
 end;
 
+procedure TDValue.SetAsVariant(const pvValue: Variant);
+var
+  lvVarType:TVarType;
+begin
+  lvVarType := VarType(pvValue);
+  case lvVarType of
+    varSmallInt, varInteger, varShortInt: SetAsInteger(pvValue);
+    varSingle, varDouble: SetAsFloat(pvValue);
+    varDate: SetAsDateTime(pvValue);
+  else
+    SetAsString(pvValue);
+  end;
+end;
+
 procedure TDValue.DoLastModify;
 begin
   FLastModify := GetTickCount;
@@ -3216,6 +3228,10 @@ function TDValueItem.SizeOf: Integer;
 begin
   Result := GetDValueSize(@FRawValue);
 end;
+
+
+initialization
+  __DateTimeFormat := 'yyyy-MM-dd hh:nn:ss.zzz';
 
 
 end.

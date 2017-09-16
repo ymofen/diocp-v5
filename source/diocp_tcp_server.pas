@@ -1532,7 +1532,7 @@ end;
 
 procedure TIocpClientContext.InnerCloseContext;
 var
-  s:String;
+  s, lvDebugStep:String;
 begin
 {$IFDEF DIOCP_DEBUG}
   if FOwner = nil then
@@ -1572,28 +1572,37 @@ begin
     CheckReleaseRes;
 
     try
+      lvDebugStep := '1.0.0';
       {$IFDEF DIOCP_DEBUG}
       CheckThreadIn('InnerCloseContext');
       try
       {$ENDIF}
+        lvDebugStep := '1.0.1';
         if FOwner.Active then
         begin
+          lvDebugStep := '1.0.2';
           if Assigned(FOwner.FOnContextDisconnected) then
           begin
+            lvDebugStep := '1.0.2';
             FOwner.FOnContextDisconnected(Self);
+            lvDebugStep := '1.0.4';
           end;
+          lvDebugStep := '1.0.5';
           DoDisconnected;
+          lvDebugStep := '1.0.6';
         end;
       {$IFDEF DIOCP_DEBUG}
       finally
+        lvDebugStep := '1.0.7';
         CheckThreadOut;
+        lvDebugStep := '1.0.8';
       end;
       {$ENDIF}
     except
       on e:Exception do
       begin
         sfLogger.LogMessage(
-          Format('InnerCloseContext:%s', [e.Message]), CORE_LOG_FILE);
+          Format('InnerCloseContext(%s):%s', [lvDebugStep, e.Message]), CORE_LOG_FILE);
       end;
     end;
   finally
