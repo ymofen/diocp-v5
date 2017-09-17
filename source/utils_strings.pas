@@ -150,6 +150,9 @@ type
     function ToString: string;{$IFDEF UNICODE}override;{$ENDIF}
     property Length: Integer read GetLength;
 
+    procedure SaveToFile(const pvFile: String);
+    procedure SaveToStream(pvStream:TStream);
+
     /// <summary>
     ///   »»ÐÐ·û: Ä¬ÈÏ#13#10
     /// </summary>
@@ -176,25 +179,26 @@ type
     function Append(const aByte:Byte): TDBufferBuilder; overload;
     function Append(const w:Word):TDBufferBuilder; overload;
     function Append(const c: Char): TDBufferBuilder; overload;
-    function Append(str:string): TDBufferBuilder; overload;
-    function Append(str:string; pvLeftStr:string; pvRightStr:String):
-        TDBufferBuilder; overload;
+    function Append(const str: string): TDBufferBuilder; overload;
+    function Append(const str, pvLeftStr, pvRightStr: string): TDBufferBuilder;
+        overload;
     function Append(v: Boolean; UseBoolStrs: Boolean = True): TDBufferBuilder;
         overload;
     function Append(v:Integer): TDBufferBuilder; overload;
     function Append(v:Double): TDBufferBuilder; overload;
-    function AppendUtf8(str:String): TDBufferBuilder;
-    function AppendRawStr(pvRawStr:RAWString): TDBufferBuilder;
+    function AppendUtf8(const str: String): TDBufferBuilder;
+    function AppendRawStr(const pvRawStr: RAWString): TDBufferBuilder;
     function AppendBreakLineBytes: TDBufferBuilder;
-    function Append(str: string; pvConvertToUtf8Bytes: Boolean): TDBufferBuilder; overload;
-    function AppendQuoteStr(str:string): TDBufferBuilder;
-    function AppendSingleQuoteStr(str:string): TDBufferBuilder;
-    function AppendLine(str:string): TDBufferBuilder;
+    function Append(const str: string; pvConvertToUtf8Bytes: Boolean):
+        TDBufferBuilder; overload;
+    function AppendQuoteStr(const str: string): TDBufferBuilder;
+    function AppendSingleQuoteStr(const str: string): TDBufferBuilder;
+    function AppendLine(const str: string): TDBufferBuilder;
 
-    procedure LoadFromFile(pvFileName:string);
+    procedure LoadFromFile(const pvFileName: string);
 
     procedure LoadFromStream(pvStream: TStream); overload;
-    procedure SaveToFile(pvFile:String);
+    procedure SaveToFile(const pvFile: String);
 
     procedure SaveToStream(pvStream:TStream);
 
@@ -589,7 +593,7 @@ function PickString(p: PChar; pvOffset, pvCount: Integer): String;
 /// </summary>
 function LoadStringFromUtf8NoBOMFile(pvFile:string): String;
 
-procedure WriteStringToUtf8NoBOMFile(pvFile, pvData: String);
+procedure WriteStringToUtf8NoBOMFile(const pvFile, pvData: String);
 
 /// <summary>
 ///   ×ª»»×Ö·û´®,
@@ -1786,6 +1790,23 @@ begin
   Result := FPosition;
 end;
 
+procedure TDStringBuilder.SaveToFile(const pvFile: String);
+var
+  Stream: TStream;
+begin
+  Stream := TFileStream.Create(pvFile, fmCreate);
+  try
+    SaveToStream(Stream);
+  finally
+    Stream.Free;
+  end;
+end;
+
+procedure TDStringBuilder.SaveToStream(pvStream:TStream);
+begin
+  if self.Length <> 0 then pvStream.WriteBuffer(FData[0], self.Length);
+end;
+
 function TDStringBuilder.ToString: string;
 var
   l:Integer;
@@ -1823,7 +1844,7 @@ begin
 
 end;
 
-function TDBufferBuilder.Append(str:string): TDBufferBuilder;
+function TDBufferBuilder.Append(const str: string): TDBufferBuilder;
 var
   l:Integer;
 begin
@@ -1852,8 +1873,8 @@ begin
   Result := Append(FloatToStr(v));
 end;
 
-function TDBufferBuilder.Append(str:string; pvLeftStr:string;
-    pvRightStr:String): TDBufferBuilder;
+function TDBufferBuilder.Append(const str, pvLeftStr, pvRightStr: string):
+    TDBufferBuilder;
 begin
   Result := Append(pvLeftStr).Append(str).Append(pvRightStr);
 end;
@@ -1863,8 +1884,8 @@ begin
   Result := AppendBuffer(@aByte, 1);
 end;
 
-function TDBufferBuilder.Append(str: string; pvConvertToUtf8Bytes: Boolean):
-    TDBufferBuilder;
+function TDBufferBuilder.Append(const str: string; pvConvertToUtf8Bytes:
+    Boolean): TDBufferBuilder;
 var
   lvBytes:TBytes;
 begin
@@ -1917,12 +1938,12 @@ begin
   Result := Self;
 end;
 
-function TDBufferBuilder.AppendLine(str:string): TDBufferBuilder;
+function TDBufferBuilder.AppendLine(const str: string): TDBufferBuilder;
 begin
   Result := Append(Str).Append(FLineBreak);
 end;
 
-function TDBufferBuilder.AppendQuoteStr(str:string): TDBufferBuilder;
+function TDBufferBuilder.AppendQuoteStr(const str: string): TDBufferBuilder;
 begin
   Result := Append('"').Append(str).Append('"');
 end;
@@ -1931,7 +1952,8 @@ end;
 
 
 
-function TDBufferBuilder.AppendRawStr(pvRawStr:RAWString): TDBufferBuilder;
+function TDBufferBuilder.AppendRawStr(const pvRawStr: RAWString):
+    TDBufferBuilder;
 begin
 {$IFDEF MSWINDOWS}
   Result := AppendBuffer(PByte(pvRawStr), System.Length(pvRawStr));
@@ -1942,15 +1964,16 @@ end;
 
 
 
-function TDBufferBuilder.AppendSingleQuoteStr(str:string): TDBufferBuilder;
+function TDBufferBuilder.AppendSingleQuoteStr(const str: string):
+    TDBufferBuilder;
 begin
   Result := Append('''').Append(str).Append('''');
 end;
 
-function TDBufferBuilder.AppendUtf8(str:String): TDBufferBuilder;
+function TDBufferBuilder.AppendUtf8(const str: String): TDBufferBuilder;
 var
   lvBytes:TBytes;
-begin 
+begin
   Result := Self;
   lvBytes := StringToUtf8Bytes(str);
   AppendBuffer(PByte(@lvBytes[0]), System.Length(lvBytes));
@@ -2038,7 +2061,7 @@ begin
   Result := FSize - FPosition;
 end;
 
-procedure TDBufferBuilder.LoadFromFile(pvFileName:string);
+procedure TDBufferBuilder.LoadFromFile(const pvFileName: string);
 var
   Stream: TStream;
 begin
@@ -2136,7 +2159,7 @@ begin
   FBufferLocked := False;
 end;
 
-procedure TDBufferBuilder.SaveToFile(pvFile:String);
+procedure TDBufferBuilder.SaveToFile(const pvFile: String);
 var
   Stream: TStream;
 begin
@@ -2267,7 +2290,7 @@ begin
   end;
 end;
 
-procedure WriteStringToUtf8NoBOMFile(pvFile, pvData: String);
+procedure WriteStringToUtf8NoBOMFile(const pvFile, pvData: String);
 var
   lvStream: TMemoryStream;
 {$IFDEF UNICODE}

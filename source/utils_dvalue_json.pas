@@ -41,7 +41,7 @@ function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
 
 function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
 function JSONParseFromFile(pvFile:string; pvDValue:TDValue): Integer;
-procedure JSONWriteToUtf8NoBOMFile(pvFile:string; pvDValue:TDValue);
+procedure JSONWriteToUtf8NoBOMFile(const pvFile: string; pvDValue: TDValue);
 
 function InputJsonBuffer(const jsonBuffer:PJsonBuffer; pvByte:Integer): Integer;
 procedure ResetJsonBuffer(const jsonBuffer:PJsonBuffer);
@@ -783,7 +783,7 @@ begin
   end;
 end;
 
-procedure JSONWriteToUtf8NoBOMFile(pvFile:string; pvDValue:TDValue);
+procedure JSONWriteToUtf8NoBOMFile(const pvFile: string; pvDValue: TDValue);
 var
   s:String;
 begin
