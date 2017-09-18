@@ -122,6 +122,8 @@ type
   PArrayStrings = ^ TArrayStrings;
 
   TCharArray = array of Char;
+
+  TCharWArray = array of DCharW;
   
   TDStringBuilder = class(TObject)
   private
@@ -279,9 +281,43 @@ type
     /// </summary>
     property Remain: Integer read GetRemain;
 
+  end;
 
 
+  TDStringWBuilder = class(TObject)
+  private
+    FData: TCharWArray;
+    FPosition: Integer;
+    FCapacity :Integer;
+    FLineBreak: DStringW;
+    procedure CheckNeedSize(pvSize: LongInt);
+    function GetLength: Integer;
+  public
+    constructor Create;
+    procedure Clear;
+    procedure ClearContent;
+    function Append(c: DCharW): TDStringWBuilder; overload;
+    function Append(const str: DStringW): TDStringWBuilder; overload;
+    function Append(const str, pvLeftStr, pvRightStr: DStringW): TDStringWBuilder;
+        overload;
+    function Append(v: Boolean; UseBoolStrs: Boolean = True): TDStringWBuilder;
+        overload;
+    function Append(v:Integer): TDStringWBuilder; overload;
+    function Append(v:Double): TDStringWBuilder; overload;
+    function AppendQuoteStr(const str: DStringW): TDStringWBuilder;
+    function AppendSingleQuoteStr(const str: DStringW): TDStringWBuilder;
+    function AppendLine(const str: DStringW): TDStringWBuilder;
 
+    function ToString: DStringW;{$IFDEF UNICODE}override;{$ENDIF}
+    property Length: Integer read GetLength;
+
+    procedure SaveToFile(const pvFile: String);
+    procedure SaveToStream(pvStream:TStream);
+
+    /// <summary>
+    ///   换行符: 默认#13#10
+    /// </summary>
+    property LineBreak: DStringW read FLineBreak write FLineBreak;
   end;
 
 
@@ -545,6 +581,14 @@ function DeleteChars(const s: string; pvCharSets: TSysCharSet): string;
 function StringToUtf8Bytes(const pvData: String; pvBytes: TBytes): Integer;
     overload;
 function StringToUtf8Bytes(const pvData: string; pvProcessEndByte: Boolean = false): TBytes; overload;
+
+
+function StringWToUtf8Bytes(const Source: PDCharW; SourceChars:Cardinal;
+    pvDest: TBytes; MaxDestBytes: Cardinal): Cardinal; overload;
+
+function StringWToUtf8Bytes(const pvSourceData: DStringW): TBytes; overload;
+
+
 /// <summary>
 ///
 /// </summary>
@@ -593,7 +637,8 @@ function PickString(p: PChar; pvOffset, pvCount: Integer): String;
 /// </summary>
 function LoadStringFromUtf8NoBOMFile(pvFile:string): String;
 
-procedure WriteStringToUtf8NoBOMFile(const pvFile, pvData: String);
+procedure WriteStringToUtf8NoBOMFile(const pvFile: String; const pvData:
+    DStringW);
 
 /// <summary>
 ///   转换字符串,
@@ -1803,8 +1848,15 @@ begin
 end;
 
 procedure TDStringBuilder.SaveToStream(pvStream:TStream);
+var
+  l:Integer;
 begin
-  if self.Length <> 0 then pvStream.WriteBuffer(FData[0], self.Length);
+  l := self.Length;
+{$IFDEF UNICODE}
+  l := l shl 1;
+{$ENDIF}
+
+  if l <> 0 then pvStream.WriteBuffer(FData[0], l);
 end;
 
 function TDStringBuilder.ToString: string;
@@ -2290,24 +2342,19 @@ begin
   end;
 end;
 
-procedure WriteStringToUtf8NoBOMFile(const pvFile, pvData: String);
+procedure WriteStringToUtf8NoBOMFile(const pvFile: String; const pvData:
+    DStringW);
 var
   lvStream: TMemoryStream;
-{$IFDEF UNICODE}
   lvBytes:TBytes;
-{$ELSE}
-  lvStr: AnsiString;
-{$ENDIF}
+
 begin
   lvStream := TMemoryStream.Create;
   try
-    {$IFDEF UNICODE}
-    lvBytes := TEncoding.UTF8.GetBytes(pvData);
-    lvStream.WriteBuffer(lvBytes[0], Length(lvBytes));
-    {$ELSE}
-    lvStr := UTF8Encode(pvData);
-    lvStream.WriteBuffer(PAnsiChar(lvStr)^, Length(lvStr));
-    {$ENDIF}
+    lvBytes := StringWToUtf8Bytes(pvData);
+
+    lvStream.Write(lvBytes[0], Length(lvBytes));
+
     lvStream.SaveToFile(pvFile);
   finally
     lvStream.Free;
@@ -2529,9 +2576,218 @@ begin
   Move(pvBuffer^, PDCharW(Result)^, pvBufLength);
 end;
 
+function StringWToUtf8Bytes(const Source: PDCharW; SourceChars:Cardinal;
+    pvDest: TBytes; MaxDestBytes: Cardinal): Cardinal;
+var
+  i, count: Cardinal;
+  c: Cardinal;
+begin
+  Result := 0;
+  if Source = nil then Exit;
+  count := 0;
+  i := 0;
+  if Length(pvDest) > 0then
+  begin
+    while (i < SourceChars) and (count < MaxDestBytes) do
+    begin
+      c := Cardinal(Source[i]);
+      Inc(i);
+      if c <= $7F then
+      begin
+        pvDest[count] := (c);
+        Inc(count);
+      end
+      else if c > $7FF then
+      begin
+        if count + 3 > MaxDestBytes then
+          break;
+        pvDest[count] := ($E0 or (c shr 12));
+        pvDest[count+1] := ($80 or ((c shr 6) and $3F));
+        pvDest[count+2] := ($80 or (c and $3F));
+        inc(count,3);
+      end
+      else //  $7F < Source[i] <= $7FF
+      begin
+        if count + 2 > MaxDestBytes then
+          break;
+        pvDest[count] := ($C0 or (c shr 6));
+        pvDest[count+1] := ($80 or (c and $3F));
+        Inc(count,2);
+      end;
+    end;
+    if count >= MaxDestBytes then count := MaxDestBytes-1;
+    pvDest[count] := 0;
+  end
+  else
+  begin    // 只计算长度
+    while i < SourceChars do
+    begin
+      c := Integer(Source[i]);
+      Inc(i);
+      if c > $7F then
+      begin
+        if c > $7FF then
+          Inc(count);
+        Inc(count);
+      end;
+      Inc(count);
+    end;
+  end;
+  Result := count+1;  // convert zero based index to byte count
+end;
+
+function StringWToUtf8Bytes(const pvSourceData: DStringW): TBytes; overload;
+var
+  L: Integer;
+  Temp: UTF8String;
+begin
+  if length(pvSourceData) = 0 then
+  begin
+    SetLength(Result, 0);
+    Exit;
+  end;
+  SetLength(Result, Length(pvSourceData) * 3); // SetLength includes space for null terminator
+  L := StringWToUtf8Bytes(PWideChar(pvSourceData), Length(pvSourceData), Result, Length(Result));
+  if L > 0 then
+    SetLength(Result, L-1)   // 去掉最后0
+  else
+    SetLength(Result, 0);
+end;
+
+constructor TDStringWBuilder.Create;
+begin
+  inherited Create;
+  FLineBreak := DCharW(13) + DCharW(10);
+end;
+
+function TDStringWBuilder.Append(c: DCharW): TDStringWBuilder;
+begin
+  CheckNeedSize(1);
+  FData[FPosition] := c;
+  Inc(FPosition);
+  Result := Self;
+end;
+
+function TDStringWBuilder.Append(const str: DStringW): TDStringWBuilder;
+var
+  l:Integer;
+begin
+  Result := Self;
+  l := System.Length(str);
+  if l = 0 then Exit;
+  CheckNeedSize(l);
+
+  Move(PDCharW(str)^, FData[FPosition], l shl 1);
 
 
+  Inc(FPosition, l);
 
+end;
+
+function TDStringWBuilder.Append(v: Boolean; UseBoolStrs: Boolean = True):
+    TDStringWBuilder;
+begin
+  Result := Append(BoolToStr(v, UseBoolStrs));
+end;
+
+function TDStringWBuilder.Append(v:Integer): TDStringWBuilder;
+begin
+  Result :=Append(IntToStr(v));
+end;
+
+function TDStringWBuilder.Append(v:Double): TDStringWBuilder;
+begin
+  Result := Append(FloatToStr(v));
+end;
+
+function TDStringWBuilder.Append(const str, pvLeftStr, pvRightStr: DStringW):
+    TDStringWBuilder;
+begin
+  Result := Append(pvLeftStr).Append(str).Append(pvRightStr);
+end;
+
+function TDStringWBuilder.AppendLine(const str: DStringW): TDStringWBuilder;
+begin
+  Result := Append(Str).Append(FLineBreak);
+end;
+
+function TDStringWBuilder.AppendQuoteStr(const str: DStringW): TDStringWBuilder;
+begin
+  Result := Append('"').Append(str).Append('"');
+end;
+
+function TDStringWBuilder.AppendSingleQuoteStr(const str: DStringW):
+    TDStringWBuilder;
+begin
+  Result := Append('''').Append(str).Append('''');
+end;
+
+procedure TDStringWBuilder.CheckNeedSize(pvSize: LongInt);
+var
+  lvCapacity:LongInt;
+begin
+  if FPosition + pvSize > FCapacity then
+  begin
+    lvCapacity := (FPosition + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    FCapacity := lvCapacity;
+    SetLength(FData, FCapacity);     
+  end;
+end;
+
+procedure TDStringWBuilder.Clear;
+begin
+  FPosition := 0;
+
+  // modify by ymf
+  // 2017-01-10 17:36:13
+  FCapacity := 0;
+  SetLength(FData, 0);
+end;
+
+procedure TDStringWBuilder.ClearContent;
+begin
+  FPosition := 0;
+  if FCapacity > 0 then
+  begin
+    FillChar(FData[0], FCapacity, 0);
+  end;
+end;
+
+function TDStringWBuilder.GetLength: Integer;
+begin
+  Result := FPosition;
+end;
+
+procedure TDStringWBuilder.SaveToFile(const pvFile: String);
+var
+  Stream: TStream;
+begin
+  Stream := TFileStream.Create(pvFile, fmCreate);
+  try
+    SaveToStream(Stream);
+  finally
+    Stream.Free;
+  end;
+end;
+
+procedure TDStringWBuilder.SaveToStream(pvStream:TStream);
+var
+  l:Integer;
+begin
+  l := self.Length;
+  l := l shl 1;
+
+  if l <> 0 then pvStream.WriteBuffer(FData[0], l);
+end;
+
+function TDStringWBuilder.ToString: DStringW;
+var
+  l:Integer;
+begin
+  l := Length;
+  SetLength(Result, l);                
+  Move(FData[0], PDCharW(Result)^, l shl 1); 
+end;
 
 initialization
 
