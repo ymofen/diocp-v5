@@ -2171,7 +2171,7 @@ constructor THttpHeaderBuilder.Create;
 begin
   inherited Create;
   FHeaders := TDValue.Create;
-  FHttpVer := 'HTTP 1.1';
+  FHttpVer := 'HTTP/1.1';
 end;
 
 destructor THttpHeaderBuilder.Destroy;
