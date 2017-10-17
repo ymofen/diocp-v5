@@ -48,7 +48,11 @@ const
 {$IFDEF MSWINDOWS}
   STRING_EMPTY_A :AnsiString = '';
 {$ENDIF}
+{$IF (RTLVersion>=26)}
+  STRING_EMPTY_W: String = '';
+{$ELSE}
   STRING_EMPTY_W: WideString = '';
+{$IFEND >=XE5}
 
 type
 {$IFDEF MSWINDOWS}

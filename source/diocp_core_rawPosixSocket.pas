@@ -403,7 +403,7 @@ begin
       begin
         lvIPPtr := PChar(LIP);
         for I := 0 to 7 do begin
-          Psockaddr_in6(@AInAddr)^.sin6_addr.s6_addr16[I] :=
+          Psockaddr_in6(@AInAddr)^.sin6_addr.{$IFDEF MACOS}__s6_addr16[I]{$ELSE}s6_addr16[I]{$ENDIF MACOS} :=
             htons(MyStrToInt('$' + __fetch(lvIPPtr, [':']), 0));
         end;
         Result := true;
