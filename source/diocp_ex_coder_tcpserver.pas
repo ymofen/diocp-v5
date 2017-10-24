@@ -321,7 +321,7 @@ begin
 
 
 
-  self.CheckThreadIn;
+  self.CheckThreadIn(STRING_EMPTY);
   try
     try
       // 执行Owner的事件

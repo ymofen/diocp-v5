@@ -630,7 +630,11 @@ begin
 {$ELSE}
   while True do
   begin
+    {$IFDEF MACOS}
+    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
+    {$ELSE}
     l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE, FTimeOut);
+    {$ENDIF}
     CheckSocketRecvResult(l);
     if l = 0 then
     begin
