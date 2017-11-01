@@ -445,8 +445,8 @@ function SplitStrings(const s: String; pvStrings: TStrings; pvSpliterChars:
 /// <param name="s"> 源字符串 </param>
 /// <param name="pvStrings"> 输出到的字符串列表 </param>
 /// <param name="pvSpliterChars"> 分隔符 </param>
-function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet):
-    TArrayStrings;
+function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet;
+    pvSkipSpliterChars: Boolean = false): TArrayStrings;
 
 
 /// <summary>
@@ -1085,8 +1085,8 @@ begin
   end;
 end;
 
-function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet):
-    TArrayStrings;
+function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet;
+    pvSkipSpliterChars: Boolean = false): TArrayStrings;
 var
   p:PChar;
   lvValue : String;
@@ -1111,6 +1111,7 @@ begin
     // 跳过开头
     r := LeftUntil(P, pvSpliterChars, lvValue);
 
+
     if r = -1 then
     begin    // 没有匹配到
       if P^ <> #0 then
@@ -1129,7 +1130,12 @@ begin
       Inc(idx);
       Inc(P);
     end;
+
+    if (pvSkipSpliterChars) then  // 跳过分隔符？
+      SkipChars(P, pvSpliterChars);
   end;
+
+  SetLength(Result, idx + 1);
 end;
 
 

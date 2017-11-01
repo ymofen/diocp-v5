@@ -86,6 +86,8 @@ type
      /// </summary>
      class function verifyData(const buf; len:Cardinal): Cardinal;
 
+     class function crc16(const buf; len:Cardinal): Byte;
+
      /// <summary>
      ///  生成数据校验码
      /// </summary>
@@ -213,6 +215,34 @@ begin
   Result := TEncoding.Default.GetString(lvBytes);
   {$ENDIF}
 
+end;
+
+class function TByteTools.crc16(const buf; len:Cardinal): Byte;
+var
+  lvPtr:PByte;
+  iCheckSum:Byte;
+  i: Integer;
+begin
+  // $GPGGA,092108.00,3030.32313974,N,11423.63228885,E,1,28,0.5,149.258,M,-14.263,M,,*4A
+  lvPtr := @buf;
+  i := len;
+
+  // first
+  iCheckSum := Byte(lvPtr^);
+  Inc(lvPtr);
+  Dec(i);
+
+  while i > 0 do  
+  begin
+    if i = 1 then
+    begin
+      i := 1;
+    end;
+    iCheckSum := iCheckSum xor Byte(lvPtr^);
+    Inc(lvPtr);
+    Dec(i);
+  end;
+  Result := iCheckSum;
 end;
 
 class function TByteTools.FileToBytes(pvFileName:string): TBytes;
