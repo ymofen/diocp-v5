@@ -2667,7 +2667,11 @@ end;
 constructor TDStringWBuilder.Create;
 begin
   inherited Create;
+{$if CompilerVersion> 18}    // Delphi7 or later
   FLineBreak := DCharW(13) + DCharW(10);
+{$else}
+  FLineBreak := #13#10;
+{$ifend}
 end;
 
 function TDStringWBuilder.Append(c: DCharW): TDStringWBuilder;
