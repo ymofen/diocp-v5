@@ -665,6 +665,7 @@ function ObjectIntStrAddr(pvObj:TObject): String;
 
 function DateTimeString(pvDateTime:TDateTime): string; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 function NowString: String; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function DateTimeStrToDateTime(const strDateTime:string):TDateTime;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
@@ -706,6 +707,9 @@ var
 {$ENDIF}
 //  VCMemCmp: TMSVCMemCmp;
 {$ENDIF}
+
+var
+  __DateFormat: TFormatSettings;
 
 procedure PrintDebugString(s:string);
 begin
@@ -2403,10 +2407,10 @@ begin
 {$IFDEF UNICODE}
   Result := TEncoding.Default.GetBytes(pvData);
 {$ELSE}
+  // 应该保持一致不值后面加\0
   lvRawStr := pvData;
-  SetLength(Result, Length(lvRawStr) + 1);
+  SetLength(Result, Length(lvRawStr));
   Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
-  Result[Length(Result) -1] := 0;
 {$ENDIF}
 end;
 
@@ -2437,6 +2441,12 @@ end;
 function ObjectIntStrAddr(pvObj:TObject): String;
 begin
   Result := IntToStr(IntPtr(pvObj));
+end;
+
+
+function DateTimeStrToDateTime(const strDateTime:string): TDateTime;
+begin
+  Result := SysUtils.StrToDateTime(strDateTime, __DateFormat);
 end;
 
 function DateTimeString(pvDateTime:TDateTime): string;
@@ -2803,7 +2813,13 @@ begin
   Move(FData[0], PDCharW(Result)^, l shl 1); 
 end;
 
-initialization
+initialization  
+  __DateFormat.DateSeparator := '-';
+  __DateFormat.TimeSeparator := ':';
+  __DateFormat.ShortDateFormat := 'yyyy-MM-dd';
+  __DateFormat.LongDateFormat := 'yyyy-MM-dd';
+  __DateFormat.ShortTimeFormat := 'HH:mm:ss';
+  __DateFormat.LongTimeFormat := 'HH:mm:ss';
 
 {$IFDEF MSWINDOWS}
 
