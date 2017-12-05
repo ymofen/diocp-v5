@@ -257,8 +257,15 @@ function GetCurrentThreadHintInfo: String;
 var
   lvInfoObj:TThreadInfoObject;
 begin
-  lvInfoObj := GetCurrentInfoObject;
-  Result := lvInfoObj.GetHintInfo;
+  try
+    lvInfoObj := GetCurrentInfoObject;
+    Result := lvInfoObj.GetHintInfo;
+  except
+    on e:Exception do
+    begin
+      Result := 'GetCurrentThreadHintInfo Err:' + e.Message;
+    end;
+  end;
 end;
 
 procedure SleepInThread(pvInterval:Cardinal; pvThread:TThread);
