@@ -684,6 +684,10 @@ function NewPString(const s: string): PString;
 
 function GetStringFromPString(const p:Pointer): string;
 
+function NewPDStringW(const s:DStringW): PDStringW;
+
+function GetDStringWFromPtr(const p:Pointer): DStringW;
+
 function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
 
 
@@ -1589,6 +1593,7 @@ begin
 {$ELSE}
   lvRawStr := UTF8Encode(pvData);
   Result := Length(lvRawStr);
+  if Result > Length(pvBytes) then Result := Length(lvBytes);
   Move(PAnsiChar(lvRawStr)^, pvBytes[0], Result);
 {$ENDIF}
 end;
@@ -2701,6 +2706,23 @@ begin
     SetLength(Result, L)   // È¥µô×îºó0
   else
     SetLength(Result, 0);
+end;
+
+function NewPDStringW(const s:DStringW): PDStringW;
+begin
+  New(Result);
+  Result^ := s;
+end;
+
+function GetDStringWFromPtr(const p:Pointer): DStringW;
+begin
+  if p = nil then
+  begin
+    Result := STRING_EMPTY;
+  end else
+  begin
+    Result := PDStringW(p)^;
+  end;
 end;
 
 constructor TDStringWBuilder.Create;

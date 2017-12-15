@@ -113,7 +113,7 @@ type
     /// <summary>
     ///   不清理Cookie
     /// </summary>
-    procedure Cleaup;
+    procedure Cleanup;
 
     /// <summary>
     ///   复位，清理Cookie
@@ -452,7 +452,7 @@ begin
   {$ENDIF}
 end;
 
-procedure TDiocpHttpClient.Cleaup;
+procedure TDiocpHttpClient.Cleanup;
 begin
   FRequestBody.Clear;
   FResponseBody.Clear;
@@ -1077,7 +1077,7 @@ end;
 
 procedure TDiocpHttpClient.Reset;
 begin
-  self.Cleaup;
+  self.Cleanup;
   FResponseCookie := STRING_EMPTY;
 end;
 
