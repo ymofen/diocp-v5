@@ -193,6 +193,12 @@ type
     function Append(v:Integer): TDBufferBuilder; overload;
     function Append(v:Double): TDBufferBuilder; overload;
     function AppendUtf8(const str: String): TDBufferBuilder;
+
+    /// <summary>
+    ///  推荐用该方法
+    /// </summary>
+    function AppendStringAsUTF8(const str:DStringW): TDBufferBuilder;
+
     function AppendRawStr(const pvRawStr: RAWString): TDBufferBuilder;
     function AppendBreakLineBytes: TDBufferBuilder;
     function Append(const str: string; pvConvertToUtf8Bytes: Boolean):
@@ -588,7 +594,7 @@ function StringToUtf8Bytes(const pvData: string; pvProcessEndByte: Boolean = fal
 
 
 function StringWToUtf8Bytes(const Source: PDCharW; SourceChars:Cardinal;
-    pvDest: TBytes; MaxDestBytes: Cardinal): Cardinal; overload;
+    pvDest: Pointer; MaxDestBytes: Cardinal): Cardinal; overload;
 
 function StringWToUtf8Bytes(const pvSourceData: DStringW): TBytes; overload;
 
@@ -2036,6 +2042,27 @@ begin
   Result := Append('''').Append(str).Append('''');
 end;
 
+function TDBufferBuilder.AppendStringAsUTF8(const str:DStringW):
+    TDBufferBuilder;
+var
+  l, l1, l2: Integer;
+begin
+  if FBufferLocked then
+  begin
+    raise Exception.Create('Buffer Locked');
+  end;
+
+  Result := Self;
+  if System.Length(str) = 0 then Exit;
+  l1 := System.Length(str);
+  l2 := l1 shl 1 + l1;
+  CheckNeedSize(l1);
+  l := StringWToUtf8Bytes(PDCharW(str), l1, @FData[FSize], l2);
+  Inc(FSize, l);
+  // 移动Position
+  FPosition := FSize;
+end;
+
 function TDBufferBuilder.AppendUtf8(const str: String): TDBufferBuilder;
 var
   lvBytes:TBytes;
@@ -2596,47 +2623,48 @@ begin
   Move(pvBuffer^, PDCharW(Result)^, pvBufLength);
 end;
 
-function StringWToUtf8Bytes(const Source: PDCharW; SourceChars:Cardinal;
-    pvDest: TBytes; MaxDestBytes: Cardinal): Cardinal;
+function StringWToUtf8Bytes(const Source: PDCharW; SourceChars: Cardinal;
+    pvDest: Pointer; MaxDestBytes: Cardinal): Cardinal;
 var
   i, count: Cardinal;
   c: Cardinal;
+  lvDest:PByte;
 begin
   Result := 0;
   if Source = nil then Exit;
   count := 0;
   i := 0;
-  if Length(pvDest) > 0then
+  if pvDest <> nil then
   begin
+    lvDest := PByte(pvDest);
     while (i < SourceChars) and (count < MaxDestBytes) do
     begin
       c := Cardinal(Source[i]);
       Inc(i);
       if c <= $7F then
       begin
-        pvDest[count] := (c);
+        lvDest^ := (c); inc(lvDest);
         Inc(count);
       end
       else if c > $7FF then
       begin
         if count + 3 > MaxDestBytes then
           break;
-        pvDest[count] := ($E0 or (c shr 12));
-        pvDest[count+1] := ($80 or ((c shr 6) and $3F));
-        pvDest[count+2] := ($80 or (c and $3F));
+        lvDest^ := ($E0 or (c shr 12)); inc(lvDest);
+        lvDest^ := ($80 or ((c shr 6) and $3F));inc(lvDest);
+        lvDest^ := ($80 or (c and $3F));inc(lvDest);
         inc(count,3);
       end
       else //  $7F < Source[i] <= $7FF
       begin
         if count + 2 > MaxDestBytes then
           break;
-        pvDest[count] := ($C0 or (c shr 6));
-        pvDest[count+1] := ($80 or (c and $3F));
+        lvDest^ := ($C0 or (c shr 6)); inc(lvDest);
+        lvDest^ := ($80 or (c and $3F)); inc(lvDest);
         Inc(count,2);
       end;
     end;
-    if count >= MaxDestBytes then count := MaxDestBytes-1;
-    pvDest[count] := 0;
+    Assert(count <= MaxDestBytes, '有越界的可能,检测代码(StringWToUtf8Bytes)');
   end
   else
   begin    // 只计算长度
@@ -2653,23 +2681,24 @@ begin
       Inc(count);
     end;
   end;
-  Result := count+1;  // convert zero based index to byte count
+  Result := count;
 end;
 
 function StringWToUtf8Bytes(const pvSourceData: DStringW): TBytes; overload;
 var
-  L: Integer;
-  Temp: UTF8String;
+  L, l1: Integer;
 begin
   if length(pvSourceData) = 0 then
   begin
     SetLength(Result, 0);
     Exit;
   end;
-  SetLength(Result, Length(pvSourceData) * 3); // SetLength includes space for null terminator
-  L := StringWToUtf8Bytes(PWideChar(pvSourceData), Length(pvSourceData), Result, Length(Result));
+  l1 := Length(pvSourceData);
+  l1 := l1 shl 1 + l1;
+  SetLength(Result, l1); // SetLength includes space for null terminator
+  L := StringWToUtf8Bytes(PWideChar(pvSourceData), Length(pvSourceData), @Result[0], Length(Result));
   if L > 0 then
-    SetLength(Result, L-1)   // 去掉最后0
+    SetLength(Result, L)   // 去掉最后0
   else
     SetLength(Result, 0);
 end;

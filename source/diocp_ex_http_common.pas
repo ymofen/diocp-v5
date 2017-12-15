@@ -455,10 +455,18 @@ procedure GZDecompressBufferBuilder(pvBuilder: TDBufferBuilder);
 procedure LZOCompressBufferBuilder(pvBuilder: TDBufferBuilder);
 procedure LZODecompressBufferBuilder(pvBuilder: TDBufferBuilder);
 {$ENDIF}
+
+/// <summary>
+///   生产一个Http响应信息
+/// </summary>
+function MakeHttpResponse(const ResponseContentType, pvResponseContent:
+    DStringW): TBytes;
+
 /// <summary>
 /// [utf8/ansi]->url
 /// </summary>
-function URLEncode(pvStr: string; pvConvertUtf8: Boolean = true): string;
+function URLEncode(const pvStr: String; pvConvertUtf8: Boolean = true):
+    string;
 
 /// <summary>
 /// raw buffer -> url
@@ -864,7 +872,31 @@ begin
   SetLength(Result, Rp - PChar(Result));
 end;
 
-function URLEncode(pvStr: string; pvConvertUtf8: Boolean = true): string;
+function MakeHttpResponse(const ResponseContentType, pvResponseContent:
+    DStringW): TBytes;
+var
+  l:Integer;
+  lvBuffer:TDBufferBuilder;
+begin
+  lvBuffer := TDBufferBuilder.Create;
+  try
+    l := Length(pvResponseContent);
+    l := StringWToUtf8Bytes(PDCharW(pvResponseContent), l, nil, 0);
+    lvBuffer.AppendStringAsUTF8('HTTP/1.1 200').AppendBreakLineBytes;
+    lvBuffer.AppendStringAsUTF8('Content-Type: ').AppendStringAsUTF8(ResponseContentType).AppendBreakLineBytes;
+    lvBuffer.AppendStringAsUTF8('Content-Length:').AppendStringAsUTF8(IntToStr(l)).AppendBreakLineBytes;
+    lvBuffer.AppendBreakLineBytes;
+
+    lvBuffer.AppendStringAsUTF8(pvResponseContent);
+
+    Result :=  lvBuffer.ToBytes;
+  finally
+    lvBuffer.Free;
+  end;
+end;
+
+function URLEncode(const pvStr: String; pvConvertUtf8: Boolean = true):
+    string;
 var
   lvBytes: TBytes;
 begin
