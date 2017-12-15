@@ -182,6 +182,7 @@ type
 
 
     FResponse: TDiocpHttpResponse;
+    FResponsing: Boolean;
 
     /// <summary>
     ///   不再使用了，归还回对象池
@@ -394,6 +395,12 @@ type
     ///   所有的请求参数， 注意调用前先调用DecodeURL和DecodePostParams
     /// </summary>
     property RequestParamsList: TDValue read GetRequestParamsList;
+
+    /// <summary>
+    ///   正在响应
+    /// </summary>
+    property Responsing: Boolean read FResponsing;
+
     property URLParams: TDValue read GetURLParams;
     property WebSocketContentBuffer: TDBufferBuilder read FWebSocketContentBuffer;
 
@@ -468,6 +475,10 @@ type
     ///  响应WEBSocket的握手
     /// </summary>
     procedure ResponseForWebSocketShake;
+
+
+
+
   end;
 
   TDiocpHttpResponse = class(TObject)
@@ -571,6 +582,11 @@ type
   private
     __free_flag:Integer;
 
+    /// <summary>
+    ///   响应引用计数
+    /// </summary>
+    FResponseRef:Integer;
+
     FCurrentStream:TStream;
     FCurrentStreamRemainSize:Integer;
     // 是否关闭连接 0是关闭, 1:不关闭
@@ -600,7 +616,6 @@ type
 
     FHttpState: TDiocpHttpState;
     FCurrentRequest: TDiocpHttpRequest;
-
     /// <summary>
     ///   清理请求列表中的对象
     /// </summary>
@@ -633,6 +648,7 @@ type
     ///  发送一块数据
     /// </summary>
     procedure CheckSendStreamBlock();
+    function GetResponsing: Boolean;
 
     procedure InnerDoSendStreamDone(pvCode:Integer);
 
@@ -654,6 +670,13 @@ type
 
   public
     property ContextType: Integer read FContextType write SetContextType;
+
+    /// <summary>
+    ///  正在响应
+    /// </summary>
+    property Responsing: Boolean read GetResponsing;
+
+
 
   protected
     /// <summary>
@@ -1305,7 +1328,7 @@ var
   lvFileStream:TFileStream;
 begin
   lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
-  ResponseAStream(lvFileStream, nil);                            
+  ResponseAStream(lvFileStream, nil);
 end;
 
 procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream;
@@ -1819,6 +1842,8 @@ begin
   FCurrentStreamRemainSize := 0;
   FCurrentStreamEndAction := 0;
 
+  FResponseRef := 0;
+
 
   inherited DoCleanUp;
 end;
@@ -1931,6 +1956,11 @@ begin
   FBlockBuffer.FlushBuffer;
 end;
 
+function TDiocpHttpClientContext.GetResponsing: Boolean;
+begin
+  Result := FResponseRef > 0;
+end;
+
 procedure TDiocpHttpClientContext.InnerDoARequest(pvRequest: TDiocpHttpRequest);
 var
   lvObj:TDiocpHttpRequest;
@@ -1976,6 +2006,7 @@ end;
 
 procedure TDiocpHttpClientContext.InnerDoSendStreamDone(pvCode:Integer);
 begin
+  InterlockedDecrement(FResponseRef);
   if Assigned(FCurrentStreamDoneCallBack) then
   begin
     FCurrentStreamDoneCallBack(FCurrentStream, pvCode);
@@ -2348,6 +2379,7 @@ begin
     self.UnLock;
   end;
 
+  InterlockedIncrement(FResponseRef);
   CheckSendStreamBlock;
 end;
 
