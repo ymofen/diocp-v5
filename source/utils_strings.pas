@@ -1593,7 +1593,7 @@ begin
 {$ELSE}
   lvRawStr := UTF8Encode(pvData);
   Result := Length(lvRawStr);
-  if Result > Length(pvBytes) then Result := Length(lvBytes);
+  if Result > Length(pvBytes) then Result := Length(pvBytes);
   Move(PAnsiChar(lvRawStr)^, pvBytes[0], Result);
 {$ENDIF}
 end;
