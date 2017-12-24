@@ -113,6 +113,7 @@ type
     procedure DecReferenceCounterAndRequestDisconnect(pvDebugInfo: string; pvObj:TObject);
 
   private
+    FCheckThreadId:THandle;
 
     FObjectAlive: Boolean;
 
@@ -170,10 +171,7 @@ type
     /// </summary>
     procedure DoReceiveData(pvRecvRequest: TIocpRecvRequest);
 
-    /// <summary>
-    ///   called by sendRequest response
-    /// </summary>
-    procedure DoSendRequestCompleted(pvRequest: TIocpSendRequest);
+
 
 
 
@@ -204,6 +202,11 @@ type
     ///   request recv data
     /// </summary>
     procedure PostWSARecvRequest();
+
+    /// <summary>
+    ///   called by sendRequest response
+    /// </summary>
+    procedure DoSendRequestCompleted(pvRequest: TIocpSendRequest);virtual;
 
     /// <summary>
     ///   post reqeust to sending queue,
@@ -306,7 +309,7 @@ type
     ///    if request is completed, will call DoSendRequestCompleted procedure
     /// </summary>
     function PostWSASendRequest(buf: Pointer; len: Cardinal; pvCopyBuf: Boolean =
-        true): Boolean; overload;
+        true; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean; overload;
     /// <summary>
     ///  post send request to iocp queue, if post successful return true.
     ///    if request is completed, will call DoSendRequestCompleted procedure
@@ -331,6 +334,8 @@ type
     property DebugInfo: string read GetDebugInfo write SetDebugInfo;
 
     function CheckActivityTimeOutEx(pvTimeOut:Integer): Boolean;
+    procedure CheckThreadIn(const pvDebugInfo: String);
+    procedure CheckThreadOut;
     function GetDebugStrings: String;
 
     property OnConnectedEvent: TNotifyContextEvent read FOnConnectedEvent write
@@ -1703,7 +1708,8 @@ end;
 
 
 function TDiocpCustomContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
-    pvCopyBuf: Boolean = true): Boolean;
+    pvCopyBuf: Boolean = true; pvTag: Integer = 0; pvTagData: Pointer = nil):
+    Boolean;
 var
   lvBuf: PAnsiChar;
 begin
@@ -1712,7 +1718,7 @@ begin
   begin
     GetMem(lvBuf, len);
     Move(buf^, lvBuf^, len);
-    Result := PostWSASendRequest(lvBuf, len, dtFreeMem);
+    Result := PostWSASendRequest(lvBuf, len, dtFreeMem, pvTag, pvTagData);
     if not Result then
     begin            //post fail
       FreeMem(lvBuf);
@@ -1720,7 +1726,7 @@ begin
   end else
   begin
     lvBuf := buf;
-    Result := PostWSASendRequest(lvBuf, len, dtNone);
+    Result := PostWSASendRequest(lvBuf, len, dtNone, pvTag, pvTagData);
   end;
 
 end;
@@ -3807,6 +3813,24 @@ begin
   begin
     InnerKickOut;
   end;
+end;
+
+procedure TDiocpCustomContext.CheckThreadIn(const pvDebugInfo: String);
+begin
+  if FCheckThreadId <> 0 then
+  begin
+    //s := GetDebugString;
+    raise Exception.CreateFmt('%s=>(%d,%d)当前对象已经被其他线程正在使用',
+       [pvDebugInfo, utils_strings.GetCurrentThreadID, FCheckThreadId]);
+  end;
+  FCheckThreadId := utils_strings.GetCurrentThreadID;
+  FDebugInfo := pvDebugInfo;
+end;
+
+procedure TDiocpCustomContext.CheckThreadOut;
+begin
+  FDebugInfo := STRING_EMPTY;
+  FCheckThreadId := 0;
 end;
 
 procedure TDiocpCustomContext.DecRefernece;

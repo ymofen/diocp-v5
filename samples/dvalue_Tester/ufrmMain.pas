@@ -346,20 +346,21 @@ var
   lvValue:Integer;
   lvSB:TDStringBuilder;
   s:String;
+  lvBytes:TBytes;
 begin
   lvDValue := TDValue.Create();
   lvDValue.ForceByPath('p2.obj').BindObject(Self, faNone);
   lvDValue.ForceByPath('p2.n').AsInteger := 3;
-  lvDValue.ForceByName('name').AsString := '张三abc';
-  lvDValue.ForceByName('__msgid').AsInteger := 1001;
-  lvDValue.ForceByPath('p1.name').AsString := 'D10.天地弦';
-  lvDValue.ForceByPath('p2.p2_1.name').AsString := 'D10.天地弦';
-  lvDValue.ForceByPath('p2.num').AsInteger := 1;
-
-
-  lvItem := lvDValue.ForceByName('array').AddArrayChild;
-  lvItem.ForceByName('key1').AsString := '数组元素1';
-  lvDValue.ForceByName('array').AddArrayChild.AsString := '数组元素2';
+//  lvDValue.ForceByName('name').AsString := '张三abc';
+//  lvDValue.ForceByName('__msgid').AsInteger := 1001;
+//  lvDValue.ForceByPath('p1.name').AsString := 'D10.天地弦';
+//  lvDValue.ForceByPath('p2.p2_1.name').AsString := 'D10.天地弦';
+//  lvDValue.ForceByPath('p2.num').AsInteger := 1;
+//
+//
+//  lvItem := lvDValue.ForceByName('array').AddArrayChild;
+//  lvItem.ForceByName('key1').AsString := '数组元素1';
+//  lvDValue.ForceByName('array').AddArrayChild.AsString := '数组元素2';
 
   s :=JSONEncode(lvDValue, true, False, [vdtObject]);
   if trim(mmoData.Lines.Text) = '' then
@@ -368,6 +369,9 @@ begin
   end;
 
   lvDValue.Free;
+
+  lvBytes := StringToBytes(Trim(s));
+  mmoData.Lines.Add(TByteTools.varToHexString(lvBytes[0], Length(lvBytes)));
 
   ShowMessage(s);
 end;
