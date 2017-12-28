@@ -165,10 +165,11 @@ type
   {$ELSE}
     FList: TObjectList;
   {$ENDIF}
-    FListLocker: TCriticalSection;
+
     FTrigerDisconnectEventAfterNoneConnected: Boolean;
     FOnContextConnectFailEvent: TNotifyContextEvent;
   protected
+    FListLocker: TCriticalSection;
     procedure DoAfterOpen;override;
     procedure DoAfterClose; override; 
   public

@@ -4,13 +4,15 @@ interface
 
 uses
   diocp_tcp_client, diocp_ex_http_common, SysUtils, Classes, utils_url,
-  utils_websocket, utils_strings, diocp_core_rawWinSocket, diocp_core_engine;
+  utils_websocket, utils_strings, diocp_core_rawWinSocket, diocp_core_engine,
+  utils_base64;
 
 type
   TDiocpWebSocketContext = class(TIocpRemoteContext)
   private
     FSendPingTick:Cardinal;
     FURL: TURL;
+    FWsUrl:String;
     FHeaderBuilder: THttpHeaderBuilder;
     /// <summary>
     ///  WebSocket接收到的整个数据
@@ -224,6 +226,7 @@ end;
 procedure TDiocpWebSocketContext.Open(WsUrl:string);
 begin
   CheckCanConnect;
+  FWsUrl := WsUrl;
   FURL.SetURL(WsUrl);
   Host := FURL.Host;
   Port := StrToInt(FURL.Port);
@@ -251,10 +254,18 @@ begin
   //    Sec-WebSocket-Key: pAwC+w4+DLzmrLTUuBG4cQ==
   //    Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
 
-   FHeaderBuilder.URI := FURL.URI;
+   FHeaderBuilder.URI := FWsUrl;
    FHeaderBuilder.Method := 'GET';
+
    FHeaderBuilder.SetHeader('Connection', 'Upgrade');
    FHeaderBuilder.SetHeader('Upgrade', 'websocket');
+   //FHeaderBuilder.SetHeader('Host', 'echo.websocket.org');
+   //FHeaderBuilder.SetHeader('Origin', 'file://');
+   FHeaderBuilder.SetHeader('Sec-WebSocket-Version', '13');
+   FHeaderBuilder.SetHeader('Sec-WebSocket-Key', Base64Encode('Diocp' + NowString));
+   FHeaderBuilder.SetHeader('Sec-WebSocket-Extensions', 'permessage-deflate; client_max_window_bits');
+
+
    s := FHeaderBuilder.Build();
 
    lvBytes := StringToBytes(s);

@@ -2221,7 +2221,7 @@ begin
   begin
     outHeader.Add(FHeaders.Items[i].Name.AsString + ':' + FHeaders.Items[i].AsString)
   end;
-  outHeader.Add(sLineBreak);
+  outHeader.Add('');
 end;
 
 function THttpHeaderBuilder.Build: string;

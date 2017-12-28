@@ -871,6 +871,7 @@ type
   protected
     procedure DoASyncWork(pvFileWritter: TSingleFileWriter; pvASyncWorker:
         TASyncWorker); virtual;
+    procedure DoIdle();virtual;
   protected
     procedure DoAfterOpen;virtual;
     procedure DoAfterClose;virtual;
@@ -2069,6 +2070,11 @@ begin
     FOnContextError(pvClientContext, pvErrorCode);
 end;
 
+procedure TDiocpCustom.DoIdle;
+begin
+  
+end;
+
 procedure TDiocpCustom.DoReceiveData(pvIocpContext: TDiocpCustomContext;
     pvRequest: TIocpRecvRequest);
 begin
@@ -2505,9 +2511,10 @@ begin
     begin
       try
         DoASyncWork(lvFileWriter, pvASyncWorker);
+        DoIdle();
         if not pvASyncWorker.Terminated then
         begin
-          self.FASyncInvoker.WaitForSleep(5000);
+          self.FASyncInvoker.WaitForSleep(100);
         end;
       except
         on e:Exception do
