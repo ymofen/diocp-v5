@@ -182,6 +182,7 @@ type
     FName: String;
     {$IFDEF MSWINDOWS}
     FMessageHandle: HWND;
+    FRaiseOnLoggerEmptyMessage: Boolean;
     procedure DoMainThreadWork(var AMsg: TMessage);
     {$ENDIF}
     procedure SetWorking(pvWorking:Boolean);
@@ -232,6 +233,11 @@ type
     /// </summary>
     property LogFilter: TLogLevels read FLogFilter write FLogFilter;
     property Name: String read FName write FName;
+
+    property RaiseOnLoggerEmptyMessage: Boolean read FRaiseOnLoggerEmptyMessage
+        write FRaiseOnLoggerEmptyMessage;
+
+
 
 
 
@@ -615,6 +621,10 @@ procedure TSafeLogger.logMessage(const pvMsg: string; const pvMsgType: string =
 var
   lvPData:TLogDataObject;
 begin
+  if RaiseOnLoggerEmptyMessage and (Length(pvMsg) = 0) then
+  begin
+    Assert(False, '记录日志信息未空!');
+  end;
   SetCurrentThreadInfo(Name +  ':logMessage START');
   try
     if not FEnable then exit;
