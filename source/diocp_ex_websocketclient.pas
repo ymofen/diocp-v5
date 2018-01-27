@@ -254,12 +254,13 @@ begin
   //    Sec-WebSocket-Key: pAwC+w4+DLzmrLTUuBG4cQ==
   //    Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
 
-   FHeaderBuilder.URI := FWsUrl;
+   FHeaderBuilder.URI := FURL.URI;
+   //FHeaderBuilder.URI := FWsUrl;
    FHeaderBuilder.Method := 'GET';
 
    FHeaderBuilder.SetHeader('Connection', 'Upgrade');
    FHeaderBuilder.SetHeader('Upgrade', 'websocket');
-   //FHeaderBuilder.SetHeader('Host', 'echo.websocket.org');
+   FHeaderBuilder.SetHeader('Host', FURL.RawHostStr);
    //FHeaderBuilder.SetHeader('Origin', 'file://');
    FHeaderBuilder.SetHeader('Sec-WebSocket-Version', '13');
    FHeaderBuilder.SetHeader('Sec-WebSocket-Key', Base64Encode('Diocp' + NowString));
