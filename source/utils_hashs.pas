@@ -79,9 +79,9 @@ type
     procedure SetValues(pvHashValue: Cardinal; const Value: Pointer);
     function GetValues(pvHashValue: Cardinal): Pointer;
   private
-    function GetValueMap(pvKey:String): Pointer;
+    function GetValueMap(const pvKey: String): Pointer;
     procedure SetBucketAutoSize(const Value: Boolean);
-    procedure SetValueMap(pvKey:String; const Value: Pointer);
+    procedure SetValueMap(const pvKey: String; const Value: Pointer);
   protected
     FBucketAutoSize: Boolean;
   public
@@ -185,7 +185,7 @@ type
     /// <summary>
     ///  进行一个赋值，如果键值存在，则不进行赋值， 返回false
     /// </summary>
-    function TrySetValue(pvKey:String; const Value: Pointer): Boolean;
+    function TrySetValue(const pvKey: String; const Value: Pointer): Boolean;
 
     property Buckets[AIndex: Cardinal]: PDHashData read GetBuckets;
 
@@ -200,7 +200,7 @@ type
     /// 是否自动调整桶大小
     property BucketAutoSize: Boolean read FBucketAutoSize write SetBucketAutoSize;
 
-    property ValueMap[pvKey:String]: Pointer read GetValueMap write SetValueMap;
+    property ValueMap[const pvKey:String]: Pointer read GetValueMap write SetValueMap;
 
     property Values[pvHashValue: Cardinal]: Pointer read GetValues write SetValues; default;
 
@@ -668,7 +668,7 @@ begin
   end;
 end;
 
-function TDHashTable.GetValueMap(pvKey:String): Pointer;
+function TDHashTable.GetValueMap(const pvKey: String): Pointer;
 var
   lvCurrData:PDHashData;
   lvIndex, lvHashValue:Cardinal;
@@ -820,7 +820,7 @@ begin
     FOnCompare := Value;
 end;
 
-procedure TDHashTable.SetValueMap(pvKey:String; const Value: Pointer);
+procedure TDHashTable.SetValueMap(const pvKey: String; const Value: Pointer);
 var
   lvPData, lvBucket, lvCurrData:PDHashData;
   lvIndex, lvHashValue:Cardinal;
@@ -925,7 +925,8 @@ begin
 
 end;
 
-function TDHashTable.TrySetValue(pvKey:String; const Value: Pointer): Boolean;
+function TDHashTable.TrySetValue(const pvKey: String; const Value: Pointer):
+    Boolean;
 var
   lvPData, lvBucket, lvCurrData:PDHashData;
   lvIndex, lvHashValue:Cardinal;

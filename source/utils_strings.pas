@@ -2120,6 +2120,11 @@ end;
 
 function TDBufferBuilder.DecodeUTF8: string;
 begin
+  if FSize =0 then
+  begin
+    Result := STRING_EMPTY;
+    exit;
+  end;
 {$IFDEF MSWINDOWS}
   Result := Utf8BufferToString(@FData[0], FSize);
 {$ELSE}
