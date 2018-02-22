@@ -9,6 +9,10 @@ uses
   {$ELSE}
 
   {$ENDIF}
+  {$IFDEF POSIX}
+  , Posix.Base, Posix.Unistd, Posix.Signal, Posix.Pthread,
+  Posix.SysTypes
+  {$ENDIF}
   ;
 
 {$IF defined(FPC) or (RTLVersion>=18))}
@@ -134,16 +138,18 @@ var
   si: SYSTEM_INFO;
 {$ENDIF}
 begin
-  {$IFDEF MSWINDOWS}
-  GetSystemInfo(si);
-  Result := si.dwNumberOfProcessors;
-  {$ELSE}// Linux,MacOS,iOS,Andriod{POSIX}
-  {$IFDEF POSIX}
-  Result := sysconf(_SC_NPROCESSORS_ONLN);
-  {$ELSE}// unkown system, default 1
-  Result := 1;
-  {$ENDIF !POSIX}
-  {$ENDIF !MSWINDOWS}
+{$IFDEF MSWINDOWS}
+    GetSystemInfo(si);
+    Result := si.dwNumberOfProcessors;
+{$ELSE}// Linux,MacOS,iOS,Andriod{POSIX}
+{$IFDEF POSIX}
+{$WARN SYMBOL_PLATFORM OFF}
+    Result := sysconf(_SC_NPROCESSORS_ONLN);
+{$WARN SYMBOL_PLATFORM ON}
+{$ELSE}// 不认识的操作系统，CPU数默认为1
+    Result := 1;
+{$ENDIF !POSIX}
+{$ENDIF !MSWINDOWS}
 end;
 
 {$IF RTLVersion<24}
@@ -227,7 +233,11 @@ begin
   t := GetTickCount;
   while (v <> pvExcept) and ((GetTickCount - t) < Cardinal(pvTimeOut)) do
   begin
+    {$IFDEF MSWINDOWS}
     Sleep(10);
+    {$ELSE}
+    TThread.Sleep(10);
+    {$ENDIF}
   end;        
   Result := v = pvExcept;
 end;

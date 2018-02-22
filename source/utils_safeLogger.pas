@@ -180,9 +180,10 @@ type
     FStateLocker:TCriticalSection;
     FWorking:Boolean;
     FName: String;
+    FRaiseOnLoggerEmptyMessage: Boolean;
     {$IFDEF MSWINDOWS}
     FMessageHandle: HWND;
-    FRaiseOnLoggerEmptyMessage: Boolean;
+
     procedure DoMainThreadWork(var AMsg: TMessage);
     {$ENDIF}
     procedure SetWorking(pvWorking:Boolean);
@@ -261,6 +262,13 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 {$EXTERNALSYM InterlockedCompareExchange}
 {$ifend}
 
+{$IF RTLVersion<24}
+function AtomicCmpExchange(var Target: Integer; Value: Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+{$IFEND <XE5}
+
 implementation
 
 resourcestring
@@ -283,7 +291,7 @@ const
 
 {$IF RTLVersion<24}
 function AtomicCmpExchange(var Target: Integer; Value: Integer;
-  Comparand: Integer): Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
   Result := InterlockedCompareExchange(Target, Value, Comparand);
@@ -292,7 +300,7 @@ begin
 {$ENDIF}
 end;
 
-function AtomicInc(var Target: Integer): Integer;
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
   Result := InterlockedIncrement(Target);
@@ -301,7 +309,17 @@ begin
 {$ENDIF}
 end;
 
+function AtomicDecrement(var Target: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedDecrement(Target);
+{$ELSE}
+  Result := TInterlocked.Decrement(Target);
+{$ENDIF}
+end;
+
 {$IFEND <XE5}
+
 
 {$IFDEF MSWINDOWS}
 {$ELSE}
@@ -456,7 +474,7 @@ begin
   begin
     lvPData :=TLogDataObject(FDataQueue.DeQueueObject);
     if lvPData = nil then Break;
-    InterlockedDecrement(__logCounter);
+    AtomicDecrement(__logCounter);
     {$IFDEF USE_QUEUE_POOL}
     lvPData.DoCleanUp;
     __dataObjectPool.EnQueueObject(lvPData, raObjectFree);
@@ -503,8 +521,7 @@ begin
   begin
     lvPData :=TLogDataObject(FDataQueue.DeQueueObject);
     if lvPData = nil then Break;
-    InterlockedDecrement(__logCounter);
-
+    AtomicDecrement(__logCounter);
     try
       FDebugData := lvPData;
       ExecuteLogData(lvPData);
@@ -604,13 +621,14 @@ end;
 
 procedure TSafeLogger.IncResponseCounter;
 begin
+  AtomicIncrement(FResponseCounter);
 
-  {$IFDEF MSWINDOWS}
-  InterlockedIncrement(FResponseCounter);
-  {$ELSE}
-  TInterlocked.Increment(FResponseCounter);
-
-  {$ENDIF}
+//  {$IFDEF MSWINDOWS}
+//  InterlockedIncrement(FResponseCounter);
+//  {$ELSE}
+//  TInterlocked.Increment(FResponseCounter);
+//
+//  {$ENDIF}
 
 end;
 
@@ -651,8 +669,8 @@ begin
       lvPData.FMsgType := pvMsgType;
       SetCurrentThreadInfo(Name +  ':logMessage START - 2.0');
 
-      InterlockedIncrement(__logCounter);
-      
+      AtomicIncrement(__logCounter);
+
       // dataQueue只引用对象
       FDataQueue.EnQueueObject(lvPData, raNone);
 
@@ -824,6 +842,8 @@ begin
               if lvPData <> nil then
               begin
                 try
+                  AtomicDecrement(__logCounter);
+
                   InterlockedDecrement(__logCounter);
                   FSafeLogger.FDebugData := lvPData;
                   SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataStart');
