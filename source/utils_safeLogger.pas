@@ -844,7 +844,7 @@ begin
                 try
                   AtomicDecrement(__logCounter);
 
-                  InterlockedDecrement(__logCounter);
+                 // InterlockedDecrement(__logCounter);
                   FSafeLogger.FDebugData := lvPData;
                   SetCurrentThreadInfo(FSafeLogger.Name + '::Safelogger.Execute::LogDataStart');
                   ExecuteLogData(lvPData);
