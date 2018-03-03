@@ -704,6 +704,20 @@ function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inli
 function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 {$IFEND <XE5}
 
+{$IF RTLVersion < 18}
+function InterlockedIncrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedIncrement';
+{$EXTERNALSYM InterlockedIncrement}
+function InterlockedDecrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedDecrement';
+{$EXTERNALSYM InterlockedDecrement}
+function InterlockedExchange(var Target: Integer; Value: Integer): Integer; stdcall;external kernel32 name 'InterlockedExchange';
+{$EXTERNALSYM InterlockedExchange}
+function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint; Comperand: Longint): Longint stdcall;external kernel32 name 'InterlockedCompareExchange';
+{$EXTERNALSYM InterlockedCompareExchange}
+
+function InterlockedExchangeAdd(Addend: PLongint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
+function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
+{$IFEND <D2007}
+
 implementation
 
 
