@@ -33,6 +33,9 @@ uses
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
+  {$IFDEF DIOCP_DEBUG}
+  utils_threadinfo,
+  {$ENDIF}
   utils_queues, utils_locker, utils_async, utils_fileWriter, utils_strings;
 
 const
@@ -1550,6 +1553,7 @@ begin
   Assert(FOwner <> nil);
 
   {$IFDEF DIOCP_DEBUG}
+  SetCurrentThreadInfo('InnerCloseContext - 1.0');
   AddDebugStrings(Format('*(%d):(%d:objAddr:%d)->InnerCloseContext- BEGIN, socketstate:%d',
          [FReferenceCounter, self.SocketHandle, IntPtr(Self), Ord(FSocketState)]));
 
@@ -1558,12 +1562,14 @@ begin
     CORE_LOG_FILE);
   if not FActive then
   begin
-    FOwner.logMessage('[%d]:InnerCloseContext FActive is false, socketstate:%d', [self.SocketHandle, Ord(FSocketState)], CORE_LOG_FILE);
+    FOwner.logMessage('[%d]:InnerCloseContext FActive is false, socketstate:%d, %s', [self.SocketHandle, Ord(FSocketState), GetDebugStrings()], CORE_LOG_FILE);
     AddDebugStrings(Format('*[*][%d]:InnerCloseContext FActive is false, socketstate:%d',
        [self.SocketHandle, Ord(FSocketState)]));
     FSocketState := ssDisconnected;
+    SetCurrentThreadInfo('InnerCloseContext - 1.1');
     Exit;
   end;
+  SetCurrentThreadInfo('InnerCloseContext - 1.2');
   {$ENDIF}
   if not FActive then
   begin
@@ -1575,7 +1581,9 @@ begin
     FActive := false;
     FRawSocket.Close(pvDoShutDown);
     CheckReleaseRes;
-
+    {$IFDEF DIOCP_DEBUG}
+    SetCurrentThreadInfo('InnerCloseContext - 1.3');
+    {$ENDIF}
     try
       DoNotifyDisconnected;
 
@@ -1585,19 +1593,34 @@ begin
       end;
 
       DoCleanUp;
-
+      {$IFDEF DIOCP_DEBUG}
+      SetCurrentThreadInfo('InnerCloseContext - 1.4');
+      {$ENDIF}
 
     except
+//      on e:Exception do
+//      begin
+//        sfLogger.LogMessage(
+//          Format('InnerCloseContext(%s):%s', [lvDebugStep, e.Message]), '执行关闭异常');
+//      end;
     end;
   finally
     {$IFDEF DIOCP_DEBUG}
     AddDebugStrings(Format('*(%d):(%d:objAddr:%d)->,%s',
       [FReferenceCounter, Self.SocketHandle, IntPtr(Self), 'InnerCloseContext:移除在线列表']));
-    {$ENDIF}
+    SetCurrentThreadInfo('InnerCloseContext - 1.5');
+
     FOwner.RemoveFromOnOnlineList(Self);
 
     // 尝试归还到池
     ReleaseBack;
+    SetCurrentThreadInfo('InnerCloseContext - 1.6');
+    {$ELSE}
+    FOwner.RemoveFromOnOnlineList(Self);
+
+    // 尝试归还到池
+    ReleaseBack;
+    {$ENDIF}
   end;
 end;
 
@@ -2424,6 +2447,9 @@ var
 begin
   self.IncRefCounter;
   try
+    {$IFDEF DIOCP_DEBUG}
+    SetCurrentThreadInfo('TDiocpCustom.KickOut-1');
+    {$ENDIF}
     FLocker.lock('KickOut');
     try
       j := 0;
@@ -2446,14 +2472,20 @@ begin
           lvBucket:= lvNextBucket;
         end;
       end;
-
+      {$IFDEF DIOCP_DEBUG}
+      SetCurrentThreadInfo('TDiocpCustom.KickOut-2.1');
+      {$ENDIF}
       Result := 0;
       for i := 0 to j - 1 do
       begin
         {$IFDEF DIOCP_DEBUG}
         Self.AddDebugStrings(Format('%d, 执行KickOut', [lvKickOutList[i].SocketHandle]));
-        {$ENDIF}
+        SetCurrentThreadInfo('TDiocpCustom.KickOut-2.2');
         lvKickOutList[i].InnerKickOut();
+        SetCurrentThreadInfo('TDiocpCustom.KickOut-2.3');
+        {$ELSE}
+        lvKickOutList[i].InnerKickOut();
+        {$ENDIF}
         Inc(Result);
       end;
     finally
@@ -3929,7 +3961,9 @@ var
 begin
   InterlockedIncrement(FKickCounter);
   {$IFDEF DIOCP_DEBUG}
-  AddDebugStrings(Format('*(%d):[%d]进入->InnerKickOut', [self.FReferenceCounter, self.SocketHandle]));
+  pvDebugInfo := Format('*(%d):[%d]进入->InnerKickOut', [self.FReferenceCounter, self.SocketHandle]);
+  AddDebugStrings(pvDebugInfo);
+  SetCurrentThreadInfo(pvDebugInfo);
   {$ENDIF}
 
 
@@ -3950,7 +3984,13 @@ begin
 
   lvCloseContext := false;
 
+  {$IFDEF DIOCP_DEBUG}
+  SetCurrentThreadInfo('TDiocpCustomContext.InnerKickOut 1-5');
   Assert(FContextLocker <> nil, 'error...');
+  SetCurrentThreadInfo('TDiocpCustomContext.InnerKickOut 1-6 Pre:'+FContextLocker.EnterINfo);
+  {$ELSE}
+  Assert(FContextLocker <> nil, 'error...');
+  {$ENDIF}
 
   FContextLocker.lock('RequestDisconnect');
   try
@@ -3977,7 +4017,9 @@ begin
   end;
 
   {$IFDEF DIOCP_DEBUG}
-  AddDebugStrings(Format('*(%d):%d执行完成->InnerKickOut', [self.FReferenceCounter, self.SocketHandle]));
+  pvDebugInfo := Format('*(%d):%d执行完成->InnerKickOut', [self.FReferenceCounter, self.SocketHandle]);
+  SetCurrentThreadInfo(pvDebugInfo);
+  AddDebugStrings(pvDebugInfo);
   {$ENDIF}
 
   if lvCloseContext then

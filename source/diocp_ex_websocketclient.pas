@@ -15,7 +15,7 @@ type
     FWsUrl:String;
     FHeaderBuilder: THttpHeaderBuilder;
     /// <summary>
-    ///  WebSocket接收到的整个数据
+    ///  WebSocket接收到的整个数据 
     /// </summary>
     FWebSocketContentBuffer: TDBufferBuilder;
 
