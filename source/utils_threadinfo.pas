@@ -7,7 +7,7 @@ uses
   Windows,
   {$ELSE}
   {$ENDIF}
-  Classes, SysUtils, SyncObjs, utils_BufferPool, utils_hashs, utils_strings;
+  Classes, SysUtils, SyncObjs, utils_hashs, utils_strings;
 
 const
   TYPE_NONE = 0;

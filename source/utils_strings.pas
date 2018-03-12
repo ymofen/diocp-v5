@@ -23,6 +23,16 @@ unit utils_strings;
 
 interface
 
+{$IFNDEF DEBUG}     // INLINE不好调试
+{$IF defined(FPC) or (RTLVersion>=18))}
+  {$DEFINE HAVE_INLINE}
+{$IFEND HAVE_INLINE}
+{$ENDIF}
+
+// 进行调试
+{.$UNDEF HAVE_INLINE}
+{.$DEFINE DIOCP_DEBUG_HINT}
+
 {$if CompilerVersion>= 28}    // XE7:28
   {$DEFINE USE_NetEncoding}
 {$ifend}
@@ -671,7 +681,8 @@ function ObjectIntStrAddr(pvObj:TObject): String;
 
 function DateTimeString(pvDateTime:TDateTime): string; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 function NowString: String; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
-function DateTimeStrToDateTime(const strDateTime:string):TDateTime;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
+function DateTimeStrToDateTime(const strDateTime:string):TDateTime;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
@@ -704,6 +715,10 @@ function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inli
 function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 {$IFEND <XE5}
 
+procedure SpinLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+procedure SpinLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+procedure SpinUnLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
+
 {$IF RTLVersion < 18}
 function InterlockedIncrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedIncrement';
 {$EXTERNALSYM InterlockedIncrement}
@@ -719,6 +734,43 @@ function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; o
 {$IFEND <D2007}
 
 implementation
+
+
+
+procedure SpinLock(var Target:Integer; var WaitCounter:Integer);
+begin
+  while AtomicCmpExchange(Target, 1, 0) <> 0 do
+  begin
+    AtomicIncrement(WaitCounter);
+//    {$IFDEF MSWINDOWS}
+//      SwitchToThread;
+//    {$ELSE}
+//      TThread.Yield;
+//    {$ENDIF}
+    {$IFDEF SPINLOCK_SLEEP}
+    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+    {$ENDIF}
+  end;
+end;
+
+procedure SpinLock(var Target:Integer);
+begin
+  while AtomicCmpExchange(Target, 1, 0) <> 0 do
+  begin
+    {$IFDEF SPINLOCK_SLEEP}
+    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+    {$ENDIF}
+  end;
+end;
+
+
+procedure SpinUnLock(var Target:Integer);
+begin
+  if AtomicCmpExchange(Target, 0, 1) <> 1 then
+  begin
+    Assert(False, 'SpinUnLock::AtomicCmpExchange(Target, 0, 1) <> 1');
+  end;
+end;
 
 
 

@@ -5195,7 +5195,7 @@ end;
 
 procedure TDiocpListener.PostAcceptExRequest(pvNum: Integer);
 begin
-  FAcceptorMgr.PostAcceptExRequest(100);
+  FAcceptorMgr.PostAcceptExRequest(pvNum);
 end;
 
 procedure TDiocpListener.Start(pvIocpEngine: TIocpEngine);
