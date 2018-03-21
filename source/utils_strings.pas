@@ -2594,7 +2594,13 @@ end;
 
 function DateTimeString(pvDateTime:TDateTime): string;
 begin
-  Result := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvDateTime);
+  if pvDateTime = 0 then
+  begin
+    Result := '0000-00-00 00:00:00.000'
+  end else
+  begin
+    Result := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvDateTime);
+  end;
 end;
 
 function NowString: String;

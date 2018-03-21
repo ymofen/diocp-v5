@@ -27,6 +27,7 @@ uses
   , utils_queues, SyncObjs;
 
 type
+  //TCheck
   /// <summary>
   ///   如果是getFromPool不能进Server的List列表
   /// </summary>
@@ -120,6 +121,8 @@ type
 
 
     property Port: Integer read FPort write FPort;
+
+
 
   end;
 
