@@ -20,6 +20,8 @@ procedure AddAFieldValue(pvVal: TDValue; pvField: TField);
 procedure AppendFromDValueList(pvDataSet: TDataSet; pvDataList: TDValue);
 procedure AssignRecordFromDValue(pvDataSet: TDataSet; pvJsonRecord:TDValue);
 
+function toSQLValue(pvField:TDValue): string;
+
 implementation
 
 uses
@@ -141,6 +143,24 @@ begin
     ConvertCurrentRecordToDValue(pvDataSet, lvItem, pvFields);
     pvDataSet.Next;
   end;
+end;
+
+function toSQLValue(pvField:TDValue): string;
+begin
+  if pvField=nil then
+     Result := 'NULL'
+  else if pvField.Value.DataType in [vdtBoolean] then
+    Result := '1'
+  else if pvField.Value.DataType in [vdtNull, vdtUnset] then
+    Result := 'NULL'
+  else if pvField.Value.DataType in [vdtDateTime] then
+    Result := '''' +  DateTimeToStr(pvField.AsDateTime) + ''''
+  else if pvField.Value.DataType in [vdtInt64, vdtInteger, vdtUInt64, vdtFloat, vdtSingle] then
+    Result := pvField.AsString
+  else
+    Result := '''' +  pvField.AsString + '''';
+
+
 end;
 
 end.

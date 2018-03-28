@@ -2874,6 +2874,7 @@ begin
     varSmallInt, varInteger, varShortInt: SetAsInteger(pvValue);
     varSingle, varDouble: SetAsFloat(pvValue);
     varDate: SetAsDateTime(pvValue);
+    varBoolean: SetAsBoolean(pvValue); 
   else
     SetAsString(pvValue);
   end;

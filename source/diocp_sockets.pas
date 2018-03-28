@@ -385,6 +385,7 @@ type
     property ConnectedCounter: Integer read FConnectedCounter;
     property ContextDNA: Integer read FContextDNA;
     property CreateSN: Integer read FCreateSN;
+    property CtxStateFlag: Integer read FCtxStateFlag;
     property CurrRecvRequest: TIocpRecvRequest read FCurrRecvRequest;
     property DisconnectedCounter: Integer read FDisconnectedCounter;
     property DisconnectedReason: String read FDisconnectedReason;
@@ -1490,10 +1491,7 @@ begin
 
   if Assigned(FOnDisconnectedEvent) then FOnDisconnectedEvent(Self);
 
-  // …Ë÷√Socket◊¥Ã¨
-  SetSocketState(ssDisconnected);
 
-  Inc(FDisconnectedCounter);
 end;
 
 procedure TDiocpCustomContext.DoReceiveData(pvRecvRequest: TIocpRecvRequest);
@@ -1629,6 +1627,7 @@ begin
       SetCurrentThreadInfo('InnerCloseContext - 1.4');
       {$ENDIF}
 
+
     except
 //      on e:Exception do
 //      begin
@@ -1644,16 +1643,23 @@ begin
 
     FOwner.RemoveFromOnOnlineList(Self);
 
+    // …Ë÷√Socket◊¥Ã¨
+    SetSocketState(ssDisconnected);
+    Inc(FDisconnectedCounter);
+    DoSetCtxState(0);
     // ≥¢ ‘πÈªπµΩ≥ÿ
     ReleaseBack;
     SetCurrentThreadInfo('InnerCloseContext - 1.6');
     {$ELSE}
     FOwner.RemoveFromOnOnlineList(Self);
-
+    // …Ë÷√Socket◊¥Ã¨
+    SetSocketState(ssDisconnected);
+    Inc(FDisconnectedCounter);
+    DoSetCtxState(0);
     // ≥¢ ‘πÈªπµΩ≥ÿ
     ReleaseBack;
     {$ENDIF}
-    DoSetCtxState(0);
+
   end;
 end;
 

@@ -405,11 +405,10 @@ begin
   if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
   begin
     DoNotifyDisconnected;
-  end else
-  begin
-    // 状态一定要设定
-    SetSocketState(ssDisconnected);
   end;
+
+  // 状态一定要设定
+  SetSocketState(ssDisconnected);
 end;
 
 procedure TIocpRemoteContext.OnConnected;

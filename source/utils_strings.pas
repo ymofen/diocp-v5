@@ -306,16 +306,22 @@ type
 
   TDStringWBuilder = class(TObject)
   private
+    FBlockSize:Integer;
+    FInitiCapacity:Integer;
     FData: TCharWArray;
     FPosition: Integer;
     FCapacity :Integer;
     FLineBreak: DStringW;
     procedure CheckNeedSize(pvSize: LongInt);
+    procedure SetBlockSize(pvBlockSize:Integer);
     function GetLength: Integer;
   public
-    constructor Create;
+    constructor Create;overload;
+    constructor Create(pvInitCapacity, pvBlockSize: Integer); overload;
+
     procedure Clear;
     procedure ClearContent;
+    function DecChar(i: Word): TDStringWBuilder;
     function Append(c: DCharW): TDStringWBuilder; overload;
     function Append(const str: DStringW): TDStringWBuilder; overload;
     function Append(const str, pvLeftStr, pvRightStr: DStringW): TDStringWBuilder;
@@ -324,9 +330,11 @@ type
         overload;
     function Append(v:Integer): TDStringWBuilder; overload;
     function Append(v:Double): TDStringWBuilder; overload;
+    function Append(SWB:TDStringWBuilder):TDStringWBuilder; overload;
     function AppendQuoteStr(const str: DStringW): TDStringWBuilder;
     function AppendSingleQuoteStr(const str: DStringW): TDStringWBuilder;
     function AppendLine(const str: DStringW): TDStringWBuilder;
+
 
     function ToString: DStringW;{$IFDEF UNICODE}override;{$ENDIF}
     property Length: Integer read GetLength;
@@ -2850,6 +2858,8 @@ begin
 {$else}
   FLineBreak := #13#10;
 {$ifend}
+  FInitiCapacity := 0;
+  Clear;
 end;
 
 function TDStringWBuilder.Append(c: DCharW): TDStringWBuilder;
@@ -2920,7 +2930,8 @@ var
 begin
   if FPosition + pvSize > FCapacity then
   begin
-    lvCapacity := (FPosition + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    // block的倍数 但是不会比size小
+    lvCapacity := (FPosition + pvSize + (FBlockSize - 1)) AND (not (FBlockSize - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);     
   end;
@@ -2932,8 +2943,8 @@ begin
 
   // modify by ymf
   // 2017-01-10 17:36:13
-  FCapacity := 0;
-  SetLength(FData, 0);
+  FCapacity := FInitiCapacity;
+  SetLength(FData, FCapacity);
 end;
 
 procedure TDStringWBuilder.ClearContent;
@@ -2943,6 +2954,33 @@ begin
   begin
     FillChar(FData[0], FCapacity, 0);
   end;
+end;
+
+constructor TDStringWBuilder.Create(pvInitCapacity, pvBlockSize: Integer);
+begin
+  inherited Create;
+{$if CompilerVersion> 18}    // Delphi7 or later
+  FLineBreak := DCharW(13) + DCharW(10);
+{$else}
+  FLineBreak := #13#10;
+{$ifend}
+  FInitiCapacity := pvInitCapacity;
+
+  Clear;
+  if pvBlockSize = 0 then pvBlockSize := 128;
+  SetBlockSize(pvBlockSize);
+end;
+
+function TDStringWBuilder.DecChar(i: Word): TDStringWBuilder;
+begin
+  if i > FPosition then
+  begin
+    FPosition := 0;
+  end else
+  begin
+    Dec(FPosition, i);
+  end;
+  Result := Self;
 end;
 
 function TDStringWBuilder.GetLength: Integer;
@@ -2972,6 +3010,21 @@ begin
   if l <> 0 then pvStream.WriteBuffer(FData[0], l);
 end;
 
+procedure TDStringWBuilder.SetBlockSize(pvBlockSize: Integer);
+var
+  j, i:Integer;
+begin
+  j := pvBlockSize;
+  i := 0;
+  while j > 0 do
+  begin
+    j := j shr 1;
+    Inc(i);
+  end;
+  Dec(i, 2);
+  FBlockSize := 2 shl i;
+end;
+
 function TDStringWBuilder.ToString: DStringW;
 var
   l:Integer;
@@ -2979,6 +3032,21 @@ begin
   l := Length;
   SetLength(Result, l);                
   Move(FData[0], PDCharW(Result)^, l shl 1); 
+end;
+
+function TDStringWBuilder.Append(SWB: TDStringWBuilder): TDStringWBuilder;
+var
+  l:Integer;
+begin
+  Result := Self;
+  l := SWB.Length;
+  if l = 0 then Exit;
+  CheckNeedSize(l);
+
+  Move(SWB.FData[0], FData[FPosition], l shl 1);
+
+
+  Inc(FPosition, l);
 end;
 
 initialization  
