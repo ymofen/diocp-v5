@@ -2860,6 +2860,7 @@ begin
 {$ifend}
   FInitiCapacity := 0;
   Clear;
+  SetBlockSize(512);
 end;
 
 function TDStringWBuilder.Append(c: DCharW): TDStringWBuilder;
