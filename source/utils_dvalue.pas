@@ -225,6 +225,7 @@ type
   private
     {$IFDEF CHECK_DVALUE}
     ///用于检测对象是否遭到破坏
+    __objflag:byte;
     __CheckValue:array[0..7] of Byte;
     procedure __CheckValueOK;
     procedure __InitalizeCheckValue;
@@ -561,6 +562,11 @@ type
 
   TDValueItem = class(TObject)
   private
+    {$IFDEF CHECK_DVALUE}
+    __objflag:Byte;
+    procedure __CheckValueOK;
+   {$ENDIF}
+  private
     FRawValue: TDRawValue;
     function GetItems(pvIndex: Integer): TDValueItem;
     function GetSize: Integer;
@@ -609,6 +615,8 @@ type
     ///    如果小于之前的尺寸，后面的值将会被清空
     /// </summary>
     procedure SetArraySize(const Value: Integer);
+
+    constructor Create();
 
     destructor Destroy; override;
 
@@ -1980,6 +1988,7 @@ begin
   {$IFDEF CHECK_DVALUE}
   __CheckValueOK();
   FillChar(__checkvalue[0], length(__checkvalue), 0);
+  __objflag := $A;
   {$ENDIF}  
   inherited;
 end;
@@ -2170,6 +2179,9 @@ end;
 
 function TDValue.CheckSetNodeType(pvType:TDValueObjectType): TDValue;
 begin
+  {$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+  {$ENDIF}
   DoLastModify;
   if pvType <> FObjectType then
   begin
@@ -2196,6 +2208,9 @@ procedure TDValue.Clear;
 var
   lvDebug:String;
 begin
+  {$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+  {$ENDIF}
   try
     FLastMsg := '';
     lvDebug := 'ClearChildren';
@@ -3011,6 +3026,10 @@ procedure TDValue.__CheckValueOK;
 var
   lvTick1, lvTick2:PCardinal;
 begin
+  Assert(self<>nil, '对象尚未创建');
+  Assert(__objflag=$DA, '对象尚未创建,或者已经销毁');
+
+  
   lvTick1 := PCardinal(@__checkvalue[0]);
   lvTick2 := PCardinal(@__checkvalue[4]);
   Assert((lvTick1^ > 0) and (lvTick1^ = lvTick2^), '对象遭到或者已经释放');
@@ -3020,6 +3039,7 @@ procedure TDValue.__InitalizeCheckValue;
 var
   lvTick1, lvTick2:PCardinal;
 begin
+  __objflag := $DA;
   lvTick1 := PCardinal(@__checkvalue[0]);
   lvTick2 := PCardinal(@__checkvalue[4]);
   lvTick1^ := GetTickCount;
@@ -3031,6 +3051,9 @@ end;
 destructor TDValueItem.Destroy;
 begin
   ClearDValue(@FRawValue);
+{$IFDEF CHECK_DVALUE}
+  __objflag := $A;
+{$ENDIF}
   inherited;
 end;
 
@@ -3052,6 +3075,14 @@ procedure TDValueItem.CloneFrom(pvSource: TDValueItem; pvIgnoreValueTypes:
     TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 begin
   RawValueCopyFrom(@pvSource.FRawValue, @FRawValue, pvIgnoreValueTypes);
+end;
+
+constructor TDValueItem.Create;
+begin
+{$IFDEF CHECK_DVALUE}
+  __objflag := $DA;
+{$ENDIF}
+
 end;
 
 function TDValueItem.Equal(pvItem:TDValueItem): Boolean;
@@ -3189,33 +3220,52 @@ end;
 
 procedure TDValueItem.SetAsBoolean(const Value: Boolean);
 begin
+{$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+{$ENDIF}
   DValueSetAsBoolean(@FRawValue, Value);
 end;
 
 
 procedure TDValueItem.SetAsFloat(const Value: Double);
 begin
+{$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+{$ENDIF}
+
   DValueSetAsFloat(@FRawValue, Value);
 end;
 
 procedure TDValueItem.SetAsInteger(const Value: Int64);
 begin
+{$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+{$ENDIF}
   DValueSetAsInt64(@FRawValue, Value);
 end;
 
 procedure TDValueItem.SetAsInterface(const Value: IInterface);
 begin
+{$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+{$ENDIF}
   DValueSetAsInterface(@FRawValue, Value);
 end;
 
 procedure TDValueItem.SetAsString(const Value: String);
 begin
+{$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+{$ENDIF}
   DValueSetAsString(@FRawValue, Value);
 end;
 
 
 procedure TDValueItem.SetAsStringW(const Value: WideString);
 begin
+{$IFDEF CHECK_DVALUE}
+  __CheckValueOK();
+{$ENDIF}
   DValueSetAsStringW(@FRawValue, Value);
 
 end;
@@ -3230,6 +3280,13 @@ begin
   Result := GetDValueSize(@FRawValue);
 end;
 
+{$IFDEF CHECK_DVALUE}
+procedure TDValueItem.__CheckValueOK;
+begin
+   Assert(self<>nil, '对象尚未创建');
+   Assert(__objflag=$DA, '对象尚未创建,或者已经销毁');
+end;
+{$ENDIF}
 
 initialization
   __DateTimeFormat := 'yyyy-MM-dd hh:nn:ss.zzz';
