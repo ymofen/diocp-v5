@@ -30,7 +30,7 @@ function DetectTextEncoding(const p: Pointer; l: Integer; var b: Boolean):
 
 function CharSizeU(c: PCharA): Integer;
 
-function LoadTextFromFile(pvFile: string; AEncoding: TDTextEncoding =
+function LoadTextFromFile(const pvFile: string; AEncoding: TDTextEncoding =
     teUnknown): String;
 
 function LoadTextFromStream(AStream: TStream; AEncoding: TDTextEncoding =
@@ -88,16 +88,22 @@ begin
   end
 end;
 
-function LoadTextFromFile(pvFile: string; AEncoding: TDTextEncoding =
+function LoadTextFromFile(const pvFile: string; AEncoding: TDTextEncoding =
     teUnknown): String;
 var
   AStream: TStream;
 begin
-  AStream := TFileStream.Create(pvFile, fmOpenRead or fmShareDenyWrite);
-  try
-    Result := LoadTextFromStream(AStream, AEncoding);
-  finally
-    AStream.Free;
+  if FileExists(pvFile) then
+  begin
+    AStream := TFileStream.Create(pvFile, fmOpenRead or fmShareDenyWrite);
+    try
+      Result := LoadTextFromStream(AStream, AEncoding);
+    finally
+      AStream.Free;
+    end;
+  end else
+  begin
+    Result := STRING_EMPTY;
   end;
 end;
 

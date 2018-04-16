@@ -20,7 +20,7 @@ procedure AddAFieldValue(pvVal: TDValue; pvField: TField);
 procedure AppendFromDValueList(pvDataSet: TDataSet; pvDataList: TDValue);
 procedure AssignRecordFromDValue(pvDataSet: TDataSet; pvJsonRecord:TDValue);
 
-function toSQLValue(pvField:TDValue): string;
+function toSQLValue(pvField: TDValue; pvPrecision: Byte = 4): string;
 
 implementation
 
@@ -145,7 +145,9 @@ begin
   end;
 end;
 
-function toSQLValue(pvField:TDValue): string;
+function toSQLValue(pvField: TDValue; pvPrecision: Byte = 4): string;
+var
+  lvFmt:String;
 begin
   if pvField=nil then
      Result := 'NULL'
@@ -155,8 +157,13 @@ begin
     Result := 'NULL'
   else if pvField.Value.DataType in [vdtDateTime] then
     Result := '''' +  DateTimeToStr(pvField.AsDateTime) + ''''
-  else if pvField.Value.DataType in [vdtInt64, vdtInteger, vdtUInt64, vdtFloat, vdtSingle] then
+  else if pvField.Value.DataType in [vdtFloat, vdtSingle] then
+  begin
+    lvFmt := '%.' + IntToStr(pvPrecision) + 'f';
+    Result := Format(lvFmt, [pvField.AsFloat]);
+  end else if pvField.Value.DataType in [vdtInt64, vdtInteger, vdtUInt64] then
     Result := pvField.AsString
+
   else
     Result := '''' +  pvField.AsString + '''';
 

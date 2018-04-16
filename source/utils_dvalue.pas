@@ -310,6 +310,7 @@ type
     procedure SetAsDateTime(const Value: TDateTime);
     function GetAsDateTime: TDateTime;
   public
+    procedure Sort(Compare: TListSortCompare);
 
     /// <summary>
     ///   清理子节点中超期未修改的子节点
@@ -2947,6 +2948,7 @@ function TDValue.SizeOf: Integer;
 var
   i: Integer;
 begin
+  
   {$IFDEF UNICODE}
   Result := Length(FName.AsString) shl 1;
   {$ELSE}
@@ -2963,6 +2965,11 @@ begin
     Inc(Result, self.Value.SizeOf);
   end;
   
+end;
+
+procedure TDValue.Sort(Compare: TListSortCompare);
+begin
+  FChildren.Sort(Compare);
 end;
 
 function TDValue.ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
