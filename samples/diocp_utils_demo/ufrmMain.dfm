@@ -32,6 +32,15 @@ object Form1: TForm1
         TabOrder = 0
         OnClick = btnGetStrValueOfNameClick
       end
+      object btnSB: TButton
+        Left = 16
+        Top = 80
+        Width = 75
+        Height = 25
+        Caption = 'btnSB'
+        TabOrder = 1
+        OnClick = btnSBClick
+      end
     end
   end
   object mmoLog: TMemo

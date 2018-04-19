@@ -18,8 +18,8 @@ object Form1: TForm1
     Top = 0
     Width = 929
     Height = 288
-    ActivePage = tsJSON
-    Align = alClient
+    ActivePage = tsDValue
+    Align = alTop
     TabOrder = 0
     object tsJSON: TTabSheet
       Caption = 'tsJSON'
@@ -220,6 +220,42 @@ object Form1: TForm1
         TabOrder = 7
         OnClick = btnAdd1000Click
       end
+      object btnSort: TButton
+        Left = 584
+        Top = 104
+        Width = 75
+        Height = 25
+        Caption = 'btnSort'
+        TabOrder = 8
+        OnClick = btnSortClick
+      end
+      object btnParseDValue: TButton
+        Left = 584
+        Top = 32
+        Width = 89
+        Height = 25
+        Caption = 'btnParseDValue'
+        TabOrder = 9
+        OnClick = btnParseDValueClick
+      end
+      object btnSortDValue: TButton
+        Left = 696
+        Top = 32
+        Width = 75
+        Height = 25
+        Caption = 'btnSortDValue'
+        TabOrder = 10
+        OnClick = btnSortDValueClick
+      end
+      object btnDelete: TButton
+        Left = 800
+        Top = 32
+        Width = 75
+        Height = 25
+        Caption = 'btnDelete'
+        TabOrder = 11
+        OnClick = btnDeleteClick
+      end
     end
     object tsDataSet: TTabSheet
       Caption = 'tsDataSet'
@@ -302,7 +338,7 @@ object Form1: TForm1
     Top = 288
     Width = 929
     Height = 172
-    Align = alBottom
+    Align = alClient
     Lines.Strings = (
       'mmoLog')
     TabOrder = 1

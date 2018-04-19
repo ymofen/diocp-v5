@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, utils_DValue, utils_strings, ComCtrls,
   utils_dvalue_multiparts, utils_dvalue_msgpack, utils_base64, utils_dvalue_dataset,
-  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, utils_textfile;
+  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, utils_textfile, Math;
 
 type
   TForm1 = class(TForm)
@@ -48,11 +48,16 @@ type
     tsLoadFile: TTabSheet;
     btnLoadTextFrom: TButton;
     btnAdd1000: TButton;
+    btnSort: TButton;
+    btnParseDValue: TButton;
+    btnSortDValue: TButton;
+    btnDelete: TButton;
     procedure btnAdd1000Click(Sender: TObject);
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
     procedure btnClearTimeOutClick(Sender: TObject);
     procedure btnConvertToDValueClick(Sender: TObject);
+    procedure btnDeleteClick(Sender: TObject);
     procedure btnDValueClick(Sender: TObject);
     procedure btnDValueCloneFromClick(Sender: TObject);
     procedure btnDValueSetLengthClick(Sender: TObject);
@@ -66,15 +71,19 @@ type
     procedure btnObjectTesterClick(Sender: TObject);
     procedure btnParseAFileClick(Sender: TObject);
     procedure btnParseClick(Sender: TObject);
+    procedure btnParseDValueClick(Sender: TObject);
     procedure btnParseJSONClick(Sender: TObject);
     procedure btnRemovePathClick(Sender: TObject);
     procedure btnSaveClick(Sender: TObject);
     procedure btnSetJSONClick(Sender: TObject);
+    procedure btnSortClick(Sender: TObject);
+    procedure btnSortDValueClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
     FDValueObj:TDValue;
     FLogObj: TDValue;
+    FDValue: TDValue;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -187,10 +196,12 @@ constructor TForm1.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FLogObj := TDValue.Create();
+  FDValue := TDValue.Create();
 end;
 
 destructor TForm1.Destroy;
 begin
+  FreeAndNil(FDValue);
   FreeAndNil(FLogObj);
   inherited Destroy;
 end;
@@ -609,6 +620,69 @@ begin
   mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
   lvDValue.Free;
 
+end;
+
+
+function MySort(Item1, Item2: Pointer): Integer;
+var
+  lvItm1, lvItm2:TDValue;
+begin
+  lvItm1 := Item1;
+  lvItm2 := Item2;
+  Result := CompareValue(lvItm1.GetValueByName('id', 0), lvItm2.GetValueByName('id', 0));
+end;
+  
+procedure TForm1.btnParseDValueClick(Sender: TObject);
+begin
+  FDValue.Clear;
+  JSONParser(mmoData.Lines.Text, FDValue);
+end;
+
+procedure TForm1.btnSortClick(Sender: TObject);
+var
+  lvDValue:TDValue;
+
+begin
+  lvDValue := TDValue.Create;
+  JSONParser('{id:2, val:2}', lvDValue.ForceByName('id_2'));
+  JSONParser('{id:1, val:1}', lvDValue.ForceByName('id_1'));
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+  lvDValue.Sort(MySort);
+  mmoLog.Lines.Add('after sort');
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+  lvDValue.Free;
+
+end;
+
+function UnloadPosiCompareFunc(Item1, Item2: Pointer): Integer;
+var
+  lvItm1, lvItm2:TDValue;
+begin
+  lvItm1 := Item1;
+  lvItm2 := Item2;
+  Result := CompareValue(lvItm1.GetValueByName('icount', 0), lvItm2.GetValueByName('icount', 0));
+  if Result = 0 then
+  begin
+    Result := CompareValue(lvItm1.ForceByName('lasttick').AsDateTime, lvItm2.ForceByName('lasttick').AsDateTime);
+  end;
+  //Result := -Result;
+end;
+
+procedure TForm1.btnDeleteClick(Sender: TObject);
+begin
+  while FDValue.Count > 5 do
+  begin
+    FDValue.Delete(0);
+  end;
+  mmoLog.Lines.Add('after delete');
+  mmoLog.Lines.Add(JSONEncode(FDValue, false, True));
+end;
+
+procedure TForm1.btnSortDValueClick(Sender: TObject);
+begin
+  FDValue.Sort(UnloadPosiCompareFunc);
+  mmoLog.Lines.Add('after sort');
+  mmoLog.Lines.Add(JSONEncode(FDValue, false, True));
 end;
 
 procedure TForm1.Button1Click(Sender: TObject);

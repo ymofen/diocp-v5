@@ -12,7 +12,9 @@ type
     tsUtils_Strings: TTabSheet;
     btnGetStrValueOfName: TButton;
     mmoLog: TMemo;
+    btnSB: TButton;
     procedure btnGetStrValueOfNameClick(Sender: TObject);
+    procedure btnSBClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -58,6 +60,19 @@ begin
   s := '';
   s1 := GetStrValueOfName(s, 'charset', ['=', ' '], [';', ' ']);
   mmoLog.Lines.Add('''' + s+ ''':'#9 + '''' + s1 + '''');
+end;
+
+procedure TForm1.btnSBClick(Sender: TObject);
+var
+  lvSB1, lvSB2:TDStringWBuilder;
+begin
+  lvSB1 := TDStringWBuilder.Create;
+  lvSB2 := TDStringWBuilder.Create;
+  lvSB1.Append('HELLO000000');
+  lvSB2.Append('YMF');
+  lvSB1.DecChar(4).Append(lvSB2);
+  mmoLog.Lines.Add(lvSB1.ToString);
+
 end;
 
 end.

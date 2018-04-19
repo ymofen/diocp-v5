@@ -6,7 +6,8 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp_tcp_client,
   utils_safeLogger, ComCtrls, diocp_sockets, ExtCtrls, utils_async,
-  utils_BufferPool, utils_fileWriter, diocp_tcp_blockClient, Registry;
+  utils_BufferPool, utils_fileWriter, diocp_tcp_blockClient, Registry,
+  utils_strings;
 
 type
   TEchoContext = class(TIocpRemoteContext)
