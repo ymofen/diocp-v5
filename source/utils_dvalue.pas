@@ -33,6 +33,7 @@ interface
 uses classes, sysutils, variants,
 {$IFDEF HAVE_GENERICS}
      System.Generics.Collections,
+     System.Generics.Defaults,
 {$ENDIF}
    utils_BufferPool,
    varutils, math, utils_base64, utils_strings;
@@ -310,7 +311,11 @@ type
     procedure SetAsDateTime(const Value: TDateTime);
     function GetAsDateTime: TDateTime;
   public
+  {$IFDEF HAVE_GENERICS}
+    procedure Sort(const Compare: IComparer<TDValue>);
+  {$ELSE}
     procedure Sort(Compare: TListSortCompare);
+  {$ENDIF}
 
     /// <summary>
     ///   清理子节点中超期未修改的子节点
@@ -2967,10 +2972,19 @@ begin
   
 end;
 
+{$IFDEF HAVE_GENERICS}
+procedure TDValue.Sort(const Compare: IComparer<TDValue>);
+begin
+  FChildren.Sort(Compare);
+end;
+{$ELSE}
 procedure TDValue.Sort(Compare: TListSortCompare);
 begin
   FChildren.Sort(Compare);
 end;
+{$ENDIF}
+
+
 
 function TDValue.ToStrings(pvNameSpliter: String = '='; pvPreNameFix: string =
     STRING_EMPTY; pvValueDelimiter: string = sLineBreak): String;
