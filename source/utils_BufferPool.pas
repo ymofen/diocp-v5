@@ -1033,7 +1033,7 @@ begin
       {$IFDEF DIOCP_DEBUG}r := {$ENDIF}AddRef(FBuffer{$IFDEF DIOCP_DEBUG}, Format('+ FlushBuffer(%d)', [n]){$ENDIF});    // 避免事件中没有使用引用计数，不释放buf
       try
         {$IFNDEF BIG_CONCURRENT}
-        {$IFDEF DEBUG}PrintDebugString(Format('+ FlushBuffer %2x: %d', [Cardinal(FBuffer), r]));{$ENDIF}
+        {$IFDEF DIOCP_DEBUG}PrintDebugString(Format('+ FlushBuffer %2x: %d', [Cardinal(FBuffer), r]));{$ENDIF}
         {$ENDIF}
         FOnBufferWrite(self, FBuffer, FSize);
       finally

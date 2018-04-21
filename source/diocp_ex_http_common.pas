@@ -2150,6 +2150,9 @@ begin
       if length(lvStr) > 0 then
       begin
         lvStart := StrToInt64Def(lvStr, 0);
+      end else
+      begin
+        lvStart := 0;
       end;
       inc(lvPtr);
       if LeftUntil(lvPtr, [',', ' '], lvStr) = 0 then
@@ -2196,6 +2199,9 @@ begin
       Result := -1;
     end;
 
+  end else
+  begin
+    Result := -1;
   end;
 end;
 

@@ -2058,6 +2058,7 @@ end;
 
 function TDValue.Add(const pvName: string; pvValue: TDValue): TDValue;
 begin
+  Result := nil;
   if pvValue = nil then Exit;
   CheckSetNodeType(vntObject);
 
@@ -2094,10 +2095,7 @@ begin
 end;
 
 function TDValue.AddVar(const pvName: string; const pvValue: Variant): TDValue;
-var
-  lvVarType:TVarType;
 begin
-  lvVarType := VarType(pvValue);
   Result := Add(pvName);
   Result.SetAsVariant(pvValue);
 end;
@@ -2236,12 +2234,14 @@ var
   i: Integer;
   lvNow:Cardinal;
 begin
+  Result := 0;
   lvNow := GetTickCount;
   for i := Count - 1 downto 0 do
   begin
     if tick_diff(Items[i].FLastModify, lvNow) >= pvTimeOut then
     begin
       Delete(i);
+      Inc(Result);
     end;    
   end;
 end;
@@ -2802,11 +2802,13 @@ var
   lvParent, lvDValue:TDValue;
   lvIndex:Integer;
 begin
+  Result := false;
   lvIndex := -1;
   InnerFindByPath(pvPath, lvParent, lvIndex);
   if lvIndex <> -1 then
   begin
     lvParent.Delete(lvIndex);
+    Result := True;
 
     if lvParent.Count = 0 then
     begin

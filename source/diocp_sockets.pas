@@ -2714,6 +2714,7 @@ begin
   end else
   begin
     pvObject.Free;
+    Result := True;
   end;
 end;
 
