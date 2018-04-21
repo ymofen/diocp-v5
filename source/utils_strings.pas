@@ -274,7 +274,7 @@ type
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(Offset: Longint; Origin: Word): Longint; overload; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload;  override;
-    function Write(const Buffer; Count: Longint): Integer; override;
+    function Write(const Buffer; Count: Longint): Longint; override;
     procedure SetSize(NewSize: Longint); override;
 
     /// <summary>
@@ -2460,7 +2460,7 @@ begin
 {$ENDIF}
 end;
 
-function TDBufferBuilder.Write(const Buffer; Count: Longint): Integer;
+function TDBufferBuilder.Write(const Buffer; Count: Longint): Longint;
 begin
   if FBufferLocked then
   begin
