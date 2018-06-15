@@ -20,7 +20,7 @@ type
 
     function ParseContentDisposition: Integer;
     function DecodeHeader: Integer;
-    function DecodeContent: Integer;
+    function DecodeContent(Suffix: Integer): Integer;
     procedure DecodeHeaderLine(pvLine:string);
 
   public
@@ -354,14 +354,14 @@ begin
   inherited Destroy;
 end;
 
-function TMultiPartsParser.DecodeContent: Integer;
+function TMultiPartsParser.DecodeContent(Suffix: Integer): Integer;
 var
   lvRAW:TMemoryStream;
   l:Integer;
 begin
   lvRAW := FCurrentHeaders.ForceByName('__raw').AsStream;
   lvRAW.Clear;
-  l := FBuffer.Length - Length(FBoundaryBytes) - 2;
+  l := FBuffer.Length - Length(FBoundaryBytes) - Suffix;
   FCurrentHeaders.ForceByName('__raw-size').AsInteger := l;
   lvRAW.SetSize(l);
   Move(FBuffer.Memory^, lvRAW.Memory^, l);
@@ -585,23 +585,23 @@ begin
           FDecodeState := 4;
         end;
       end;
-    8:       //开始解码数据
+    8:       //开始接收数据
       begin
         if pvByte = FBoundaryBytes[FBoundaryMatchIndex] then
-        begin
+        begin             // 接收到分割的尾部，开始进行匹配
           Inc(FBoundaryMatchIndex);
           if FBoundaryMatchIndex = Length(FBoundaryBytes) then
-          begin
+          begin            // 匹配完成
             Inc(FDecodeState);
           end;
         end else
-        begin
+        begin                 // 重新匹配，下标重置
           FBoundaryMatchIndex := 0;
         end;
       end;
     9:
       begin
-        if pvByte = 13 then Inc(FDecodeState)
+        if pvByte = 13 then Inc(FDecodeState)   // 匹配完成后，如果是换行符，到#10再进行解码
         else if pvByte = Ord('-') then FDecodeState := 12  //解码完成
         else
         begin
@@ -616,7 +616,7 @@ begin
       begin
         if pvByte = 10 then
         begin  // 解码到一个数据
-          if DecodeContent = 1 then
+          if DecodeContent(4) = 1 then  // 两个换行符
           begin
             Result := 2;
             FDecodeState := 4;
@@ -642,7 +642,7 @@ begin
       begin
         if pvByte = Ord('-') then
         begin           // 完整解码
-          if DecodeContent = 1 then
+          if DecodeContent(2) = 1 then
           begin
             Result := 9;
             FBuffer.Clear;

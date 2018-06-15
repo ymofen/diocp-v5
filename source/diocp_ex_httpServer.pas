@@ -631,7 +631,7 @@ type
     procedure InnerDoARequest(pvRequest:TDiocpHttpRequest);
 
     // 执行事件
-    procedure DoRequest(pvRequest:TDiocpHttpRequest);
+    procedure DoRequestBACK(pvRequest:TDiocpHttpRequest);
 
     procedure InnerPushRequest(pvRequest:TDiocpHttpRequest);
 
@@ -663,6 +663,10 @@ type
     /// <summary>
     ///   准备发送一个流(依次读取发送),如果还有未发送任务，则抛出异常
     /// </summary>
+    /// <param name="pvCloseAction">
+    ///    0:关闭
+    ///    1:不关闭
+    /// </param>
     procedure PostWriteAStream(pvStream: TStream; pvSize, pvCloseAction: Integer;
         pvDoneCallBack: TWorkDoneCallBack);
 
@@ -1341,16 +1345,16 @@ var
 begin
   if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
-    lvCloseAction := 1;
+    lvCloseAction := 0;
   end else if not FInnerRequest.CheckKeepAlive then
   begin
-    lvCloseAction := 1;
+    lvCloseAction := 0;
   end else if SameText(FResponse.Header.GetValueByName('Connection', STRING_EMPTY), 'close') then
   begin
-    lvCloseAction := 1;
+    lvCloseAction := 0;
   end else
   begin
-    lvCloseAction := 0;
+    lvCloseAction := 1;
   end;
 
   lvIsRangeResonse := False;
@@ -1855,7 +1859,7 @@ begin
 end;
 
 
-procedure TDiocpHttpClientContext.DoRequest(pvRequest: TDiocpHttpRequest);
+procedure TDiocpHttpClientContext.DoRequestBACK(pvRequest:TDiocpHttpRequest);
 begin
   {$IFDEF INNER_IOCP_PROCESSOR}
   InnerDoARequest(pvRequest);
@@ -2015,6 +2019,9 @@ begin
     FCurrentStream.Free;
   end;
   FCurrentStream := nil;
+
+  // 发送完成。可以投递接收请求
+  self.DecRecvRef;
 end;
 
 procedure TDiocpHttpClientContext.InnerTriggerDoRequest;
@@ -2043,6 +2050,8 @@ begin
       RequestDisconnect('未处理的请求队列过大', nil);
       Exit;
     end;
+
+    InterlockedIncrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
 
     {$IFDEF QDAC_QWorker}
     self.IncRecvRef;
@@ -2360,6 +2369,8 @@ procedure TDiocpHttpClientContext.PostWriteAStream(pvStream: TStream; pvSize,
 begin
   self.Lock;
   try
+    // 不接收请求
+    Self.IncRecvRef;
     if FCurrentStream <> nil then
     begin
       if Assigned(pvDoneCallBack) then

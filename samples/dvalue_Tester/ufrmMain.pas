@@ -2,6 +2,10 @@ unit ufrmMain;
 
 interface
 
+{$IF CompilerVersion>25}  // XE4(VER250)
+  {$DEFINE HAVE_GENERICS}
+{$IFEND}
+
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, utils_DValue, utils_strings, ComCtrls,
@@ -546,7 +550,7 @@ begin
   lvTickCount := GetTickCount;
   MultiPartsParseFromFile(lvDVAlue, 'dvalue_multparts.dat');
   Self.Caption := Format('MultiPartsParseFromFile, time:%d ns', [GetTickCount - lvTickCount]);
-  SavePartValueToFile(lvDVAlue, 'data', 'abc.dat');
+  SavePartValueToFile(lvDVAlue, 'filedata', 'abc.dat');
   ShowMessage(ExtractValueAsUtf8String(lvDVAlue, 'fileID', ''));
   lvDVAlue.Free;
 end;
@@ -647,7 +651,11 @@ begin
   JSONParser('{id:2, val:2}', lvDValue.ForceByName('id_2'));
   JSONParser('{id:1, val:1}', lvDValue.ForceByName('id_1'));
   mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+
+{$IFDEF HAVE_GENERICS}
+{$ELSE}
   lvDValue.Sort(MySort);
+{$ENDIF}
   mmoLog.Lines.Add('after sort');
   mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
   lvDValue.Free;
@@ -680,7 +688,11 @@ end;
 
 procedure TForm1.btnSortDValueClick(Sender: TObject);
 begin
+{$IFDEF HAVE_GENERICS}
+{$ELSE}
   FDValue.Sort(UnloadPosiCompareFunc);
+{$ENDIF}
+
   mmoLog.Lines.Add('after sort');
   mmoLog.Lines.Add(JSONEncode(FDValue, false, True));
 end;
