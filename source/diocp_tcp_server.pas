@@ -167,6 +167,8 @@ type
 
     FCreateSN:Integer;
 
+
+
     // 大于0时不会被KickOut
     FBusingCounter: Integer;
 
@@ -1624,13 +1626,13 @@ end;
 procedure TIocpClientContext.InnerLock;
 begin
   //FContextLocker.lock();
-  SpinLock(FInnerLockerFlag);
+  utils_strings.SpinLock(FInnerLockerFlag);
 end;
 
 procedure TIocpClientContext.InnerUnLock;
 begin
   //FContextLocker.unLock;
-  SpinUnLock(FInnerLockerFlag);
+  utils_strings.SpinUnLock(FInnerLockerFlag);
 end;
 
 

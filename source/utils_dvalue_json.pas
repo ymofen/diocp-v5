@@ -904,7 +904,13 @@ begin
   if FileExists(pvFile) then
   begin
     s := LoadTextFromFile(pvFile);
-    Result := JSONParser(s, pvDValue);
+    if JSONParser(s, pvDValue) = 0 then
+    begin
+      Result := 1;
+    end else
+    begin
+      Result := 0;
+    end;
   end else
   begin
     Result := 0;

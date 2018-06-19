@@ -384,6 +384,7 @@ type
     ///     如果之前不是vntObject类型，将会被清除
     /// </summary>
     function Add: TDValue; overload;
+    function AsArray: TDValue;
 
 
     function Add(const pvName: String; pvType: TDValueObjectType): TDValue;
@@ -2100,6 +2101,12 @@ begin
   Result.SetAsVariant(pvValue);
 end;
 
+function TDValue.AsArray: TDValue;
+begin
+  CheckSetNodeType(vntArray);
+  Result := self;
+end;
+
 procedure TDValue.AttachDValue(const pvName: String; pvDValue: TDValue);
 begin
   CheckSetNodeType(vntObject);
@@ -2697,12 +2704,14 @@ end;
 function TDValue.IndexOf(const pvName: string): Integer;
 var
   i:Integer;
+  s:string;
 begin
   Result := -1;
   if Assigned(FChildren) then
     for i := 0 to FChildren.Count - 1 do
     begin
-      if CompareText(Items[i].FName.AsString, pvName) = 0 then
+      s := Items[i].FName.AsString;
+      if CompareText(s, pvName) = 0 then
       begin
         Result := i;
         Break;

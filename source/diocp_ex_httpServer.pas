@@ -587,6 +587,10 @@ type
     /// </summary>
     FResponseRef:Integer;
 
+    // 最后一次响应, 响应请求后重置
+
+    FLastResponseType:Integer;
+
     FCurrentStream:TStream;
     FCurrentStreamRemainSize:Integer;
     // 是否关闭连接 0是关闭, 1:不关闭
@@ -674,6 +678,10 @@ type
 
   public
     property ContextType: Integer read FContextType write SetContextType;
+
+    // 最后一次响应类型
+    //  0:默认, 1:发送流(异步发送)
+    property LastResponseType: Integer read FLastResponseType;
 
     /// <summary>
     ///  正在响应
@@ -2030,6 +2038,8 @@ var
   lvObj:TDiocpHttpRequest;
 {$ENDIF}
 begin
+   Self.FLastResponseType := 0;
+   
 {$IFDEF INNER_IOCP_PROCESSOR}
     while (Self.Active) do
     begin
@@ -2389,6 +2399,8 @@ begin
   finally
     self.UnLock;
   end;
+
+  FLastResponseType := 1;
 
   InterlockedIncrement(FResponseRef);
   CheckSendStreamBlock;
