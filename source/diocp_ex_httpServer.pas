@@ -43,7 +43,7 @@ uses
   , diocp_ex_http_common
   , diocp_res
   , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
-  utils_BufferPool,  utils_websocket,  utils_base64;
+  utils_BufferPool,  utils_websocket,  utils_base64, DateUtils;
 
 
 
@@ -426,10 +426,19 @@ type
     /// </summary>
     procedure SendResponse(pvContentLength: Integer = 0);
 
+    procedure ErrorResponse(pvCode:Integer; pvMsg:String);
+
     /// <summary>
     ///   直接发送一个文件
     /// </summary>
     procedure ResponseAFile(pvFileName:string);
+
+    /// <summary>
+    ///   直接发送一个文件
+    ///    响应类型
+    ///    缓存
+    /// </summary>
+    procedure ResponseAFileEx(const pvFileName: string);
 
     /// <summary>
     ///   直接发送一个流
@@ -448,6 +457,7 @@ type
     ///  关闭连接
     /// </summary>
     procedure CloseContext;
+
     function GetDebugString: String;
 
     /// <summary>
@@ -504,7 +514,6 @@ type
     destructor Destroy; override;
     procedure WriteBuf(pvBuf: Pointer; len: Cardinal);
     procedure WriteString(pvString: string; pvUtf8Convert: Boolean = true);
-
     function GetResponseHeaderAsString: RAWString;
 
     function AddCookie: TDiocpHttpCookie; overload;
@@ -863,6 +872,49 @@ implementation
 
 uses
   ComObj;
+
+
+
+function GetFileLastModifyTimeEx(pvFileName: AnsiString): TDateTime;
+var
+  hFile: THandle;
+  mCreationTime: TFileTime;
+  mLastAccessTime: TFileTime;
+  mLastWriteTime: TFileTime;
+  dft:DWord;
+begin
+  hFile := _lopen(PAnsiChar(pvFileName), OF_READ);
+  GetFileTime(hFile, @mCreationTime, @mLastAccessTime, @mLastWriteTime);
+  _lclose(hFile);
+  FileTimeToLocalFileTime(mLastWriteTime, mCreationTime);
+  FileTimeToDosDateTime(mCreationTime, LongRec(dft).Hi,LongRec(dft).Lo);
+  Result:=FileDateToDateTime(dft);
+end;
+
+function GetFileLastModifyTime(const AFileName:string): TDateTime;
+var
+  lvF,FSize:LongInt;
+begin
+  lvF:=FileOpen(AFileName, fmOpenRead or fmShareDenyNone);
+  if lvF > 0 then
+  begin
+    Result:=FileDateToDateTime(FileGetDate(lvF));
+    FileClose(lvF);
+  end else
+  begin
+    Result := 0;
+  end;
+end;
+
+function GetETagFromFile(const AFileName:string):String;
+var
+  lvDateTime:TDateTime;
+begin
+  lvDateTime := GetFileLastModifyTime(AFileName);
+  //Result := Format('W/"%d"',[DateTimeToUnix(lvDateTime)]);
+  Result := Format('W/"%s"',[FormatDateTime('yyMMddhhnnsszzz',lvDateTime)]);
+
+end;
   
 {$IFDEF DIOCP_DEBUG}
 var
@@ -1159,6 +1211,21 @@ begin
   FInnerRequest.DecodeURLParam(pvUseUtf8Decode);
 end;
 
+procedure TDiocpHttpRequest.ErrorResponse(pvCode:Integer; pvMsg:String);
+begin
+  self.FResponse.ResponseCode := pvCode;
+  if Length(pvMsg) > 0 then
+  begin
+    self.FResponse.SetContentType('text/plan;chartset=utf-8;');
+    self.FResponse.WriteString(pvMsg, True);
+  end else
+  begin
+    self.FResponse.ContentBody.Clear;
+  end;
+  SendResponse();
+  DoResponseEnd();    
+end;
+
 function TDiocpHttpRequest.GetContentLength: Int64;
 begin
   Result := FInnerRequest.ContentLength;
@@ -1343,6 +1410,32 @@ begin
   ResponseAStream(lvFileStream, nil);
 end;
 
+procedure TDiocpHttpRequest.ResponseAFileEx(const pvFileName: string);
+var
+  lvFileStream:TFileStream;
+  lvDateTime:TDateTime;
+  lvETag, lvReqTag:string;
+begin
+  if not FileExists(pvFileName) then
+  begin
+    ErrorResponse(404, STRING_EMPTY);
+    Exit;
+  end;
+  lvReqTag := self.Header.GetValueByName('If-None-Match', STRING_EMPTY);
+  lvETag := GetETagFromFile(pvFileName);
+  if lvReqTag = lvETag then
+  begin
+    ErrorResponse(304, STRING_EMPTY);
+    exit;
+  end;
+
+  Response.ContentType := GetContentTypeFromFileExt(ExtractFileExt(pvFileName), 'text/html');
+  lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
+
+  Response.Header.ForceByName('ETag').AsString := lvETag;
+  ResponseAStream(lvFileStream, nil);  
+end;
+
 procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream;
     pvDoneCallBack: TWorkDoneCallBack);
 var
@@ -1394,7 +1487,7 @@ begin
       Exit;
     end;
   end;
-  
+
   if (not lvIsRangeResonse) then
   begin
     SendResponse(pvStream.Size);
