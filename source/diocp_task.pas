@@ -259,7 +259,6 @@ begin
   inherited Create;
   FLocker := TIocpLocker.Create('iocpTaskLocker');
   FIocpEngine := TIocpEngine.Create();
-  FIocpEngine.setWorkerCount(2);
   FSignalTasks := TDHashTable.Create(17);
   FSignalTasks.OnDelete := OnSignalTaskDelete;
 
@@ -778,7 +777,7 @@ end;
 initialization
   requestPool := TBaseQueue.Create;
   requestPool.Name := 'taskRequestPool';
-  checkInitializeTaskManager(2);
+  checkInitializeTaskManager(0);
 
 
 finalization

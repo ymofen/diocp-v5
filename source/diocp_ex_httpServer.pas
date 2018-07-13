@@ -56,7 +56,12 @@ const
 
   Context_Type_WebSocket = 1;
 
-  SEND_BLOCK_SIZE = 1024*4;
+  SEND_BLOCK_SIZE = 1024 * 100;
+
+  Response_state_inital = 0;
+  Response_state_stream = 1;
+  Response_state_err = 2;
+  Response_state_done = 2;
 
 type
   TDiocpHttpState = (hsCompleted, hsRequest { 接收请求 } , hsRecvingPost { 接收数据 } );
@@ -179,6 +184,9 @@ type
 
 
     FLastResponseContentLength: Integer;
+
+    // 响应
+    //FResponseState:Byte;
 
 
     FResponse: TDiocpHttpResponse;
@@ -596,9 +604,8 @@ type
     /// </summary>
     FResponseRef:Integer;
 
-    // 最后一次响应, 响应请求后重置
-
-    FLastResponseType:Integer;
+    // 响应状态
+    FResponseState: Integer;
 
     FCurrentStream:TStream;
     FCurrentStreamRemainSize:Integer;
@@ -688,9 +695,9 @@ type
   public
     property ContextType: Integer read FContextType write SetContextType;
 
-    // 最后一次响应类型
-    //  0:默认, 1:发送流(异步发送)
-    property LastResponseType: Integer read FLastResponseType;
+    // 响应状态
+    //  0:默认, 1:发送流(异步发送), 2: 错误信息响应
+    property ResponseState: Integer read FResponseState write FResponseState;
 
     /// <summary>
     ///  正在响应
@@ -1213,6 +1220,7 @@ end;
 
 procedure TDiocpHttpRequest.ErrorResponse(pvCode:Integer; pvMsg:String);
 begin
+  self.Connection.FResponseState := Response_state_err;
   self.FResponse.ResponseCode := pvCode;
   if Length(pvMsg) > 0 then
   begin
@@ -2131,8 +2139,8 @@ var
   lvObj:TDiocpHttpRequest;
 {$ENDIF}
 begin
-   Self.FLastResponseType := 0;
-   
+   Self.FResponseState := 0;
+
 {$IFDEF INNER_IOCP_PROCESSOR}
     while (Self.Active) do
     begin
@@ -2470,6 +2478,8 @@ end;
 procedure TDiocpHttpClientContext.PostWriteAStream(pvStream: TStream; pvSize,
     pvCloseAction: Integer; pvDoneCallBack: TWorkDoneCallBack);
 begin
+  FResponseState := Response_state_stream;
+  
   self.Lock;
   try
     // 不接收请求
@@ -2492,8 +2502,6 @@ begin
   finally
     self.UnLock;
   end;
-
-  FLastResponseType := 1;
 
   InterlockedIncrement(FResponseRef);
   CheckSendStreamBlock;
