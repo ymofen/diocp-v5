@@ -3256,7 +3256,7 @@ end;
 procedure TDiocpTcpServer.SetWorkerCount(const Value: Integer);
 begin
   // 不设置默认引擎工作线程的数量
-  if FIocpEngine = __defaultDiocpEngine then Exit;
+  // if FIocpEngine = __defaultDiocpEngine then Exit;
 
   FIocpEngine.SetWorkerCount(Value);
 end;
