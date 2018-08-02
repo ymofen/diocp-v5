@@ -418,6 +418,10 @@ begin
   lvRequest.FWSAToAddr := ToAddr;
   lvRequest.SetBuffer(buf, len, CopyBuf);
   Result := lvRequest.PostRequest();
+  if not Result then
+  begin
+    ReleaseSendRequest(lvRequest);
+  end;
 end;
 
 procedure TDiocpUdp.WSASendTo(pvRemoteIP:String; pvRemotePort:Integer; buf:
