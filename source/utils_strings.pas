@@ -472,6 +472,9 @@ function SplitStrings(const s: String; pvStrings: TStrings; pvSpliterChars:
 function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet;
     pvSkipSpliterChars: Boolean = false): TArrayStrings;
 
+function SplitNToArrayStr(const s: String; pvSpliterChars: TSysCharSet; pvMaxN:
+    Integer; pvSkipSpliterChars: Boolean = false): TArrayStrings;
+
 
 /// <summary>
 ///  将一个字符串分割成2个字符串
@@ -2878,6 +2881,65 @@ function StrAddPrefix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
     String;
 begin
   Result := FillNChr(pvTotalWidth - length(s), pvFillChar) + s;
+end;
+
+function SplitNToArrayStr(const s: String; pvSpliterChars: TSysCharSet; pvMaxN:
+    Integer; pvSkipSpliterChars: Boolean = false): TArrayStrings;
+var
+  p:PChar;
+  lvValue : String;
+  l, idx, r:Integer;
+begin
+  if (pvMaxN <= 0) then
+  begin
+    Result := SplitToArrayStr(s, pvSpliterChars, pvSkipSpliterChars);
+    Exit;
+  end else if pvMaxN = 1 then
+  begin
+    SetLength(Result, 1);
+    Result[0] := s;
+    Exit;
+  end;
+
+  SetLength(Result, pvMaxN);
+
+  p := PChar(s);
+  l := 0;
+  idx := 0;
+  while True do
+  begin
+    // 跳过开头
+    r := LeftUntil(P, pvSpliterChars, lvValue);
+    if r = -1 then
+    begin    // 没有匹配到
+      if P^ <> #0 then
+      begin  // 最后一个字符
+        // 添加到列表中
+        SetLength(Result, idx + 1);
+        Result[idx] := P;
+        Inc(idx);
+      end;
+      Exit;
+    end else
+    begin
+      Result[idx] := lvValue;
+      Inc(idx);
+      Inc(P);
+    end;
+
+    if (pvSkipSpliterChars) then  // 跳过分隔符？
+      SkipChars(P, pvSpliterChars);
+
+    if (idx + 1) = pvMaxN then
+    begin
+      Result[idx] := P;
+      Inc(idx);
+      Exit;
+    end;
+  end;
+
+  SetLength(Result, idx + 1);
+
 end;
 
 constructor TDStringWBuilder.Create;
