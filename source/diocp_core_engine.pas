@@ -73,7 +73,6 @@ type
     __free_flag:Integer;
     FThreadID : THandle;
     FData: Pointer;
-
     FWorkerThreadID:THandle;
 
     /// io request response info
@@ -160,6 +159,9 @@ type
 
 
     property Tag: Integer read FTag write FTag;
+
+
+    
 
 
     function OverlappedPtr: POVERLAPPEDEx;

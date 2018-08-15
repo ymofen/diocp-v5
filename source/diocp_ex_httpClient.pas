@@ -670,7 +670,7 @@ begin
 
   FURL.SetURL(pvURL);
   FRequestHeader.Clear;
-  if FURL.ParamStr = '' then
+  if Length(FURL.ParamStr)=0 then
   begin
     FRequestHeader.Add(Format('POST %s HTTP/1.1', [FURL.URI]));
   end else

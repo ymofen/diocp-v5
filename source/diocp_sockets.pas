@@ -131,6 +131,8 @@ type
   private
     FDebugLocker:Integer;
 
+
+
     FCheckThreadId:THandle;
 
     FObjectAlive: Boolean;
@@ -151,9 +153,10 @@ type
 
     FCurrRecvRequest:TIocpRecvRequest;
 
-    FcurrSendRequest:TIocpSendRequest;
+    //FcurrSendRequest:TIocpSendRequest;
 
     FData: Pointer;
+    FDirectPostRequest: Boolean;
 
     /// <summary>
     ///   断线原因
@@ -190,7 +193,7 @@ type
     procedure DoReceiveData(pvRecvRequest: TIocpRecvRequest);
 
 
-
+    procedure InnerPostSendRequest(lvRequest:TIocpSendRequest);
 
 
     /// <summary>
@@ -329,6 +332,9 @@ type
 
 
 
+
+
+
     
     /// <summary>
     ///  post send request to iocp queue, if post successful return true.
@@ -387,6 +393,8 @@ type
     property CreateSN: Integer read FCreateSN;
     property CtxStateFlag: Integer read FCtxStateFlag;
     property CurrRecvRequest: TIocpRecvRequest read FCurrRecvRequest;
+    property DirectPostRequest: Boolean read FDirectPostRequest write
+        FDirectPostRequest;
     property DisconnectedCounter: Integer read FDisconnectedCounter;
     property DisconnectedReason: String read FDisconnectedReason;
 
@@ -480,6 +488,8 @@ type
     FOwner: TDiocpCustom;
 
     FContext: TDiocpCustomContext;
+    
+    FDirectPost: Boolean;
 
 
     FOnDataRequestCompleted: TOnDataRequestCompleted;
@@ -523,6 +533,8 @@ type
     procedure SetBuffer(buf: Pointer; len: Cardinal; pvBufReleaseType:
         TDataReleaseType); overload;
 
+    /// 直接投递没有经过队列
+    property DirectPost: Boolean read FDirectPost write FDirectPost;
     property Owner: TDiocpCustom read FOwner;
     /// <summary>
     ///   on entire buf send completed
@@ -1235,30 +1247,8 @@ begin
   end;
 
   if lvRequest <> nil then
-  begin   
-    FcurrSendRequest := lvRequest;
-    if lvRequest.ExecuteSend then
-    begin
-      if (FOwner.FDataMoniter <> nil) then
-      begin
-        FOwner.FDataMoniter.incPostSendObjectCounter;
-      end;
-    end else
-    begin
-      FcurrSendRequest := nil;
-
-      /// cancel request
-      lvRequest.CancelRequest;
-
-      {$IFDEF DIOCP_DEBUG}
-      FOwner.logMessage('[%d]TIocpClientContext.CheckNextSendRequest.ExecuteSend return false',
-         [self.SocketHandle]);
-      {$ENDIF}
-      /// kick out the clientContext
-      RequestDisconnect('CheckNextSendRequest::lvRequest.checkSendNextBlock Fail', lvRequest);
-    
-      FOwner.ReleaseSendRequest(lvRequest);
-    end;
+  begin
+     InnerPostSendRequest(lvRequest);
   end;
 end;
 
@@ -3245,6 +3235,7 @@ begin
   FContext := nil;
   FBuf := nil;
   FLen := 0;
+  FDirectPost := False;
 end;
 
 procedure TIocpSendRequest.HandleResponse;
@@ -3304,7 +3295,10 @@ begin
 
       lvContext.DoSendRequestCompleted(Self);
 
-      lvContext.PostNextSendRequest;
+      if not self.DirectPost then
+      begin
+        lvContext.PostNextSendRequest;
+      end;
     end;
   finally
     // maybe release context
@@ -4077,6 +4071,34 @@ begin
   end;
 end;
 
+procedure TDiocpCustomContext.InnerPostSendRequest(lvRequest:TIocpSendRequest);
+begin
+  //FcurrSendRequest := lvRequest;
+  if lvRequest.ExecuteSend then
+  begin
+    if (FOwner.FDataMoniter <> nil) then
+    begin
+      FOwner.FDataMoniter.incPostSendObjectCounter;
+    end;
+  end else
+  begin
+    //FcurrSendRequest := nil;
+
+    /// cancel request
+    lvRequest.CancelRequest;
+
+    {$IFDEF DIOCP_DEBUG}
+    FOwner.logMessage('[%d]TIocpClientContext.CheckNextSendRequest.ExecuteSend return false',
+       [self.SocketHandle]);
+    {$ENDIF}
+    /// kick out the clientContext
+    RequestDisconnect('CheckNextSendRequest::lvRequest.checkSendNextBlock Fail', lvRequest);
+
+    // 会释放Buff
+    FOwner.ReleaseSendRequest(lvRequest);
+  end;
+end;
+
 
 
 function TDiocpCustomContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
@@ -4097,20 +4119,28 @@ begin
         lvRequest.SetBuffer(buf, len, pvBufReleaseType);
         lvRequest.Tag := pvTag;
         lvRequest.Data := pvTagData;
-        Result := InnerPostSendRequestAndCheckStart(lvRequest);
-        if not Result then
+        if FDirectPostRequest then
         begin
-          /// Push Fail unbinding buf
-          lvRequest.UnBindingSendBuffer;
+          lvRequest.DirectPost := true;
+          Result := True;
+          InnerPostSendRequest(lvRequest);
+        end else
+        begin
+          Result := InnerPostSendRequestAndCheckStart(lvRequest);
+          if not Result then
+          begin
+            /// Push Fail unbinding buf
+            lvRequest.UnBindingSendBuffer;
 
-          lvErrStr := Format(strSendPushFail, [SocketHandle,
-            FSendRequestLink.Count, FSendRequestLink.MaxSize]);
-          Self.RequestDisconnect(lvErrStr,
-            lvRequest);
+            lvErrStr := Format(strSendPushFail, [SocketHandle,
+              FSendRequestLink.Count, FSendRequestLink.MaxSize]);
+            Self.RequestDisconnect(lvErrStr,
+              lvRequest);
 
 
-          lvRequest.CancelRequest;
-          FOwner.ReleaseSendRequest(lvRequest);
+            lvRequest.CancelRequest;
+            FOwner.ReleaseSendRequest(lvRequest);
+          end;
         end;
       finally
         self.DecReferenceCounter('PostWSASendRequest', Self);

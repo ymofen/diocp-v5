@@ -564,6 +564,19 @@ function StrStrIgnoreCase(P, PSub: PChar): PChar;
 
 
 /// <summary>
+///   Ìî³äN¸ö×Ö·û
+/// </summary>
+function FillNChr(const ACount: Integer; AChr: Char = ' '): string;
+
+/// <summary>
+///   Ìî³ä×Ö·û´®
+///   StrAddPrefix('A01', 5, '0') = 00A01
+/// </summary>
+function StrAddPrefix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+
+
+/// <summary>
 ///  ×Ö·û×ª´óÐ´
 ///  * À´×Ôqdac.qstrings
 /// </summary>
@@ -2848,6 +2861,23 @@ begin
   begin
     Result := PDStringW(p)^;
   end;
+end;
+
+function FillNChr(const ACount: Integer; AChr: Char = ' '): string;
+var
+  i: Integer;
+begin
+  SetLength(Result, ACount);
+  for i := 1 to ACount do
+  begin
+    Result[i] := AChr;
+  end;
+end;
+
+function StrAddPrefix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+begin
+  Result := FillNChr(pvTotalWidth - length(s), pvFillChar) + s;
 end;
 
 constructor TDStringWBuilder.Create;

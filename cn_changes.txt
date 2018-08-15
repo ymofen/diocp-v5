@@ -243,5 +243,8 @@ DIOCP-v5 0.0.2
 
 53：2018-06-19 14:47:24
     1.添加ResponseAFileEx函数 处理ETag(文件缓存机制)
+	
+54: 2018-08-15 11:31:24
+    1. DiocpTcpClient.Context.DirectPost (添加直投模式)， 不经过队列直接投递到系统的IOCP发送队列
     
     

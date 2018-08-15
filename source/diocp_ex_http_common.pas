@@ -47,6 +47,7 @@ type
     FHttpVer: string;
     FMethod: string;
     FURI: string;
+    FURLParams: String;
   public
 
     constructor Create;
@@ -75,6 +76,7 @@ type
     ///   包含参数部分
     /// </summary>
     property URI: string read FURI write FURI;
+    property URLParams: String read FURLParams write FURLParams;
 
 
 
@@ -2222,7 +2224,13 @@ procedure THttpHeaderBuilder.Build(outHeader: TStrings);
 var
   i: Integer;
 begin
-  outHeader.Add(Format('%s %s %s', [FMethod, FURI, FHttpVer]));
+  if Length(FURLParams)=0 then
+  begin
+    outHeader.Add(Format('%s %s %s', [FMethod, FURI, FHttpVer]));
+  end else
+  begin
+    outHeader.Add(Format('%s %s %s', [FMethod, FURI + '?' + FURLParams, FHttpVer]));
+  end;
   for i := 0 to FHeaders.Count - 1 do
   begin
     outHeader.Add(FHeaders.Items[i].Name.AsString + ':' + FHeaders.Items[i].AsString)

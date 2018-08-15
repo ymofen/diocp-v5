@@ -255,6 +255,7 @@ begin
   //    Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
 
    FHeaderBuilder.URI := FURL.URI;
+   FHeaderBuilder.URLParams := FURL.ParamStr;
    //FHeaderBuilder.URI := FWsUrl;
    FHeaderBuilder.Method := 'GET';
 
