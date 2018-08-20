@@ -56,6 +56,7 @@ type
     btnParseDValue: TButton;
     btnSortDValue: TButton;
     btnDelete: TButton;
+    btnParseFile: TButton;
     procedure btnAdd1000Click(Sender: TObject);
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
@@ -76,6 +77,7 @@ type
     procedure btnParseAFileClick(Sender: TObject);
     procedure btnParseClick(Sender: TObject);
     procedure btnParseDValueClick(Sender: TObject);
+    procedure btnParseFileClick(Sender: TObject);
     procedure btnParseJSONClick(Sender: TObject);
     procedure btnRemovePathClick(Sender: TObject);
     procedure btnSaveClick(Sender: TObject);
@@ -684,6 +686,26 @@ begin
   end;
   mmoLog.Lines.Add('after delete');
   mmoLog.Lines.Add(JSONEncode(FDValue, false, True));
+end;
+
+procedure TForm1.btnParseFileClick(Sender: TObject);
+var
+  s:String;
+var
+  lvDValue, lvDValue2, lvAccountGroup:TDValue;
+begin
+  if not dlgOpenFile.Execute then exit;
+  s := LoadTextFromFile(dlgOpenFile.FileName);
+
+  lvDValue := TDValue.Create();
+  try
+    JSONParser(mmoData.Lines.Text, lvDValue);
+    ShowMessage(Format('解析成功, 节点数:%d', [lvDValue.Count]));
+  finally
+    lvDValue.Free;
+  end;
+
+
 end;
 
 procedure TForm1.btnSortDValueClick(Sender: TObject);

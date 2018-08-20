@@ -18,7 +18,7 @@ object Form1: TForm1
     Top = 0
     Width = 929
     Height = 288
-    ActivePage = tsMultiParts
+    ActivePage = tsJSON
     Align = alTop
     TabOrder = 0
     object tsJSON: TTabSheet
@@ -83,6 +83,15 @@ object Form1: TForm1
           Caption = 'btnSetJSON'
           TabOrder = 5
           OnClick = btnSetJSONClick
+        end
+        object btnParseFile: TButton
+          Left = 824
+          Top = 21
+          Width = 75
+          Height = 25
+          Caption = 'btnParseFile'
+          TabOrder = 6
+          OnClick = btnParseFileClick
         end
       end
       object mmoData: TMemo
