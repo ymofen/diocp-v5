@@ -699,7 +699,7 @@ begin
 
   lvDValue := TDValue.Create();
   try
-    JSONParser(mmoData.Lines.Text, lvDValue);
+    JSONParser(s, lvDValue);
     ShowMessage(Format('解析成功, 节点数:%d', [lvDValue.Count]));
   finally
     lvDValue.Free;

@@ -112,6 +112,10 @@ object Form1: TForm1
     object tsMultiParts: TTabSheet
       Caption = 'tsMultiParts'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object btnSave: TButton
         Left = 16
         Top = 16
@@ -143,6 +147,10 @@ object Form1: TForm1
     object tsMsgPack: TTabSheet
       Caption = 'tsMsgPack'
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object btnMsgPackTester: TButton
         Left = 24
         Top = 16
@@ -156,6 +164,10 @@ object Form1: TForm1
     object tsDValue: TTabSheet
       Caption = 'tsDValue'
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object btnDValue: TButton
         Left = 16
         Top = 32
@@ -269,6 +281,10 @@ object Form1: TForm1
     object tsDataSet: TTabSheet
       Caption = 'tsDataSet'
       ImageIndex = 4
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object btnConvertToDValue: TButton
         Left = 379
         Top = 3
@@ -331,6 +347,10 @@ object Form1: TForm1
     object tsLoadFile: TTabSheet
       Caption = 'tsLoadFile'
       ImageIndex = 5
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object btnLoadTextFrom: TButton
         Left = 40
         Top = 32
