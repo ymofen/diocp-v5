@@ -442,6 +442,11 @@ type
     procedure ResponseAFile(pvFileName:string);
 
     /// <summary>
+    ///   处理头
+    /// </summary>
+    function ResponseAFileETag(const pvFileName: string): Boolean;
+
+    /// <summary>
     ///   直接发送一个文件
     ///    响应类型
     ///    缓存
@@ -484,6 +489,7 @@ type
     ///   获取响应的数据长度(不包含头信息)
     /// </summary>
     function GetResponseLength: Integer;
+
     /// <summary>
     ///   请尽量使用SendResponse和DoResponseEnd来代替
     /// </summary>
@@ -1418,12 +1424,13 @@ begin
   ResponseAStream(lvFileStream, nil);
 end;
 
-procedure TDiocpHttpRequest.ResponseAFileEx(const pvFileName: string);
+function TDiocpHttpRequest.ResponseAFileETag(const pvFileName: string): Boolean;
 var
   lvFileStream:TFileStream;
   lvDateTime:TDateTime;
   lvETag, lvReqTag:string;
 begin
+  Result := False;
   if not FileExists(pvFileName) then
   begin
     ErrorResponse(404, STRING_EMPTY);
@@ -1437,11 +1444,22 @@ begin
     exit;
   end;
 
-  Response.ContentType := GetContentTypeFromFileExt(ExtractFileExt(pvFileName), 'text/html');
-  lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
-
   Response.Header.ForceByName('ETag').AsString := lvETag;
-  ResponseAStream(lvFileStream, nil);  
+
+  Result := true;
+
+end;
+
+procedure TDiocpHttpRequest.ResponseAFileEx(const pvFileName: string);
+var
+  lvFileStream:TFileStream;
+begin
+  if ResponseAFileETag(pvFileName) then
+  begin
+    Response.ContentType := GetContentTypeFromFileExt(ExtractFileExt(pvFileName), 'text/html');
+    lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
+    ResponseAStream(lvFileStream, nil);
+  end;
 end;
 
 procedure TDiocpHttpRequest.ResponseAStream(const pvStream: TStream;
