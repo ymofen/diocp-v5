@@ -960,18 +960,23 @@ begin
   end;
 
 
-  if lvMsg <> '' then lvMsg := lvMsg + ':' + pvData.FMsg else lvMsg := pvData.FMsg;
+  if lvMsg <> '' then
+  begin
+    lvMsg := lvMsg + ':' + pvData.FMsg
+  end else
+  begin
+    lvMsg := pvData.FMsg;
+  end;
 
 
   if FStrings.Count > FMaxLines then FStrings.Clear;
-
-  if Self.AppendLineBreak then
+  if FAddTimeInfo then
   begin
     FStrings.Add(lvMsg);
   end else
   begin
-    FStrings.Add(lvMsg);
-  end;
+    FStrings.Text := FStrings.Text + lvMsg;  
+  end;        
 end;
 
 procedure TLogFileAppender.AppendLog(pvData: TLogDataObject);

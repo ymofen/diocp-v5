@@ -1,3 +1,7 @@
+{
+   数据量大建议采用字符串拼接方式拼接JSON。
+   字符串拼接是最有效率的JSON打包方式
+}
 unit utils_dvalue_dataset;
 
 interface
@@ -113,7 +117,7 @@ begin
     ftBoolean:
       pvVal.Add(pvField.FieldName, pvField.AsBoolean);
     ftDate, ftDateTime, ftTime:
-      pvVal.Add(pvField.FieldName, FormatDateTime('yyyy-MM-dd hh:nn.ss.zzz', pvField.AsDateTime));
+      pvVal.Add(pvField.FieldName, FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvField.AsDateTime));
   else
     pvVal.Add(pvField.FieldName, pvField.AsString);
   end;

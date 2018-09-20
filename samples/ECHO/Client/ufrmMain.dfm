@@ -38,10 +38,6 @@ object frmMain: TfrmMain
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object pnlOpera_Top: TPanel
         Left = 0
         Top = 0
@@ -117,10 +113,6 @@ object frmMain: TfrmMain
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3
