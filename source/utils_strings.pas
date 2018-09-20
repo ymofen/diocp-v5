@@ -383,6 +383,28 @@ function SkipUntilEx(var p:PChar; pvChars: TSysCharSet): Integer;
 function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
 
 /// <summary>
+///   跳过N个字符
+/// </summary>
+function SkipN(p: PChar; n: Integer): PChar;
+
+
+/// <summary>
+///   跳过字符
+/// </summary>
+function StrSkipChars(const src :String; pvChars:TSysCharSet): String;
+
+
+/// <summary>
+///   从左边开始获取几个字符串
+/// </summary>
+function LeftStr(const s:string; count:Integer): String;
+
+/// <summary>
+///   从右边开始获取几个字符串
+/// </summary>
+function RightStr(const s:string; count:Integer): String;
+
+/// <summary>
 ///   跳过字符串
 ///   // p = pchar("abcabcefggg");
 ///   // 执行后 p = "efgg"
@@ -398,6 +420,8 @@ function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
 /// <param name="pvIgnoreCase"> 忽略大小写 </param>
 function SkipStr(var P:PChar; pvSkipStr: PChar; pvIgnoreCase: Boolean = true):
     Integer;
+
+
 
 
 /// <summary>
@@ -434,6 +458,7 @@ function LeftUntil(var p:PChar; pvChars: TSysCharSet): string; overload;
 /// <param name="p"> 源(字符串)开始的位置, 匹配成功会出现在pvChars的首次出现位置, 否则不会进行移动</param>
 function LeftUntil(var p: PChar; pvChars: TSysCharSet; var vLeftStr: string):
     Integer; overload;
+
 
 
 /// <summary>
@@ -934,7 +959,11 @@ begin
   l := Length(s);
   SetLength(lvStr, l);
   times := 0;
+  {$IFDEF MSWINDOWS}
+  for i := 1 to l do
+  {$ELSE}
   for i := Low(s) to high(s) do
+  {$ENDIF}
   begin
     if not CharInSet(s[i], pvCharSets) then
     begin
@@ -2940,6 +2969,53 @@ begin
 
   SetLength(Result, idx + 1);
 
+end;
+
+function StrSkipChars(const src :String; pvChars:TSysCharSet): String;
+var
+  lvPtr:PChar;
+begin
+  lvPtr := PChar(src);
+  SkipChars(lvPtr, pvChars);
+  Result := lvPtr;
+end;
+
+function RightStr(const s:string; count:Integer): String;
+var
+  lvPtr :PChar;
+  l:Integer;
+begin
+  l := Length(s);
+  if l < count then
+  begin
+    Result :=s ;
+  end else
+  begin
+    lvPtr := PChar(s);
+    Result := SkipN(lvPtr, l - count);
+  end;
+end;
+
+function SkipN(p: PChar; n: Integer): PChar;
+var
+  i:Integer;
+begin
+  i := 0;
+  while (p^ <> #0) and (i<n) do
+  begin
+    Inc(P);
+    Inc(i);
+  end;
+  Result := P;   
+end;
+
+function LeftStr(const s:string; count:Integer): String;
+begin
+  Result := s;
+  if Length(Result) > count then
+  begin
+    SetLength(Result, count);
+  end;  
 end;
 
 constructor TDStringWBuilder.Create;
