@@ -934,7 +934,7 @@ begin
   l := Length(s);
   SetLength(lvStr, l);
   times := 0;
-  for i := 1 to l do
+  for i := Low(s) to high(s) do
   begin
     if not CharInSet(s[i], pvCharSets) then
     begin
