@@ -7,7 +7,7 @@ uses
   utils_strings, SysUtils, utils_base64, utils_byteTools;
 
 const
-  MHSTR: AnsiString = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+  //MHSTR: AnsiString = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
   OPT_CONTINUE:BYTE = $00;
   OPT_TEXT:Byte     = $01;

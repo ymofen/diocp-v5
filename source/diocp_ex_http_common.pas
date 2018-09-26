@@ -2244,6 +2244,7 @@ var
 begin
   lvHeader := TStringList.Create;
   try
+    lvHeader.LineBreak := #13#10;
     Build(lvHeader); 
     Result := lvHeader.Text;
   finally
