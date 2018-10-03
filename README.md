@@ -29,6 +29,11 @@ diocp5
 	  4>. Http服务逻辑处理是由diocpTask进行逻辑处理的，diocpTask默认的工作线程数量: cpu * 2 -1，
 	      可以引用diocp_task.pas, 在初始化app时进行设定 iocpTaskManager.setWorkerCount(50);
 	      可以在APP编译条件中指定QDAC_QWorker, 切换使用qworkers线程池
+        
+## 注意的一些事情
+### HTTP协议
+#### 关于ResponseStream, ResponesAFile
+如果使用这两个过程响应Http, Diocp会分块发送数据，直达发送所有的数据发送完成，然后进行判断是否需要关闭连接。所以您不需要进行其他的响应(SendResponse), 也不需要执行ResponseEnd，也不能提前把Stream进行释放，Diocp的Http会接管处理他。
 
 
 ## 目录说明:

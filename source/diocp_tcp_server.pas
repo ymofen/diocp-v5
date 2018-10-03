@@ -3880,6 +3880,7 @@ var
 begin
   if not FListenSocket.SocketValid then Exit;
   j := 0;
+  i :=0;
   Assert(FOwner <> nil);
 
   try
