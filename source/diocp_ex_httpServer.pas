@@ -143,6 +143,8 @@ type
   private
     __free_flag:Integer;
 
+    FRefCounter:Integer;
+
     FDecodeState:Integer;
     FDecodeMsg:string;
 
@@ -237,6 +239,16 @@ type
 
     function CheckIsRangeRequest: Boolean;
 
+    /// <summary>
+    ///   会阻止request释放，和连接投递接收请求
+    /// </summary>
+    procedure AddRef;
+
+    /// <summary>
+    ///   与AddRef配套使用
+    /// </summary>
+    function DecRef: Boolean;
+
 
     /// <summary>
     ///   设置Request暂时不进行释放
@@ -315,6 +327,8 @@ type
     procedure SaveToFile(pvFile:string);
 
     procedure ContentSaveToFile(pvFile:String);
+
+    function GetBodyAsString: String;
 
     property ContentType: String read GetContentType;
 
@@ -1050,6 +1064,7 @@ begin
   FInnerWebSocketFrame := TDiocpWebSocketFrame.Create;
   FResponse := TDiocpHttpResponse.Create();
   FWebSocketContentBuffer := TDBufferBuilder.Create;
+  FRefCounter := 0;
 
   //FRequestParamsList := TStringList.Create; // TODO:创建存放http参数的StringList
 end;
@@ -1089,6 +1104,12 @@ begin
   finally
     FLocker.Leave;
   end;
+end;
+
+procedure TDiocpHttpRequest.AddRef;
+begin
+  Self.Connection.IncRecvRef;  
+  AtomicIncrement(self.FRefCounter);  
 end;
 
 procedure TDiocpHttpRequest.DoResponseEnd;
@@ -1224,6 +1245,24 @@ begin
   FInnerRequest.DecodeURLParam(pvUseUtf8Decode);
 end;
 
+function TDiocpHttpRequest.DecRef: Boolean;
+var
+  lvConnection:TDiocpHttpClientContext;
+begin
+  // 预先存临时变量，避免close后，connection改变
+  lvConnection := Self.Connection;
+  if AtomicDecrement(Self.FRefCounter) = 0 then
+  begin
+    Self.Close;
+    Result := True;
+  end;
+
+  // 后执行，避免先投递了接收请求
+  lvConnection.DecRecvRef;
+
+
+end;
+
 procedure TDiocpHttpRequest.ErrorResponse(pvCode:Integer; pvMsg:String);
 begin
   self.Connection.FResponseState := Response_state_err;
@@ -1238,6 +1277,21 @@ begin
   end;
   SendResponse();
   DoResponseEnd();    
+end;
+
+function TDiocpHttpRequest.GetBodyAsString: String;
+var
+  lvCharset:String;
+begin
+  lvCharset := Self.GetCharset;
+  if SameText(lvCharset, 'utf-8') then
+  begin
+    Result := self.ContentBody.DecodeUTF8;
+  end else
+  begin
+    Result := self.ContentBody.ToString();
+  end;
+
 end;
 
 function TDiocpHttpRequest.GetContentLength: Int64;
@@ -2126,10 +2180,14 @@ begin
     {$IFDEF DIOCP_DEBUG}
     lvObj.CheckThreadOut;
     {$ENDIF}
-    // 归还HttpRequest到池
-    if not lvObj.FReleaseLater then
+    if (lvObj.FRefCounter > 0) then
     begin
-      //lvObj.CheckThreadOut;
+
+    end else if lvObj.FReleaseLater then             
+    begin
+    
+    end else
+    begin
       lvObj.Close;
     end;
   end;

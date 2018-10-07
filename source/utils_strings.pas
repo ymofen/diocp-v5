@@ -258,6 +258,8 @@ type
 
     function DecodeUTF8: string;
 
+    function ToString: String;
+
     function ToRAWString: RAWString;
 
     /// <summary>
@@ -561,6 +563,9 @@ function StringsValueOfName(pvStrings: TStrings; const pvName: string;
 function GetStrValueOfName(const pvStr, pvName: string; pvSplitChars,
     pvEndChars: TSysCharSet): string;
 
+function PosStr(const sub, s: string): Integer;
+
+function PosWStr(const sub, s: DStringW): Integer;
 
 /// <summary>
 ///   查找PSub在P中出现的第一个位置
@@ -575,6 +580,8 @@ function GetStrValueOfName(const pvStr, pvName: string; pvSplitChars,
 /// <param name="P"> 要开始查找(字符串) </param>
 /// <param name="PSub"> 要搜(字符串) </param>
 function StrStr(P:PChar; PSub:PChar): PChar;
+
+
 
 /// <summary>
 ///   查找PSub在P中出现的第一个位置
@@ -753,7 +760,7 @@ function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
 
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
-function PosWStr(sub: DStringW; const s: DStringW): Integer;
+
 
 
 
@@ -2505,6 +2512,22 @@ begin
 {$ENDIF}
 end;
 
+function TDBufferBuilder.ToString: String;
+begin
+  CheckNeedSize(2);
+  FData[FSize] := 0;
+  FData[FSize + 1] := 0; 
+{$IFDEF MSWINDOWS}
+  {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
+  TEncoding.Default.GetString(FData, 0, self.Length);
+  {$ELSE}
+  Result := StrPas(PAnsiChar(@FData[0]));
+  {$IFEND >=XE5}
+{$ELSE}  
+  Result := TEncoding.Default.GetString(FData, 0, self.Length);
+{$ENDIF}
+end;
+
 function TDBufferBuilder.Write(const Buffer; Count: Longint): Longint;
 begin
   if FBufferLocked then
@@ -2765,7 +2788,7 @@ begin
   end;
 end;
 
-function PosWStr(sub: DStringW; const s: DStringW): Integer;
+function PosWStr(const sub, s: DStringW): Integer;
 begin
   Result := Pos(sub, s);
 end;
@@ -3016,6 +3039,11 @@ begin
   begin
     SetLength(Result, count);
   end;  
+end;
+
+function PosStr(const sub, s: string): Integer;
+begin
+  Result := Pos(sub, s);
 end;
 
 constructor TDStringWBuilder.Create;
