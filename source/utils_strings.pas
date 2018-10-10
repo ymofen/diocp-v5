@@ -735,6 +735,8 @@ function GetCurrentThreadID: Cardinal;
 function ObjectHexAddr(pvObj:TObject): String;
 function ObjectIntStrAddr(pvObj:TObject): String;
 
+function ToUtc(pvDateTime:TDateTime): TDateTime;
+
 function DateTimeString(pvDateTime:TDateTime): string; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 function NowString: String; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
@@ -3044,6 +3046,24 @@ end;
 function PosStr(const sub, s: string): Integer;
 begin
   Result := Pos(sub, s);
+end;
+
+function IncMinute(const AValue: TDateTime;
+  const ANumberOfMinutes: Int64): TDateTime;
+begin
+  Result := ((AValue * MinsPerDay) + ANumberOfMinutes) / MinsPerDay;
+end;
+
+function ToUtc(pvDateTime:TDateTime): TDateTime;
+{$IFDEF MSWINDOWS}
+var
+  pTime: _TIME_ZONE_INFORMATION;
+{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  GetTimeZoneInformation(pTime);//获取时区
+  Result := IncMinute(pvDateTime, pTime.Bias);
+{$ENDIF}
 end;
 
 constructor TDStringWBuilder.Create;

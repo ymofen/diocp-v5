@@ -81,6 +81,7 @@ type
     FTaskData:Pointer;
     procedure DoCleanUp;
     procedure InnerDoTask;
+    procedure InnerDoTaskAction;
   protected
     procedure HandleResponse; override;
     function GetStateINfo: String; override;
@@ -286,7 +287,7 @@ begin
   begin
     try
       if not FEnable then Exit;
-      TIocpTaskRequest(AMsg.WPARAM).InnerDoTask();
+      TIocpTaskRequest(AMsg.WPARAM).InnerDoTaskAction();
     finally
       if AMsg.LPARAM <> 0 then
         TEvent(AMsg.LPARAM).SetEvent;
@@ -737,27 +738,32 @@ end;
 procedure TIocpTaskRequest.InnerDoTask;
 begin
   try
-    if Assigned(FOnTaskWork) then
-    begin
-      FOnTaskWork(Self);
-    end else if Assigned(FOnTaskWorkProc) then
-    begin
-      FOnTaskWorkProc(Self);
-    end else if Assigned(FOnTaskWorkStrData) then
-    begin
-      FOnTaskWorkStrData(FStrData);
-    end else if Assigned(FOnTaskWorkActionIdData) then
-    begin
-      FOnTaskWorkActionIdData(FActionID, FStrData);
-    end else if Assigned(FOnTaskWorkNoneData) then
-    begin
-      FOnTaskWorkNoneData();
-    end;
+    InnerDoTaskAction();
   except
     on E:Exception do
     begin
       SafeWriteFileMsg('Task¬ﬂº≠¥¶¿Ì“Ï≥£:' + E.Message, 'DIOCP_TASK_DEBUG');
     end;
+  end;
+end;
+
+procedure TIocpTaskRequest.InnerDoTaskAction;
+begin 
+  if Assigned(FOnTaskWork) then
+  begin
+    FOnTaskWork(Self);
+  end else if Assigned(FOnTaskWorkProc) then
+  begin
+    FOnTaskWorkProc(Self);
+  end else if Assigned(FOnTaskWorkStrData) then
+  begin
+    FOnTaskWorkStrData(FStrData);
+  end else if Assigned(FOnTaskWorkActionIdData) then
+  begin
+    FOnTaskWorkActionIdData(FActionID, FStrData);
+  end else if Assigned(FOnTaskWorkNoneData) then
+  begin
+    FOnTaskWorkNoneData();
   end;
 end;
 

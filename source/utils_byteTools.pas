@@ -46,7 +46,11 @@ type
      /// </summary>
      class function HexToBin(pvHexStr:String; buf:Pointer):Integer;
 
-     class function HexStrToBytes(pvHexStr:String): TBytes;
+     class function HexStrToBytes(pvHexStr:String): TBytes; overload;
+
+     class function HexStrToBytes(pvHexStr:String; outBuf:Pointer):Integer; overload;
+     
+     
 
      /// <summary>
      ///  16进制字符到二进制
@@ -316,6 +320,22 @@ begin
   SetLength(Result, l);
   r := HexToBin(lvStr, @Result[0]);
   Assert(r = l, 'TByteTools.HexStrToBytes');
+end;
+
+class function TByteTools.HexStrToBytes(pvHexStr: String;
+  outBuf: Pointer): Integer;
+var
+  lvStr:String;
+  l, r:Integer;
+begin
+  lvStr := StringReplace(pvHexStr, ' ', '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #13, '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #10, '', [rfReplaceAll]);
+  l := Length(lvStr);
+  l := l shr 1;
+  r := HexToBin(lvStr, outBuf);
+  Assert(r = l, 'TByteTools.HexStrToBytes');
+  Result := r;  
 end;
 
 class function TByteTools.HexToBin(pvHexStr: String;
