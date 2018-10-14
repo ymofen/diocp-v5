@@ -155,6 +155,7 @@ procedure ClearBufferPool(buffPool:PBufferPool);
 
 function GetBuffer(ABuffPool:PBufferPool): PByte;{$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
 
+// 获取一块内存, 可以通过AddRef和ReleaseRef进行引用计数释放
 function GetBuffer(pvSize:Integer): Pointer;{$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
 
 procedure FreeBuffer(const pvBuffer:PByte; const pvHint: string; pvReleaseAttachDataAtEnd:Boolean=True);overload; {$IFDEF HAVE_INLINE} inline;{$ENDIF}

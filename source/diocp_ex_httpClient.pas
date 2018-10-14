@@ -609,7 +609,6 @@ var
 
 begin
   FHttpBuffer.DoCleanUp;
-{$IFDEF MSWINDOWS}
 
   while True do
   begin
@@ -619,7 +618,7 @@ begin
     begin
       // 对方被关闭
       Close;
-      raise TDiocpSocketSendException.Create('与服务器断开连接！');
+      raise TDiocpSocketRecvException.Create('与服务器断开连接！');
     end;
     x := DecodeHttp;
     if x = 1 then
@@ -627,28 +626,7 @@ begin
       Break;
     end;
   end;
-{$ELSE}
-  while True do
-  begin
-    {$IFDEF MACOS}
-    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
-    {$ELSE}
-    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE, FTimeOut);
-    {$ENDIF}
-    CheckSocketRecvResult(l);
-    if l = 0 then
-    begin
-      // 对方被关闭
-      Close;
-      raise TDiocpSocketSendException.Create('与服务器断开连接！');
-    end;
-    x := DecodeHttp;
-    if x = 1 then
-    begin
-      Break;
-    end;
-  end;
-{$ENDIF}
+
 
 
   FLastActivity := GetTickCount;
