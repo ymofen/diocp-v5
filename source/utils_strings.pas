@@ -406,6 +406,7 @@ function LeftStr(const s:string; count:Integer): String;
 /// </summary>
 function RightStr(const s:string; count:Integer): String;
 
+
 /// <summary>
 ///   Ìø¹ý×Ö·û´®
 ///   // p = pchar("abcabcefggg");
@@ -608,6 +609,13 @@ function FillNChr(const ACount: Integer; AChr: Char = ' '): string;
 ///   StrAddPrefix('A01', 5, '0') = 00A01
 /// </summary>
 function StrAddPrefix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+
+/// <summary>
+///   Ìî³ä×Ö·û´®
+///   StrAddSuffix('A01', 5, '0') = 00A01
+/// </summary>
+function StrAddSuffix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
     String;
 
 
@@ -3034,7 +3042,7 @@ begin
   Result := P;   
 end;
 
-function LeftStr(const s:string; count:Integer): String;
+function LeftStr(const s:String; count:Integer): string;
 begin
   Result := s;
   if Length(Result) > count then
@@ -3064,6 +3072,12 @@ begin
   GetTimeZoneInformation(pTime);//»ñÈ¡Ê±Çø
   Result := IncMinute(pvDateTime, pTime.Bias);
 {$ENDIF}
+end;
+
+function StrAddSuffix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+begin
+  Result :=s + FillNChr(pvTotalWidth - length(s), pvFillChar);
 end;
 
 constructor TDStringWBuilder.Create;

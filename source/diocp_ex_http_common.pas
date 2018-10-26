@@ -2244,7 +2244,9 @@ var
 begin
   lvHeader := TStringList.Create;
   try
+    {$IF RTLVersion >= 18}
     lvHeader.LineBreak := #13#10;
+    {$IFEND <D2007}
     Build(lvHeader); 
     Result := lvHeader.Text;
   finally
