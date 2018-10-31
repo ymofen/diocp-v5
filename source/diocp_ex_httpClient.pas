@@ -232,7 +232,11 @@ implementation
 
 { TDiocpHttpClient }
 const
+{$IFDEF DEBUG}
+  BLOCK_SIZE = 256;
+{$ELSE}
   BLOCK_SIZE = 1024 * 50;
+{$ENDIF}
 
 resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
@@ -528,20 +532,28 @@ end;
 procedure TDiocpHttpClient.InnerExecuteRecvResponse;
 var
   lvRawHeader, lvBytes:TBytes;
-  x, l:Integer;
-  lvTempStr, lvRawHeaderStr, lvCookie:String;
+  x, nBufLength:Integer;
+  lvTempStr, lvRawHeaderStr, lvCookie, lvTransferEncoding:String;
   lvBuffer:PByte;
+  lvIsChunked:Boolean;
 
   lvTempBuffer:array[0.. BLOCK_SIZE -1] of Byte;
 
   function DecodeHttp():Integer;
   var
-    r, i:Integer;
+    r, n, l:Integer;
+    vByte:byte;
   begin
     Result := 0;
-    for i := 0 to l - 1 do
+    n := 0;
+    for n := 0 to nBufLength - 1 do
     begin
-      r := FHttpBuffer.InputBuffer(lvTempBuffer[i]);
+      vByte := lvTempBuffer[n];
+//      if n = 0 then
+//      begin
+//        vByte := Integer(vByte) + 1 -1;
+//      end;
+      r := FHttpBuffer.InputBuffer(vByte);
       Inc(FResponseSize);
       if r = 1 then
       begin
@@ -559,17 +571,23 @@ var
         FResponseContentEncoding :=StringsValueOfName(FResponseHeader, 'Content-Encoding', [':'], True);
 
         lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
+        lvTransferEncoding := StringsValueOfName(FResponseHeader, 'Transfer-Encoding', [':'], True);
 
-
-        
-        l := StrToIntDef(lvTempStr, 0);
-        if l = 0  then
+        FHttpBuffer.IsChunked := lvTransferEncoding = 'chunked';
+        if FHttpBuffer.IsChunked then
         begin
-          Result := 1;
-          Break;
+          FHttpBuffer.SetChunkedBegin;     // 开启Chunked解码
         end else
         begin
-          FHttpBuffer.ContentLength := l;
+          if Length(lvTempStr) = 0 then l := 0 else l := StrToIntDef(lvTempStr, 0);
+          if l = 0  then
+          begin
+            Result := 1;
+            Break;
+          end else
+          begin
+            FHttpBuffer.ContentLength := l;
+          end;
         end;
       end else if r = -2 then               
       begin
@@ -612,9 +630,9 @@ begin
 
   while True do
   begin
-    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
-    CheckSocketRecvResult(l);
-    if l = 0 then
+    nBufLength := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
+    CheckSocketRecvResult(nBufLength);
+    if nBufLength = 0 then
     begin
       // 对方被关闭
       Close;

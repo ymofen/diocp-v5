@@ -311,11 +311,17 @@ type
     // 接收数据的Builder
     FRecvBuilder: TDBufferBuilder;
 
+    FTempBuilder: TDBufferBuilder;
+
     FContentBuilder: TDBufferBuilder;
     FContentLength: Int64;
+    FChunkLength: Integer;   // 当前Chunk长度
+    FChunkSize: Integer;     // 当前接收长度
     FHeaderBuilder: TDBufferBuilder;
 
     FRecvSize: Integer;
+
+    FIsChunked: Boolean;
 
     /// <summary>
     /// 解码状态
@@ -351,12 +357,15 @@ type
     /// <param name="pvByte"> (Byte) </param>
     function InputBuffer(pvByte: Byte): Integer;
 
+    procedure SetChunkedBegin();
+
     property ContentBuilder: TDBufferBuilder read FContentBuilder;
     /// <summary>
     /// 需要接收的数据长度
     /// </summary>
     property ContentLength: Int64 read FContentLength write FContentLength;
     property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
+    property IsChunked: Boolean read FIsChunked write FIsChunked;
 
   end;
 
@@ -1995,12 +2004,15 @@ constructor THttpBuffer.Create;
 begin
   FContentBuilder := TDBufferBuilder.Create;
   FHeaderBuilder := TDBufferBuilder.Create;
+  FTempBuilder := TDBufferBuilder.Create;
 end;
 
 destructor THttpBuffer.Destroy;
 begin
   FreeAndNil(FContentBuilder);
   FreeAndNil(FHeaderBuilder);
+  if FTempBuilder <> nil then
+    FTempBuilder.Free;
   inherited Destroy;
 end;
 
@@ -2011,6 +2023,9 @@ begin
   if FHeaderBuilder <> nil then
     FHeaderBuilder.Clear;
 
+  if FTempBuilder <> nil then
+    FTempBuilder.Clear;
+
   FRecvBuilder := FHeaderBuilder;
 
   FRecvSize := 0;
@@ -2020,6 +2035,8 @@ begin
 end;
 
 function THttpBuffer.InputBuffer(pvByte: Byte): Integer;
+var
+  str:string;
 
   procedure InnerCaseZero;
   begin
@@ -2035,6 +2052,19 @@ function THttpBuffer.InputBuffer(pvByte: Byte): Integer;
     end;
   end;
 
+  procedure InnerCheckRecvChunkedHeadder;
+  begin
+    if pvByte = 13 then
+    begin
+      inc(FDecodeState);
+    end;
+
+    if FRecvBuilder.Size >= 20 then
+    begin // 长度行——太长
+      FFlag := 0;
+      Result := -2;
+    end;
+  end;
 begin
   Result := 0;
   if FFlag = 0 then
@@ -2047,6 +2077,7 @@ begin
   end;
 
   FRecvBuilder.Append(pvByte);
+  Inc(FChunkSize);
 
   case FDecodeState of
     0:
@@ -2099,7 +2130,69 @@ begin
           exit;
         end;
       end;
+    5:      //  chunked_recv    通过解析头后，调用SetChunkedBegin开启
+      begin
+        InnerCheckRecvChunkedHeadder;
+      end;
+    6:
+      begin   //  chunked_recv_10
+        if pvByte = 10 then
+        begin // Header
+          str := Trim(FTempBuilder.DecodeUTF8);
+          if Length(str) = 0 then
+          begin            // 不正常完成，应该为0
+            Result := 2; // 接收完成
+            FFlag := 0; // 重新开始请求Buffer进行解码
+          end else
+          begin
+            if str = '0' then
+            begin
+              FChunkLength := 2;
+              FChunkSize := 0;
+              FDecodeState := 8; // 还有两个字符#13#10
+              FRecvBuilder := FTempBuilder;
+            end else
+            begin
+              FChunkLength := StrToInt('$' + str) + 2;  // 有个尾巴 #13#10
+              FChunkSize := 0;
+              Inc(FDecodeState);  // 接收数据
+              FRecvBuilder := FContentBuilder;
+            end;
+          end;
+          exit;
+        end else
+        begin     // 有问题
+          Result := -1;
+          FFlag := 0;
+          Exit;
+        end;
+      end;
+    7:
+      begin
+        if FChunkSize = FChunkLength then
+        begin
+          FRecvBuilder.DecBuf(2);  // 去掉#13#10
+          Result := 0; // ContentAsRAWString
+          SetChunkedBegin;        // 重新去接收
+          exit;
+        end;
+      end;
+    8:
+      begin
+        if FChunkSize = FChunkLength then  // 有#13#10
+        begin                  // 解码完成  正常结束
+          Result := 2; // 接收完成
+          FFlag := 0; // 重新开始请求Buffer进行解码
+        end;
+      end;
   end;
+end;
+
+procedure THttpBuffer.SetChunkedBegin;
+begin
+  FTempBuilder.Clear;
+  FRecvBuilder := FTempBuilder;  // 接收头部
+  FDecodeState := 5; 
 end;
 
 constructor THttpRange.Create;

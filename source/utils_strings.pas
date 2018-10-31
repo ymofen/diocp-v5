@@ -192,6 +192,7 @@ type
   public
     constructor Create;
     procedure Clear;
+    procedure DecBuf(n:Integer);  // ºı…Ÿ ˝æ›
     function Append(const aByte:Byte): TDBufferBuilder; overload;
     function Append(const w:Word):TDBufferBuilder; overload;
     function Append(const c: Char): TDBufferBuilder; overload;
@@ -2306,6 +2307,11 @@ begin
 //  ZeroMemory(@FData[0], FCapacity);
 //  {$ENDIF}
 //  {$ENDIF}
+end;
+
+procedure TDBufferBuilder.DecBuf(n: Integer);
+begin
+  Dec(FSize, n);
 end;
 
 function TDBufferBuilder.DecodeUTF8: string;
