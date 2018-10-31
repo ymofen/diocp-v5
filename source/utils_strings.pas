@@ -406,6 +406,11 @@ function LeftStr(const s:string; count:Integer): String;
 /// </summary>
 function RightStr(const s:string; count:Integer): String;
 
+/// <summary>
+///   右边的第一个字符
+/// </summary>
+function RightChar(const s:string): Char;
+
 
 /// <summary>
 ///   跳过字符串
@@ -502,6 +507,9 @@ function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet;
 
 function SplitNToArrayStr(const s: String; pvSpliterChars: TSysCharSet; pvMaxN:
     Integer; pvSkipSpliterChars: Boolean = false): TArrayStrings;
+
+function JoinArrayStrings(const pvArrayStrings: TArrayStrings; const
+    pvSplitStr: DStringW): DStringW;
 
 
 /// <summary>
@@ -617,6 +625,12 @@ function StrAddPrefix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
 /// </summary>
 function StrAddSuffix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
     String;
+
+/// <summary>
+///   确定最后一个字符为suffixChar否则添加
+/// </summary>
+function CheckAddSuffix(const s: string; pvCheckChars: TSysCharSet; suffixChar:
+    Char): string;
 
 
 /// <summary>
@@ -3078,6 +3092,57 @@ function StrAddSuffix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
     String;
 begin
   Result :=s + FillNChr(pvTotalWidth - length(s), pvFillChar);
+end;
+
+function JoinArrayStrings(const pvArrayStrings: TArrayStrings; const
+    pvSplitStr: DStringW): DStringW;
+var
+  i: Integer;
+  lvSB:TDStringWBuilder;
+begin
+  lvSB := TDStringWBuilder.Create;
+  try
+    for i := 0 to length(pvArrayStrings) - 1 do
+    begin
+      if (i > 0) then lvSB.Append(pvSplitStr);
+      lvSB.Append(pvArrayStrings[i]);
+
+    end;
+    Result := lvSB.ToString;
+  finally
+    lvSB.Free;
+  end;
+end;
+
+function RightChar(const s:string): Char;
+var
+  lvPtr :PChar;
+  l:Integer;
+begin
+  l := Length(s);
+  if l = 0 then
+  begin
+    Result := #0;
+  end else
+  begin
+    lvPtr := PChar(s);
+    lvPtr := SkipN(lvPtr, l -1);
+    Result := lvPtr^
+  end;
+
+end;
+
+function CheckAddSuffix(const s: string; pvCheckChars: TSysCharSet; suffixChar:
+    Char): string;
+begin
+  if RightChar(s) in pvCheckChars then
+  begin
+    Result := s;
+  end else
+  begin
+    Result := s + suffixChar;
+  end;
+
 end;
 
 constructor TDStringWBuilder.Create;

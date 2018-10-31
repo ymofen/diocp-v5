@@ -453,7 +453,7 @@ type
     /// <summary>
     ///   直接发送一个文件
     /// </summary>
-    procedure ResponseAFile(pvFileName:string);
+    procedure ResponseAFile(const pvFileName: string);
 
     /// <summary>
     ///   处理头
@@ -1470,7 +1470,7 @@ begin
   FDecodeState := Result;
 end;
 
-procedure TDiocpHttpRequest.ResponseAFile(pvFileName: string);
+procedure TDiocpHttpRequest.ResponseAFile(const pvFileName: string);
 var
   lvFileStream:TFileStream;
 begin
