@@ -2004,15 +2004,17 @@ constructor THttpBuffer.Create;
 begin
   FContentBuilder := TDBufferBuilder.Create;
   FHeaderBuilder := TDBufferBuilder.Create;
-  FTempBuilder := TDBufferBuilder.Create;
+  FTempBuilder := TDBufferBuilder.Create; 
 end;
 
 destructor THttpBuffer.Destroy;
 begin
-  FreeAndNil(FContentBuilder);
-  FreeAndNil(FHeaderBuilder);
+  if FContentBuilder <> nil then
+    FreeAndNil(FContentBuilder);
+  if FHeaderBuilder <> nil then
+    FreeAndNil(FHeaderBuilder);
   if FTempBuilder <> nil then
-    FTempBuilder.Free;
+    FreeAndNil(FTempBuilder);
   inherited Destroy;
 end;
 
