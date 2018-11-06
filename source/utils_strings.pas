@@ -786,6 +786,12 @@ function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
 
+function HashStr(const pvStrData:String): Integer;
+function HashPtr(const p:Pointer;l:Integer): Integer;
+
+function NewIDString: String;
+
+function RandomVal(const max:Integer): Cardinal;
 
 
 
@@ -813,6 +819,8 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 function InterlockedExchangeAdd(Addend: PLongint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
 function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
 {$IFEND <D2007}
+
+
 
 implementation
 
@@ -3148,7 +3156,60 @@ begin
   begin
     Result := s + suffixChar;
   end;
+end;
 
+function HashPtr(const p:Pointer;l:Integer): Integer;
+var
+  ps:PInteger;
+  lr:Integer;
+begin
+  Result:=0;
+  if l>0 then
+  begin
+    ps:=p;
+    lr:=(l and $03);      //check length is multi 4
+    l:=(l and $FFFFFFFC); //
+    while l>0 do
+    begin
+      Result:=((Result shl 5) or (Result shr 27)) xor ps^;
+      Inc(ps);
+      Dec(l,4);
+    end;
+    if lr<>0 then
+    begin
+      l:=0;
+      Move(ps^,l,lr);
+      Result:=((Result shl 5) or (Result shr 27)) xor l;
+    end;
+  end;
+end;
+
+function HashStr(const pvStrData:String): Integer;
+begin
+  Result := HashPtr(PChar(pvStrData), Length(pvStrData) * SizeOf(Char));
+end;
+
+function NewIDString: String;
+var
+  lvGuid:TGUID;
+begin
+  CreateGUID(lvGuid);
+  SetLength(Result, SizeOf(TGUID) * 2);
+  BinToHex(@lvGuid, PChar(Result), SizeOf(TGUID));
+end;
+
+function RandomVal(const max:Integer): Cardinal;
+var
+  lvGuid:TGUID;
+begin
+  CreateGUID(lvGuid);
+
+
+  Result := Cardinal(HashPtr(@lvGuid, SizeOf(TGUID)));
+  if max > 0 then
+  begin
+    Result := Result mod max;
+  end;
 end;
 
 constructor TDStringWBuilder.Create;
