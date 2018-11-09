@@ -789,7 +789,10 @@ procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 function HashStr(const pvStrData:String): Integer;
 function HashPtr(const p:Pointer;l:Integer): Integer;
 
-function NewIDString: String;
+function NewIDString: DStringW;
+
+procedure BufferToHex(pvBuffer: Pointer; outText: PDCharW; BufSize: Integer);
+
 
 function RandomVal(const max: Cardinal): Cardinal;
 
@@ -818,6 +821,8 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 
 function InterlockedExchangeAdd(Addend: PLongint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
 function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
+
+
 {$IFEND <D2007}
 
 
@@ -3183,18 +3188,36 @@ begin
   end;
 end;
 
+procedure BufferToHex(pvBuffer: Pointer; outText: PDCharW; BufSize: Integer);
+const
+  Convert: array[0..15] of WideChar = '0123456789ABCDEF';
+var
+  I: Integer;
+  Buffer:PByte;
+begin
+  Buffer:=PByte(pvBuffer);
+
+  for I := 0 to BufSize - 1 do
+  begin
+    outText[0] := Convert[Byte(Buffer^) shr 4];
+    outText[1] := Convert[Byte(Buffer^) and $F];
+    Inc(outText, 2);
+    Inc(Buffer);
+  end;
+end;
+
 function HashStr(const pvStrData:String): Integer;
 begin
   Result := HashPtr(PChar(pvStrData), Length(pvStrData) * SizeOf(Char));
 end;
 
-function NewIDString: String;
+function NewIDString: DStringW;
 var
   lvGuid:TGUID;
 begin
   CreateGUID(lvGuid);
   SetLength(Result, SizeOf(TGUID) * 2);
-  BinToHex(@lvGuid, PChar(Result), SizeOf(TGUID));
+  BufferToHex(@lvGuid, PDCharW(Result), SizeOf(TGUID));
 end;
 
 function RandomVal(const max: Cardinal): Cardinal;
