@@ -791,7 +791,7 @@ function HashPtr(const p:Pointer;l:Integer): Integer;
 
 function NewIDString: String;
 
-function RandomVal(const max:Integer): Cardinal;
+function RandomVal(const max: Cardinal): Cardinal;
 
 
 
@@ -1722,7 +1722,6 @@ end;
 function StartWith(P:PChar; pvStart:PChar; pvIgnoreCase: Boolean = true):
     Boolean;
 var
-  lvSubUP: String;
   PSubUP : PChar;
 begin
   Result := False;
@@ -2089,11 +2088,14 @@ var
 begin
   l := Length;
   SetLength(Result, l);
-{$IFDEF UNICODE}
-  Move(FData[0], PChar(Result)^, l shl 1);
-{$ELSE}
-  Move(FData[0], PChar(Result)^, l);
-{$ENDIF}
+  if l > 0 then
+  begin
+  {$IFDEF UNICODE}
+    Move(FData[0], PChar(Result)^, l shl 1);
+  {$ELSE}
+    Move(FData[0], PChar(Result)^, l);
+  {$ENDIF}
+  end;
 end;
 
 constructor TDBufferBuilder.Create;
@@ -2978,7 +2980,7 @@ function SplitNToArrayStr(const s: String; pvSpliterChars: TSysCharSet; pvMaxN:
 var
   p:PChar;
   lvValue : String;
-  l, idx, r:Integer;
+  idx, r:Integer;
 begin
   if (pvMaxN <= 0) then
   begin
@@ -2994,7 +2996,6 @@ begin
   SetLength(Result, pvMaxN);
 
   p := PChar(s);
-  l := 0;
   idx := 0;
   while True do
   begin
@@ -3007,7 +3008,6 @@ begin
         // 添加到列表中
         SetLength(Result, idx + 1);
         Result[idx] := P;
-        Inc(idx);
       end;
       Exit;
     end else
@@ -3023,7 +3023,6 @@ begin
     if (idx + 1) = pvMaxN then
     begin
       Result[idx] := P;
-      Inc(idx);
       Exit;
     end;
   end;
@@ -3198,14 +3197,12 @@ begin
   BinToHex(@lvGuid, PChar(Result), SizeOf(TGUID));
 end;
 
-function RandomVal(const max:Integer): Cardinal;
+function RandomVal(const max: Cardinal): Cardinal;
 var
   lvGuid:TGUID;
 begin
   CreateGUID(lvGuid);
-
-
-  Result := Cardinal(HashPtr(@lvGuid, SizeOf(TGUID)));
+  Result := lvGuid.D2 + lvGuid.D3 + lvGuid.D1;  //   Cardinal(HashPtr(@lvGuid, SizeOf(TGUID)));
   if max > 0 then
   begin
     Result := Result mod max;

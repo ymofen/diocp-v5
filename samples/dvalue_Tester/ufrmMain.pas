@@ -564,7 +564,8 @@ begin
   lvDValue := TDValue.Create();
   try
     JSONParser(mmoData.Lines.Text, lvDValue);
-    ShowMessage(JSONEncode(lvDValue, False));
+
+    ShowMessage(lvDValue.ForceByPath('applicationDate.date')));
   finally
     lvDValue.Free;
   end;

@@ -828,7 +828,7 @@ var
 begin
   lvPData := nil;
   lvDataKey   := LowerCase(pvKey);
-  lvHashValue := hashOf(lvDataKey);
+  lvHashValue := Cardinal(hashOf(lvDataKey));
   
   lvIndex:=lvHashValue mod FBucketSize;
   lvCurrData:=FBuckets[lvIndex];

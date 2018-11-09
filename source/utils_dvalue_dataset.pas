@@ -25,7 +25,11 @@ procedure AssignFieldValue(pvField:TField; pvVal:TDValue;
     pvIfNullThenEmpty:Boolean);
 
 procedure AppendFromDValueList(pvDataSet: TDataSet; pvDataList: TDValue);
-procedure AssignRecordFromDValue(pvDataSet: TDataSet; pvJsonRecord:TDValue);
+
+procedure AssignRecordFromDValue(pvDataSet: TDataSet; pvJsonRecord:TDValue);overload;
+
+procedure AssignRecordFromDValue(pvDataSet: TDataSet; pvJsonRecord:TDValue;
+    pvIgnoreFields:string); overload;
 
 function toSQLValue(pvField: TDValue; pvPrecision: Byte = 4): string;
 
@@ -188,6 +192,29 @@ begin
     else
       pvField.AsString := pvVal.AsString;
     end;
+  end;
+
+end;
+
+procedure AssignRecordFromDValue(pvDataSet: TDataSet; pvJsonRecord:TDValue;
+    pvIgnoreFields:string); overload;
+var
+  lvField:TField;
+  i:Integer;
+  lvValue:TDValue;
+  lvIgnoreFields:TArrayStrings;
+begin
+  if not (pvDataSet.State in [dsInsert, dsEdit]) then pvDataSet.Edit;
+  lvIgnoreFields := SplitToArrayStr(pvIgnoreFields, [',', ';'], True);
+  for i := 0 to pvDataSet.FieldCount - 1 do
+  begin
+    lvField := pvDataSet.Fields[i];
+    if StrIndexOf(lvField.FieldName, lvIgnoreFields) = -1 then
+    begin
+      lvValue := pvJsonRecord.FindByName(lvField.FieldName);
+      AssignFieldValue(lvField, lvValue, False);
+    end;
+
   end;
 
 end;
