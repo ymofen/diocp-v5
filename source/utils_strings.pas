@@ -3190,7 +3190,7 @@ end;
 
 procedure BufferToHex(pvBuffer: Pointer; outText: PDCharW; BufSize: Integer);
 const
-  Convert: array[0..15] of WideChar = '0123456789ABCDEF';
+  Convert: array[0..15] of DCharW = ('0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F');
 var
   I: Integer;
   Buffer:PByte;
