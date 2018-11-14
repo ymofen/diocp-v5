@@ -960,6 +960,8 @@ type
     property SentSize: Int64 read FSentSize;
     property Speed_WSARecvResponse: Int64 read FSpeed_WSARecvResponse;
     property Speed_WSASendResponse: Int64 read FSpeed_WSASendResponse;
+    property Speed_WSASentSize: Int64 read FSpeed_WSASentSize;
+ 
   end;
 
   {$IF RTLVersion>22}
@@ -4995,6 +4997,8 @@ begin
 
   FSpeed_WSASendResponse := Trunc((FResponseWSASendCounter - FLastSpeed_WSASendResponse) / lvSec);
 
+  FSpeed_WSASentSize := Trunc((FSentSize - FLastSpeed_WSASentSize) / lvSec);
+
 
   FSpeed_WSARecvResponse := Trunc((self.FResponseWSARecvCounter - FLastSpeed_WSARecvResponse) / lvSec);
 
@@ -5005,6 +5009,7 @@ begin
   FLastSpeedTick := GetTickCount;
   FLastSpeed_WSASendResponse := FResponseWSASendCounter;
   FLastSpeed_WSARecvResponse := FResponseWSARecvCounter;
+  FLastSpeed_WSASentSize := FSentSize;
 end;
 
 { TIocpDisconnectExRequest }

@@ -871,18 +871,23 @@ begin
   end;
   Result := 0;
   ABuffPool := lvBlock.owner;
-  Assert(ABuffPool <> nil);
-  {$IFDEF USE_SPINLOCK}
-  SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
-  {$ELSE}
-  ABuffPool.FLocker.Enter;
-  {$ENDIF}
-  if not CheckBufferBlockBounds(lvBlock) then Result := 1;  
-  {$IFDEF USE_SPINLOCK}
-  SpinUnLock(ABuffPool.FSpinLock);
-  {$ELSE}
-  ABuffPool.FLocker.Leave;
-  {$ENDIF}
+  if ABuffPool <> nil then
+  begin
+    {$IFDEF USE_SPINLOCK}
+    SpinLock(ABuffPool.FSpinLock, ABuffPool.FLockWaitCounter);
+    {$ELSE}
+    ABuffPool.FLocker.Enter;
+    {$ENDIF}
+  end;
+  if not CheckBufferBlockBounds(lvBlock) then Result := 1;
+  if ABuffPool <> nil then
+  begin
+    {$IFDEF USE_SPINLOCK}
+    SpinUnLock(ABuffPool.FSpinLock);
+    {$ELSE}
+    ABuffPool.FLocker.Leave;
+    {$ENDIF}
+  end;
   {$ELSE}
   Result := -1;
   {$ENDIF}
