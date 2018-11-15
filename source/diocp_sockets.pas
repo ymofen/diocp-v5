@@ -663,6 +663,7 @@ type
     // 记录开始时间点_数据
     FLastSpeed_WSASendResponse: Int64;
     FLastSpeed_WSARecvResponse: Int64;
+    FLastSpeed_RecvSize:Int64;
 
     FContextCreateCounter:Integer;
     FContextOutCounter:Integer;
@@ -674,6 +675,7 @@ type
 
     FSpeed_WSASendResponse: Int64;
     FSpeed_WSARecvResponse: Int64;
+    FSpeed_Recv:Int64;
 
     procedure incSentSize(pvSize:Cardinal);
     procedure incPostWSASendSize(pvSize:Cardinal);
@@ -753,6 +755,7 @@ type
     property SendRequestOutCounter: Integer read FSendRequestOutCounter;
     property SendRequestReturnCounter: Integer read FSendRequestReturnCounter;
     property SentSize: Int64 read FSentSize;
+    property Speed_Recv: Int64 read FSpeed_Recv;
     property Speed_WSARecvResponse: Int64 read FSpeed_WSARecvResponse;
     property Speed_WSASendResponse: Int64 read FSpeed_WSASendResponse;
 
@@ -3630,7 +3633,7 @@ begin
 
 
   FSpeed_WSARecvResponse := Trunc((self.FResponseWSARecvCounter - FLastSpeed_WSARecvResponse) / lvSec);
-
+  FSpeed_Recv := Trunc((self.FRecvSize - FLastSpeed_RecvSize) / lvSec);
 end;
 
 procedure TIocpDataMonitor.SpeedCalcuStart;
@@ -3638,6 +3641,7 @@ begin
   FLastSpeedTick := GetTickCount;
   FLastSpeed_WSASendResponse := FResponseWSASendCounter;
   FLastSpeed_WSARecvResponse := FResponseWSARecvCounter;
+  FLastSpeed_RecvSize := FRecvSize;
 end;
 
 procedure TContextDoublyLinked.add(pvContext: TDiocpCustomContext);
