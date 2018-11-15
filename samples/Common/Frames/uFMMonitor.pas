@@ -80,7 +80,7 @@ resourcestring
   strState_ObjectNull  = '没有监控对象';    //'iocp server is null'
   strState_Off         = '关闭';
   strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
-  strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
+  strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d, %.3f (M)/每秒';  //post:%d, response:%d, remain:%d
   strSendQueue_Info    = '压入/弹出/完成/终止:%d, %d, %d, %d';//push/pop/complted/abort:%d, %d, %d, %d
   strSendRequest_Info  = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
   strRecvRequest_Info  = '创建:%d, 借出:%d, 还回:%d';  //'create:%d, out:%d, return:%d'
@@ -235,7 +235,9 @@ begin
        FIocpTcpServer.DataMoniter.PostWSASendCounter,
        FIocpTcpServer.DataMoniter.ResponseWSASendCounter,
        FIocpTcpServer.DataMoniter.PostWSASendCounter - FIocpTcpServer.DataMoniter.ResponseWSASendCounter,
-       FIocpTcpServer.DataMoniter.Speed_WSASendResponse
+       FIocpTcpServer.DataMoniter.Speed_WSASendResponse,
+       FIocpTcpServer.DataMoniter.Speed_WSASentSize / (1024.00 * 1024)
+
      ]
     );
 
