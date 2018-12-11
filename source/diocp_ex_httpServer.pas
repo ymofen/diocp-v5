@@ -43,7 +43,8 @@ uses
   , diocp_ex_http_common
   , diocp_res
   , utils_objectPool, utils_safeLogger, Windows, utils_threadinfo, SyncObjs,
-  utils_BufferPool,  utils_websocket,  utils_base64, DateUtils;
+  utils_BufferPool,  utils_websocket,  utils_base64, DateUtils,
+  utils_fileWriter;
 
 
 
@@ -619,6 +620,10 @@ type
   private
     __free_flag:Integer;
 
+    {$IFDEF TRACE_HTTP_DETAIL}
+    FTraceWriter:TSingleFileWriter;
+    {$ENDIF}
+
     /// <summary>
     ///   响应引用计数
     /// </summary>
@@ -898,7 +903,7 @@ function GetWebSocketAccept(pvWebSocketKey:AnsiString): AnsiString;
 implementation
 
 uses
-  ComObj;
+  ComObj, utils_byteTools;
 
 
 
@@ -1014,6 +1019,7 @@ begin
   FWebSocketContentBuffer.Clear;
   FDecodeState := 0;
   FDecodeMsg := STRING_EMPTY;
+  
 end;
 
 procedure TDiocpHttpRequest.Close;
@@ -1942,7 +1948,7 @@ end;
 
 constructor TDiocpHttpClientContext.Create;
 begin
-  inherited Create;
+  inherited Create; 
   FBlockBuffer := TBlockBuffer.Create(nil);
   FBlockBuffer.OnBufferWrite := OnBlockBufferWrite;
   FRequestQueue := TSimpleQueue.Create();
@@ -1958,6 +1964,12 @@ begin
   ClearTaskListRequest;
   
   FRequestQueue.Free;
+  {$IFDEF TRACE_HTTP_DETAIL}
+  if FTraceWriter <> nil then
+  begin
+    FTraceWriter.Free;
+  end;
+  {$ENDIF}
   inherited Destroy;
 end;
 
@@ -2028,6 +2040,14 @@ begin
   FCurrentStreamEndAction := 0;
 
   FResponseRef := 0;
+
+  {$IFDEF TRACE_HTTP_DETAIL}
+  if FTraceWriter <> nil then
+  begin
+    FTraceWriter.Free;
+    FTraceWriter := nil;
+  end;
+  {$ENDIF}
 
 
   inherited DoCleanUp;
@@ -2377,11 +2397,21 @@ procedure TDiocpHttpClientContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
   ErrCode: Word);
 var
   lvTmpBuf: PByte;
+  lvByte:Byte;
   lvRemain: Cardinal;
   r:Integer;
   lvTempRequest: TDiocpHttpRequest;
 begin
   inherited;
+  {$IFDEF TRACE_HTTP_DETAIL}
+  if FTraceWriter = nil then
+  begin
+    FTraceWriter := TSingleFileWriter.Create;
+    FTraceWriter.FilePreFix := Format('HTTP_CTX_RECV_%d_', [self.SocketHandle]);
+  end;
+  FTraceWriter.WriteBuffer(buf, len);
+  FTraceWriter.Flush;
+  {$ENDIF}
 
   lvTmpBuf := PByte(buf);
   lvRemain := len;  
@@ -2397,11 +2427,16 @@ begin
 
         // 记录当前contextDNA，异步任务时做检测
         FCurrentRequest.FContextDNA := self.ContextDNA;
+
+//        sfLogger.logMessage(TByteTools.varToHexString(lvTmpBuf^, len));
+//        sfLogger.logMessage(ByteBufferToString(lvTmpBuf, len));
+
       end;
 
 
       try
-        r := FCurrentRequest.InputBuffer(lvTmpBuf^);
+        lvByte := lvTmpBuf^;
+        r := FCurrentRequest.InputBuffer(lvByte);
       except
         on e:Exception do
         begin
@@ -2474,6 +2509,11 @@ begin
               self.RequestDisconnect('无效的POST/PUT请求数据', self);
               Exit;
             end;
+          end else if SameText(FCurrentRequest.FInnerRequest.Method, '_PING') then
+          begin
+            // 还回
+            FCurrentRequest.Close;
+            FCurrentRequest := nil;
           end else
           begin
             lvTempRequest := FCurrentRequest;

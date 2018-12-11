@@ -218,6 +218,7 @@ type
         pvTimeOut: Integer = 0): Integer;
 
     function SetSendBufferLength(const len:Integer): Integer;
+    function GetSendBufferLength: Integer;
     function SetRecvBufferLength(const len:Integer): Integer;
     function Readable(pvTimeOut:Integer): Boolean;
 
@@ -257,6 +258,8 @@ type
     /// </summary>
     /// <param name="pvOption">true Îª½ûÓÃ</param>
     function SetNoDelayOption(pvOption:Boolean): Boolean;
+
+    function GetNoDelayOption: Boolean;
 
     property IPVersion: Integer read FIPVersion write FIPVersion;
 
@@ -463,9 +466,9 @@ begin
   if FIPVersion = IP_V6 then
   begin
     {$IFDEF UNICODE}
-    FSocketHandle := WSASocketW(AF_INET6, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    FSocketHandle := WSASocketW(AF_INET6, SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED);
     {$ELSE}
-    FSocketHandle := WSASocketA(AF_INET6, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    FSocketHandle := WSASocketA(AF_INET6, SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED);
     {$ENDIF}
   end else
   begin
@@ -474,7 +477,7 @@ begin
 //    {$ELSE}
 //    FSocketHandle := WSASocketA(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
 //    {$ENDIF}
-    FSocketHandle := WSASocket(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED)
+    FSocketHandle := WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED)
   end;
 
  // FSocketHandle := WSASocket(AF_INET6,SOCK_STREAM, IPPROTO_IPV6, Nil, 0, WSA_FLAG_OVERLAPPED);
@@ -488,7 +491,7 @@ end;
 procedure TRawSocket.CreateTcpSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+  FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;
@@ -581,6 +584,24 @@ begin
   Size := SizeOf(TSockAddr);
   getsockname(SocketHandle, lvSockAddr, Size);
   Result := ntohs(lvSockAddr.sin_port);
+end;
+
+function TRawSocket.GetNoDelayOption: Boolean;
+var
+  bNoDelay: BOOL;
+  r:Integer;
+begin
+  r := SizeOf(bNoDelay);
+  getsockopt(FSocketHandle,SOL_SOCKET,TCP_NODELAY,PAnsiChar(@bNoDelay),r);
+  Result := bNoDelay;
+end;
+
+function TRawSocket.GetSendBufferLength: Integer;
+var
+  r:Integer;
+begin
+  r := 4;
+  getsockopt(FSocketHandle,SOL_SOCKET,SO_SNDBUF,PAnsiChar(@Result),r);
 end;
 
 function TRawSocket.Listen(const backlog: Integer = 0): Boolean;
@@ -892,7 +913,7 @@ var
   bNoDelay: BOOL;
 begin
   bNoDelay := pvOption;
-  Result := setsockopt(FSocketHandle, IPPROTO_TCP, TCP_NODELAY, @bNoDelay, SizeOf(bNoDelay)) <> SOCKET_ERROR;
+  Result := setsockopt(FSocketHandle, SOL_SOCKET, TCP_NODELAY, @bNoDelay, SizeOf(bNoDelay)) <> SOCKET_ERROR;
 end;
 
 function TRawSocket.SetReadTimeOut(const pvTimeOut: Cardinal): Integer;

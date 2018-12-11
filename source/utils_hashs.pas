@@ -161,7 +161,7 @@ type
     /// <summary>
     ///   remove data by strKey
     /// </summary>
-    function Remove(pvKey:string):Boolean;
+    function Remove(const pvKey: string): Boolean;
   public
 
 
@@ -528,7 +528,7 @@ begin
   Dispose(vData);
 end;
 
-function TDHashTable.Remove(pvKey: string): Boolean;
+function TDHashTable.Remove(const pvKey: string): Boolean;
 var
   lvIndex, lvHashValue:Cardinal;
   lvCurrData, lvPrior:PDHashData;

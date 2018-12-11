@@ -1243,14 +1243,21 @@ function THttpRequest.DecodeHeader: Integer;
 var
   lvPtr: PChar;
   lvLine: String;
+  r :Integer;
 begin
   lvPtr := PChar(FRawHeader);
 
   lvLine := LeftUntil(lvPtr, [#13, #10]);
-  Result := DecodeFirstLine(lvLine);
-  if Result = -1 then
+  r := DecodeFirstLine(lvLine);
+  if r = -1 then
   begin
+    Result := -1;
     exit;
+  end else if r = 2 then           
+  begin  // PING
+    Result := 0;
+    Exit;
+
   end;
 
   while true do
@@ -1298,8 +1305,8 @@ begin
   // GET /test?v=abc HTTP/1.1
   lvPtr := PChar(pvLine);
 
-  FMethod := UpperCase(LeftUntil(lvPtr, [' ']));
-  if FMethod = '' then
+  FMethod := UpperCase(LeftUntil(lvPtr, [' ', #13]));
+  if length(FMethod) = 0 then
   begin
     Result := -1;
     exit;
@@ -1331,6 +1338,12 @@ begin
   end
   else if (FMethod = 'CONNECT') then
   begin;
+  end
+  else if (FMethod = '_PING') then
+  begin;
+    FHttpVersionValue := 11;
+    Result := 2;
+    Exit;
   end
   else
   begin
@@ -1464,6 +1477,9 @@ begin
   else if (StrLIComp(lvBuf, 'CONNECT', 7) = 0) then
   begin
     FMethod := 'CONNECT';
+  end else if (StrLIComp(lvBuf, '_PING', 5) = 0) then
+  begin
+    FMethod := '_PING';
   end
   else
   begin
@@ -1604,19 +1620,20 @@ begin
   FFlag := 0;
   FDecodeState := 0;
   FContentLength := -1;
-  FRawHeader := '';
-  FRequestURI := '';
-  FRequestRawURL := '';
+  FRawHeader := STRING_EMPTY;
+  FRequestURI := STRING_EMPTY;
+  FRequestRawURL := STRING_EMPTY;
   FRequestRawCookie := '-1';
   FContentType := '-1';
   FContentCharset := '-1';
   FRequestCookieList.Clear;
-  FRequestRawURLParamStr := '';
+  FRequestRawURLParamStr := STRING_EMPTY;
   FURLParams.Clear;
   FRequestParams.Clear;
   FRequestFormParams.Clear;
   FHeaders.Clear;
   FKeepAlive := -1;
+  FMethod := STRING_EMPTY;
 end;
 
 function THttpRequest.GetCharset: String;
@@ -1709,8 +1726,9 @@ function THttpRequest.InputBuffer(const pvByte: Byte): Integer;
         Result := -1;
         exit;
       end;
-    end
-    else if pvByte = 13 then
+    end;
+
+    if pvByte = 13 then
     begin
       inc(FDecodeState);
     end;

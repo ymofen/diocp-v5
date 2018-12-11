@@ -355,7 +355,7 @@ begin
   try
     lvBasePath :=ExtractFilePath(ParamStr(0)) + 'log';
     ForceDirectories(lvBasePath);
-    lvFileName :=lvBasePath + '\__safe_' + FormatDateTime('mmddhhnnsszzz', Now()) + '.log';
+    lvFileName :=lvBasePath + '\__safe_' + FormatDateTime('mmdd', Now()) + '.log';
 
     AssignFile(lvLogFile, lvFileName);
     if (FileExists(lvFileName)) then
@@ -384,7 +384,7 @@ begin
     lvBasePath :=ExtractFilePath(ParamStr(0)) + 'log';
     ForceDirectories(lvBasePath);
     lvFileName :=lvBasePath + '\' + __ProcessIDStr+ '_' + pvFilePre +
-     FormatDateTime('mmddhhnn', Now()) + '.log';
+     FormatDateTime('mmdd', Now()) + '.log';
 
     AssignFile(lvLogFile, lvFileName);
     if (FileExists(lvFileName)) then

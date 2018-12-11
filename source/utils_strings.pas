@@ -805,6 +805,8 @@ function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inli
 function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 {$IFEND <XE5}
 
+
+
 procedure SpinLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
 procedure SpinLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
 procedure SpinUnLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
@@ -822,8 +824,15 @@ function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint;
 function InterlockedExchangeAdd(Addend: PLongint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
 function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
 
-
 {$IFEND <D2007}
+
+
+{$IFDEF MSWINDOWS}
+function AtomicAdd64(var Target:Int64; n:Int64): Int64;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall external kernel32 name 'InterlockedCompareExchange64';
+{$ELSE}
+
+{$ENDIF}
 
 
 
@@ -3231,6 +3240,18 @@ begin
     Result := Result mod max;
   end;
 end;
+
+{$IFDEF MSWINDOWS}
+function AtomicAdd64(var Target:Int64; n:Int64): Int64;
+var
+  Old: Int64;
+begin
+  repeat
+    Old := Target;
+    Result := Old + n;
+  until InterlockedCompareExchange64(Target, Result, Old) = Old;
+end;
+{$ENDIF}
 
 constructor TDStringWBuilder.Create;
 begin
