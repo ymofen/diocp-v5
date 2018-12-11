@@ -65,6 +65,9 @@ const
 {$IFEND >=XE5}
 
 type
+  TDataProc = procedure(pvData:Pointer);
+  TDataEvent = procedure(pvData:Pointer) of object;
+
 {$IFDEF MSWINDOWS}
   RAWString = AnsiString;
 {$ELSE}

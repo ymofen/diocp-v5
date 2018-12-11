@@ -161,7 +161,9 @@ end;
 constructor TDTimeWheel.Create(pvMSecs4Interval: Cardinal; pvSlotNum: Integer);
 begin
   inherited Create;
+  FIsTerminated := true;
   FTaskMap := TDHashTable.Create();
+  FTaskIDCounter := 1;
   FInterval_msecs := pvMSecs4Interval;
   FTicker := TDTimer.Create();
   New(FEventChan);
@@ -554,10 +556,13 @@ end;
 
 procedure TDTimeWheel.Stop;
 begin
-  FIsTerminated := true;
-  PostRequestCloseCmd();
-  FTicker.Stop;
-  WaitForSingleObject(self.FHandles[2], INFINITE);
+  if not FIsTerminated then
+  begin
+    FIsTerminated := true;
+    PostRequestCloseCmd();
+    FTicker.Stop;
+    WaitForSingleObject(self.FHandles[2], INFINITE);
+  end;
 end;
 
 end.
