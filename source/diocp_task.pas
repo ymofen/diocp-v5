@@ -281,16 +281,42 @@ begin
   inherited Destroy;
 end;
 
+function IsClass(Obj: TObject; Cls: TClass): Boolean;
+var
+  Parent: TClass;
+begin
+  Parent := Obj.ClassType;
+  while (Parent <> nil) and (Parent.ClassName <> Cls.ClassName) do
+    Parent := Parent.ClassParent;
+  Result := Parent <> nil;
+end;
+
+
+procedure HandleException();
+begin
+  if GetCapture <> 0 then SendMessage(GetCapture, WM_CANCELMODE, 0, 0);
+  if IsClass(ExceptObject, Exception) then
+  begin
+    if not IsClass(ExceptObject, EAbort) then
+      SysUtils.ShowException(ExceptObject, ExceptAddr);
+  end else
+    SysUtils.ShowException(ExceptObject, ExceptAddr);
+end;
+
 procedure TIocpTaskMananger.DoMainThreadWork(var AMsg: TMessage);
 begin
   if AMsg.Msg = WM_REQUEST_TASK then
   begin
     try
-      if not FEnable then Exit;
-      TIocpTaskRequest(AMsg.WPARAM).InnerDoTaskAction();
-    finally
-      if AMsg.LPARAM <> 0 then
-        TEvent(AMsg.LPARAM).SetEvent;
+      try
+        if not FEnable then Exit;
+        TIocpTaskRequest(AMsg.WPARAM).InnerDoTaskAction();
+      finally
+        if AMsg.LPARAM <> 0 then
+          TEvent(AMsg.LPARAM).SetEvent;
+      end;
+    except
+      HandleException();
     end;
   end else
     AMsg.Result := DefWindowProc(FMessageHandle, AMsg.Msg, AMsg.WPARAM, AMsg.LPARAM);

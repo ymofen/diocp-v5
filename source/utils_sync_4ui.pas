@@ -3,7 +3,7 @@ unit utils_sync_4ui;
 interface
 
 uses
-  utils_strings, Classes
+  Classes, SysUtils
 {$IFDEF MSWINDOWS}
   , windows, messages
 {$ENDIF};
@@ -13,6 +13,9 @@ const
   WM_SYNC_MSG = WM_USER + 1;
 
 type
+  TDataProc = procedure(pvData:Pointer);
+  TDataEvent = procedure(pvData:Pointer) of object;
+  
   TSyncTaskObject = class(TObject)
   private
     FCb:TDataEvent;
@@ -60,6 +63,29 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
+
+function IsClass(Obj: TObject; Cls: TClass): Boolean;
+var
+  Parent: TClass;
+begin
+  Parent := Obj.ClassType;
+  while (Parent <> nil) and (Parent.ClassName <> Cls.ClassName) do
+    Parent := Parent.ClassParent;
+  Result := Parent <> nil;
+end;
+
+
+procedure HandleException();
+begin
+  if GetCapture <> 0 then SendMessage(GetCapture, WM_CANCELMODE, 0, 0);
+  if IsClass(ExceptObject, Exception) then
+  begin
+    if not IsClass(ExceptObject, EAbort) then
+      SysUtils.ShowException(ExceptObject, ExceptAddr);
+  end else
+    SysUtils.ShowException(ExceptObject, ExceptAddr);
+end;
+
 procedure TSync4UI.DoMainThreadWork(var AMsg: TMessage);
 var
   lvSyncObj:TSyncTaskObject;
@@ -67,11 +93,15 @@ begin
   if AMsg.Msg = WM_SYNC_MSG then
   begin
     try
-      lvSyncObj := TSyncTaskObject(AMsg.WPARAM);
-      lvSyncObj.DoCallBack;
-    finally
-      lvSyncObj.Free;
-    end;
+      try
+        lvSyncObj := TSyncTaskObject(AMsg.WPARAM);
+        lvSyncObj.DoCallBack;
+      finally
+        lvSyncObj.Free;
+      end;
+    except
+      HandleException();
+    end
   end else
     AMsg.Result := DefWindowProc(FMessageHandle, AMsg.Msg, AMsg.WPARAM, AMsg.LPARAM);
 end;
@@ -87,13 +117,12 @@ begin
   lvTaskData.FCb := pvCb;
   lvTaskData.FData := pvData;
   lvTaskData.FDataFreeProc := pvDataFreeProc;
-  TThread.Queue(nil, lvTaskData.DoTaskForSync);
 
-//  {$IFDEF MSWINDOWS}
-//  PostMessage(FMessageHandle, WM_SYNC_MSG, WPARAM(lvTaskData), 0)
-//  {$ELSE}
-//
-//  {$ENDIF}
+  {$IFDEF MSWINDOWS}
+  PostMessage(FMessageHandle, WM_SYNC_MSG, WPARAM(lvTaskData), 0)
+  {$ELSE}
+  TThread.Queue(nil, lvTaskData.DoTaskForSync);
+  {$ENDIF}
 end;
 
 procedure TSync4UI.RaiseMessage(const pvMsg: string);
