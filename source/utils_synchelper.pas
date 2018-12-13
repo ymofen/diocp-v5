@@ -1,4 +1,4 @@
-unit utils_sync_4ui;
+unit utils_synchelper;
 
 interface
 
@@ -29,7 +29,7 @@ type
 
 
 
-  TSync4UI = class(TObject)
+  TSyncHelper = class(TObject)
   private
 
   protected
@@ -46,7 +46,7 @@ type
 
 implementation
 
-constructor TSync4UI.Create;
+constructor TSyncHelper.Create;
 begin
   inherited Create;
   {$IFDEF MSWINDOWS}
@@ -54,7 +54,7 @@ begin
   {$ENDIF}
 end;
 
-destructor TSync4UI.Destroy;
+destructor TSyncHelper.Destroy;
 begin
   {$IFDEF MSWINDOWS}
   DeallocateHWnd(FMessageHandle);
@@ -86,7 +86,7 @@ begin
     SysUtils.ShowException(ExceptObject, ExceptAddr);
 end;
 
-procedure TSync4UI.DoMainThreadWork(var AMsg: TMessage);
+procedure TSyncHelper.DoMainThreadWork(var AMsg: TMessage);
 var
   lvSyncObj:TSyncTaskObject;
 begin
@@ -108,7 +108,7 @@ end;
 {$ENDIF}
 
 
-procedure TSync4UI.Post(pvCb:TDataEvent; pvData:Pointer;
+procedure TSyncHelper.Post(pvCb:TDataEvent; pvData:Pointer;
     pvDataFreeProc:TDataProc);
 var
   lvTaskData:TSyncTaskObject;
@@ -125,7 +125,7 @@ begin
   {$ENDIF}
 end;
 
-procedure TSync4UI.RaiseMessage(const pvMsg: string);
+procedure TSyncHelper.RaiseMessage(const pvMsg: string);
 begin
   ;
 end;
