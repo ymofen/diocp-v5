@@ -50,7 +50,7 @@ implementation
 {$R *.dfm}
 
 resourcestring
-  strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d 速度:%d 个/秒, %.4f M /秒';  //post:%d, response:%d, remain:%d
+  strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d 速度:%d 个/秒, %s';  //post:%d, response:%d, remain:%d
   strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度:%d 个/秒';  //post:%d, response:%d, remain:%d
 
 class function TFMDiocpCltMonitor.createAsChild(pvParent: TWinControl;
@@ -78,6 +78,8 @@ begin
 end;
 
 procedure TFMDiocpCltMonitor.refreshState;
+var
+  str:string;
 begin
   if FIocpSocket = nil then
   begin
@@ -113,6 +115,18 @@ begin
 //     ]
 //    );
 
+  if FIocpSocket.DataMoniter.Speed_Recv < 1024 then
+  begin
+    str := Format('%d B/秒', [FIocpSocket.DataMoniter.Speed_Recv]);
+  end else if FIocpSocket.DataMoniter.Speed_Recv < 1024 * 1024 then
+  begin
+    str := Format('%.2f KB/秒', [FIocpSocket.DataMoniter.Speed_Recv / 1024]);
+  end else
+  begin
+    str := Format('%.2f MB/秒', [FIocpSocket.DataMoniter.Speed_Recv / (1024 * 1024.00)]);           
+  end;
+  
+
   lblPostRecvINfo.Caption :=   Format(strRecv_PostInfo,
      [
        FIocpSocket.DataMoniter.PostWSARecvCounter,
@@ -120,7 +134,7 @@ begin
        FIocpSocket.DataMoniter.PostWSARecvCounter -
        FIocpSocket.DataMoniter.ResponseWSARecvCounter,
        FIocpSocket.DataMoniter.Speed_WSARecvResponse,
-       FIocpSocket.DataMoniter.Speed_Recv / (1024 * 1024.00)
+       str
      ]
     );
 

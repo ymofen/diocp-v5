@@ -40,8 +40,9 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    procedure RaiseMessage(const pvMsg:string);
+    procedure RaiseMessage(const s: string);
     procedure Post(pvCb:TDataEvent; pvData:Pointer; pvDataFreeProc:TDataProc);
+    procedure ShowMessage(const s:string);
   end;
 
 implementation
@@ -125,7 +126,12 @@ begin
   {$ENDIF}
 end;
 
-procedure TSyncHelper.RaiseMessage(const pvMsg: string);
+procedure TSyncHelper.RaiseMessage(const s: string);
+begin
+  ;
+end;
+
+procedure TSyncHelper.ShowMessage(const s: string);
 begin
   ;
 end;

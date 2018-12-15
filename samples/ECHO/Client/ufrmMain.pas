@@ -652,8 +652,8 @@ var
 begin
   lvDValue := TDValue.Create();
   JSONParseFromUtf8NoBOMFile(pvFileName, lvDVAlue);
-  edtHost.Text := lvDValue.ForceByName('host').AsString;
-  edtPort.Text := lvDValue.ForceByName('port').AsString;
+  edtHost.Text := lvDValue.GetValueByName('host', '127.0.0.1');
+  edtPort.Text := lvDValue.GetValueByName('port', '9983');;
   mmoData.Lines.Text := lvDValue.ForceByName('sendText').AsString;
   chkRecvEcho.Checked := lvDValue.ForceByName('chk_recvecho').AsBoolean;
   chkSaveData.Checked := lvDValue.ForceByName('chk_saveonrecv').AsBoolean;

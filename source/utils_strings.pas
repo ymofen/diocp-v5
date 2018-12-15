@@ -67,6 +67,8 @@ const
 type
   TDataProc = procedure(pvData:Pointer);
   TDataEvent = procedure(pvData:Pointer) of object;
+  TExceptionNotifyEvent = procedure(pvSender: TObject; pvException: Exception;
+      pvTag: Integer) of object;
 
 {$IFDEF MSWINDOWS}
   RAWString = AnsiString;
@@ -837,9 +839,22 @@ function InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64):
 
 {$ENDIF}
 
-
+procedure FreeAsObjectProc(pvData: Pointer);
+procedure FreeAsDisposeProc(pvData: Pointer);
 
 implementation
+
+
+procedure FreeAsObjectProc(pvData: Pointer);
+begin
+  TObject(pvData).Free;
+end;
+
+procedure FreeAsDisposeProc(pvData: Pointer);
+begin
+  Dispose(pvData);
+end;
+
 
 
 

@@ -336,7 +336,7 @@ object frmMain: TfrmMain
     end
     object chkAutoReconnect: TCheckBox
       Left = 278
-      Top = 83
+      Top = 82
       Width = 97
       Height = 17
       Caption = #33258#21160#37325#36830

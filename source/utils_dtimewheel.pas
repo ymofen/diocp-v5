@@ -3,12 +3,12 @@ unit utils_dtimewheel;
 interface
 
 uses
-  SyncObjs, Windows, utils_dtimer, Classes, utils_sync_object, utils_hashs;
+  SyncObjs, Windows, utils_dtimer, utils_strings, Classes, utils_sync_object,
+  utils_hashs, SysUtils;
 
 type
   TDTimeWheel = class;
   TTaskCallBack = procedure(pvTimeWheel:TDTimeWheel; pvUserData:Pointer) of object;
-  TUserDataProc = procedure(pvUserData:Pointer);
 
   PDTimeWheelTaskRec = ^TDTimeWheelTaskRec;
   PDTimeWheelChan = ^TDTimeWheelChan;
@@ -18,7 +18,7 @@ type
     TaskID: Integer;
     CallBack: TTaskCallBack;
     UserData: Pointer;
-    UserDataRelease: TUserDataProc;
+    UserDataRelease: TDataProc;
     Interval: Cardinal;
     RepeatNum: Cardinal;
     RunCounter: Int64;
@@ -54,6 +54,7 @@ type
     FHandles: array[0..2] of THandle;
     FTicker: TDTimer;
     FIsTerminated:Boolean;
+    FOnException: TExceptionNotifyEvent;
 
     procedure Execute;
     procedure OnTickerTimer(pvSender: TObject);
@@ -96,22 +97,32 @@ type
     /// <param name="pvRepeatNum"> 重复次数, 0为永久重复 </param>
     /// <returns>返回一个任务ID, 移除时使用 </returns>
     function AddTask(pvInterval: Cardinal; pvTaskCb: TTaskCallBack; pvUserData:
-        Pointer; pvRepeatNum: Cardinal; pvUserDataFreeProc: TUserDataProc): Integer;
+        Pointer; pvRepeatNum: Cardinal; pvUserDataFreeProc: TDataProc): Integer;
 
 
     procedure RemoveTask(pvTaskID: Integer);
 
     procedure Start(pvIsAsync: Boolean);
     procedure Stop;
+    
+    property OnException: TExceptionNotifyEvent read FOnException write
+        FOnException;
+
+
+
+
   end;
 
-procedure FreeAsObjectProc(pvUserData:Pointer);
-procedure FreeAsDisposeProc(pvUserData:Pointer);
+
+
+var
+  Dtw:TDTimeWheel;
+
+procedure StopDtw;
+procedure InitialDtw(pvIntervalMSecs:Cardinal);
 
 implementation
 
-uses
-  utils_strings;
 
 function NewTaskRec():PDTimeWheelTaskRec;
 begin
@@ -123,19 +134,28 @@ begin
   Result.UserData := nil;
 end;
 
-procedure FreeAsObjectProc(pvUserData:Pointer);
+procedure StopDtw;
 begin
-  TObject(pvUserData).Free;
+  if Dtw <> nil then
+  begin
+    Dtw.Stop;
+    Dtw.Free;
+    Dtw := nil;
+  end;
 end;
 
-procedure FreeAsDisposeProc(pvUserData:Pointer);
+procedure InitialDtw(pvIntervalMSecs:Cardinal);
 begin
-  Dispose(pvUserData);
+  if Dtw <> nil then Exit;
+  
+  Dtw := TDTimeWheel.Create(pvIntervalMSecs, 128);
+  Dtw.Start(True);
 end;
+
 
 function TDTimeWheel.AddTask(pvInterval: Cardinal; pvTaskCb: TTaskCallBack;
-    pvUserData: Pointer; pvRepeatNum: Cardinal; pvUserDataFreeProc:
-    TUserDataProc): Integer;
+    pvUserData: Pointer; pvRepeatNum: Cardinal; pvUserDataFreeProc: TDataProc):
+    Integer;
 var
   lvItm:PDTimeWheelTaskRec;
 begin
@@ -259,7 +279,15 @@ procedure TDTimeWheel.DoCallBack(pvRec: PDTimeWheelTaskRec);
 begin
   if Assigned(pvRec.CallBack) then
   begin
-    pvRec.CallBack(self, pvRec.UserData);
+    try
+      pvRec.CallBack(self, pvRec.UserData);
+    except
+      on E:Exception do
+      begin
+        if Assigned(FOnException) then
+          FOnException(self, E, 0);
+      end;
+    end;
   end;
   pvRec.RunCounter := pvRec.RunCounter + 1;
 end;
@@ -564,5 +592,14 @@ begin
     WaitForSingleObject(self.FHandles[2], INFINITE);
   end;
 end;
+
+
+initialization
+
+
+finalization
+  StopDtw;
+
+
 
 end.
