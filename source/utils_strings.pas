@@ -597,7 +597,6 @@ function PosWStr(const sub, s: DStringW): Integer;
 function StrStr(P:PChar; PSub:PChar): PChar;
 
 
-
 /// <summary>
 ///   查找PSub在P中出现的第一个位置
 ///   忽略大小写
@@ -612,6 +611,13 @@ function StrStr(P:PChar; PSub:PChar): PChar;
 /// <param name="PSub"> 要搜(字符串) </param>
 function StrStrIgnoreCase(P, PSub: PChar): PChar;
 
+/// <summary>
+///   比较两个Buff是否相等
+/// </summary>
+/// <returns> 0: 相等, r := p1-p2 </returns>
+function CompareBuf(p1, p2: Pointer; len: Integer): Integer;
+function CompareStrIgnoreCase(const s1, s2:PChar; compareLen:Integer): Integer;
+function CompareWStrIgnoreCase(const s1, s2:PDCharW; compareLen:Integer): Integer;
 
 /// <summary>
 ///   填充N个字符
@@ -644,6 +650,8 @@ function CheckAddSuffix(const s: string; pvCheckChars: TSysCharSet; suffixChar:
 ///  * 来自qdac.qstrings
 /// </summary>
 function UpperChar(c: Char): Char;
+
+function UpperCharW(c: DCharW): DCharW;
 
 /// <summary>
 ///  aStr是否在Strs列表中
@@ -842,6 +850,12 @@ function InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64):
 procedure FreeAsObjectProc(pvData: Pointer);
 procedure FreeAsDisposeProc(pvData: Pointer);
 
+/// <summary>
+///   排序TStrings使用
+/// </summary>
+function CmpIntValForSortFun(List: TStringList; Index1, Index2: Integer):
+    Integer;
+
 implementation
 
 
@@ -942,7 +956,7 @@ var
 {$ELSE}
   VCStrStr: TMSVCStrStr;
 {$ENDIF}
-//  VCMemCmp: TMSVCMemCmp;
+  VCMemCmp: TMSVCMemCmp;
 {$ENDIF}
 
 var
@@ -1046,6 +1060,23 @@ begin
   SetLength(lvStr, times);
   Result := lvStr;
 end;
+
+
+function CmpIntValForSortFun(List: TStringList; Index1, Index2: Integer):
+    Integer;
+var
+  v1, v2:Integer;
+begin
+  v1 := StrToInt64Def(List[index1], 0);
+  v2 := StrToInt64Def(List[Index2], 0);
+  if v1<v2 then
+    result:=-1
+  else if v2=v2 then
+    Result:=0
+  else
+    Result:=1;
+end;
+
 
 
 function StrIndexOf(const pvStr: string; const pvStringList: array of string):
@@ -3269,6 +3300,79 @@ begin
     Result := Old + n;
   until InterlockedCompareExchange64(Target, Result, Old) = Old;
 end;
+
+function CompareBuf(p1, p2: Pointer; len: Integer): Integer;
+begin
+  if len = 0 then
+    Result := 0
+  else
+  begin
+    {$IFDEF MSWINDOWS}
+      Result := VCMemCmp(p1, p2, len)
+    {$ELSE}
+      Result := memcmp(p1, p2, len);
+    {$ENDIF}
+  end;
+end;
+
+function CompareStrIgnoreCase(const s1, s2:PChar; compareLen:Integer): Integer;
+var
+  lvP1, lvP2:PChar;
+  j:Integer;
+begin
+  j := 0;
+  lvP1 := s1;
+  lvP2 := s2;
+  while (lvP1^ <> #0) and (lvP2^ <> #0) and ((compareLen=0) or (j<compareLen)) do
+  begin
+    Result := Ord(lvP1^)-Ord(lvP2^);
+    if Result <> 0 then
+      Result := Ord(UpCase(lvP1^)) - Ord(UpCase(lvP2^));
+
+    if Result <> 0 then
+    begin
+      Break;
+    end;
+    inc(lvP1);
+    Inc(lvP2);
+    Inc(j);
+  end;
+end;
+
+function CompareWStrIgnoreCase(const s1, s2:PDCharW; compareLen:Integer):
+    Integer;
+var
+  lvP1, lvP2:PDCharW;
+  j:Integer;
+begin
+  j := 0;
+  lvP1 := s1;
+  lvP2 := s2;
+  while (lvP1^ <> #0) and (lvP2^ <> #0) and ((compareLen=0) or (j<compareLen)) do
+  begin
+    Result := Ord(lvP1^)-Ord(lvP2^);
+    if Result <> 0 then
+      Result := Ord(UpperCharW(lvP1^)) - Ord(UpperCharW(lvP2^));
+
+    if Result <> 0 then
+    begin
+      Break;
+    end;
+    inc(lvP1);
+    Inc(lvP2);
+    Inc(j);
+  end;
+
+end;
+
+function UpperCharW(c: DCharW): DCharW;
+begin
+  if (c >= #$61) and (c <= #$7A) then
+    Result := DCharW(PWord(@c)^ xor $20)
+  else
+    Result := c;
+end;
+
 {$ENDIF}
 
 constructor TDStringWBuilder.Create;
@@ -3486,7 +3590,7 @@ VCStrStrW := nil;
 {$ELSE}
 VCStrStr := nil;
 {$ENDIF}
-//VCMemCmp := nil;
+VCMemCmp := nil;
 hMsvcrtl := LoadLibrary('msvcrt.dll');
 if hMsvcrtl <> 0 then
 begin
@@ -3495,7 +3599,7 @@ begin
   {$ELSE}
   VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
   {$ENDIF}
-  //VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
+  VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
 end;
 {$ENDIF}
 

@@ -41,6 +41,46 @@ object Form1: TForm1
         TabOrder = 1
         OnClick = btnSBClick
       end
+      object btnCompare: TButton
+        Left = 176
+        Top = 80
+        Width = 75
+        Height = 25
+        Caption = 'btnCompare'
+        TabOrder = 2
+        OnClick = btnCompareClick
+      end
+    end
+    object tsHttpResponseHeader: TTabSheet
+      Caption = 'tsHttpResponseHeader'
+      ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
+      object mmoHeader: TMemo
+        Left = 0
+        Top = 0
+        Width = 361
+        Height = 204
+        Align = alLeft
+        Lines.Strings = (
+          'HTTP/1.1 404 Not Found'
+          'Content-Type: text/plain; charset=utf-8'
+          'X-Content-Type-Options: nosniff'
+          'Date: Thu, 20 Dec 2018 02:15:38 GMT'
+          'Content-Length: 19')
+        TabOrder = 0
+      end
+      object btnDecodeHeader: TButton
+        Left = 376
+        Top = 3
+        Width = 137
+        Height = 25
+        Caption = 'btnDecodeHeader'
+        TabOrder = 1
+        OnClick = btnDecodeHeaderClick
+      end
     end
   end
   object mmoLog: TMemo

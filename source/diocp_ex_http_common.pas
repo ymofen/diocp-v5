@@ -78,11 +78,33 @@ type
     property URI: string read FURI write FURI;
     property URLParams: String read FURLParams write FURLParams;
 
-
-
-
-
   end;
+
+  THttpHeader = class(TObject)
+  private
+    FHttpVer: string;
+    FMethod: string;
+    function Decode0ForResp(pvLine:PChar): Integer; virtual; abstract;
+    /// Œ¥ µœ÷
+    procedure DecodeLine(const pvLine:PChar);
+  public
+    function ParseHeader(const pvHeader: string): Integer;
+
+    property HttpVer: string read FHttpVer;
+  public  // Request
+    property Method: string read FMethod;
+  end;
+
+  THttpRespHeader = class(THttpHeader)
+  private
+    FHttpCode: Integer;
+    FRespCodeStr: String;
+    function Decode0ForResp(pvLine:PChar): Integer; override;
+  public
+    property HttpCode: Integer read FHttpCode;
+    property RespCodeStr: String read FRespCodeStr;
+  end;
+
 
   THttpRange = class(TObject)
   private
@@ -2385,6 +2407,71 @@ end;
 procedure THttpHeaderBuilder.SetHeader(const pvKey:String; pvValue:String);
 begin
   FHeaders.ForceByName(pvKey).AsString := pvValue;
+end;
+
+procedure THttpHeader.DecodeLine(const pvLine: PChar);
+begin
+  
+end;
+
+function THttpHeader.ParseHeader(const pvHeader: string): Integer;
+var
+  lvPtr: PChar;
+  lvLine: String;
+  r :Integer;
+begin
+  lvPtr := PChar(pvHeader);
+
+  lvLine := LeftUntil(lvPtr, [#13, #10]);
+  Result := Decode0ForResp(PChar(lvLine));
+  if Result = -1 then
+  begin
+    Exit;
+  end;
+
+  while true do
+  begin
+    SkipChars(lvPtr, [#13, #10, ' ', #9]);
+    if LeftUntil(lvPtr, [#13, #10], lvLine) = 0 then
+    begin
+      DecodeLine(PChar(lvLine));
+    end
+    else
+    begin
+      break;
+    end;
+  end;
+
+  Result := 0;
+end;
+
+function THttpRespHeader.Decode0ForResp(pvLine:PChar): Integer;
+var
+  lvStr:String;
+  lvPtr :PChar;
+begin
+  lvPtr := pvLine;
+  Result := -1;
+  if CompareStrIgnoreCase(pvLine, 'HTTP/', 0) = 0 then
+  begin
+    SkipN(lvPtr, 5);
+    if LeftUntil(lvPtr, [' '], self.FHttpVer) <> 0 then
+    begin
+      Exit;
+    end;
+    SkipChars(lvPtr, [' ']);
+    FRespCodeStr :=TrimRight(lvPtr);
+    if LeftUntil(lvPtr, [' ', #13, #10], lvStr) <> 0 then
+    begin
+      Exit;
+    end;
+
+    FHttpCode := StrToIntDef(lvStr, -1);
+    Result := 0;
+  end else
+  begin
+    Result := -1;
+  end;
 end;
 
 end.
