@@ -80,8 +80,23 @@ type
   end;
 
 
+function GetOptionCaption(pvOptCode: Integer): String;
+
+
 
 implementation
+
+function GetOptionCaption(pvOptCode: Integer): String;
+begin
+
+  if pvOptCode = OPT_PING then Result := 'PING'
+  else if pvOptCode = OPT_PONG then Result := 'PONG'
+  else if pvOptCode = OPT_BINARY then Result := 'BINARY'
+  else if pvOptCode = OPT_TEXT then  Result := 'TEXT'
+  else
+    Result := Format('%d-UNKOWN', [pvOptCode])
+
+end;
 
 constructor TDiocpWebSocketFrame.Create;
 begin

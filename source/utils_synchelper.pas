@@ -1,9 +1,16 @@
 unit utils_synchelper;
+{
+  一般用于Application中做主线程同步
+}
 
 interface
 
 uses
   Classes, SysUtils
+{$IFDEF CONSOLE}
+{$ELSE}
+  , Forms
+{$ENDIF}
 {$IFDEF MSWINDOWS}
   , windows, messages
 {$ENDIF};
@@ -101,7 +108,11 @@ begin
         lvSyncObj.Free;
       end;
     except
+      {$IFDEF CONSOLE}
       HandleException();
+      {$ELSE}
+      Application.HandleException(Application);
+      {$ENDIF}
     end
   end else
     AMsg.Result := DefWindowProc(FMessageHandle, AMsg.Msg, AMsg.WPARAM, AMsg.LPARAM);
