@@ -43,6 +43,10 @@ type
     FOnConnectFailEvent: TNotifyContextEvent;
     FOnASyncCycle: TNotifyContextEvent;
 
+    // 阻止重连时间
+    FBlockStartTick:Cardinal;
+    FBlockTime:Cardinal;
+
     FHost: String;
     FPort: Integer;
     /// <summary>TIocpRemoteContext.PostConnectRequest
@@ -59,6 +63,11 @@ type
 
     procedure DoConnectFail;
   protected
+
+    procedure DoBeforeReconnect(var vAllowReconnect: Boolean); virtual;
+    procedure BlockReconnectTime(pvMSecs:Cardinal);
+  protected
+
     procedure OnConnecteExResponse(pvObject:TObject);
 
     procedure OnDisconnected; override;
@@ -68,6 +77,8 @@ type
     procedure OnConnectFail; virtual;
 
     procedure SetSocketState(pvState:TSocketState); override;
+
+
 
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
 
@@ -287,6 +298,12 @@ begin
   inherited Destroy;
 end;
 
+procedure TIocpRemoteContext.BlockReconnectTime(pvMSecs: Cardinal);
+begin
+  FBlockTime := pvMSecs;
+  FBlockStartTick := GetTickCount;
+end;
+
 function TIocpRemoteContext.CanAutoReConnect: Boolean;
 begin
   Result := FAutoReConnect and (Owner.Active) and (not TDiocpTcpClient(Owner).DisableAutoConnect);
@@ -409,6 +426,26 @@ begin
 
   // 状态一定要设定
   SetSocketState(ssDisconnected);
+end;
+
+procedure TIocpRemoteContext.DoBeforeReconnect(var vAllowReconnect: Boolean);
+begin
+  vAllowReconnect := (FAutoReConnect) and CheckActivityTimeOut(10000);
+  if vAllowReconnect then
+  begin
+    if (FBlockStartTick > 0) and (FBlockTime > 0) then
+    begin
+      if tick_diff(FBlockStartTick, GetTickCount) < FBlockTime then
+      begin         // 阻止连接
+        vAllowReconnect := False;
+      end else
+      begin
+        FBlockStartTick := 0;
+        FBlockTime := 0;
+      end;
+    end;
+
+  end;
 end;
 
 procedure TIocpRemoteContext.OnConnected;
@@ -574,6 +611,7 @@ procedure TDiocpTcpClient.DoAutoReconnect(pvASyncWorker:TASyncWorker);
 var
   i: Integer;
   lvContext:TIocpRemoteContext;
+  vAllow:Boolean;
 begin
   if not CheckOperaFlag(OPERA_SHUTDOWN_CONNECT) then
   begin
@@ -584,9 +622,8 @@ begin
         if pvASyncWorker.Terminated then Break;
 
         lvContext := TIocpRemoteContext(FList[i]);
-        if (lvContext.FAutoReConnect)
-          and lvContext.CheckActivityTimeOut(10000)
-          then
+        lvContext.DoBeforeReconnect(vAllow);
+        if vAllow then
         begin
           lvContext.CheckDoReConnect;
         end;

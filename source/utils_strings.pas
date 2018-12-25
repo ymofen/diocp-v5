@@ -189,6 +189,7 @@ type
     FCapacity :Integer;
     FBufferLocked:Boolean;
     FLineBreak: String;
+    FTagPtr: Pointer;
 
     procedure CheckNeedSize(pvSize: LongInt); overload;
     procedure CheckNeedSize(pvOffset, pvSize: LongInt); overload;
@@ -308,6 +309,12 @@ type
     ///   剩余数据长度
     /// </summary>
     property Remain: Integer read GetRemain;
+
+
+    property TagPtr: Pointer read FTagPtr write FTagPtr;
+
+
+
 
   end;
 
@@ -578,6 +585,9 @@ function StringsValueOfName(pvStrings: TStrings; const pvName: string;
 function GetStrValueOfName(const pvStr, pvName: string; pvSplitChars,
     pvEndChars: TSysCharSet): string;
 
+/// <summary>
+///   > 0 找到
+/// </summary>
 function PosStr(const sub, s: string): Integer;
 
 function PosWStr(const sub, s: DStringW): Integer;
