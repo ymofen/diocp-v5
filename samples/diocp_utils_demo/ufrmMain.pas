@@ -41,7 +41,7 @@ procedure TForm1.btnCompareClick(Sender: TObject);
 var
   s1, s2:DStringW;
   p1, p2:PDCharW;
-  r, l:Integer;
+  r, r2, l:Integer;
 begin
   s1 := 'HTTP/1.1 503';
   s2 := 'HTTP/1.1';
@@ -49,7 +49,8 @@ begin
   p2 := PDCharW(s2);
   l := Length(s2) * 2;
   r := CompareWStrIgnoreCase(p1, p2, 0);
-  mmoLog.Lines.Add(Format('compare(%s, %s, %d) = %d', [s1, s2,l, r]));
+  r2 := CompareWStrIgnoreCase(p1, p2, -1);
+  mmoLog.Lines.Add(Format('compare(%s, %s, %d) = %d(r2:%d)', [s1, s2,l, r, r2]));
 end;
 
 procedure TForm1.btnDecodeHeaderClick(Sender: TObject);
