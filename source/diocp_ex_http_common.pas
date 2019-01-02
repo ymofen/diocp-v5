@@ -542,6 +542,8 @@ function URLDecode(const pvInputStr: string; pvEncoding: TEncoding): String;
 
 implementation
 
+
+
 resourcestring
   { System.NetEncoding }
   sErrorDecodingURLText =
@@ -1080,6 +1082,22 @@ begin
   else if (lvExt = '.png') then
   begin
     Result := 'image/png';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.m3u', -1) = 0 then
+  begin
+    Result := 'audio/mpegurl';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.mp3', -1) = 0 then
+  begin
+    Result := 'audio/mp3';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.mp4', -1) = 0 then
+  begin
+    Result := 'audio/mp4';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.wma', -1) = 0 then
+  begin
+    Result := 'audio/wma';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.wav', -1) = 0 then
+  begin
+    Result := 'audio/wav';
+
   end
   else
   begin

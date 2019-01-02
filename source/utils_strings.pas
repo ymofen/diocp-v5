@@ -626,6 +626,9 @@ function StrStrIgnoreCase(P, PSub: PChar): PChar;
 /// </summary>
 /// <returns> 0: 相等, r := p1-p2 </returns>
 function CompareBuf(p1, p2: Pointer; len: Integer): Integer;
+
+/// <param name="compareLen">-1：全部比较, 0: 比较到其中一个结束</param>
+/// <returns> 0: 相等, r := p1-p2 </returns>
 function CompareStrIgnoreCase(const s1, s2:PChar; compareLen:Integer): Integer;
 function CompareWStrIgnoreCase(const s1, s2:PDCharW; compareLen:Integer): Integer;
 
@@ -1079,12 +1082,13 @@ var
 begin
   v1 := StrToInt64Def(List[index1], 0);
   v2 := StrToInt64Def(List[Index2], 0);
-  if v1<v2 then
-    result:=-1
-  else if v2=v2 then
-    Result:=0
-  else
-    Result:=1;
+  Result := CompareValue(v1, v2);
+//  if v1<v2 then
+//    result:=-1
+//  else if v2=v2 then
+//    Result:=0
+//  else
+//    Result:=1;
 end;
 
 
@@ -3331,10 +3335,22 @@ var
   j:Integer;
 begin
   j := 0;
+  Result := 0;
   lvP1 := s1;
   lvP2 := s2;
-  while (lvP1^ <> #0) and (lvP2^ <> #0) and ((compareLen=0) or (j<compareLen)) do
+  while true do
   begin
+    if (compareLen=0) and ((lvP1^ = #0) or (lvP2^ = #0)) then
+    begin
+      Break;
+    end else if (j=compareLen) then
+    begin
+      Break;
+    end else if (lvP1^=#0) and (lvP2^=#0) then
+    begin
+      break;
+    end;
+
     Result := Ord(lvP1^)-Ord(lvP2^);
     if Result <> 0 then
       Result := Ord(UpCase(lvP1^)) - Ord(UpCase(lvP2^));
@@ -3356,10 +3372,21 @@ var
   j:Integer;
 begin
   j := 0;
+  Result := 0;  // 默认相等
   lvP1 := s1;
   lvP2 := s2;
-  while (lvP1^ <> #0) and (lvP2^ <> #0) and ((compareLen=0) or (j<compareLen)) do
+  while true do
   begin
+    if (compareLen=0) and ((lvP1^ = #0) or (lvP2^ = #0)) then
+    begin
+      Break;
+    end else if (j=compareLen) then
+    begin
+      Break;
+    end else if (lvP1^=#0) and (lvP2^=#0) then
+    begin
+      break;
+    end;
     Result := Ord(lvP1^)-Ord(lvP2^);
     if Result <> 0 then
       Result := Ord(UpperCharW(lvP1^)) - Ord(UpperCharW(lvP2^));

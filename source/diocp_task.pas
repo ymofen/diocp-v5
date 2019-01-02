@@ -17,7 +17,7 @@ interface
 
 uses
   diocp_core_engine, SysUtils, utils_queues, Messages, Windows, Classes,
-  SyncObjs, utils_hashs, utils_locker, utils_threadinfo;
+  SyncObjs, utils_hashs, utils_locker, utils_threadinfo, utils_BufferPool;
 
 const
   WM_REQUEST_TASK = WM_USER + 1;
@@ -36,7 +36,7 @@ type
   /// rtPostMessage: use in dll project
   TRunInMainThreadType = (rtSync, rtPostMessage);
 
-  TDataFreeType = (ftNone, ftFreeAsObject, ftUseDispose);
+  TDataFreeType = (ftNone, ftFreeAsObject, ftUseDispose, ftReleaseRef);
 
   TSignalTaskData = class(TObject)
   private
@@ -169,10 +169,11 @@ type
 
     /// <summary>
     ///   post a signal task
+    ///   投递失败会安装FreeType处理数据
     /// </summary>
-    procedure SignalATask(pvSignalID: Integer; pvTaskData: Pointer = nil;
+    function SignalATask(pvSignalID: Integer; pvTaskData: Pointer = nil;
         pvDataFreeType: TDataFreeType = ftNone; pvRunInMainThread: Boolean = False;
-        pvRunType: TRunInMainThreadType = rtSync); overload;
+        pvRunType: TRunInMainThreadType = rtSync): Boolean; overload;
 
 
     property Active: Boolean read FActive write SetActive;
@@ -203,7 +204,7 @@ var
 resourcestring
   strDebugRequest_State = '主线程运行: %s, 完成: %s, 耗时(ms): %d';
   strSignalAlreadyRegisted = '信号(%d)已经注册';
-  strSignalUnRegister = '信号(%d)取消注册';
+  strSignalUnRegister = '信号(%d)未注册或者已经取消注册';
 
 procedure CheckFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
 begin
@@ -215,6 +216,9 @@ begin
   end else if pvDataFreeType = ftUseDispose then
   begin
     Dispose(pvData);
+  end else if pvDataFreeType = ftReleaseRef then
+  begin
+    ReleaseRef(pvData);
   end;
 end;
 
@@ -605,15 +609,16 @@ begin
 
 end;
 
-procedure TIocpTaskMananger.SignalATask(pvSignalID: Integer; pvTaskData:
-    Pointer = nil; pvDataFreeType: TDataFreeType = ftNone; pvRunInMainThread:
-    Boolean = False; pvRunType: TRunInMainThreadType = rtSync);
+function TIocpTaskMananger.SignalATask(pvSignalID: Integer; pvTaskData: Pointer
+    = nil; pvDataFreeType: TDataFreeType = ftNone; pvRunInMainThread: Boolean =
+    False; pvRunType: TRunInMainThreadType = rtSync): Boolean;
 var
   lvSignalData:TSignalTaskData;
 
   lvRequest:TIocpTaskRequest;
   lvTaskWork: TOnTaskWork;
 begin
+  Result := False;
   lvTaskWork := nil;
   if not FEnable then
   begin
@@ -628,7 +633,8 @@ begin
     if lvSignalData = nil then
     begin
       CheckFreeData(pvTaskData, pvDataFreeType);
-      raise Exception.CreateFmt(strSignalUnRegister, [pvSignalID]);
+      Exit;
+      //raise Exception.CreateFmt(strSignalUnRegister, [pvSignalID]);
     end;
 
     lvTaskWork := lvSignalData.FOnTaskWork;
@@ -651,6 +657,7 @@ begin
     lvRequest.FRunInMainThreadType := pvRunType;
 
     InnerPostTask(lvRequest);
+    Result := True;
   except
     // if occur exception, push to requestPool.
     if lvRequest <> nil then requestPool.EnQueue(lvRequest);
