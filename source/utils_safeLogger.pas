@@ -255,6 +255,8 @@ var
   __ProcessIDStr :String;
   __GetThreadStackFunc: TThreadStackFunc;
 
+procedure StopSafeLogger;
+
 procedure SafeWriteFileMsg(const pvMsg, pvFilePre: String);
 
 {$if CompilerVersion < 18} //before delphi 2007
@@ -1120,6 +1122,15 @@ begin
 end;
 {$ENDIF}
 
+procedure StopSafeLogger;
+begin
+  if sfLogger <> nil then
+  begin
+    sfLogger.Free;
+    sfLogger := nil;
+  end;
+end;
+
 procedure TLogDataObject.DoCleanUp;
 begin
   FMsg := STRING_EMPTY;
@@ -1143,7 +1154,7 @@ initialization
   {$ENDIF}
 
 finalization
-  sfLogger.Free;
+  StopSafeLogger;
 
   {$IFDEF USE_QUEUE_POOL}
   __dataObjectPool.Free;

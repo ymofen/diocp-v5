@@ -35,7 +35,7 @@ interface
 
 
 uses
-  Classes, StrUtils, SysUtils, SHA, utils_strings 
+  Classes, StrUtils, SysUtils, utils_SHA, utils_strings
 
   {$IFDEF QDAC_QWorker}, qworker{$ENDIF}
   {$IFDEF DIOCP_Task}, diocp_task{$ENDIF}
