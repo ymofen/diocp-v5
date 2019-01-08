@@ -256,6 +256,7 @@ var
   __GetThreadStackFunc: TThreadStackFunc;
 
 procedure StopSafeLogger;
+procedure StartDefaultSafeLogger;
 
 procedure SafeWriteFileMsg(const pvMsg, pvFilePre: String);
 
@@ -1122,6 +1123,16 @@ begin
 end;
 {$ENDIF}
 
+procedure StartDefaultSafeLogger;
+begin
+  if sfLogger = nil then
+  begin
+    sfLogger := TSafeLogger.Create();
+    sfLogger.Name := 'defaultLogger';
+    sfLogger.setAppender(TLogFileAppender.Create(True));
+  end;
+end;
+
 procedure StopSafeLogger;
 begin
   if sfLogger <> nil then
@@ -1146,9 +1157,8 @@ initialization
   __dataObjectPool.Name := 'safeLogger.LogDataPool';
   InnerPushPoolObjects;
   {$ENDIF}
-  sfLogger := TSafeLogger.Create();
-  sfLogger.Name := 'defaultLogger';
-  sfLogger.setAppender(TLogFileAppender.Create(True));
+  StartDefaultSafeLogger;
+
   {$IFDEF MSWINDOWS}
   {$ELSE}
   {$ENDIF}

@@ -352,6 +352,7 @@ type
 
 
     function ToString: DStringW;{$IFDEF UNICODE}override;{$ENDIF}
+    function WStrPtr: PDCharW;
     property Length: Integer read GetLength;
 
     procedure SaveToFile(const pvFile: String);
@@ -592,6 +593,7 @@ function PosStr(const sub, s: string): Integer;
 
 function PosWStr(const sub, s: DStringW): Integer;
 
+
 /// <summary>
 ///   查找PSub在P中出现的第一个位置
 ///   精确查找
@@ -670,7 +672,7 @@ function UpperCharW(c: DCharW): DCharW;
 ///  aStr是否在Strs列表中
 /// </summary>
 /// <returns>
-///   如果在列表中返回true
+///   返回在列表中的位置，否则返回-1
 /// </returns>
 /// <param name="pvStr"> sensors,1,3.1415926,1.1,1.2,1.3 </param>
 /// <param name="pvStringList"> (array of string) </param>
@@ -869,6 +871,9 @@ procedure FreeAsDisposeProc(pvData: Pointer);
 function CmpIntValForSortFun(List: TStringList; Index1, Index2: Integer):
     Integer;
 
+var
+  __app_root: string;
+
 implementation
 
 
@@ -974,6 +979,7 @@ var
 
 var
   __DateFormat: TFormatSettings;
+
 
 procedure PrintDebugString(s:string);
 begin
@@ -3597,6 +3603,11 @@ begin
   Move(FData[0], PDCharW(Result)^, l shl 1); 
 end;
 
+function TDStringWBuilder.WStrPtr: PDCharW;
+begin
+  Result := @FData[0];
+end;
+
 function TDStringWBuilder.Append(SWB: TDStringWBuilder): TDStringWBuilder;
 var
   l:Integer;
@@ -3619,6 +3630,7 @@ initialization
   __DateFormat.LongDateFormat := 'yyyy-MM-dd';
   __DateFormat.ShortTimeFormat := 'HH:mm:ss';
   __DateFormat.LongTimeFormat := 'HH:mm:ss';
+  __app_root := ExtractFilePath(ParamStr(0));
 
 {$IFDEF MSWINDOWS}
 

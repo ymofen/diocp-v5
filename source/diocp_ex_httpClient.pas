@@ -250,6 +250,7 @@ resourcestring
 
 var
   __trace_id: Integer;
+  __root: string;
   __writeBufferPool: PBufferPool;
 
 procedure RaiseLastSendException(LastError: Integer);
@@ -946,7 +947,9 @@ begin
     raise Exception.Create(Format('´íÎóµÄResponseHttpCode[%d]', [lvCode]));
   end else
   begin
-    FHttpBuffer.ContentBuilder.SaveToFile('response.dat');
+    {$IFDEF TRACE_LOG}
+    FHttpBuffer.ContentBuilder.SaveToFile(__app_root + 'response.dat');
+    {$ENDIF}
     raise Exception.Create(Format('´íÎóµÄResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
   end;
 end;
@@ -1095,7 +1098,10 @@ end;
 
 initialization
   __trace_id := 0;
+  __root := ExtractFilePath(ParamStr(0));
   __writeBufferPool := NewBufferPool(BLOCK_SIZE);
+
+
 
 finalization
   FreeBufferPool(__writeBufferPool);
