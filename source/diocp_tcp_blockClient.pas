@@ -51,6 +51,8 @@ type
   [ComponentPlatformsAttribute(pidWin32 or pidWin64 {$IF CompilerVersion >= 25} or pidOSX32 or pidAndroid or pidiOSSimulator{$IFEND})]
   {$IFEND}
 
+  ETcpClientSocketException = class(Exception);
+
   TDiocpBlockTcpClient = class(TComponent)
   private
     FActive: Boolean;
@@ -193,7 +195,7 @@ begin
   if pvSocketResult = -2 then
   begin
     self.Disconnect;
-    raise Exception.Create(STRING_E_TIMEOUT);
+    raise ETcpClientSocketException.Create(STRING_E_TIMEOUT);
   end;
   ///  Posix, fail return 0
   ///  ms_windows, fail return -1
@@ -212,12 +214,20 @@ begin
   begin
     lvErrorCode := GetLastError;
     Disconnect;     // 出现异常后断开连接
-
     {$if CompilerVersion < 23}
-    RaiseLastOSErrorException(lvErrorCode);
+    raise ETcpClientSocketException.Create(
+      Format(SOSError, [lvErrorCode, SysErrorMessage(lvErrorCode)]));
     {$ELSE}
-    RaiseLastOSError(lvErrorCode);
-    {$ifend} 
+    raise ETcpClientSocketException.Create(
+      Format(SOSError, [lvErrorCode, SysErrorMessage(lvErrorCode), '']));
+    {$ifend}
+//    {$ELSE}
+//    {$if CompilerVersion < 23}
+//    RaiseLastOSErrorException(lvErrorCode);
+//    {$ELSE}
+//    RaiseLastOSError(lvErrorCode);
+//    {$ifend}
+//    {$ENDIF}
   end;
   {$ENDIF}
 end;
@@ -287,7 +297,7 @@ begin
     FActive := FRawSocket.ConnectTimeOut(lvIpAddr, FPort, pvMs);
     if not FActive then
     begin
-      raise Exception.CreateFmt(strConnectTimeOut, [FHost, FPort]);
+      raise ETcpClientSocketException.CreateFmt(strConnectTimeOut, [FHost, FPort]);
     end;
   finally
     if not FActive then
@@ -351,7 +361,7 @@ begin
     if lvTempL = 0 then
     begin
       Disconnect;
-      raise Exception.Create(STRING_E_RECV_ZERO);
+      raise ETcpClientSocketException.Create(STRING_E_RECV_ZERO);
     end;
 
     CheckSocketResult(lvTempL);
@@ -370,7 +380,7 @@ begin
   if Result = 0 then
   begin
     Disconnect;
-    raise Exception.Create(STRING_E_RECV_ZERO);
+    raise ETcpClientSocketException.Create(STRING_E_RECV_ZERO);
   end;
   CheckSocketResult(Result);
 end;
@@ -382,7 +392,7 @@ begin
   if Result = 0 then
   begin
     Disconnect;
-    raise Exception.Create(STRING_E_RECV_ZERO);
+    raise ETcpClientSocketException.Create(STRING_E_RECV_ZERO);
   end;
   CheckSocketResult(Result);
 end;

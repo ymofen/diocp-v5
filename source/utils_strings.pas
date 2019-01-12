@@ -46,7 +46,9 @@ uses
     , System.NetEncoding
 {$ENDIF}
 {$ENDIF}
-
+{$IFDEF POSIX}
+    , Posix.String_, Posix.Time,Posix.SysTypes
+{$ENDIF}
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
     , AnsiStrings
 {$IFEND >=XE5}
@@ -3320,6 +3322,7 @@ begin
     Result := Old + n;
   until InterlockedCompareExchange64(Target, Result, Old) = Old;
 end;
+{$ENDIF}
 
 function CompareBuf(p1, p2: Pointer; len: Integer): Integer;
 begin
@@ -3416,7 +3419,7 @@ begin
     Result := c;
 end;
 
-{$ENDIF}
+
 
 constructor TDStringWBuilder.Create;
 begin
