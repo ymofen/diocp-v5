@@ -860,7 +860,7 @@ function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; o
 {$IFDEF MSWINDOWS}
 //http://code.google.com/p/omnithreadlibrary/source/browse/branches/x64/OtlSync.pas?r=1071
 function CAS64(const oldData, newData: int64; var destination): boolean;
-function AtomicAdd64(var Target:Int64; n:Int64): Int64; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicAdd64(var Target:Int64; n:Int64): Int64; 
 function __InterlockedCompareExchange64(var Destination: Int64; Exchange: Int64; Comparand: Int64): Int64; stdcall;
 {$ELSE}
 
@@ -970,7 +970,7 @@ type
   TMSVCStrStr = function(s1, s2: PAnsiChar): PAnsiChar; cdecl;
   TMSVCStrStrW = function(s1, s2: PWChar): PWChar; cdecl;
   TMSVCMemCmp = function(s1, s2: Pointer; len: Integer): Integer; cdecl;
-  TMSInterlockedCompareExchange64 = function(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall; {$IFDEF HAVE_INLINE}inline;{$ENDIF HAVE_INLINE}
+  TMSInterlockedCompareExchange64 = function(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall;
 
 
 var
@@ -3365,7 +3365,6 @@ end;
 function AtomicAdd64(var Target:Int64; n:Int64): Int64;
 var
   r, Old: Int64;
-
 begin
   repeat
     Old := Target;
