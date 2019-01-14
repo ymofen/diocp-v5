@@ -858,8 +858,10 @@ function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; o
 
 
 {$IFDEF MSWINDOWS}
-function AtomicAdd64(var Target:Int64; n:Int64): Int64;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
-function InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall external kernel32 name 'InterlockedCompareExchange64';
+//http://code.google.com/p/omnithreadlibrary/source/browse/branches/x64/OtlSync.pas?r=1071
+function CAS64(const oldData, newData: int64; var destination): boolean;
+function AtomicAdd64(var Target:Int64; n:Int64): Int64; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function __InterlockedCompareExchange64(var Destination: Int64; Exchange: Int64; Comparand: Int64): Int64; stdcall;
 {$ELSE}
 
 {$ENDIF}
@@ -875,6 +877,7 @@ function CmpIntValForSortFun(List: TStringList; Index1, Index2: Integer):
 
 var
   __app_root: string;
+  __default_datetime_fmt:string;
 
 implementation
 
@@ -967,9 +970,12 @@ type
   TMSVCStrStr = function(s1, s2: PAnsiChar): PAnsiChar; cdecl;
   TMSVCStrStrW = function(s1, s2: PWChar): PWChar; cdecl;
   TMSVCMemCmp = function(s1, s2: Pointer; len: Integer): Integer; cdecl;
+  TMSInterlockedCompareExchange64 = function(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall; {$IFDEF HAVE_INLINE}inline;{$ENDIF HAVE_INLINE}
+
 
 var
   hMsvcrtl: HMODULE;
+  hKernel32: HMODULE;
 
 {$IFDEF UNICODE}
   VCStrStrW: TMSVCStrStrW;
@@ -977,6 +983,9 @@ var
   VCStrStr: TMSVCStrStr;
 {$ENDIF}
   VCMemCmp: TMSVCMemCmp;
+
+  InterlockedCompareExchange64Locker:Integer;
+  InterlockedCompareExchange64Func :TMSInterlockedCompareExchange64;
 {$ENDIF}
 
 var
@@ -993,6 +1002,19 @@ begin
   {$ENDIF}
   {$ENDIF}
 
+end;
+
+function __xp_InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall; {$IFDEF HAVE_INLINE}inline;{$ENDIF HAVE_INLINE}
+begin 
+  SpinLock(InterlockedCompareExchange64Locker);
+  Result := Val;
+  if val = Compare  then
+  begin
+    Result := Compare;
+    Val := Exchange;
+  end;
+  SpinUnLock(InterlockedCompareExchange64Locker);
+  
 end;
 
 {$if CompilerVersion < 20}
@@ -2800,7 +2822,7 @@ begin
     Result := '0000-00-00 00:00:00.000'
   end else
   begin
-    Result := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvDateTime);
+    Result := FormatDateTime(__default_datetime_fmt, pvDateTime);
   end;
 end;
 
@@ -3313,14 +3335,47 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
+
+function CAS64(const oldData, newData: int64; var destination): boolean;
+asm
+{$IFNDEF CPUX64}
+  push  edi
+  push  ebx
+  mov   edi, destination
+  mov   ebx, low newData
+  mov   ecx, high newData
+  mov   eax, low oldData
+  mov   edx, high oldData
+  lock cmpxchg8b [edi]
+  pop   ebx
+  pop   edi
+{$ELSE CPUX64}
+  mov   rax, oldData
+  lock cmpxchg [destination], newData
+{$ENDIF ~CPUX64}
+  setz  al
+end; { CAS64 }
+
+
+function __InterlockedCompareExchange64;
+begin
+  Result := InterlockedCompareExchange64Func(Destination, Exchange, Comparand);
+end;
+
 function AtomicAdd64(var Target:Int64; n:Int64): Int64;
 var
-  Old: Int64;
+  r, Old: Int64;
+
 begin
   repeat
     Old := Target;
     Result := Old + n;
-  until InterlockedCompareExchange64(Target, Result, Old) = Old;
+    r := InterlockedCompareExchange64Func(Target, Result, Old);
+    if r = Old then
+    begin
+      break;
+    end;
+  until (1=1);
 end;
 {$ENDIF}
 
@@ -3631,35 +3686,49 @@ initialization
   __DateFormat.TimeSeparator := ':';
   __DateFormat.ShortDateFormat := 'yyyy-MM-dd';
   __DateFormat.LongDateFormat := 'yyyy-MM-dd';
-  __DateFormat.ShortTimeFormat := 'HH:mm:ss';
-  __DateFormat.LongTimeFormat := 'HH:mm:ss';
+  __DateFormat.ShortTimeFormat := 'HH:nn:ss';
+  __DateFormat.LongTimeFormat := 'HH:nn:ss';
   __app_root := ExtractFilePath(ParamStr(0));
+  __default_datetime_fmt := 'yyyy-MM-dd hh:nn:ss.zzz';
 
-{$IFDEF MSWINDOWS}
+  {$IFDEF MSWINDOWS}
 
-{$IFDEF UNICODE}
-VCStrStrW := nil;
-{$ELSE}
-VCStrStr := nil;
-{$ENDIF}
-VCMemCmp := nil;
-hMsvcrtl := LoadLibrary('msvcrt.dll');
-if hMsvcrtl <> 0 then
-begin
   {$IFDEF UNICODE}
-  VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
+  VCStrStrW := nil;
   {$ELSE}
-  VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
+  VCStrStr := nil;
   {$ENDIF}
-  VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
-end;
-{$ENDIF}
+  VCMemCmp := nil;
+  hMsvcrtl := LoadLibrary('msvcrt.dll');
+  if hMsvcrtl <> 0 then
+  begin
+    {$IFDEF UNICODE}
+    VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
+    {$ELSE}
+    VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
+    {$ENDIF}
+    VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
+  end;
+
+  hKernel32 := LoadLibrary(kernel32);
+  if hKernel32 <> 0 then
+  begin
+    InterlockedCompareExchange64Func := TMSInterlockedCompareExchange64(GetProcAddress(hKernel32, 'InterlockedCompareExchange64'));
+  end;
+
+  if not Assigned(InterlockedCompareExchange64Func) then
+    InterlockedCompareExchange64Func := @__xp_InterlockedCompareExchange64;
+
+  {$ENDIF}
 
 finalization
 
 {$IFDEF MSWINDOWS}
 if hMsvcrtl <> 0 then
   FreeLibrary(hMsvcrtl);
+
+if hKernel32 <> 0 then
+  FreeLibrary(hKernel32);
 {$ENDIF}
 
 end.
