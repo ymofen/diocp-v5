@@ -20,14 +20,14 @@ const
   WM_SYNC_MSG = WM_USER + 1;
 
 type
-  TDataProc = procedure(pvData:Pointer);
+  TVarDataProc = procedure(var vData: Pointer);
   TDataEvent = procedure(pvData:Pointer) of object;
   
   TSyncTaskObject = class(TObject)
   private
     FCb:TDataEvent;
     FData:Pointer;
-    FDataFreeProc:TDataProc;
+    FDataFreeProc:TVarDataProc;
   public
     procedure DoCallBack();
     procedure DoTaskForSync;
@@ -48,7 +48,7 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure RaiseMessage(const s: string);
-    procedure Post(pvCb:TDataEvent; pvData:Pointer; pvDataFreeProc:TDataProc);
+    procedure Post(pvCb:TDataEvent; pvData:Pointer; pvDataFreeProc:TVarDataProc);
     procedure ShowMessage(const s:string);
   end;
 
@@ -121,7 +121,7 @@ end;
 
 
 procedure TSyncHelper.Post(pvCb:TDataEvent; pvData:Pointer;
-    pvDataFreeProc:TDataProc);
+    pvDataFreeProc:TVarDataProc);
 var
   lvTaskData:TSyncTaskObject;
 begin

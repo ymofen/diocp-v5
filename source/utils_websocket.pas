@@ -41,6 +41,7 @@ type
     FBuffer: TDBufferBuilder;
   private
     FContentLength: Int64;
+    FContentMaxSize: Integer;
     FHeadLength: Byte;
     FPlayload:Byte;
     function GetMaskState: Byte;
@@ -54,6 +55,12 @@ type
     constructor Create;
     destructor Destroy; override;
 
+    /// <summary>
+    ///
+    /// </summary>
+    /// <returns>
+    ///    -2: 数据太大
+    /// </returns>
     function InputBuffer(const buf:Byte): Integer;
 
     procedure EncodeBuffer(const buf: Pointer; len: Int64; pvFIN: Boolean;
@@ -77,6 +84,10 @@ type
     function DecodeDataWithUtf8: string;
     property Buffer: TDBufferBuilder read FBuffer;
     property ContentLength: Int64 read FContentLength;
+
+    property ContentMaxSize: Integer read FContentMaxSize write FContentMaxSize;
+
+
   end;
 
 
@@ -102,6 +113,7 @@ constructor TDiocpWebSocketFrame.Create;
 begin
   inherited Create;
   FBuffer := TDBufferBuilder.Create();
+  FContentMaxSize := 1024 * 1024 * 10;
 end;
 
 function TDiocpWebSocketFrame.GetFIN: Byte;
@@ -242,6 +254,11 @@ begin
     end else if (FPlayload = 127) then
     begin
       FContentLength := TByteTools.swap64(PInt64(FBuffer.MemoryBuffer(2))^);  //   Swap64(PInt64(@SrcData[2])^);
+    end;
+    if FContentLength > FContentMaxSize then
+    begin      // 超过10M 大小
+      Result := -2;
+      Exit;
     end;
   end;
 

@@ -866,8 +866,8 @@ function __InterlockedCompareExchange64(var Destination: Int64; Exchange: Int64;
 
 {$ENDIF}
 
-procedure FreeAsObjectProc(pvData: Pointer);
-procedure FreeAsDisposeProc(pvData: Pointer);
+procedure FreeAsObjectProc(var pvData: Pointer);
+procedure FreeAsDisposeProc(var pvData: Pointer);
 
 /// <summary>
 ///   ≈≈–ÚTStrings π”√
@@ -882,12 +882,16 @@ var
 implementation
 
 
-procedure FreeAsObjectProc(pvData: Pointer);
+procedure FreeAsObjectProc(var pvData: Pointer);
+var
+  lvObj:TObject;
 begin
-  TObject(pvData).Free;
+  lvObj := TObject(pvData);
+  FreeAndNil(lvObj);
+  pvData := nil; 
 end;
 
-procedure FreeAsDisposeProc(pvData: Pointer);
+procedure FreeAsDisposeProc(var pvData: Pointer);
 begin
   Dispose(pvData);
 end;
