@@ -2303,6 +2303,7 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(2);
+  Assert((FSize + 2) < self.FCapacity);
   FData[FSize] := 13;
   FData[FSize +1 ] := 10;
   Inc(FSize, 2);
@@ -2318,6 +2319,8 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(pvLength);
+
+  Assert((FSize + pvLength) < self.FCapacity);
 
   // 在最后添加
   Move(pvBuffer^, FData[FSize], pvLength);
@@ -2510,6 +2513,7 @@ end;
 
 function TDBufferBuilder.MemoryBuffer(const pvIndex: Integer): PByte;
 begin
+  Assert(pvIndex < self.FCapacity);
   Result := @FData[pvIndex];
 end;
 

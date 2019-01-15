@@ -262,9 +262,15 @@ begin
     end;
   end;
 
+  if FBuffer.Length > FContentMaxSize then
+  begin
+    Assert(FBuffer.Length < FContentMaxSize);
+  end;
+
+
   if FBuffer.Length = (FHeadLength + FContentLength) then
   begin   // 完整数据
-    FFlag := 0; 
+    FFlag := 0;
     if GetMaskState = 1 then
     begin
       DecodeWithMask;
@@ -275,7 +281,6 @@ begin
       Result := 1;
       Exit;
     end;
-
   end;
 
   Result := 0;
