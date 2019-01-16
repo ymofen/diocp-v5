@@ -248,4 +248,5 @@ DIOCP-v5 0.0.2
 54: 2018-08-15 11:31:24
     1. DiocpTcpClient.Context.DirectPost (添加直投模式)， 不经过队列直接投递到系统的IOCP发送队列
     
-    
+55. 2019-01-16 09:38:52
+    1. 修复TDBufferBuilder，在有的情况下面没有增长的BUG
