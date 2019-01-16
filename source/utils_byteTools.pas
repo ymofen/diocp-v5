@@ -13,16 +13,19 @@ unit utils_byteTools;
 interface
 
 uses
-  SysUtils, Classes;
+  SysUtils, Classes, utils_strings;
 
 type
-  {$IF RTLVersion<25}
-  IntPtr=Integer;
-  {$IFEND IntPtr}
 
-  {$if CompilerVersion < 18} //before delphi 2007
-  TBytes = array of Byte;
-  {$ifend}
+// 在utils_strings中存在，避免重复定义，造成D7无法编译
+//  {$IF RTLVersion<25}
+//  IntPtr=Integer;
+//  {$IFEND IntPtr}
+//
+//  {$if CompilerVersion < 18} //before delphi 2007
+//  TBytes = array of Byte;
+//  {$ifend}
+
 
   TByteTools = class(TObject)
   public
@@ -480,7 +483,7 @@ var
   lvPtr:PChar;
 begin
   l1 := Length(Split);
-  SetLength(Result, Integer(len * 8 + l1 * len));
+  SetLength(Result, Integer(len) * 8 + l1 * Integer(len));
   lvPtr := PChar(Result);
   lvBuf := @v;
   for i := 0 to (len * 8 - 1) do

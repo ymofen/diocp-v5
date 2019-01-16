@@ -605,7 +605,7 @@ type
 
     procedure SetChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
 
-    procedure SetChunkedUtf8(pvStr:string);
+    procedure SetChunkedUtf8(const pvStr: string);
   end;
 
   TDiocpWebSocketRequest = class(TDiocpHttpRequest)
@@ -1259,6 +1259,7 @@ function TDiocpHttpRequest.DecRef: Boolean;
 var
   lvConnection:TDiocpHttpClientContext;
 begin
+  Result := False;
   // 预先存临时变量，避免close后，connection改变
   lvConnection := Self.Connection;
   if AtomicDecrement(Self.FRefCounter) = 0 then
@@ -1266,10 +1267,8 @@ begin
     Self.Close;
     Result := True;
   end;
-
   // 后执行，避免先投递了接收请求
   lvConnection.DecRecvRef;
-
 
 end;
 
@@ -1837,7 +1836,7 @@ begin
   FInnerResponse.ChunkedBufferStart;
 end;
 
-procedure TDiocpHttpResponse.SetChunkedUtf8(pvStr:string);
+procedure TDiocpHttpResponse.SetChunkedUtf8(const pvStr: string);
 var
   lvBytes:TBytes;
 begin
@@ -2437,7 +2436,7 @@ begin
 
       end;
 
-
+      r := 0;
       try
         lvByte := lvTmpBuf^;
         r := FCurrentRequest.InputBuffer(lvByte);

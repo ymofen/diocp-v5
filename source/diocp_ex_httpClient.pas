@@ -249,7 +249,7 @@ resourcestring
   {$ENDIF}
 
 var
-  __trace_id: Integer;
+  //__trace_id: Integer;
   __root: string;
   __writeBufferPool: PBufferPool;
 
@@ -837,7 +837,7 @@ begin
     end;
     CheckSocketRecvResult(lvTempL);
 
-    lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));
+    lvPBuf := Pointer(IntPtr(lvPBuf) + IntPtr(lvTempL));
     lvReadL := lvReadL + Cardinal(lvTempL);
   end;
 end;
@@ -920,7 +920,7 @@ begin
   try
     r := FRawSocket.SendBuf(pvBuf^, len);
     CheckSocketRecvResult(r);
-    if r <> len then
+    if r <> Integer(len) then
     begin
       raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
     end;
@@ -1097,7 +1097,7 @@ begin
 end;
 
 initialization
-  __trace_id := 0;
+  //__trace_id := 0;
   __root := ExtractFilePath(ParamStr(0));
   __writeBufferPool := NewBufferPool(BLOCK_SIZE);
 
