@@ -873,6 +873,10 @@ type
     procedure CheckSessionTimeOut;
 
     function GetPrintDebugInfo: string;
+    /// <summary>
+    ///   发送Ping到所有的客户端
+    /// </summary>
+    procedure WebSocketSendBuffer(pvBuf: Pointer; pvBufLen: Integer; OPTCode: Byte);
 
   published
 
@@ -2982,6 +2986,35 @@ begin
          end;
        finally
          lvContext.UnLockContext('sendPing', lvContext);
+       end;
+    end;
+  finally
+    lvList.Free;
+  end;
+    
+end;
+
+procedure TDiocpHttpServer.WebSocketSendBuffer(pvBuf: Pointer; pvBufLen:
+    Integer; OPTCode: Byte);
+var
+  lvList:TList;
+  i: Integer;
+  lvContext:TDiocpHttpClientContext;
+begin
+  lvList := TList.Create;
+  try
+    GetOnlineContextList(lvList); 
+    for i := 0 to lvList.Count - 1 do
+    begin
+       lvContext := TDiocpHttpClientContext(lvList[i]);
+       if lvContext.LockContext('SendWsBuffer', lvContext) then
+       try
+         if lvContext.ContextType = Context_Type_WebSocket then
+         begin
+           lvContext.PostWebSocketSendBuffer(pvBuf, pvBufLen, OPTCode);
+         end;
+       finally
+         lvContext.UnLockContext('SendWsBuffer', lvContext);
        end;
     end;
   finally

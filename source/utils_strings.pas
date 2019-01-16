@@ -2137,9 +2137,9 @@ procedure TDStringBuilder.CheckNeedSize(pvSize: LongInt);
 var
   lvCapacity:LongInt;
 begin
-  if FPosition + pvSize > FCapacity then
+  if (FPosition + pvSize) >= FCapacity then
   begin
-    lvCapacity := (FPosition + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    lvCapacity := (FPosition + pvSize + BUFFER_BLOCK_SIZE) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);     
   end;
@@ -2319,8 +2319,10 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(pvLength);
-
-  Assert((FSize + pvLength) < self.FCapacity);
+  if (FSize + pvLength) >= self.FCapacity then
+  begin
+   Assert((FSize + pvLength) < self.FCapacity);
+  end;
 
   // 在最后添加
   Move(pvBuffer^, FData[FSize], pvLength);
@@ -2396,9 +2398,9 @@ procedure TDBufferBuilder.CheckNeedSize(pvSize: LongInt);
 var
   lvCapacity:LongInt;
 begin
-  if FSize + pvSize > FCapacity then
+  if (FSize + pvSize) >= FCapacity then
   begin
-    lvCapacity := (FSize + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    lvCapacity := (FSize + pvSize + BUFFER_BLOCK_SIZE) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);
   end;
@@ -2408,9 +2410,9 @@ procedure TDBufferBuilder.CheckNeedSize(pvOffset, pvSize: LongInt);
 var
   lvCapacity:LongInt;
 begin
-  if pvOffset + pvSize > FCapacity then
+  if (pvOffset + pvSize) >= FCapacity then
   begin
-    lvCapacity := (pvOffset + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    lvCapacity := (pvOffset + pvSize + BUFFER_BLOCK_SIZE) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);
   end;
