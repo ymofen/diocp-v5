@@ -3987,7 +3987,7 @@ end;
 procedure TIocpAcceptorMgr.PostAcceptExRequest;
 var
   lvRequest:TIocpAcceptExRequest;
-  i, j:Integer;
+  i:Integer;
 begin
   if not FListenSocket.SocketValid then Exit;
   i :=0;
@@ -4753,7 +4753,6 @@ begin
   FWSABuf.buf := buf;
   FWSABuf.len := len;
   dwFlag := 0;
-  lvErrorCode := 0;
   lpNumberOfBytesSent := 0;
 
   // maybe on HandleResonse and release self

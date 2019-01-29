@@ -69,6 +69,8 @@ const
 type
   TDataProc = procedure(pvData:Pointer);
   TDataEvent = procedure(pvData:Pointer) of object;
+  TBufferFuncEvent = function(pvSender:TObject; const Buffer; Count:Int64):Int64 of object;
+  
   TExceptionNotifyEvent = procedure(pvSender: TObject; pvException: Exception;
       pvTag: Integer) of object;
 
@@ -180,6 +182,20 @@ type
     ///   »»ÐÐ·û: Ä¬ÈÏ#13#10
     /// </summary>
     property LineBreak: String read FLineBreak write FLineBreak;
+  end;
+
+
+  TDStreamAdapter = class(TStream)
+  private
+    FOnWrite: TBufferFuncEvent;
+  public
+    function Read(var Buffer; Count: Longint): Longint; override;
+    function Seek(Offset: Longint; Origin: Word): Longint; overload; override;
+    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload;  override;
+    function Write(const Buffer; Count: Longint): Longint; override;
+    procedure SetSize(NewSize: Longint); override;
+  public
+    property OnWrite: TBufferFuncEvent read FOnWrite write FOnWrite;
   end;
 
 
@@ -3688,6 +3704,40 @@ begin
 
 
   Inc(FPosition, l);
+end;
+
+{ TDStreamAdapter }
+
+function TDStreamAdapter.Read(var Buffer; Count: Integer): Longint;
+begin
+  
+end;
+
+function TDStreamAdapter.Seek(Offset: Integer; Origin: Word): Longint;
+begin
+
+end;
+
+function TDStreamAdapter.Seek(const Offset: Int64; Origin: TSeekOrigin): Int64;
+begin
+
+end;
+
+procedure TDStreamAdapter.SetSize(NewSize: Integer);
+begin
+  inherited;
+
+end;
+
+function TDStreamAdapter.Write(const Buffer; Count: Integer): Longint;
+begin
+  if Assigned(FOnWrite) then
+  begin
+    Result := FOnWrite(Self,Buffer,Count);
+  end else
+  begin
+    Result := 0;
+  end;
 end;
 
 initialization  

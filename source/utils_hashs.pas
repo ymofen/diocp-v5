@@ -928,12 +928,11 @@ end;
 function TDHashTable.TrySetValue(const pvKey: String; const Value: Pointer):
     Boolean;
 var
-  lvPData, lvBucket, lvCurrData:PDHashData;
+  lvBucket, lvCurrData:PDHashData;
   lvIndex, lvHashValue:Cardinal;
   lvDataKey  : String;
 begin
   Result := False;
-  lvPData := nil;
   lvDataKey   := LowerCase(pvKey);
   lvHashValue := hashOf(lvDataKey);
   
@@ -945,7 +944,6 @@ begin
     //compare hash value
     if (lvCurrData.Hash = lvHashValue) and (SameText(lvDataKey, lvCurrData.Key)) then
     begin
-      lvPData := lvCurrData;
       Exit;
     end;
     lvCurrData:=lvCurrData.Next;

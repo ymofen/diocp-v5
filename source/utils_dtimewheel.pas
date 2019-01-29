@@ -3,7 +3,11 @@ unit utils_dtimewheel;
 interface
 
 uses
-  SyncObjs, Windows, utils_dtimer, utils_strings, Classes, utils_sync_object,
+  SyncObjs,
+  {$IFDEF MSWINDOWS}
+  Windows, ActiveX,
+  {$ENDIF}
+  utils_dtimer, utils_strings, Classes, utils_sync_object,
   utils_hashs, SysUtils;
 
 type
@@ -38,7 +42,12 @@ type
 
   TDTimeWheel = class(TObject)
   private
+{$IFDEF MSWINDOWS}
+    FCoInitialized:Boolean;
+{$ENDIF}
+  private
     FInterval_msecs:Cardinal;
+
 
 
     FLock:Integer;
@@ -80,6 +89,10 @@ type
     procedure PostRequestCloseCmd();
 
     function FIFOChan(pvChan:PDTimeWheelChan): PDTimeWheelTaskRec;
+  public
+{$IFDEF MSWINDOWS}
+    procedure CheckCoInitializeEx(pvReserved: Pointer = nil; coInit: Longint = 0);
+{$ENDIF}
   public
     /// <summary>TDTimeWheel.Create
     /// </summary>
@@ -177,6 +190,17 @@ begin
   SetEvent(self.FHandles[1]);
   Result := lvItm.TaskID;
 end;
+
+{$IFDEF MSWINDOWS}
+procedure TDTimeWheel.CheckCoInitializeEx(pvReserved: Pointer; coInit: Integer);
+begin
+  if not FCoInitialized then
+  begin
+    CoInitializeEx(pvReserved, coInit);
+    FCoInitialized := true;
+  end;
+end;
+{$ENDIF}
 
 constructor TDTimeWheel.Create(pvMSecs4Interval: Cardinal; pvSlotNum: Integer);
 begin
@@ -543,6 +567,11 @@ begin
     Self.Execute;
     InnerRemoveAllTask;
     InnerRemoveSlotList;
+    
+{$IFDEF MSWINDOWS}
+    if FCoInitialized then CoUninitialize();
+{$ENDIF}
+    
   finally
     SetEvent(FHandles[2]);
   end;

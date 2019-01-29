@@ -553,7 +553,6 @@ end;
 /// </summary>
 procedure InnerFreeBuffer(pvBufBlock: PBufferBlock; const pvHint: string);{$IFDEF HAVE_INLINE} inline;{$ENDIF}
 var
-  lvBuffer:PBufferBlock;
   lvOwner:PBufferPool;
 begin
   if pvBufBlock.__debug_flag = 0 then
@@ -1026,7 +1025,7 @@ begin
 end;
 
 procedure TBlockBuffer.FlushBuffer;
-{$IF Defined(DIOCP_DEBUG) or Defined(DEBUG)}
+{$IF Defined(DIOCP_DEBUG)}
 var
   r, n:Integer;
 {$IFEND}

@@ -65,7 +65,6 @@ type
   protected
 
     procedure DoBeforeReconnect(var vAllowReconnect: Boolean); virtual;
-    procedure BlockReconnectTime(pvMSecs:Cardinal);
   protected
 
     procedure OnConnecteExResponse(pvObject:TObject);
@@ -95,6 +94,7 @@ type
 
     constructor Create; override;
     destructor Destroy; override;
+    procedure BlockReconnectTime(pvMSecs:Cardinal);
     /// <summary>
     ///  阻塞方式建立连接
     ///    连接状态变化: ssDisconnected -> ssConnected/ssDisconnected
@@ -298,7 +298,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TIocpRemoteContext.BlockReconnectTime(pvMSecs: Cardinal);
+procedure TIocpRemoteContext.BlockReconnectTime(pvMSecs:Cardinal);
 begin
   FBlockTime := pvMSecs;
   FBlockStartTick := GetTickCount;

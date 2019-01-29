@@ -38,6 +38,7 @@ function JSONParser(const s: string; pvDValue: TDValue): Integer;
 function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
     true; pvExceptValueTypes: TDValueDataTypes = [vdtInterface, vdtObject,
     vdtPtr]): String;
+function NewDValueFromJSONString(const s:String): TDValue;
 
 function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
 function JSONParseFromFile(pvFile:string; pvDValue:TDValue): Integer;
@@ -928,6 +929,12 @@ begin
   finally
     lvSB.Free;
   end;
+end;
+
+function NewDValueFromJSONString(const s:String): TDValue;
+begin
+  Result := TDValue.Create;
+  JSONParser(s, Result);
 end;
 
 end.
