@@ -2695,6 +2695,13 @@ begin
         Result := j;
         Break;
       end;
+    end else if lvItem.ValueType = vdtObject then
+    begin
+      if lvItem.Value.AsPointer = pvData then
+      begin
+        Result := j;
+        Break;
+      end;
     end;
   end;
 
