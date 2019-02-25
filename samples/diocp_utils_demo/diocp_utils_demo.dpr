@@ -2,7 +2,8 @@ program diocp_utils_demo;
 
 uses
   Forms,
-  ufrmMain in 'ufrmMain.pas' {Form1};
+  ufrmMain in 'ufrmMain.pas' {Form1},
+  utils_router in '..\..\source\utils_router.pas';
 
 {$R *.res}
 

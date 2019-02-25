@@ -33,6 +33,10 @@ interface
 {.$UNDEF HAVE_INLINE}
 {.$DEFINE DIOCP_DEBUG_HINT}
 
+/// 如果不进行sleep会跑满cpu。
+/// spinlock 交换失败时会执行sleep
+{$DEFINE SPINLOCK_SLEEP}
+
 {$if CompilerVersion>= 28}    // XE7:28
   {$DEFINE USE_NetEncoding}
 {$ifend}

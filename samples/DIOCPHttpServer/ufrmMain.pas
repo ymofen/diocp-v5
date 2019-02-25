@@ -17,7 +17,7 @@ uses
   , utils_safeLogger, StrUtils, 
   ComCtrls, diocp_ex_httpServer, diocp_ex_http_common, utils_byteTools,
   utils_dvalue_json, utils_BufferPool, diocp_tcp_server, uRunTimeINfoTools,
-  diocp_task, System.Actions;
+  diocp_task;
 
 type
   TfrmMain = class(TForm)
@@ -114,6 +114,12 @@ begin
   FTcpServer.createDataMonitor;
   FTcpServer.OnDiocpHttpRequest := OnHttpSvrRequest;
   FTcpServer.WorkerCount := 5;
+  //FTcpServer.UseAsyncRecvQueue := true;
+  //StartDiocpLogicWorker(0);
+{$IFDEF DIOCP_HIGH_SPEED}
+{$ELSE}
+  FTcpServer.DisableSession := true;
+{$ENDIF}
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
   
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
@@ -227,12 +233,14 @@ var
 begin
   //Randomize;
   //Sleep(Random(2000));
-//
-//  pvRequest.Response.ResponseCode := 200;
-//  pvRequest.Response.WriteString('hello');
-//  pvRequest.SendResponse();
-//  pvRequest.DoResponseEnd;
-//  Exit;
+  if pvRequest.RequestURI = '/hello' then
+  begin
+    pvRequest.Response.ResponseCode := 200;
+    pvRequest.Response.WriteString('hello world');
+    pvRequest.SendResponse();
+    pvRequest.DoResponseEnd;
+    Exit;
+  end;
   try
     if chkRecord2File.Checked then
     begin

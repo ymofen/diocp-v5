@@ -28,6 +28,7 @@ uses
   , types
 {$ifend}
   , diocp_winapi_winsock2
+  , utils_strings
 
   , ComObj, ActiveX, utils_locker;
 
@@ -75,6 +76,8 @@ type
     FData: Pointer;
     FWorkerThreadID:THandle;
 
+    FRefCounter:Integer;
+
     /// io request response info
     FIocpWorker: TIocpWorker;
 
@@ -118,7 +121,19 @@ type
     /// </summary>
     procedure CancelRequest; virtual;
 
+    procedure DoRelease; virtual;
+
   public
+    /// <summary>
+    ///   会阻止request释放
+    /// </summary>
+    procedure AddRef;
+
+    /// <summary>
+    ///   与AddRef配套使用, 为0后执行DoRelease
+    /// </summary>
+    function DecRef: Boolean;
+
     /// <summary>
     ///   设置线程内部信息, 请在线程内部执行
     /// </summary>
@@ -1484,6 +1499,7 @@ begin
   FOverlapped.refCount := 0;
 end;
 
+
 destructor TIocpRequest.Destroy;
 begin
   if __free_flag = -1 then
@@ -1492,6 +1508,11 @@ begin
   end;
   __free_flag := -1;
   inherited;
+end;
+
+procedure TIocpRequest.DoRelease;
+begin
+
 end;
 
 constructor TIocpRequestSingleLink.Create(pvMaxSize: Integer = 1024);
@@ -1663,6 +1684,23 @@ begin
     FLocker.unLock;
   end;
 end;
+
+procedure TIocpRequest.AddRef;
+begin
+  AtomicIncrement(FRefCounter);
+end;
+
+function TIocpRequest.DecRef: Boolean;
+var
+  r:Integer;
+begin
+  r := AtomicDecrement(FRefCounter);
+  if r = 0 then
+  begin
+    DoRelease;
+  end;
+end;
+
 
 procedure TIocpRequest.CancelIoEx(const pvHandle: THandle);
 begin

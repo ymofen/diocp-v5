@@ -68,7 +68,7 @@ uses
   utils_queues, utils_locker, utils_strings, utils_threadinfo
   
   , utils_byteTools
-  , utils_BufferPool;
+  , utils_BufferPool, utils_grouptask;
 
 const
   SOCKET_HASH_SIZE = $FFFF;
@@ -173,6 +173,11 @@ type
 
     FSendQueueSize:Integer;
 
+    // 接收需要处理的队列
+    FRecvQueue: TSafeQueue;
+
+    FProcessFlag: Integer;
+
 
 
     // 大于0时不会被KickOut
@@ -204,13 +209,15 @@ type
     /// </summary>
     FRequestDisconnect:Boolean;
 
+
+
     FWSARecvRef:Integer;
-
-
-
 
     FDebugInfo: string;
     procedure SetDebugInfo(const Value: string);
+
+
+    procedure DoProcessRecvQueue();
 
 
 
@@ -305,6 +312,8 @@ type
     FRemotePort: Integer;
     FTagStr: String;
 
+    procedure InnerDoRecv(pvRecvRequest: TIocpRecvRequest);
+
 
     /// <summary>
     ///   在投递的接收请求响应中调用，触发接收数据事件
@@ -350,6 +359,8 @@ type
     ///   投递接收请求
     /// </summary>
     procedure PostWSARecvRequest();virtual;
+
+    procedure OnAfterCreateSocket();virtual;
 
     /// <summary>
     ///   called by sendRequest response
@@ -570,6 +581,8 @@ type
     procedure HandleResponse; override;
 
     procedure ResponseDone; override;
+
+    procedure DoRelease;override;
   public
     /// <summary>
     ///   post recv request to iocp queue
@@ -870,6 +883,8 @@ type
     FRecvRequestReturnCounter:Integer;
     FRecvRequestOutCounter:Integer;
 
+    FCtxRecvQueueSize:Integer;
+
     FPostWSASendCounter:Integer;
     FResponseWSASendCounter:Integer;
 
@@ -886,6 +901,8 @@ type
     procedure IncSentSize(pvSize:Cardinal);
     procedure IncPostWSASendSize(pvSize:Cardinal);
     procedure IncRecvdSize(pvSize:Cardinal);
+    procedure IncCtxRecvQueueSize();
+    procedure DecCtxRecvQueueSize();
 
     procedure IncPostWSASendCounter;
     procedure IncResponseWSASendCounter;
@@ -937,6 +954,7 @@ type
     property ContextCreateCounter: Integer read FContextCreateCounter;
     property ContextOutCounter: Integer read FContextOutCounter;
     property ContextReturnCounter: Integer read FContextReturnCounter;
+    property CtxRecvQueueSize: Integer read FCtxRecvQueueSize;
     property DisconnectedCounter: Integer read FDisconnectedCounter;
     property HandleCreateCounter: Integer read FHandleCreateCounter;
     property HandleDestroyCounter: Integer read FHandleDestroyCounter;
@@ -980,6 +998,9 @@ type
   TDiocpTcpServer = class(TComponent)
   private
     FListeners: TDiocpListeners;
+
+    // 接收数据Link
+    FRecvBuffLink:PBufferPool;
 
     FDefaultListener:TDiocpListener;
 
@@ -1079,6 +1100,7 @@ type
     FKeepAliveTime: Cardinal;
     FOwnerEngine:Boolean;
     FSendBufCacheSize: Integer;
+    FUseAsyncRecvQueue: Boolean;
     procedure CheckDoDestroyEngine;
     function InnerCreateSendRequest: TIocpSendRequest;
     function InnerCreateRecvRequest: TIocpRecvRequest;
@@ -1133,6 +1155,7 @@ type
     procedure InnerAddToDebugStrings(const pvMsg: String);
 
     procedure DoInnerCreate(pvInitalizeNum: Integer);
+    procedure SetUseAsyncRecvQueue(const Value: Boolean);
   public
     procedure CheckOpen(pvInitalizeNum:Integer);
 
@@ -1293,6 +1316,13 @@ type
     property Active: Boolean read FActive write SetActive;
 
     /// <summary>
+    ///  使用异步的接收处理方式
+    ///    尚未经过项目验证
+    /// </summary>
+    property UseAsyncRecvQueue: Boolean read FUseAsyncRecvQueue write
+        SetUseAsyncRecvQueue;
+
+    /// <summary>
     ///   最大的待发送缓存队列, 服务开启时不允许设定
     /// </summary>
     property MaxSendingQueueSize: Integer read FMaxSendingQueueSize write SetMaxSendingQueueSize;
@@ -1416,13 +1446,16 @@ type
         FOnDataReceived;
 
 
+  end;
 
-
-
-
-
-
-
+  TDiocpLogicTask = class(TObject)
+  private
+    FGroupTask: TGroupTask;
+    procedure DoTask(pvSender: TGroupTask; pvWorker: TGroupTaskWorker; pvData:
+        Pointer);
+  public
+    constructor Create;
+    destructor Destroy; override;
 
   end;
 
@@ -1432,10 +1465,14 @@ var
   __svrLogger:TSafeLogger;
 
 
+
 /// <summary>
 ///   注册服务使用的SafeLogger
 /// </summary>
 procedure RegisterDiocpSvrLogger(pvLogger:TSafeLogger);
+
+
+procedure StartDiocpLogicWorker(const num:Integer);
 
 
 
@@ -1449,6 +1486,9 @@ var
   __startTime:TDateTime;
   __innerLogger:TSafeLogger;
   __create_sn:Integer;
+  __logic_task:TDiocpLogicTask;
+  __default_task:TDiocpLogicTask;
+
 
 
 
@@ -1552,6 +1592,15 @@ begin
   end;
 end;
 
+procedure StartDiocpLogicWorker(const num:Integer);
+begin
+  if __default_task = nil then __default_task := TDiocpLogicTask.Create;
+
+  __default_task.FGroupTask.CheckCreateWorker(num);
+
+  __logic_task := __default_task;
+end;
+
 
 procedure TIocpClientContext.InnerCloseContext;
 var
@@ -1565,6 +1614,11 @@ begin
        [s]);
     sfLogger.logMessage(s, 'core_debug', lgvWarning);
     Assert(FOwner <> nil);
+  end;
+
+  if FRecvQueue.Size > 0 then
+  begin
+    Assert(FRecvQueue.Size = 0);
   end;
 {$ENDIF}
 
@@ -1642,6 +1696,27 @@ begin
 
   end;
 
+end;
+
+procedure TIocpClientContext.InnerDoRecv(pvRecvRequest: TIocpRecvRequest);
+begin
+  if FOwner <> nil then
+  begin
+    if FOwner.UseAsyncRecvQueue then
+    begin        // 压入队列等待处理
+      pvRecvRequest.AddRef;
+      self.FRecvQueue.EnQueueObject(pvRecvRequest);
+
+      if Assigned(FOwner.FDataMoniter) then FOwner.FDataMoniter.IncCtxRecvQueueSize;
+
+
+      // 投递到队列
+      __logic_task.FGroupTask.PostATask(self);
+    end else
+    begin      // 直接处理
+      DoReceiveData(pvRecvRequest);
+    end;
+  end;
 end;
 
 procedure TIocpClientContext.InnerLock;
@@ -1781,8 +1856,12 @@ begin
   FActive := false;
 
   FSendRequestLink := TIocpRequestSingleLink.Create(100);
+
+
 //  FRecvRequest := TIocpRecvRequest.Create;
 //  FRecvRequest.FClientContext := self;
+
+  FRecvQueue := TSafeQueue.Create();
 
   {$IFDEF SOCKET_REUSE}
   FDisconnectExRequest:=TIocpDisconnectExRequest.Create;
@@ -2005,6 +2084,13 @@ end;
 
 destructor TIocpClientContext.Destroy;
 begin
+{$IFDEF DIOCP_DEBUG}
+  if FRecvQueue.Size > 0 then
+  begin
+    Assert(FRecvQueue.Size = 0);
+  end;
+{$ENDIF}
+
   if IsDebugMode then
   begin
     if FReferenceCounter <> 0 then
@@ -2036,6 +2122,7 @@ begin
   if IsDebugMode then
   begin
     Assert(FSendRequestLink.Count = 0);
+    Assert(FRecvQueue.Size = 0);
   end;
 
   {$IFDEF SOCKET_REUSE}
@@ -2046,6 +2133,8 @@ begin
   FContextLocker.Free;
   FDebugStrings.Free;
   FDebugStrings := nil;
+  FRecvQueue.Free;
+
   __free_flag := FREE_FLAG;
   inherited Destroy;
 end;
@@ -2217,6 +2306,31 @@ begin
   Owner.DoClientContextError(self, pvErrorCode);
 end;
 
+procedure TIocpClientContext.DoProcessRecvQueue;
+var
+  lvRecv:TIocpRecvRequest;
+begin
+  if AtomicCmpExchange(self.FProcessFlag, 1, 0) = 0 then
+  begin
+    try
+      while True do
+      begin
+        lvRecv := TIocpRecvRequest(FRecvQueue.DeQueueObject);
+        if lvRecv = nil then Break;
+        try
+          self.DoReceiveData(lvRecv);
+          if Assigned(FOwner.FDataMoniter) then FOwner.FDataMoniter.DecCtxRecvQueueSize;
+        finally
+          lvRecv.DecRef;
+        end;
+      end;
+    finally
+      self.FProcessFlag := 0;
+    end;
+  end;
+
+end;
+
 procedure TIocpClientContext.DoReceiveData(pvRecvRequest: TIocpRecvRequest);
 begin
   try
@@ -2225,7 +2339,6 @@ begin
       // 不再响应任何的接收数据请求
       Exit;
     end;
-    
     BeginBusy;
     try
       FLastActivity := GetTickCount;
@@ -2316,6 +2429,11 @@ begin
 end;
 
 
+procedure TIocpClientContext.OnAfterCreateSocket;
+begin
+
+end;
+
 procedure TIocpClientContext.OnConnected;
 begin
   
@@ -2360,8 +2478,7 @@ end;
 {$ENDIF}
 
 
-procedure TIocpClientContext.OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode:
-    WORD);
+procedure TIocpClientContext.OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD);
 begin
     
 end;
@@ -2436,6 +2553,7 @@ var
 begin
   lvRecvRequest := FOwner.GetRecvRequest;
   lvRecvRequest.FClientContext := Self;
+
   if not lvRecvRequest.PostRecvRequest then
   begin
     lvRecvRequest.ReleaseBack;
@@ -2754,6 +2872,11 @@ begin
   // 开启IOCP引擎
   FIocpEngine.CheckStart;
 
+  if UseAsyncRecvQueue then
+  begin
+    FRecvBuffLink := NewBufferPool(self.FWSARecvBufferSize, 0);
+  end;
+
   if FListeners.FList.Count = 0 then
   begin
     FDefaultListener.FListenAddress := FDefaultListenAddress;
@@ -3051,7 +3174,6 @@ end;
 procedure TDiocpTcpServer.OnCreateClientContext(const context:
     TIocpClientContext);
 begin
-
 end;
 
 procedure TDiocpTcpServer.Open;
@@ -3087,6 +3209,16 @@ begin
   if IsDebugMode then
   begin
     Assert(pvObject.FAlive)
+  end;
+
+  if UseAsyncRecvQueue then
+  begin
+    if (pvObject.FInnerBuffer.buf <> nil) then
+    begin
+      ReleaseRef(PByte(pvObject.FInnerBuffer.buf));
+      pvObject.FInnerBuffer.buf := nil;
+      pvObject.FInnerBuffer.len := 0;
+    end;
   end;
 
   if UseObjectPool then
@@ -3262,6 +3394,12 @@ begin
 
     FRecvRequestPool.FreeDataObject;
     FRecvRequestPool.Clear;
+
+    if Assigned(FRecvBuffLink) then
+    begin
+      FreeBufferPool(FRecvBuffLink);
+      FRecvBuffLink := nil;
+    end;
 
     DoAfterClose;
 
@@ -3581,6 +3719,14 @@ begin
   end;
   Result.Tag := 0;
   Result.FAlive := true;
+  Result.AddRef;
+  if UseAsyncRecvQueue then
+  begin
+    Result.FInnerBuffer.buf := PAnsiChar(GetBuffer(self.FRecvBuffLink));
+    Result.FInnerBuffer.len := self.FRecvBuffLink.FBlockSize;
+    AddRef(PByte(Result.FInnerBuffer.buf));
+  end;
+
   if FDataMoniter <> nil then FDataMoniter.IncRecvRequestOutCounter;
 end;
 
@@ -3856,8 +4002,18 @@ begin
   end;
 end;
 
+procedure TDiocpTcpServer.SetUseAsyncRecvQueue(const Value: Boolean);
+begin
+  if self.Active then raise Exception.Create('启动模式下不能修改该选项');
+  if FUseAsyncRecvQueue <> Value then
+  begin
+    FUseAsyncRecvQueue := Value;
+  end;
+end;
+
 procedure TDiocpTcpServer.SetWSARecvBufferSize(const Value: cardinal);
 begin
+  if self.Active then raise Exception.Create('启动模式下不能修改该选项');
   FWSARecvBufferSize := Value;
   if FWSARecvBufferSize = 0 then
   begin
@@ -4099,6 +4255,13 @@ end;
 function TIocpAcceptorMgr.ReleaseClientContext(pvObject:TIocpClientContext):
     Boolean;
 begin
+{$IFDEF DIOCP_DEBUG}
+  if pvObject.FRecvQueue.Size > 0 then
+  begin
+    Assert(pvObject.FRecvQueue.Size = 0);
+  end;
+{$ENDIF}
+
   if not FOwner.FUseObjectPool then
   begin
     pvObject.Free;
@@ -4242,6 +4405,7 @@ begin
       FOwner.FDataMoniter.incHandleCreateCounter;
     FClientContext.FRawSocket.IPVersion := lvListenSocket.IPVersion;
     FClientContext.FRawSocket.CreateTcpOverlappedSocket;
+    FClientContext.OnAfterCreateSocket;
 
     lvRetCode := FOwner.IocpEngine.IocpCore.Bind2IOCPHandle(
       FClientContext.FRawSocket.SocketHandle, 0);
@@ -4263,6 +4427,7 @@ begin
   {$ELSE}
   FClientContext.FRawSocket.IPVersion := lvListenSocket.IPVersion;
   FClientContext.FRawSocket.CreateTcpOverlappedSocket;
+  FClientContext.OnAfterCreateSocket;
   {$ENDIF}
   dwBytes := 0;
   lp := @FOverlapped;
@@ -4345,6 +4510,19 @@ begin
   end;
   __debugFlag := GetCurrentThreadID;
   inherited Destroy;
+end;
+
+procedure TIocpRecvRequest.DoRelease;
+var
+  lvContext : TIocpClientContext;
+begin
+  inherited;
+  lvContext := FClientContext;
+  try
+    FOwner.ReleaseRecvRequest(Self);
+  finally
+    lvContext.DecReferenceCounter('TIocpRecvRequest.WSARecvRequest.Response Done', Self);
+  end;
 end;
 
 procedure TIocpRecvRequest.HandleResponse;
@@ -4433,7 +4611,7 @@ begin
       end else
       begin
         lvDebugStep := 40;
-        FClientContext.DoReceiveData(Self);
+        FClientContext.InnerDoRecv(Self);
         lvDebugStep := 49;
       end;
     finally
@@ -4573,14 +4751,8 @@ begin
   end else
 {$ENDIF}
   begin
-    // fclientcontext is nil
-    lvContext := FClientContext;
-    try
-      FOwner.ReleaseRecvRequest(Self);
-    finally
-      lvContext.DecReferenceCounter('TIocpRecvRequest.WSARecvRequest.Response Done', Self);
-    end;
-  end;  
+    self.DecRef;
+  end;
 end;
 
 function TIocpRecvRequest.PostRecvRequest: Boolean;
@@ -4986,6 +5158,11 @@ end;
 
 
 
+procedure TIocpDataMonitor.DecCtxRecvQueueSize;
+begin
+  AtomicDecrement(Self.FCtxRecvQueueSize);
+end;
+
 destructor TIocpDataMonitor.Destroy;
 begin
   FLocker.Free;
@@ -4995,6 +5172,11 @@ end;
 procedure TIocpDataMonitor.IncAcceptExObjectCounter;
 begin
    InterlockedIncrement(FAcceptExObjectCounter); 
+end;
+
+procedure TIocpDataMonitor.IncCtxRecvQueueSize;
+begin
+  AtomicIncrement(Self.FCtxRecvQueueSize);
 end;
 
 procedure TIocpDataMonitor.IncDisconnectedCounter;
@@ -5374,6 +5556,28 @@ begin
   FAcceptorMgr.WaitForCancel(pvTimeOut);
 end;
 
+constructor TDiocpLogicTask.Create;
+begin
+  inherited Create;
+  FGroupTask := TGroupTask.Create();
+  FGroupTask.OnWorkerExecute := DoTask;
+end;
+
+destructor TDiocpLogicTask.Destroy;
+begin
+  FGroupTask.StopWorker(120000);
+  FreeAndNil(FGroupTask);
+  inherited Destroy;
+end;
+
+{ TDiocpLogicTask }
+
+procedure TDiocpLogicTask.DoTask(pvSender: TGroupTask; pvWorker:
+    TGroupTaskWorker; pvData: Pointer);
+begin
+  TIocpClientContext(pvData).DoProcessRecvQueue;
+end;
+
 initialization
   __startTime :=  Now();
   __innerLogger := TSafeLogger.Create();
@@ -5389,6 +5593,11 @@ finalization
   if __innerLogger <> nil then
   begin
     __innerLogger.Free;
+  end;
+
+  if __default_task <> nil then
+  begin
+    __default_task.Free;
   end;
 
 

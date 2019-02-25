@@ -88,6 +88,10 @@ type
   private
     FReleaseBack:TNotifyContextEvent;
     FCreateSN:Integer;
+
+    // 发送队列
+    FSendQueueSize:Integer;
+
     // 如果使用池，关闭后将会回归到池中
     FOwnePool:TSafeQueue;
     
@@ -288,6 +292,10 @@ type
     ///   call in response event
     /// </summary>
     procedure DoConnected;
+    /// <summary>
+    ///   投递的发送请求响应时执行，一响应，马上执行，Errcode <> 0也会响应
+    /// </summary>
+    procedure DoSendRequestRespnonse(pvRequest: TIocpSendRequest); virtual;
 
 
     /// <summary>
@@ -407,6 +415,7 @@ type
     property RawSocket: TRawSocket read FRawSocket;
     property RecvBytesSize: Int64 read FRecvBytesSize;
     property SendBytesSize: Int64 read FSendBytesSize;
+    property SendQueueSize: Integer read FSendQueueSize;
 
     property SocketState: TSocketState read FSocketState;
 
@@ -890,7 +899,6 @@ type
 
   private
     FNoDelayOption: Boolean;
-
     /// <summary>
     ///   获取当前在线数量
     /// </summary>
@@ -1125,7 +1133,6 @@ type
     /// </summary>
     property OnReceivedBuffer: TOnBufferReceived read FOnReceivedBuffer write
         FOnReceivedBuffer;
-
 
   end;
 
@@ -3255,6 +3262,9 @@ begin
       FOwner.FDataMoniter.incResponseWSASendCounter;
     end;
 
+    lvContext.DoSendRequestRespnonse(Self);
+
+
     if not FOwner.Active then
     begin
       {$IFDEF DIOCP_DEBUG}
@@ -3332,6 +3342,7 @@ begin
   lvContext := FContext;
   if lvContext.incReferenceCounter('InnerPostRequest::WSASend_Start', self) then
   try
+    AtomicIncrement(lvContext.FSendQueueSize);
     lvRet := WSASend(lvContext.FRawSocket.SocketHandle,
                       @FWSABuf,
                       1,
@@ -3346,6 +3357,7 @@ begin
       Result := lvErrorCode = WSA_IO_PENDING;
       if not Result then
       begin
+       AtomicDecrement(lvContext.FSendQueueSize);
        FIsBusying := False;
        {$IFDEF DIOCP_DEBUG}
        lvOwner.logMessage(
@@ -3928,6 +3940,13 @@ begin
   DoCtxStateLock;
   Dec(FReferenceCounter);
   DoCtxStateUnLock;
+end;
+
+procedure TDiocpCustomContext.DoSendRequestRespnonse(pvRequest:
+    TIocpSendRequest);
+begin
+  FLastActivity := GetTickCount;
+  AtomicDecrement(FSendQueueSize);
 end;
 
 function TDiocpCustomContext.GetDebugInfo: string;

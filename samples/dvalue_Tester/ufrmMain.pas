@@ -10,7 +10,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, utils_DValue, utils_strings, ComCtrls,
   utils_dvalue_multiparts, utils_dvalue_msgpack, utils_base64, utils_dvalue_dataset,
-  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, utils_textfile, Math;
+  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, Math;
 
 type
   TForm1 = class(TForm)
@@ -108,7 +108,7 @@ var
 implementation
 
 uses
-  utils_DValue_JSON;
+  utils_DValue_JSON, utils_textfile;
 
 {$R *.dfm}
 
@@ -564,8 +564,10 @@ begin
   lvDValue := TDValue.Create();
   try
     JSONParser(mmoData.Lines.Text, lvDValue);
+    lvDValue2 := lvDValue.FindByName('maps').Items[0];
 
-    ShowMessage(lvDValue.ForceByPath('applicationDate.date')));
+
+    ShowMessage(lvDValue2.ForceByPath('name').AsString);
   finally
     lvDValue.Free;
   end;

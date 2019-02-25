@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ComCtrls, diocp_ex_http_common;
+  Dialogs, StdCtrls, ComCtrls, diocp_ex_http_common, utils_strings,
+  utils_regex, utils_byteTools, utils_BufferPool;
 
 type
   TForm1 = class(TForm)
@@ -17,14 +18,21 @@ type
     tsHttpResponseHeader: TTabSheet;
     mmoHeader: TMemo;
     btnDecodeHeader: TButton;
+    tsURIRouter: TTabSheet;
+    btn1: TButton;
+    tsStreamAdapter: TTabSheet;
+    Button1: TButton;
+    procedure btn1Click(Sender: TObject);
     procedure btnCompareClick(Sender: TObject);
     procedure btnDecodeHeaderClick(Sender: TObject);
     procedure btnGetStrValueOfNameClick(Sender: TObject);
     procedure btnSBClick(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
   public
     { Public declarations }
+    function OnStreamWrite(Sender:TObject; const Buffer; count:Int64): Int64;
   end;
 
 var
@@ -32,10 +40,29 @@ var
 
 implementation
 
-uses
-  utils_strings;
 
 {$R *.dfm}
+
+procedure TForm1.btn1Click(Sender: TObject);
+var
+  s1, s2:string;
+  lvRegEx:TRegExHelper;
+begin
+  s1 := '/user/Jane/girl/';
+  s2 := '/user/[^/]+/[^/]+$';  // ∆•≈‰
+  //s2 := '[^\/]+';
+  lvRegEx := TRegExHelper.Create;
+  try
+    lvRegEx.SetString(s2, s1);
+    while lvRegEx.ExecMatch do
+    begin
+      ShowMessage(lvRegEx.GetMatchedText);
+    end;
+  finally
+    lvRegEx.Free;
+  end;
+  ;
+end;
 
 procedure TForm1.btnCompareClick(Sender: TObject);
 var
@@ -110,6 +137,28 @@ begin
   lvSB1.DecChar(4).Append(lvSB2);
   mmoLog.Lines.Add(lvSB1.ToString);
 
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  lvStm:TDStreamAdapter;
+  str:String;
+begin
+  lvStm := TDStreamAdapter.Create;
+  try
+    lvStm.OnWrite := OnStreamWrite;
+    str := 'abc';
+    lvStm.Write(PChar(str)^, SizeOf(Char) * Length(str));
+  finally
+    lvStm.Free;
+  end;
+  ;
+end;
+
+function TForm1.OnStreamWrite(Sender:TObject; const Buffer; count:Int64): Int64;
+begin
+  mmoLog.Lines.Add(TByteTools.varToHexString(Buffer, count));
+  Result := count;
 end;
 
 end.
