@@ -1028,18 +1028,7 @@ begin
 
 end;
 
-function __xp_InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall; {$IFDEF HAVE_INLINE}inline;{$ENDIF HAVE_INLINE}
-begin 
-  SpinLock(InterlockedCompareExchange64Locker);
-  Result := Val;
-  if val = Compare  then
-  begin
-    Result := Compare;
-    Val := Exchange;
-  end;
-  SpinUnLock(InterlockedCompareExchange64Locker);
-  
-end;
+
 
 {$if CompilerVersion < 20}
 function CharInSet(const C: Char; const CharSet: TSysCharSet): Boolean;
@@ -3366,6 +3355,18 @@ end;
 
 {$IFDEF MSWINDOWS}
 
+function __xp_InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall; {$IFDEF HAVE_INLINE}inline;{$ENDIF HAVE_INLINE}
+begin
+  SpinLock(InterlockedCompareExchange64Locker);
+  Result := Val;
+  if val = Compare  then
+  begin
+    Result := Compare;
+    Val := Exchange;
+  end;
+  SpinUnLock(InterlockedCompareExchange64Locker);
+end;
+
 function CAS64(const oldData, newData: int64; var destination): boolean;
 asm
 {$IFNDEF CPUX64}
@@ -3385,6 +3386,9 @@ asm
 {$ENDIF ~CPUX64}
   setz  al
 end; { CAS64 }
+
+
+
 
 
 function __InterlockedCompareExchange64;
