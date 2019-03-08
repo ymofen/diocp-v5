@@ -457,7 +457,7 @@ type
     procedure ResponseAFile(const pvFileName: string);
 
     /// <summary>
-    ///   处理头
+    ///   处理头, 响应ETag, 如果返回false表示已经响应
     /// </summary>
     function ResponseAFileETag(const pvFileName: string): Boolean;
 

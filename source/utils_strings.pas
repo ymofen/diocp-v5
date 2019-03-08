@@ -195,7 +195,8 @@ type
   public
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(Offset: Longint; Origin: Word): Longint; overload; override;
-    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload;  override;
+    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload;
+        override;
     function Write(const Buffer; Count: Longint): Longint; override;
     procedure SetSize(NewSize: Longint); override;
   public
@@ -3716,12 +3717,12 @@ end;
 
 { TDStreamAdapter }
 
-function TDStreamAdapter.Read(var Buffer; Count: Integer): Longint;
+function TDStreamAdapter.Read(var Buffer; Count: Longint): Longint;
 begin
   
 end;
 
-function TDStreamAdapter.Seek(Offset: Integer; Origin: Word): Longint;
+function TDStreamAdapter.Seek(Offset: Longint; Origin: Word): Longint;
 begin
 
 end;
@@ -3731,13 +3732,13 @@ begin
 
 end;
 
-procedure TDStreamAdapter.SetSize(NewSize: Integer);
+procedure TDStreamAdapter.SetSize(NewSize: Longint);
 begin
   inherited;
 
 end;
 
-function TDStreamAdapter.Write(const Buffer; Count: Integer): Longint;
+function TDStreamAdapter.Write(const Buffer; Count: Longint): Longint;
 begin
   if Assigned(FOnWrite) then
   begin
