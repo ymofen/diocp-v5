@@ -1118,8 +1118,10 @@ end;
 
 procedure TDiocpHttpRequest.AddRef;
 begin
-  Self.Connection.IncRecvRef;  
-  AtomicIncrement(self.FRefCounter);  
+  Self.Connection.IncRecvRef;
+  self.Connection.LockContext('TDiocpHttpRequest.Ref', nil);  // 避免连接提前关闭
+  AtomicIncrement(self.FRefCounter);
+  
 end;
 
 procedure TDiocpHttpRequest.DoResponseEnd;
@@ -1269,6 +1271,7 @@ begin
   end;
   // 后执行，避免先投递了接收请求
   lvConnection.DecRecvRef;
+  lvConnection.UnLockContext('TDiocpHttpRequest.Ref', nil);
 
 end;
 

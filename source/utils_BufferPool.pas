@@ -247,6 +247,9 @@ procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 function GetBufferPoolDebugInfo(ABuffPool:PBufferPool): string;
 
 
+procedure FreePtrAsObjectProc(pvData:Pointer);
+
+
 
 
 implementation
@@ -1002,6 +1005,11 @@ begin
 
     Dec(pvLinked.FSize);
   end;
+end;
+
+procedure FreePtrAsObjectProc(pvData:Pointer);
+begin
+  TObject(pvData).Free;
 end;
 
 
