@@ -445,7 +445,10 @@ begin
       pvRequest.Response.WriteString(s);
     end else if pvRequest.RequestURI = '/logout' then
     begin
-      lvSession.DValues.ForceByName('login').AsBoolean := false;
+      if lvSession <> nil then
+      begin
+        lvSession.DValues.ForceByName('login').AsBoolean := false;
+      end;
       WriteLoginForm();
     end else if pvRequest.RequestURI = '/redirect' then
     begin                                       //重新定向
