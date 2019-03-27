@@ -10,12 +10,12 @@ uses
 type
   TDiocpWebSocketContext = class(TIocpRemoteContext)
   private
-    FSendPingTick:Cardinal;
+    FSendPingTick: Cardinal;
     FURL: TURL;
-    FWsUrl:String;
+    FWsUrl: String;
     FHeaderBuilder: THttpHeaderBuilder;
     /// <summary>
-    ///  WebSocket接收到的整个数据 
+    /// WebSocket接收到的整个数据
     /// </summary>
     FWebSocketContentBuffer: TDBufferBuilder;
 
@@ -24,8 +24,9 @@ type
     FOnRecv: TNotifyEvent;
     FOnShakeHand: TNotifyEvent;
 
-    FRecvShakeHand:Byte;
+    FRecvShakeHand: Byte;
     FOnDisconnectedEvent: TNotifyEvent;
+    FMasked: Boolean;
     procedure PostWebSocketRequest;
   protected
     procedure OnConnected; override;
@@ -36,7 +37,7 @@ type
     constructor Create; override;
     destructor Destroy; override;
   public
-    procedure Open(WsUrl:string);
+    procedure Open(WsUrl: string);
 
     procedure SendPing;
 
@@ -44,18 +45,16 @@ type
 
     procedure SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte);
 
-    procedure SendText(const s:string);
+    procedure SendText(const s: string);
 
     property HeaderBuilder: THttpHeaderBuilder read FHeaderBuilder;
     property HttpBuffer: THttpBuffer read FHttpBuffer;
-    property OnDisconnectedEvent: TNotifyEvent read FOnDisconnectedEvent write
-        FOnDisconnectedEvent;
-
+    property OnDisconnectedEvent: TNotifyEvent read FOnDisconnectedEvent write FOnDisconnectedEvent;
 
     property WebSocketContentBuffer: TDBufferBuilder read FWebSocketContentBuffer;
     property OnRecv: TNotifyEvent read FOnRecv write FOnRecv;
     property OnShakeHand: TNotifyEvent read FOnShakeHand write FOnShakeHand;
-
+    property Masked: Boolean read FMasked write FMasked;
 
   end;
 
@@ -64,25 +63,22 @@ type
     constructor Create(AOwner: TComponent); override;
   end;
 
-
 procedure DoInitializeWebSocketClient;
 procedure DoFinalizeWebSocketClient;
 
 function NewWsClient: TDiocpWebSocketContext;
 
-  
-
 implementation
 
 var
-  __webtcpClient:TDiocpWebSocketTcpClient;
+  __webtcpClient: TDiocpWebSocketTcpClient;
 
 procedure DoInitializeWebSocketClient;
 begin
   if __webtcpClient = nil then
   begin
-     __webtcpClient := TDiocpWebSocketTcpClient.Create(nil);
-     __webtcpClient.Open;
+    __webtcpClient := TDiocpWebSocketTcpClient.Create(nil);
+    __webtcpClient.Open;
   end;
 end;
 
@@ -125,7 +121,8 @@ end;
 
 procedure TDiocpWebSocketContext.CheckSendPing(pvInterval: Cardinal = 20000);
 begin
-  if self.SocketState <> ssConnected then Exit;
+  if self.SocketState <> ssConnected then
+    Exit;
 
   if tick_diff(FSendPingTick, GetTickCount) > pvInterval then
   begin
@@ -136,24 +133,26 @@ end;
 
 procedure TDiocpWebSocketContext.DoRecv;
 var
-  lvOptCode:Integer;
+  lvOptCode: Integer;
 begin
-  lvOptCode :=FWsFrame.GetOptCode;
+  lvOptCode := FWsFrame.GetOptCode;
   if lvOptCode = OPT_PING then
   begin
     PostWSASendRequest(@WS_MSG_PONG, 2, False);
-  end else if lvOptCode = OPT_PONG then
+  end
+  else if lvOptCode = OPT_PONG then
   begin
-    Assert(lvOptCode = OPT_PONG);
-    ; // {noop}
-  end else if lvOptCode = OPT_CLOSE then
+    Assert(lvOptCode = OPT_PONG);; // {noop}
+  end
+  else if lvOptCode = OPT_CLOSE then
   begin
     RequestDisconnect('收到WebSocket-Close请求');
-  end else
+  end
+  else
   begin
     if Assigned(FOnRecv) then
     begin
-      FOnRecv(Self);
+      FOnRecv(self);
     end;
   end;
 end;
@@ -174,14 +173,13 @@ begin
   inherited;
   if Assigned(FOnDisconnectedEvent) then
   begin
-    FOnDisconnectedEvent(Self);
+    FOnDisconnectedEvent(self);
   end;
 end;
 
-procedure TDiocpWebSocketContext.OnRecvBuffer(buf: Pointer; len: Cardinal;
-    ErrCode: WORD);
+procedure TDiocpWebSocketContext.OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD);
 var
-  lvPtr:PByte;
+  lvPtr: PByte;
   i, r: Integer;
 begin
   inherited;
@@ -197,11 +195,12 @@ begin
         FRecvShakeHand := 1;
         if Assigned(FOnShakeHand) then
         begin
-          FOnShakeHand(Self);
+          FOnShakeHand(self);
         end;
         FHttpBuffer.DoCleanUp;
       end;
-    end else
+    end
+    else
     begin
       r := FWsFrame.InputBuffer(lvPtr^);
       Inc(lvPtr);
@@ -211,19 +210,20 @@ begin
         if FWsFrame.GetFIN <> FIN_EOF then
         begin
           FWsFrame.DoCleanUp();
-        end else
+        end
+        else
         begin
           DoRecv();
 
           FWsFrame.DoCleanUp;
           FWebSocketContentBuffer.Clear;
-        end;      
-      end;      
+        end;
+      end;
     end;
   end;
 end;
 
-procedure TDiocpWebSocketContext.Open(WsUrl:string);
+procedure TDiocpWebSocketContext.Open(WsUrl: string);
 begin
   CheckCanConnect;
   FWsUrl := WsUrl;
@@ -235,71 +235,69 @@ end;
 
 procedure TDiocpWebSocketContext.PostWebSocketRequest;
 var
-  s:String;
-  lvBytes:TBytes;
+  s: String;
+  lvBytes: TBytes;
 begin
 
-  //    GET ws://127.0.0.1:8081/ HTTP/1.1
-  //    Host: 127.0.0.1:8081
-  //    Connection: Upgrade
-  //    Pragma: no-cache
-  //    Cache-Control: no-cache
-  //    Upgrade: websocket
-  //    Origin: http://127.0.0.1:8081
-  //    Sec-WebSocket-Version: 13
-  //    User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.122 Safari/537.36
-  //    Accept-Encoding: gzip,deflate,sdch
-  //    Accept-Language: zh-CN,zh;q=0.8
-  //    Cookie: diocp_cookie=xxxx
-  //    Sec-WebSocket-Key: pAwC+w4+DLzmrLTUuBG4cQ==
-  //    Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+  // GET ws://127.0.0.1:8081/ HTTP/1.1
+  // Host: 127.0.0.1:8081
+  // Connection: Upgrade
+  // Pragma: no-cache
+  // Cache-Control: no-cache
+  // Upgrade: websocket
+  // Origin: http://127.0.0.1:8081
+  // Sec-WebSocket-Version: 13
+  // User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.122 Safari/537.36
+  // Accept-Encoding: gzip,deflate,sdch
+  // Accept-Language: zh-CN,zh;q=0.8
+  // Cookie: diocp_cookie=xxxx
+  // Sec-WebSocket-Key: pAwC+w4+DLzmrLTUuBG4cQ==
+  // Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
 
-   FHeaderBuilder.URI := FURL.URI;
-   FHeaderBuilder.URLParams := FURL.ParamStr;
-   //FHeaderBuilder.URI := FWsUrl;
-   FHeaderBuilder.Method := 'GET';
+  FHeaderBuilder.URI := FURL.URI;
+  FHeaderBuilder.URLParams := FURL.ParamStr;
+  // FHeaderBuilder.URI := FWsUrl;
+  FHeaderBuilder.Method := 'GET';
 
-   FHeaderBuilder.SetHeader('Connection', 'Upgrade');
-   FHeaderBuilder.SetHeader('Upgrade', 'websocket');
-   FHeaderBuilder.SetHeader('Host', FURL.RawHostStr);
-   //FHeaderBuilder.SetHeader('Origin', 'file://');
-   FHeaderBuilder.SetHeader('Sec-WebSocket-Version', '13');
-   FHeaderBuilder.SetHeader('Sec-WebSocket-Key', Base64Encode('Diocp' + NowString));
-   FHeaderBuilder.SetHeader('Sec-WebSocket-Extensions', 'permessage-deflate; client_max_window_bits');
+  FHeaderBuilder.SetHeader('Connection', 'Upgrade');
+  FHeaderBuilder.SetHeader('Upgrade', 'websocket');
+  FHeaderBuilder.SetHeader('Host', FURL.RawHostStr);
+  // FHeaderBuilder.SetHeader('Origin', 'file://');
+  FHeaderBuilder.SetHeader('Sec-WebSocket-Version', '13');
+  FHeaderBuilder.SetHeader('Sec-WebSocket-Key', Base64Encode('Diocp' + NowString));
+  FHeaderBuilder.SetHeader('Sec-WebSocket-Extensions', 'permessage-deflate; client_max_window_bits');
 
+  s := FHeaderBuilder.Build();
 
-   s := FHeaderBuilder.Build();
+  lvBytes := StringToBytes(s);
 
-   lvBytes := StringToBytes(s);
+  self.PostWSASendRequest(PByte(@lvBytes[0]), Length(lvBytes));
 
-   Self.PostWSASendRequest(PByte(@lvBytes[0]), Length(lvBytes));    
-   
 end;
 
-procedure TDiocpWebSocketContext.SendBuffer(buf: Pointer; len: Cardinal;
-    opcode: Byte);
+procedure TDiocpWebSocketContext.SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte);
 var
-  lvWSFrame:TDiocpWebSocketFrame;
-begin  
+  lvWSFrame: TDiocpWebSocketFrame;
+begin
   lvWSFrame := TDiocpWebSocketFrame.Create;
   try
-    lvWSFrame.EncodeBuffer(buf, len, true, opcode);
-
+    lvWSFrame.EncodeBuffer(buf, len, true, opcode, FMasked);
     PostWSASendRequest(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
   finally
     lvWSFrame.Free;
   end;
-  
+
 end;
 
 procedure TDiocpWebSocketContext.SendPing;
 begin
-  PostWSASendRequest(@WS_MSG_PING, 2, False);
+  // PostWSASendRequest(@WS_MSG_PING, 2, False);
+  SendBuffer(nil, 0, OPT_PING);
 end;
 
-procedure TDiocpWebSocketContext.SendText(const s:string);
+procedure TDiocpWebSocketContext.SendText(const s: string);
 var
-  lvBytes:TBytes;
+  lvBytes: TBytes;
 begin
   lvBytes := StringToUtf8Bytes(s);
   SendBuffer(@lvBytes[0], Length(lvBytes), OPT_TEXT);
@@ -310,6 +308,5 @@ begin
   inherited;
   RegisterContextClass(TDiocpWebSocketContext);
 end;
-
 
 end.
