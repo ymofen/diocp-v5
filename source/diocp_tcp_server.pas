@@ -169,6 +169,9 @@ type
   private
     __free_flag:Integer;
 
+    FCloseingFlag:Byte;
+    FOnRecvingFlag:Byte;
+
     FCreateSN:Integer;
 
     FSendQueueSize:Integer;
@@ -2089,6 +2092,22 @@ begin
   begin
     Assert(FRecvQueue.Size = 0);
   end;
+
+  if FCloseingFlag = 1 then
+  begin
+    Assert(FCloseingFlag = 0, '关闭事件尚未结束');
+  end;
+
+  if FOnRecvingFlag = 1 then
+  begin
+    Assert(FOnRecvingFlag = 0, 'OnRecv事件尚未结束');
+  end;
+
+  if FWSARecvRef > 0 then
+  begin
+     Assert(FWSARecvRef = 0, Format('OnRecv事件尚未结束, FWSARecvRef:%d',[FWSARecvRef]));
+  end;
+
 {$ENDIF}
 
   if IsDebugMode then
@@ -2296,9 +2315,14 @@ end;
 
 procedure TIocpClientContext.DoDisconnected;
 begin
-  if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then FOwner.FDataMoniter.IncDisconnectedCounter;
-  
-  OnDisconnected;
+  self.FCloseingFlag := 1;
+  try
+    if (FOwner <> nil) and (FOwner.FDataMoniter <> nil) then FOwner.FDataMoniter.IncDisconnectedCounter;
+
+    OnDisconnected;
+  finally
+    self.FCloseingFlag := 0;
+  end;
 end;
 
 procedure TIocpClientContext.DoOwnerClientContext(pvErrorCode: Integer);
@@ -2339,6 +2363,7 @@ begin
       // 不再响应任何的接收数据请求
       Exit;
     end;
+    FOnRecvingFlag := 1;
     BeginBusy;
     try
       FLastActivity := GetTickCount;
@@ -2350,6 +2375,7 @@ begin
         FOwner.doReceiveData(Self, pvRecvRequest);
     finally
       EndBusy;
+      FOnRecvingFlag := 0;
     end;
   except
     on E:Exception do
@@ -4260,6 +4286,11 @@ begin
   begin
     Assert(pvObject.FRecvQueue.Size = 0);
   end;
+
+  if pvObject.FWSARecvRef > 0 then
+  begin
+     Assert(pvObject.FWSARecvRef = 0, Format('ReleaseClientContext:OnRecv事件尚未结束, FWSARecvRef:%d',[pvObject.FWSARecvRef]));
+  end;
 {$ENDIF}
 
   if not FOwner.FUseObjectPool then
@@ -4798,6 +4829,9 @@ begin
       dtFreeMem: FreeMem(FBuf);
     end;
   end;
+  FWSABuf.len := 0;
+  FWSABuf.buf := nil;
+  FBuf := nil;
   FSendBufferReleaseType := dtNone;
   FLen := 0;
 end;

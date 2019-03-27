@@ -30,6 +30,9 @@ function DetectTextEncoding(const p: Pointer; l: Integer; var b: Boolean):
 
 function CharSizeU(c: PCharA): Integer;
 
+function SaveTextToFile(const pvFile:String; const pvText:string;
+    pvOverride:Boolean = False): Integer;
+
 function LoadTextFromFile(const pvFile: string; AEncoding: TDTextEncoding =
     teUnknown): String;
 
@@ -288,6 +291,28 @@ begin
   end
   else
     Result := STRING_EMPTY;
+end;
+
+function SaveTextToFile(const pvFile:String; const pvText:string;
+    pvOverride:Boolean = False): Integer;
+var
+  lvFs:TFileStream;
+  lvBytes:TBytes;
+begin
+  if pvOverride or (not FileExists(pvFile)) then
+  begin
+    lvFs := TFileStream.Create(pvFile, fmCreate);
+  end else
+  begin
+    lvFs := TFileStream.Create(pvFile, fmOpenWrite or fmShareDenyWrite);
+    lvFs.Position := lvFs.Size;
+  end;
+  try
+    lvBytes := StringToBytes(pvText);
+    lvFs.Write(lvBytes[0], Length(lvBytes));
+  finally
+    lvFs.Free;
+  end;
 end;
 
 end.

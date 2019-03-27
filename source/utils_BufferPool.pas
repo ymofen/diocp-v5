@@ -586,6 +586,7 @@ begin
       {$ELSE}
       lvOwner.FLocker.Enter;
       {$ENDIF}
+      ReleaseAttachData(pvBufBlock);
       PushABlockBuffer(pvBufBlock, lvOwner);
   //    lvBuffer := lvOwner.FHead;
   //    pvBufBlock.next := lvBuffer;

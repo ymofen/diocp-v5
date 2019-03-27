@@ -57,7 +57,7 @@ const
 
   Context_Type_WebSocket = 1;
 
-  SEND_BLOCK_SIZE = 1024 * 100;
+  SEND_BLOCK_SIZE = 1024 * 4;
 
   Response_state_inital = 0;
   Response_state_stream = 1;
@@ -623,6 +623,8 @@ type
     {$IFDEF TRACE_HTTP_DETAIL}
     FTraceWriter:TSingleFileWriter;
     {$ENDIF}
+
+    FRequestingFlag:Byte;
 
     /// <summary>
     ///   响应引用计数
@@ -1964,6 +1966,13 @@ end;
 destructor TDiocpHttpClientContext.Destroy;
 begin
   __free_flag := FREE_FLAG;
+  {$IFDEF DIOCP_DEBUG}
+  if FRequestingFlag = 1 then
+  begin
+    Assert(FRequestingFlag=0, '正在处理Http请求....');
+  end;
+  {$ENDIF}
+  
   
   FBlockBuffer.Free;
 
@@ -2740,6 +2749,7 @@ begin
   lvContext := pvRequest.Connection;
   lvContext.CheckThreadIn('DoRequest');
   try
+    lvContext.FRequestingFlag := 1;
     lvContext.BeginBusy;
     SetCurrentThreadInfo('进入Http::DoRequest');
     try
@@ -2811,7 +2821,8 @@ begin
       end;
     end;
   finally
-    lvContext.EndBusy;
+    lvContext.FRequestingFlag := 0;
+    lvContext.EndBusy;             
     lvContext.CheckThreadOut;
     SetCurrentThreadInfo('结束Http::DoRequest');
     //pvRequest.Connection.SetRecvWorkerHint('DoRequest:: end');

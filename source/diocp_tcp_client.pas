@@ -195,6 +195,12 @@ type
     /// </summary>
     procedure ClearContexts;
 
+
+    /// <summary>
+    ///   请求断开所有连接，会立刻返回。
+    /// </summary>
+    procedure DisconnectAll;  override;
+
     /// <summary>
     ///   添加一个连对象
     /// </summary>
@@ -593,6 +599,25 @@ begin
   FList.Free;
   FListLocker.Free;
   inherited Destroy;
+end;
+
+procedure TDiocpTcpClient.DisconnectAll;
+var
+  i: Integer;
+  lvContext:TIocpRemoteContext;
+  vAllow:Boolean;
+begin
+  inherited;
+  FListLocker.Enter;
+  try
+    for i := 0 to FList.Count - 1 do
+    begin
+      lvContext := TIocpRemoteContext(FList[i]);
+      lvContext.RequestDisconnect('主动请求断开所有连接');
+    end;
+  finally
+    FListLocker.Leave;
+  end;
 end;
 
 procedure TDiocpTcpClient.DoAfterOpen;
