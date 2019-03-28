@@ -2592,7 +2592,7 @@ begin
   
   lvWSFrame := TDiocpWebSocketFrame.Create;
   try
-    lvWSFrame.EncodeBuffer(pvBuffer, len, true, opcode);
+    lvWSFrame.EncodeBuffer(pvBuffer, len, true, opcode, false);
     FBlockBuffer.Lock;
     try
       WriteResponseBuffer(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
