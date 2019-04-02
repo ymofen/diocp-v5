@@ -1067,6 +1067,10 @@ begin
   begin
     Result := 'text/css';
   end
+  else if lvExt = '.json' then
+  begin
+    Result := 'application/json;charset=UTF-8';
+  end
   else if (lvExt = '.html') or (lvExt = '.htm') then
   begin
     Result := 'text/html;charset=UTF-8';

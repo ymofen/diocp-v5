@@ -192,6 +192,7 @@ end;
 procedure TDiocpWebSocketFrame.EncodeBuffer(const buf: Pointer; len: Int64; pvFIN: Boolean; pvOpcode: BYTE; Masked: Boolean);
 var
   masking: LongWord;
+  i64:Int64;
 begin
   FBuffer.Clear;
   FBuffer.Append(BYTE($00));
@@ -210,7 +211,8 @@ begin
   else
   begin
     FBuffer.Append(BYTE(127));
-    FBuffer.Append(TByteTools.swap64(len));
+    i64 := TByteTools.swap64(len);
+    FBuffer.AppendBuffer(@i64, 8);
   end;
 
   if (Masked) then

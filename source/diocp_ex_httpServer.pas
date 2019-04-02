@@ -1469,7 +1469,8 @@ begin
     Result := FInnerWebSocketFrame.InputBuffer(buf);
     if Result = 1 then
     begin
-      FWebSocketContentBuffer.AppendBuffer(FInnerWebSocketFrame.ContentBuffer, FInnerWebSocketFrame.ContentLength);
+      FWebSocketContentBuffer.AppendBuffer(FInnerWebSocketFrame.ContentBuffer,
+        FInnerWebSocketFrame.ContentLength);
 
       if FInnerWebSocketFrame.GetFIN <> FIN_EOF then
       begin
