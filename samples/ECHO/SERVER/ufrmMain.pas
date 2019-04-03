@@ -165,6 +165,8 @@ begin
   FTcpServer.SafeStop; 
   FreeBufferPool(FPool);
   FTcpServer.Free;
+  FAsync.Free;
+
   inherited Destroy;
 end;
 

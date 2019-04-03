@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 80
     Width = 856
     Height = 312
-    ActivePage = TabSheet1
+    ActivePage = tsWebSocket
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -54,10 +54,6 @@ object frmMain: TfrmMain
     object tsTester: TTabSheet
       Caption = #27979#35797#38754#26495
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object btnCompress: TButton
         Left = 3
         Top = 3
@@ -89,10 +85,6 @@ object frmMain: TfrmMain
     object tsURLCode: TTabSheet
       Caption = 'tsURLCode'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoURLInput: TMemo
         Left = 3
         Top = 3
@@ -131,21 +123,17 @@ object frmMain: TfrmMain
     object tsWebSocket: TTabSheet
       Caption = 'WebSocket'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object mmoWebSocketData: TMemo
         Left = 3
-        Top = 3
-        Width = 358
-        Height = 158
+        Top = 34
+        Width = 842
+        Height = 239
         Lines.Strings = (
           #25512#36865#20449#24687#21040#23458#25143#31471)
         TabOrder = 0
       end
       object btnWebSocketPush: TButton
-        Left = 380
+        Left = 3
         Top = 3
         Width = 137
         Height = 25

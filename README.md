@@ -11,8 +11,8 @@ diocp5
 	最新版zip下载
 	  https://codeload.github.com/ymofen/diocp-v5/zip/master
     
-  FAQ文档:
-    http://note.youdao.com/noteshare?id=2b40e5d99f39a57512d739f0a5a8a3ee
+	FAQ文档:
+	  http://note.youdao.com/noteshare?id=2b40e5d99f39a57512d739f0a5a8a3ee
 
 
 	设置Delphi环境变量
