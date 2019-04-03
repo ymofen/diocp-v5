@@ -396,6 +396,11 @@ end;
 procedure TIocpRemoteContext.ConnectASync;
 begin
   if (Owner <> nil) and (not Owner.Active) then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
+  if (Owner <> nil) then
+  begin
+    // ½ûÖ¹Á¬½Ó
+    if Owner.DisableConnectFlag = 1 then Exit;
+  end;
 
   if SocketState <> ssDisconnected then raise Exception.Create(Format(strCannotConnect, [TSocketStateCaption[SocketState]]));
 
@@ -598,6 +603,7 @@ begin
   FList.Clear;
   FList.Free;
   FListLocker.Free;
+  FListLocker := nil;
   inherited Destroy;
 end;
 
@@ -607,7 +613,8 @@ var
   lvContext:TIocpRemoteContext;
   vAllow:Boolean;
 begin
-  inherited;
+  inherited DisconnectAll;
+  if FListLocker = nil then Exit;  
   FListLocker.Enter;
   try
     for i := 0 to FList.Count - 1 do
@@ -640,11 +647,14 @@ var
 begin
   if not CheckOperaFlag(OPERA_SHUTDOWN_CONNECT) then
   begin
+    if self.DisableConnectFlag = 1 then Exit;
+    
     FListLocker.Enter;
     try
       for i := 0 to FList.Count - 1 do
       begin
         if pvASyncWorker.Terminated then Break;
+
 
         lvContext := TIocpRemoteContext(FList[i]);
         lvContext.DoBeforeReconnect(vAllow);
@@ -826,9 +836,14 @@ procedure TDiocpTcpClient.RemoveAllContext;
 begin
   IncOperaOptions(OPERA_SHUTDOWN_CONNECT);
   try
-    DisconnectAll;
-    WaitForContext(30000);
-    ClearContexts();
+    FDisableConnectFlag := 1;
+    try
+      DisconnectAll;
+      WaitForContext(30000);
+      ClearContexts();
+    finally
+      FDisableConnectFlag := 0;
+    end;
   finally
     DecOperaOptions(OPERA_SHUTDOWN_CONNECT);
   end;

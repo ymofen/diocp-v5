@@ -801,8 +801,9 @@ type
     function LogCanWrite: Boolean;
 
   protected
-
-
+    /// 1: 禁止连接 (如果刚连接成功的，将请求断开)
+    FDisableConnectFlag: Integer;
+    
     FContextClass:TIocpContextClass;
 
     FIocpSendRequestClass:TIocpSendRequestClass;
@@ -901,6 +902,7 @@ type
     procedure SetWSASendBufferSize(const Value: Cardinal);
 
   private
+
     FNoDelayOption: Boolean;
     /// <summary>
     ///   获取当前在线数量
@@ -1051,6 +1053,7 @@ type
     function GetDebugString: String;
 
 
+    property DisableConnectFlag: Integer read FDisableConnectFlag;
     /// <summary>
     ///   NoDelay属性(默认是false)
     ///   设置为true是会禁用Socket的NoDelay属性(禁用nagle算法)
@@ -1471,7 +1474,13 @@ begin
         end;
         SetSocketState(ssConnected);
         self.DoSetCtxState(2);
-        PostWSARecvRequest;
+        if (FOwner.FDisableConnectFlag = 1) then
+        begin
+          self.RequestDisconnect('服务停止, 请求断线');
+        end else
+        begin
+          PostWSARecvRequest;
+        end;
       finally
         self.UnLockContext('OnConnected', Self);
       end;
@@ -2190,6 +2199,8 @@ procedure TDiocpCustom.Open;
 begin
   if FActive = true then exit;
 
+  FDisableConnectFlag := 0;
+
   //if FDataMoniter <> nil then FDataMoniter.clear;
 
   // engine start
@@ -2266,6 +2277,7 @@ end;
 procedure TDiocpCustom.Close;
 begin
   FActive := false;
+  FDisableConnectFlag := 1;
   
   FASyncInvoker.Terminate;
 
