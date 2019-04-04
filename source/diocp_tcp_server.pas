@@ -210,7 +210,7 @@ type
     /// <summary>
     ///   是否被请求关闭的标志，如果为true时 和引用计数器为0 时进行真正的关闭连接
     /// </summary>
-    FRequestDisconnect:Boolean;
+    FRequestDisconnectFlag: Boolean;
 
 
 
@@ -546,6 +546,7 @@ type
     property RemoteAddr: String read FRemoteAddr;
 
     property RemotePort: Integer read FRemotePort;
+    property RequestDisconnectFlag: Boolean read FRequestDisconnectFlag;
     property SendQueueSize: Integer read FSendQueueSize;
 
     /// <summary>
@@ -1878,7 +1879,7 @@ function TIocpClientContext.IncReferenceCounter(const pvDebugInfo: string;
 begin
   InnerLock;
   try
-    if (not Active) or FRequestDisconnect then
+    if (not Active) or FRequestDisconnectFlag then
     begin
       Result := false;
     end else
@@ -1886,8 +1887,10 @@ begin
       Assert(FReferenceCounter >= 0);
       
       Inc(FReferenceCounter);
+
       {$IFDEF DIOCP_DEBUG}
-      AddDebugString(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+      if Length(pvDebugInfo) > 0 then
+        AddDebugString(Format('+(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
       {$ENDIF}
 
       Result := true;
@@ -1935,7 +1938,8 @@ begin
     Dec(FReferenceCounter);
     Result := FReferenceCounter;
     {$IFDEF DIOCP_DEBUG}
-    AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
+    if Length(pvDebugInfo) > 0 then
+      AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     {$ENDIF}
 
     if FReferenceCounter < 0 then
@@ -1956,7 +1960,7 @@ begin
       FReferenceCounter :=0;
     end;
     if FReferenceCounter = 0 then
-      if FRequestDisconnect then lvCloseContext := true;
+      if FRequestDisconnectFlag then lvCloseContext := true;
   finally
     InnerUnLock;
   end;
@@ -1978,7 +1982,7 @@ begin
         strRequestDisconnectFileID, lgvDebug);
     {$ENDIF}
 
-    FRequestDisconnect := true;
+    FRequestDisconnectFlag := true;
     Dec(FReferenceCounter);
   
     {$IFDEF DIOCP_DEBUG}
@@ -2046,7 +2050,7 @@ begin
   
     {$IFDEF SOCKET_REUSE}
     lvCloseContext := False;
-    if not FRequestDisconnect then
+    if not FRequestDisconnectFlag then
     begin
       FDisconnectedReason := pvReason;
 
@@ -2060,13 +2064,13 @@ begin
         FRawSocket.close;
         if FReferenceCounter = 0 then  lvCloseContext := true;    //      lvCloseContext := true;   //directly close
       end;
-      FRequestDisconnect := True;
+      FRequestDisconnectFlag := True;
     end;
     {$ELSE}
-    if not FRequestDisconnect then
+    if not FRequestDisconnectFlag then
     begin
       FDisconnectedReason := pvReason;
-      FRequestDisconnect := True;
+      FRequestDisconnectFlag := True;
     end;
     lvCloseContext := False;
     if FReferenceCounter = 0 then  lvCloseContext := true;
@@ -2199,8 +2203,8 @@ begin
   end;
   if j = 0 then
   begin
-    if (not FRequestDisconnect) then
-    begin 
+    if (not FRequestDisconnectFlag) then
+    begin
       PostWSARecvRequest;
     end;
   end;
@@ -2218,7 +2222,7 @@ begin
     FWSARecvRef := 0;
 
     FOwner := nil;
-    FRequestDisconnect := false;
+    FRequestDisconnectFlag := false;
     FSending := false;
 
     FWorkerEndTick := 0;
@@ -2452,6 +2456,7 @@ var
 begin
   j := InterlockedIncrement(FWSARecvRef);
   Assert(j > 0, 'error IncRecvRef');
+
 end;
 
 
@@ -2577,6 +2582,10 @@ procedure TIocpClientContext.PostWSARecvRequest;
 var
   lvRecvRequest:TIocpRecvRequest;
 begin
+  if FOwner = nil then
+  begin
+    Assert(FOwner<> nil);
+  end;
   lvRecvRequest := FOwner.GetRecvRequest;
   lvRecvRequest.FClientContext := Self;
 
@@ -2658,7 +2667,7 @@ begin
   if self.Active then
   begin
     {$IFDEF DIOCP_DEBUG}
-    if self.IncReferenceCounter('PostWSASendRequest', Self) then
+    if self.IncReferenceCounter(STRING_EMPTY) then
     {$ELSE}
     if self.IncReferenceCounter(STRING_EMPTY) then
     {$ENDIF}
@@ -2692,7 +2701,7 @@ begin
         {$ENDIF}
       finally
         {$IFDEF DIOCP_DEBUG}
-        self.DecReferenceCounter('PostWSASendRequest', Self);
+        self.DecReferenceCounter(STRING_EMPTY);
         {$ELSE}
         self.DecReferenceCounter(STRING_EMPTY);
         {$ENDIF}
@@ -4562,28 +4571,29 @@ var
   lvDebugInfo:String;
   lvDebugStep:Integer;
 begin
+  // 该过程执行中，可以确保不会被关闭
+  //   FClientCtx不会被回归
+  //   在投递之前进行了锁定
   lvDebugStep := 1;
-  lvDNACounter := 0;
-  try
-    lvDNACounter := Self.FCounter;
+  lvDNACounter := Self.FCounter;
 
-    FClientContext.IncRecvRef;
-
-
-    {$IFDEF DIOCP_DEBUG}
-    InterlockedDecrement(FOverlapped.RefCount);
-    if FOverlapped.RefCount <> 0 then
-    begin        // 引用计数异常
-      if IsDebugMode then
-      begin
-        Assert(FOverlapped.RefCount <>0);
-      end;
-      FOwner.logMessage(strRecvResponseErr,
-          [Integer(self.FClientContext), Integer(Self), FOverlapped.RefCount],
-          CORE_LOG_FILE, lgvError);
+  {$IFDEF DIOCP_DEBUG}  
+  InterlockedDecrement(FOverlapped.RefCount);
+  if FOverlapped.RefCount <> 0 then
+  begin        // 引用计数异常
+    if IsDebugMode then
+    begin
+      Assert(FOverlapped.RefCount <>0);
     end;
-    {$ENDIF}
+    FOwner.logMessage(strRecvResponseErr,
+        [Integer(self.FClientContext), Integer(Self), FOverlapped.RefCount],
+        CORE_LOG_FILE, lgvError);
+  end;
+  {$ENDIF}
 
+
+  try
+    FClientContext.IncRecvRef;
 
     Assert(FOwner <> nil);
     try
@@ -4617,7 +4627,7 @@ begin
       end else if FErrorCode <> 0 then
       begin
         lvDebugStep := 20;
-        if not FClientContext.FRequestDisconnect then
+        if not FClientContext.FRequestDisconnectFlag then
         begin   // 如果请求关闭，不再输出日志,和触发错误
           {$IFDEF WRITE_LOG}
           FOwner.logMessage(
@@ -4633,7 +4643,7 @@ begin
       end else if (FBytesTransferred = 0) then
       begin      // no data recvd, socket is break
         lvDebugStep := 30;
-        if not FClientContext.FRequestDisconnect then
+        if not FClientContext.FRequestDisconnectFlag then
         begin
           FClientContext.RequestDisconnect(
             Format(strRecvZero,  [FClientContext.FSocketHandle]),  Self);
@@ -4704,8 +4714,12 @@ begin
   FRecvBuffer.buf := pvBuffer;
   FRecvBuffer.len := len;
   lvDNACounter := InterlockedIncrement(FCounter);
+  {$IFDEF DIOCP_DEBUG}
   if FClientContext.IncReferenceCounter(Format(
     'TIocpRecvRequest.WSARecvRequest.Post, DNACounter:%d', [lvDNACounter]), Self) then
+  {$ELSE}
+  if FClientContext.IncReferenceCounter(STRING_EMPTY, nil) then
+  {$ENDIF}
   begin
     {$IFDEF DIOCP_DEBUG}
     if FOverlapped.RefCount <> 0 then
@@ -4896,7 +4910,7 @@ begin
     begin
       FReponseState := 3;
 
-      if not FClientContext.FRequestDisconnect then
+      if not FClientContext.FRequestDisconnectFlag then
       begin   // 如果请求关闭，不再输出日志,和触发错误
         {$IFDEF WRITE_LOG}
         FOwner.logMessage(
@@ -5032,8 +5046,9 @@ begin
       lvContext.DecReferenceCounter(
         Format('InnerPostRequest::WSASend_Fail, ErrorCode:%d', [lvErrorCode])
          , Self);
-     {$ENDIF}
+     {$ELSE}
       lvContext.DecReferenceCounter(STRING_EMPTY, Self);
+     {$ENDIF}                                           
     end;
   end;
 end;

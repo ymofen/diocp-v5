@@ -243,7 +243,7 @@ type
     /// <summary>
     ///   会阻止request释放，和连接投递接收请求
     /// </summary>
-    procedure AddRef;
+    function AddRef: Boolean;
 
     /// <summary>
     ///   与AddRef配套使用
@@ -649,8 +649,6 @@ type
     FContextType:Integer;
 
 
-    /// 是否正在处理请求
-    FIsProcessRequesting:Boolean;
     
     /// 请求的任务队列
     FRequestQueue:TSimpleQueue;
@@ -676,9 +674,6 @@ type
     {$ENDIF}
 
     procedure InnerDoARequest(pvRequest:TDiocpHttpRequest);
-
-    // 执行事件
-    procedure DoRequestBACK(pvRequest:TDiocpHttpRequest);
 
     procedure InnerPushRequest(pvRequest:TDiocpHttpRequest);
 
@@ -1118,12 +1113,17 @@ begin
   end;
 end;
 
-procedure TDiocpHttpRequest.AddRef;
+function TDiocpHttpRequest.AddRef: Boolean;
 begin
-  Self.Connection.IncRecvRef;
-  self.Connection.LockContext('TDiocpHttpRequest.Ref', nil);  // 避免连接提前关闭
-  AtomicIncrement(self.FRefCounter);
-  
+  if self.Connection.LockContext('TDiocpHttpRequest.Ref', nil) then
+  begin
+    Self.Connection.IncRecvRef;
+    AtomicIncrement(self.FRefCounter);
+    Result := True;
+  end else
+  begin
+    Result := False;
+  end;
 end;
 
 procedure TDiocpHttpRequest.DoResponseEnd;
@@ -1266,6 +1266,7 @@ begin
   Result := False;
   // 预先存临时变量，避免close后，connection改变
   lvConnection := Self.Connection;
+  Assert(lvConnection <> nil);
   if AtomicDecrement(Self.FRefCounter) = 0 then
   begin
     Self.Close;
@@ -2027,7 +2028,6 @@ begin
       // 归还到任务池
       lvTask.Close;
     end;
-    FIsProcessRequesting := False;
   finally
     self.UnLock;
   end;  
@@ -2076,47 +2076,6 @@ begin
 end;
 
 
-procedure TDiocpHttpClientContext.DoRequestBACK(pvRequest:TDiocpHttpRequest);
-begin
-  {$IFDEF INNER_IOCP_PROCESSOR}
-  InnerDoARequest(pvRequest);
-  {$ELSE}
-
-
-  if FRequestQueue.Size > 1000 then
-  begin
-    try
-      pvRequest.Connection.RequestDisconnect('未处理的请求队列过大', pvRequest);
-    finally
-      pvRequest.Close;
-    end;
-    Exit;
-  end;
-
-  self.Lock;
-  try
-    FRequestQueue.EnQueue(pvRequest);
-
-    InterlockedIncrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
-
-    if not FIsProcessRequesting then
-    begin 
-      {$IFDEF QDAC_QWorker}
-      Workers.Post(OnExecuteJob, FRequestQueue);
-      {$ELSE}
-      {$IFDEF DIOCP_TASK}
-      iocpTaskManager.PostATask(OnExecuteJob, FRequestQueue);
-      {$ELSE}
-      警告无处理处理逻辑方法，请定义处理宏// {$DEFINE DIOCP_TASK}
-      {$ENDIF}
-      {$ENDIF}
-    end;
-  finally
-    self.UnLock;
-  end;
-  {$ENDIF}
-end;
-
 procedure TDiocpHttpClientContext.DoSendBufferCompleted(pvBuffer: Pointer; len:
     Cardinal; pvBufferTag: Integer; pvTagData: Pointer; pvErrorCode: Integer);
 {$IFDEF DIOCP_DEBUG}
@@ -2129,11 +2088,11 @@ begin
   if pvBufferTag >= BLOCK_BUFFER_TAG then
   begin
     r := ReleaseRef(pvBuffer, Format('- DoSendBufferCompleted(%d)', [pvBufferTag]));
-    PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
+    //PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
   end else if pvBufferTag = BLOCK_STREAM_BUFFER_TAG then
   begin
     r := ReleaseRef(pvBuffer, Format('- DoSendBufferCompleted(%d)', [pvBufferTag]));
-    PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
+    //PrintDebugString(Format('- %x: %d', [IntPtr(pvBuffer), r]));
   end;
   {$ELSE}
   if pvBufferTag >= BLOCK_BUFFER_TAG then
@@ -2188,13 +2147,13 @@ var
 begin
   lvObj := pvRequest;
   try
-    // 连接已经断开, 放弃处理逻辑
-    if (Self = nil) then Exit;
-
-    // 连接已经断开, 放弃处理逻辑
-    if (FOwner = nil) then Exit;
-
     {$IFDEF DIOCP_DEBUG}
+    // 连接已经断开, 放弃处理逻辑
+    Assert(Self <> nil);
+
+    // 连接已经断开, 放弃处理逻辑
+    Assert(FOwner <> nil);
+
     lvObj.CheckThreadIn;
     lvObj.AddDebugStrings('DoRequest::' + pvRequest.RequestURI);
     {$ENDIF}
@@ -2202,16 +2161,15 @@ begin
     // 已经不是当时请求的连接， 放弃处理逻辑
     if lvObj.FContextDNA <> self.ContextDNA then
     begin
-     Exit;
+      Exit;
     end;
 
-    if Self.LockContext('HTTP逻辑处理...', Self) then
-    try
-     // 触发事件
-     TDiocpHttpServer(FOwner).DoRequest(lvObj);
-    finally
-     self.UnLockContext('HTTP逻辑处理...', Self);
-    end;
+    // 请求关闭了, 直接退出
+    if self.RequestDisconnectFlag then Exit;     
+
+
+    // 触发事件
+    TDiocpHttpServer(FOwner).DoRequest(lvObj);
   finally
     {$IFDEF DIOCP_DEBUG}
     lvObj.CheckThreadOut;
@@ -2277,12 +2235,18 @@ begin
     InterlockedIncrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
 
     {$IFDEF QDAC_QWorker}
-    self.IncRecvRef;
-    Workers.Post(OnExecuteJob, FRequestQueue);
+    if self.LockContext('InnerTriggerDoRequest', nil) then
+    begin
+      self.IncRecvRef;
+      Workers.Post(OnExecuteJob, FRequestQueue);
+    end;
     {$ELSE}
     {$IFDEF DIOCP_TASK}
-    self.IncRecvRef;
-    iocpTaskManager.PostATask(OnExecuteJob, FRequestQueue);
+    if self.LockContext('InnerTriggerDoRequest', nil) then
+    begin
+      self.IncRecvRef;
+      iocpTaskManager.PostATask(OnExecuteJob, FRequestQueue);
+    end;
     {$ELSE}
     警告无处理处理逻辑方法，请定义处理宏// {$DEFINE DIOCP_TASK}
     {$ENDIF}
@@ -2310,11 +2274,11 @@ begin
     n := BLOCK_BUFFER_TAG + 1;
   end;
   r := AddRef(pvBuffer, Format('+ OnBlockBufferWrite(%d)', [n]));
-  PrintDebugString(Format('+ %2x: %d', [IntPtr(pvBuffer), r]));
+  //PrintDebugString(Format('+ %2x: %d', [IntPtr(pvBuffer), r]));
   if not Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, n) then
   begin
     r := ReleaseRef(pvBuffer, '- OnBlockBufferWrite PostWSASendRequest false');
-    PrintDebugString(Format('- %2x: %d', [IntPtr(pvBuffer), r]));
+    //PrintDebugString(Format('- %2x: %d', [IntPtr(pvBuffer), r]));
   end;
   {$ELSE}
   AddRef(pvBuffer);
@@ -2330,23 +2294,12 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvJob:PQJob);
 var
   lvObj:TDiocpHttpRequest;
 begin
-  // 连接已经断开, 放弃处理逻辑
-  if (FOwner = nil) then Exit;
-
-  if __free_flag = FREE_FLAG then
-  begin
-    Exit;
-  end;
-  if Self.LockContext('qworker httptask', nil) then
   try
-    //取出一个任务
-    self.Lock;
-    try
-      if FIsProcessRequesting then Exit;
-      FIsProcessRequesting := True;
-    finally
-      self.UnLock;
-    end;
+    {$IFDEF DIOCP_DEBUG}
+    Assert(FOwner <> nil);  
+    Assert(__free_flag <> FREE_FLAG);
+    {$ENDIF}
+
 
     // 如果需要执行
     if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
@@ -2365,7 +2318,7 @@ begin
     end;
     Self.DecRecvRef;
   finally
-    self.UnLockContext('qworker httptask', nil);
+    self.UnLockContext('InnerTriggerDoRequest', nil);
   end;
 
 end;
@@ -2377,13 +2330,13 @@ procedure TDiocpHttpClientContext.OnExecuteJob(pvTaskRequest: TIocpTaskRequest);
 var
   lvObj:TDiocpHttpRequest;
 begin
-  // 连接已经断开, 放弃处理逻辑
-  if (FOwner = nil) then Exit;
+  try
+    {$IFDEF DIOCP_DEBUG}
+    Assert(FOwner <> nil);  
+    Assert(__free_flag <> FREE_FLAG);
+    {$ENDIF}
 
-  if __free_flag = FREE_FLAG then Exit;
 
-  if Self.LockContext('iocptask httptask', nil) then
-  try 
     // 如果需要执行
     if TDiocpHttpServer(FOwner).LogicWorkerNeedCoInitialize then
       pvTaskRequest.iocpWorker.checkCoInitializeEx();
@@ -2398,11 +2351,10 @@ begin
       end;
       InterlockedDecrement(TDiocpHttpServer(FOwner).FRequestQueueSize);
       InnerDoARequest(lvObj);
-
-    end;
-    Self.DecRecvRef;
+    end;                     
   finally
-    self.UnLockContext('iocptask httptask', nil);
+    Self.DecRecvRef;
+    self.UnLockContext('InnerTriggerDoRequest', nil);
   end;    
 end;
 {$ENDIF}
