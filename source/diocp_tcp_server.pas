@@ -516,7 +516,6 @@ type
         const); overload;
 
     property Active: Boolean read FActive;
-
     property BusingCounter: Integer read FBusingCounter;
 
     property Data: Pointer read FData write FData;
@@ -1919,6 +1918,9 @@ function TIocpClientContext.DecReferenceCounter(const pvDebugInfo: string;
     pvObj: TObject = nil): Integer;
 var
   lvCloseContext:Boolean;
+  {$IFDEF DIOCP_DEBUG}
+  lvFmt:String;
+  {$ENDIF}
 begin
   {$IFDEF DIOCP_DEBUG}
   if __free_flag = FREE_FLAG then
@@ -1933,9 +1935,10 @@ begin
 
   if FOwner = nil then
   begin
-    sfLogger.logMessage('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s%s',
-      [FReferenceCounter, sLineBreak, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
-    Assert(False);
+    lvFmt := format('TIocpClientContext.DecReferenceCounter:%d, DebugInfo:%s%s',
+      [FReferenceCounter, sLineBreak, FDebugStrings.Text]);
+    sfLogger.logMessage(lvFmt, CORE_DEBUG_FILE, lgvError);
+    Assert(False, lvFmt);
   end;
   {$ENDIF}
 
@@ -3279,6 +3282,8 @@ function TDiocpTcpServer.ReleaseRecvRequest(pvObject: TIocpRecvRequest):
 begin
 
   {$IFDEF DIOCP_DEBUG}
+  
+  pvObject.CheckThreadOut;
 
   if self = nil then
   begin
@@ -3843,7 +3848,9 @@ begin
 //      [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
     Assert(False);
   end;
+  Result.CheckThreadIn;
   {$ENDIF}
+  Result.FPostSucc := 0;
   Result.Tag := 0;
   Result.FAlive := true;
   Result.AddRef;
@@ -3887,6 +3894,7 @@ begin
   Result.CheckThreadIn;
   Assert(not Result.FAlive);
   {$ENDIF}
+  Result.FPostSucc := 0;
   Result.Tag := 0;
   Result.FAlive := true;
   //Result.DoCleanup;
