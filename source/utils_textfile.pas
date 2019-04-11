@@ -30,8 +30,8 @@ function DetectTextEncoding(const p: Pointer; l: Integer; var b: Boolean):
 
 function CharSizeU(c: PCharA): Integer;
 
-function SaveTextToFile(const pvFile:String; const pvText:string;
-    pvOverride:Boolean = False): Integer;
+procedure SaveTextToFile(const pvFile:String; const pvText:string;
+    pvOverride:Boolean = False);
 
 function LoadTextFromFile(const pvFile: string; AEncoding: TDTextEncoding =
     teUnknown): String;
@@ -293,8 +293,8 @@ begin
     Result := STRING_EMPTY;
 end;
 
-function SaveTextToFile(const pvFile:String; const pvText:string;
-    pvOverride:Boolean = False): Integer;
+procedure SaveTextToFile(const pvFile:String; const pvText:string;
+    pvOverride:Boolean = False);
 var
   lvFs:TFileStream;
   lvBytes:TBytes;

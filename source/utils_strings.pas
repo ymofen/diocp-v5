@@ -3719,17 +3719,17 @@ end;
 
 function TDStreamAdapter.Read(var Buffer; Count: Longint): Longint;
 begin
-  
+  Result := 0;
 end;
 
 function TDStreamAdapter.Seek(Offset: Longint; Origin: Word): Longint;
 begin
-
+  Result := 0;
 end;
 
 function TDStreamAdapter.Seek(const Offset: Int64; Origin: TSeekOrigin): Int64;
 begin
-
+  Result := 0;
 end;
 
 procedure TDStreamAdapter.SetSize(NewSize: Longint);

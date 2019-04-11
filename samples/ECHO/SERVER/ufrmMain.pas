@@ -388,7 +388,7 @@ begin
 
     for i := 0 to lvList.Count - 1 do
     begin
-      TCrackTcpSvr(FTcpServer).ReleaseSendRequest(TIocpSendRequest(lvList[i]));
+      TCrackTcpSvr(FTcpServer).ReleaseSendRequest(TIocpSendRequest(lvList[i]){$IFDEF DIOCP_DEBUG},nil{$ENDIF});
     end;
 
     TCrackTcpSvr(FTcpServer).DoCleanUpSendRequest;

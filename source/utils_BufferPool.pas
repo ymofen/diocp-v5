@@ -31,6 +31,7 @@ uses
 {$IFEND HAVE_INLINE}
 {$ENDIF}
 
+
 // 进行调试
 {.$UNDEF HAVE_INLINE}
 {.$DEFINE DIOCP_DEBUG_HINT}
@@ -39,9 +40,15 @@ uses
   {$UNDEF DIOCP_DEBUG}
 {$ENDIF}
 
+{$IFDEF DIOCP_DEBUG}
+{$UNDEF HAVE_INLINE}
+{$ENDIF}
+
+
 
 const
   block_flag :Word = $1DFB;
+  free_block_flag: Word = $1DFE;
 
 {$IFDEF DEBUG}
   protect_size = 8;
@@ -545,6 +552,7 @@ begin
   end;
 
   lvBuffer.__debug_flag := 1;
+  lvBuffer.flag := block_flag;
 
   {$IFDEF DIOCP_DEBUG_HINT}
   InnerAddBlockHint(lvBuffer, '* GetBuffer');
@@ -566,6 +574,7 @@ begin
     Assert(pvBufBlock.__debug_flag <> 0, '多次归还');
   end;
   pvBufBlock.__debug_flag := 0;
+  pvBufBlock.flag := free_block_flag;
 
   {$IFDEF DIOCP_DEBUG_HINT}
   InnerAddBlockHint(pvBufBlock, '# FreeBuff' + pvHint);
@@ -1074,25 +1083,35 @@ procedure TBlockBuffer.FlushBuffer;
 {$IF Defined(DIOCP_DEBUG)}
 var
   r, n:Integer;
+  lvDebugStr:string;
 {$IFEND}
+var
+  lvBuffer:PByte; 
 begin
-  if FBuffer = nil then Exit;
+  lvBuffer := FBuffer;
+  if lvBuffer = nil then Exit;
   try
     if (Assigned(FOnBufferWrite) and (FSize > 0)) then
     begin
       {$IFDEF DIOCP_DEBUG}n := AtomicIncrement(__debug_dna){$ENDIF};
-      {$IFDEF DIOCP_DEBUG}r := {$ENDIF}AddRef(FBuffer{$IFDEF DIOCP_DEBUG}, Format('+ FlushBuffer(%d)', [n]){$ENDIF});    // 避免事件中没有使用引用计数，不释放buf
+      {$IFDEF DIOCP_DEBUG}r := {$ENDIF}AddRef(lvBuffer{$IFDEF DIOCP_DEBUG}, Format('+ FlushBuffer(%d)', [n]){$ENDIF});    // 避免事件中没有使用引用计数，不释放buf
       try
         {$IFNDEF BIG_CONCURRENT}
-        {$IFDEF DIOCP_DEBUG}PrintDebugString(Format('+ FlushBuffer %2x: %d', [Cardinal(FBuffer), r]));{$ENDIF}
+        //{$IFDEF DIOCP_DEBUG}PrintDebugString(Format('+ FlushBuffer %2x: %d', [Cardinal(FBuffer), r]));{$ENDIF}
         {$ENDIF}
-        FOnBufferWrite(self, FBuffer, FSize);
+        FOnBufferWrite(self, lvBuffer, FSize);
       finally
-        ReleaseRef(FBuffer{$IFDEF DIOCP_DEBUG}, Format('- FlushBuffer(%d)', [n]){$ENDIF});
+        {$IFDEF DIOCP_DEBUG}
+        lvDebugStr := Format('- FlushBuffer(n:%d)(r:%d)', [n, r]);
+        ReleaseRef(lvBuffer, lvDebugStr);
+        {$ELSE}
+        ReleaseRef(lvBuffer);
+        {$ENDIF}
+
       end;
     end else
     begin
-      if FBuffer <> nil then FreeBuffer(FBuffer{$IFDEF DIOCP_DEBUG}, 'FlushBuffer - 2'{$ENDIF});
+      FreeBuffer(lvBuffer{$IFDEF DIOCP_DEBUG}, 'FlushBuffer - 2'{$ENDIF});
     end;
   finally
     FBuffer := nil;

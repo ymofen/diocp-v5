@@ -15,6 +15,9 @@ uses
 {$IFDEF USE_Z_LZO}
     , utils_lzo
 {$ENDIF}
+{$IFDEF USE_AES}
+   , AES
+{$ENDIF}
 {$IFDEF USE_ZLIBExGZ}
     , ZLibExGZ, ZLibEx
 {$ENDIF}
@@ -252,6 +255,8 @@ type
     /// </summary>
     procedure DecodeURLParamAsIE;
 
+    procedure DecodeBodyWithAES(const pvaes:string);
+
 {$IFDEF UNICODE}
     procedure DecodeURLParam(pvEncoding: TEncoding); overload;
 {$ENDIF}
@@ -437,6 +442,8 @@ type
     /// GZip 压缩
     /// </summary>
     procedure GZipContent;
+
+    procedure AESEncodeContent(const AESKey:string);
 
     procedure DeflateCompressContent;
 
@@ -795,6 +802,41 @@ begin
   pvBuilder.AppendBuffer(@lvOutBytes[0], l);
 end;
 {$ENDIF}
+
+{$IFDEF USE_AES}
+procedure AESEncryptBufferBuilder(pvBuilder: TDBufferBuilder; const aes_key:string);
+var
+  lvInStream, lvOutStream: TMemoryStream;
+begin
+  lvOutStream := TMemoryStream.Create;
+  try
+    pvBuilder.Position := 0;
+    AES.EncryptStream(pvBuilder, aes_key, lvOutStream);
+    pvBuilder.Clear;
+    pvBuilder.AppendBuffer(lvOutStream.Memory, lvOutStream.Size);
+  finally
+    lvOutStream.Free;
+  end;
+end;
+
+procedure AESDecodeBufferBuilder(pvBuilder: TDBufferBuilder; const aes_key:string);
+var
+  lvInStream, lvOutStream: TMemoryStream;
+begin
+  lvOutStream := TMemoryStream.Create;
+  try
+    pvBuilder.Position := 0;
+    AES.DecryptStream(pvBuilder, aes_key, lvOutStream);
+    pvBuilder.Clear;
+    pvBuilder.AppendBuffer(lvOutStream.Memory, lvOutStream.Size);
+  finally
+    lvOutStream.Free;
+  end;
+end;
+
+{$ENDIF}
+
+
 {$IFDEF USE_ZLIBExGZ}
 
 procedure GZCompressBufferBuilder(pvBuilder: TDBufferBuilder);
@@ -823,7 +865,6 @@ begin
     lvInStream.Free;
     lvOutStream.Free;
   end;
-
 end;
 
 procedure GZDecompressBufferBuilder(pvBuilder: TDBufferBuilder);
@@ -1440,6 +1481,15 @@ begin
   end;
 end;
 
+procedure THttpRequest.DecodeBodyWithAES(const pvaes: string);
+begin
+{$IFDEF USE_AES}
+  AESDecodeBufferBuilder(FContentBuilder, pvaes);
+{$ELSE}
+  Assert(false, '工程中需要定义编译宏 USE_AES');
+{$ENDIF}  
+end;
+
 procedure THttpRequest.DecodeContentAsFormUrlencoded({$IFDEF UNICODE}
   pvEncoding: TEncoding {$ELSE}pvUseUtf8Decode: Boolean{$ENDIF});
 var
@@ -1906,6 +1956,15 @@ begin
   Result := AddCookie;
   Result.Name := pvName;
   Result.Value := pvValue;
+end;
+
+procedure THttpResponse.AESEncodeContent(const AESKey:string);
+begin
+{$IFDEF USE_AES}
+  AESEncryptBufferBuilder(FContentBuffer, AESKey);
+{$ELSE}
+  Assert(false, '工程中需要定义编译宏 USE_AES');
+{$ENDIF}  
 end;
 
 procedure THttpResponse.ClearCookies;

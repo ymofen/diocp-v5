@@ -286,6 +286,8 @@ type
     procedure DecodePostDataParam(
       {$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 
+    procedure DecodeBodyAES(const aeskey:string);
+
     /// <summary>
     ///   解码URL中的参数，放到参数列表中
     ///   在OnDiocpHttpRequest中调用
@@ -591,9 +593,13 @@ type
 
     procedure GZipContent;
 
+    
+
     procedure DeflateCompressContent;
 
     procedure ZLibContent;
+
+    procedure AESEncodeContent(const aes_key:string);
 
     procedure LZOCompressContent;
 
@@ -1232,6 +1238,11 @@ begin
   FInnerRequest.ContentSaveToFile(pvFile);
 end;
 
+procedure TDiocpHttpRequest.DecodeBodyAES(const aeskey: string);
+begin
+  FInnerRequest.DecodeBodyWithAES(aeskey);
+end;
+
 procedure TDiocpHttpRequest.DecodePostDataParam({$IFDEF UNICODE} pvEncoding:TEncoding {$ELSE}pvUseUtf8Decode:Boolean{$ENDIF});
 begin
   {$IFDEF UNICODE}
@@ -1769,6 +1780,11 @@ function TDiocpHttpResponse.AddCookie(pvName:String; pvValue:string):
     TDiocpHttpCookie;
 begin
   Result := FInnerResponse.AddCookie(pvName, pvValue);
+end;
+
+procedure TDiocpHttpResponse.AESEncodeContent(const aes_key:string);
+begin
+  FInnerResponse.AESEncodeContent(aes_key);
 end;
 
 function TDiocpHttpResponse.EncodeHeader: String;

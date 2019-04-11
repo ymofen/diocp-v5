@@ -82,6 +82,8 @@ type
 
     procedure OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
 
+    procedure OnHttpSvrTestRequest(pvRequest:TDiocpHttpRequest);
+
     function WebSocketPush(const pvData: string; pvExceptContext:
         TDiocpHttpClientContext): Integer;
 
@@ -134,6 +136,7 @@ begin
   //HELLO;
 {$ENDIF}
 end;
+
 
 procedure TfrmMain.OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
 var
@@ -490,6 +493,27 @@ begin
         pvRequest.Response.GetResponseHeaderAsString);
     end;
   end;
+end;
+
+procedure TfrmMain.OnHttpSvrTestRequest(pvRequest: TDiocpHttpRequest);
+var
+  lvDValue:TDValue;
+  s:string;
+begin
+  if pvRequest.RequestURI = '/json' then
+  begin
+    pvRequest.Response.ContentType := 'text/json';
+    s := '{"ab":"1111111111111111111111111111111111111111111111111111111111111111111"}';
+//    lvDValue := TDValue.Create;
+//    lvDValue.ForceByName('title').AsString := 'DIOCP-V5 Http 服务演示';
+//    lvDValue.ForceByName('author').AsString := 'D10.天地弦';
+//    lvDValue.ForceByName('time').AsString := DateTimeToStr(Now());
+//    s := JSONEncode(lvDValue);
+//   lvDValue.Free;
+    pvRequest.Response.WriteString(s);
+    pvRequest.SendResponse;
+    pvRequest.DoResponseEnd;
+  end;  
 end;
 
 destructor TfrmMain.Destroy;

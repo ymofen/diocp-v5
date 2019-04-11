@@ -564,10 +564,12 @@ begin
   lvDValue := TDValue.Create();
   try
     JSONParser(mmoData.Lines.Text, lvDValue);
-    lvDValue2 := lvDValue.FindByName('maps').Items[0];
+    ShowMessage(JSONEncode(lvDValue));
+
+    //lvDValue2 := lvDValue.FindByName('maps').Items[0];
 
 
-    ShowMessage(lvDValue2.ForceByPath('name').AsString);
+    //ShowMessage(lvDValue2.ForceByPath('name').AsString);
   finally
     lvDValue.Free;
   end;
