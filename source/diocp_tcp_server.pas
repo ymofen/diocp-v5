@@ -517,6 +517,8 @@ type
 
     property Active: Boolean read FActive;
 
+    property BusingCounter: Integer read FBusingCounter;
+
     property Data: Pointer read FData write FData;
 
     property DebugInfo: string read GetDebugInfo write SetDebugInfo;
