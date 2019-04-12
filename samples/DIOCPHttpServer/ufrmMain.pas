@@ -116,6 +116,7 @@ begin
   FTcpServer.createDataMonitor;
   FTcpServer.OnDiocpHttpRequest := OnHttpSvrRequest;
   FTcpServer.WorkerCount := 5;
+  CheckCreateRequestPoolForTask(20000);
   //FTcpServer.UseAsyncRecvQueue := true;
   //StartDiocpLogicWorker(0);
 {$IFDEF DIOCP_HIGH_SPEED}

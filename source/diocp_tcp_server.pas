@@ -1749,7 +1749,17 @@ end;
 function TIocpClientContext.LockContext(const pvDebugInfo: string; pvObj:
     TObject): Boolean;
 begin
+  {$IFDEF DIOCP_DEBUG}
+  if Length(pvDebugInfo)=0 then
+  begin
+    Result := IncReferenceCounter('LockContext', pvObj);
+  end else
+  begin
+    Result := IncReferenceCounter(pvDebugInfo, pvObj);
+  end;
+  {$ELSE}
   Result := IncReferenceCounter(pvDebugInfo, pvObj);
+  {$ENDIF}
 end;
 
 procedure TIocpClientContext.UnLockContext(const pvDebugInfo: string; pvObj:
@@ -1760,8 +1770,17 @@ begin
   begin
     Assert(Self<> nil);
   end;
-  {$ENDIF}
+  if Length(pvDebugInfo)=0 then
+  begin
+    DecReferenceCounter('UnLockContext', pvObj);
+  end else
+  begin
+    DecReferenceCounter(pvDebugInfo, pvObj);
+  end;
+  {$ELSE}
   DecReferenceCounter(pvDebugInfo, pvObj);
+  {$ENDIF}
+
 end;
 
 
@@ -1954,7 +1973,10 @@ begin
     {$IFDEF DIOCP_DEBUG}
     if Length(pvDebugInfo) = 0 then
     begin
-      Assert(Length(pvDebugInfo) > 0)
+      if IsDebugMode then
+      begin
+        Assert(Length(pvDebugInfo) > 0);
+      end;
     end;
     AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     {$ENDIF}
@@ -2005,7 +2027,7 @@ begin
     {$IFDEF DIOCP_DEBUG}
     if Length(pvDebugInfo) = 0 then
     begin
-      Assert(Length(pvDebugInfo) > 0)
+      if IsDebugMode then Assert(Length(pvDebugInfo) > 0)
     end;
     AddDebugString(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvDebugInfo]));
     {$ENDIF}
@@ -5066,7 +5088,7 @@ begin
 
       {$IFDEF DIRECT_SEND}
       {$ELSE}
-      FClientContext.CheckNextSendRequest;
+      FClientContext.PostNextSendRequest;   // 虚函数，子类的context可以继承重构
       {$ENDIF}
     end;
   finally

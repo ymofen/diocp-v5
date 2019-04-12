@@ -195,7 +195,12 @@ function checkInitializeTaskManager(pvWorkerCount: Integer = 0;
 
 procedure CheckFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
 
+procedure CheckCreateRequestPoolForTask(const pvMax:Integer);
+
 implementation
+
+uses
+  utils_strings;
 
 var
   /// iocpRequestPool
@@ -305,6 +310,16 @@ begin
       SysUtils.ShowException(ExceptObject, ExceptAddr);
   end else
     SysUtils.ShowException(ExceptObject, ExceptAddr);
+end;
+
+procedure CheckCreateRequestPoolForTask(const pvMax:Integer);
+var
+  i: Integer;
+begin
+  for i := 0 to pvMax - 1 do
+  begin
+    requestPool.EnQueue(TIocpTaskRequest.Create);
+  end;
 end;
 
 procedure TIocpTaskMananger.DoMainThreadWork(var AMsg: TMessage);
@@ -693,7 +708,7 @@ end;
 
 procedure TIocpTaskRequest.DoCleanUp;
 begin
-  self.Remark := '';
+  self.Remark := STRING_EMPTY;
   FOnTaskWork := nil;
   FOnTaskWorkStrData := nil;
   FOnTaskWorkProc := nil;
@@ -761,8 +776,11 @@ begin
       end;
     end;
     FEndTime := GetTickCount;
-  finally 
+  finally
     CheckFreeData(FTaskData, FFreeType);
+    Self.Data := nil;
+    self.FStrData := STRING_EMPTY;
+    self.DoCleanUp;
     requestPool.EnQueue(Self);
     SetCurrentThreadInfo('DiocpTask::HandleResponse - finally end');
   end;

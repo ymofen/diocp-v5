@@ -134,7 +134,7 @@
 			<Directories Name="PackageDCPOutputDir"></Directories>
 			<Directories Name="SearchPath">C:\Program Files (x86)\Neos Eureka S.r.l\EurekaLog 7\Lib\Win32\Debug\Studio11\;$(BDS)\lib\Debug;$(BDS)\Lib\Debug\Indy10</Directories>
 			<Directories Name="Packages"></Directories>
-			<Directories Name="Conditionals">DIOCP_DEBUG;DEBUG</Directories>
+			<Directories Name="Conditionals">DEBUG</Directories>
 			<Directories Name="DebugSourceDirs"></Directories>
 			<Directories Name="UsePackages">False</Directories>
 		</Directories>
