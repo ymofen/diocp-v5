@@ -390,7 +390,7 @@ type
 
     /// <summary>
     ///   执行真正的连接断开清理工作触发事件
-    ///   单线程调用
+    ///   确保:单线程调用
     /// </summary>
     procedure InnerCloseContext;
 
@@ -481,7 +481,11 @@ type
     /// </summary>
     procedure PostWSACloseRequest();
 
-    procedure RequestDisconnect(const pvReason: string = ''; pvObj: TObject = nil);
+    /// <summary>
+    ///   安全的做法是: LockContext, 然后进行RequestDisconnect
+    /// </summary>
+    function RequestDisconnect(const pvReason: string = ''; pvObj: TObject = nil):
+        Boolean;
 
     /// <summary>
     ///  post send request to iocp queue, if post successful return true.
@@ -1210,6 +1214,13 @@ type
     /// </summary>
     function FindContext(pvSocketHandle:TSocket): TIocpClientContext;
 
+    /// <summary>
+    ///   查找后进行锁定
+    /// </summary>
+    /// <returns> 锁定成功返回 Ctx对象，否则返回nil, 调用成功后 注意调用Unlock </returns>
+    function TryLockContext(pvSocketHandle: TSocket; const pvDebugInfo: string;
+        pvDebugObj: TObject): TIocpClientContext;
+
     procedure RegisterContextClass(pvContextClass: TIocpClientContextClass);
 
     procedure RegisterSendRequestClass(pvClass: TIocpSendRequestClass);
@@ -1615,7 +1626,7 @@ begin
     s := FDebugStrings.Text;
     s := Format('当前对象已经失去Owner:%s',
        [s]);
-    sfLogger.logMessage(s, 'core_debug', lgvWarning);
+    sfLogger.logMessage(s, CORE_DEBUG_FILE, lgvWarning);
     Assert(FOwner <> nil);
   end;
 
@@ -2068,22 +2079,38 @@ begin
   Result := FOwner.ReleaseSendRequest(pvObject{$IFDEF DIOCP_DEBUG},Self{$ENDIF});
 end;
 
-procedure TIocpClientContext.RequestDisconnect(const pvReason: string = '';
-    pvObj: TObject = nil);
+function TIocpClientContext.RequestDisconnect(const pvReason: string = '';
+    pvObj: TObject = nil): Boolean;
 var
   lvCloseContext:Boolean;
 begin
+  Result := False;
   if not FActive then exit;
 
 {$IFDEF WRITE_LOG}
-  FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvReason]), strRequestDisconnectFileID, lgvDebug);
+  if FOwner <> nil then
+  begin
+    FOwner.logMessage(Format('(%s:%d[%d]):%s', [self.RemoteAddr, self.RemotePort, self.SocketHandle, pvReason]), strRequestDisconnectFileID, lgvDebug);
+  end;
 {$ENDIF}
 
-  // 关闭请求
-  FRequestClose := 1;
   lvCloseContext := False;
   InnerLock;
   try
+    if FAlive = False then
+    begin
+      Exit;
+    end;
+    
+    if FRequestClose = 1 then
+    begin
+      Exit;
+    end;
+
+
+    // 关闭请求
+    FRequestClose := 1;
+
     {$IFDEF SOCKET_REUSE}
     lvCloseContext := False;
     if not FRequestDisconnectFlag then
@@ -2125,7 +2152,10 @@ begin
     end;
     {$ENDIF}
 
-     if FReferenceCounter = 0 then  lvCloseContext := true;
+    Result := True;
+
+
+    if FReferenceCounter = 0 then  lvCloseContext := true;
   finally
     InnerUnLock;
   end;
@@ -4180,6 +4210,44 @@ begin
   if FWSARecvBufferSize = 0 then
   begin
     FWSARecvBufferSize := 1024 * 4;
+  end;
+end;
+
+function TDiocpTcpServer.TryLockContext(pvSocketHandle: TSocket; const
+    pvDebugInfo: string; pvDebugObj: TObject): TIocpClientContext;
+{$IFDEF USE_HASHTABLE}
+
+{$ELSE}
+var
+  lvHash:Integer;
+  lvObj:TIocpClientContext;
+{$ENDIF}
+begin
+  FLocker.lock('FindContext');
+  try
+    {$IFDEF USE_HASHTABLE}
+    Result := TIocpClientContext(FOnlineContextList.FindFirstData(pvSocketHandle));
+    {$ELSE}
+    Result := nil;
+    lvHash := pvSocketHandle and SOCKET_HASH_SIZE;
+    lvObj := FClientsHash[lvHash];
+    while lvObj <> nil do
+    begin
+      if lvObj.FRawSocket.SocketHandle = pvSocketHandle then
+      begin
+        Result := lvObj;
+        break;
+      end;
+      lvObj := lvObj.FNextForHash;
+    end;
+    {$ENDIF}
+
+    if (Result <> nil) and (not Result.LockContext(pvDebugInfo, pvDebugObj)) then
+    begin
+      Result := nil;
+    end;
+  finally
+    FLocker.unLock;
   end;
 end;
 
