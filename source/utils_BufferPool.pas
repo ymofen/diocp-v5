@@ -1046,7 +1046,7 @@ begin
     Inc(FSize, l);
     if FPosition = FBlockSize then
     begin
-      FlushBuffer;
+      FlushBuffer; // Buffer = nil;
     end else if FPosition > FBlockSize then
     begin            // Ô½½ç
       Assert(false, Format('TBlockBuffer.Append bug :: pos:%d, block:%d', [FPosition, FBlockSize]));

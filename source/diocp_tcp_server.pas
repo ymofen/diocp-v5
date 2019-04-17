@@ -285,7 +285,7 @@ type
 
 
     /// <summary>
-    ///   正在请求关闭,不响应任何的接收数据事件
+    ///   正在请求关闭,不响应任何的接收数据事件, PostWSAClose时会提前设置该标志
     /// </summary>
     FRequestClose: Byte;
 
@@ -2101,8 +2101,8 @@ begin
     begin
       Exit;
     end;
-    
-    if FRequestClose = 1 then
+
+    if FRequestDisconnectFlag then
     begin
       Exit;
     end;
@@ -2563,7 +2563,7 @@ end;
 
 procedure TIocpClientContext.OnConnected;
 begin
-  
+
 end;
 
 procedure TIocpClientContext.OnDisconnected;
