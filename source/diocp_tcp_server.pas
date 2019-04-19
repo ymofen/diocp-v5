@@ -247,7 +247,7 @@ type
     ///   减少引用计数，并请求关闭
     ///   当引用计数器 = 0时，会调用断开函数(InnerCloseContext)
     /// </summary>
-    procedure DecReferenceCounterAndRequestDisconnectBk(const pvDebugInfo: string;
+    procedure DecReferenceCounterAndRequestDisconnect(const pvDebugInfo: string;
         pvObj: TObject= nil);
 
 
@@ -511,31 +511,6 @@ type
     function PostWSASendRequest(buf: Pointer; len: Cardinal; pvBufReleaseType:
         TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
         overload;
-
-    function PostWSASendAndShutDown(buf: Pointer; len: Cardinal;pvBufReleaseType:
-        TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
-    /// <summary>
-    ///    投递发送请求到IOCP队列
-    ///    post send request to iocp queue, if post successful return true.
-    ///      if request is completed, will call DoSendRequestCompleted procedure
-    ///    如果 长度为0, 则在处理请求时进行关闭。
-    /// </summary>
-    /// <returns>
-    ///    如果投递成功返回true。否则返回false(投递队列已满)
-    /// </returns>
-    /// <param name="buf"> (Pointer) </param>
-    /// <param name="len"> (Cardinal) </param>
-    /// <param name="pvBufReleaseType"> 释放类型 </param>
-    /// <param name="pvTag"> -1: 服务端请求关闭,如延时关闭 </param>
-    /// <param name="pvTagData"> (Pointer) </param>
-    function DirectPostWSASendRequest(buf: Pointer; len: Cardinal;
-        pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer
-        = nil): Boolean; overload;
-    /// <summary>
-    ///   投递关闭请求
-    ///     等待前面的数据发送请求进行关闭后，然后进行断开操作
-    /// </summary>
-    procedure PostWSAShutdownRequest;
 
     /// <summary>
     ///   设置当前的接收线程信息
@@ -1865,16 +1840,9 @@ begin
 
       if r = -2 then
       begin
+        // 
         FRawSocket.ShutDown();
-        RequestDisconnect(strWSACloseRequestEx, lvRequest);
-      end else if r = -3 then
-      begin
-        // 进行ShutDown，
-        //  不请求关闭, 下次投递recv时会出现 错误
-        FRawSocket.ShutDown();
-        {$IFDEF DIOCP_DEBUG}
-        AddDebugString(Format('*(%d):%d,请求ShutDown', [FReferenceCounter, IntPtr(lvRequest)]));
-        {$ENDIF}
+        //RequestDisconnect(strWSACloseRequestEx, lvRequest);
       end else
       begin
        /// 踢出连接
@@ -2052,7 +2020,7 @@ begin
   if lvCloseContext then InnerCloseContext;
 end;
 
-procedure TIocpClientContext.DecReferenceCounterAndRequestDisconnectBk(const
+procedure TIocpClientContext.DecReferenceCounterAndRequestDisconnect(const
     pvDebugInfo: string; pvObj: TObject= nil);
 var
   lvCloseContext:Boolean;
@@ -2085,7 +2053,7 @@ begin
         Assert(FReferenceCounter >=0);
       end else
       begin
-        FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnectBk:%d, DebugInfo:%s',
+        FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, DebugInfo:%s',
             [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
       end;
       {$ENDIF}
@@ -2199,12 +2167,7 @@ begin
   {$ELSE}
   if lvCloseContext then InnerCloseContext else
   begin
-    if FRawSocket.Close(False) = -1 then
-    begin
-      {$IFDEF DIOCP_DEBUG}
-      __svrLogger.logMessage(strSocketError, [self.SocketHandle, 'CloseSocket时', WSAGetLastError], CORE_DEBUG_FILE);
-      {$ENDIF}
-    end;
+    FRawSocket.Close(False);
   end;
   {$ENDIF}
 end;
@@ -2730,18 +2693,6 @@ begin
 end;
 
 
-function TIocpClientContext.PostWSASendAndShutDown(buf: Pointer; len: Cardinal;
-    pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer
-    = nil): Boolean;
-begin
-  Result := DirectPostWSASendRequest(buf, len, pvBufReleaseType, pvTag, pvTagData);
-  self.FRawSocket.ShutDown();
-  //shutdown(SocketHandle, SD_BOTH);
-end;
-
-
-
-
 
 function TIocpClientContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
     pvCopyBuf: Boolean = true; pvTag: Integer = 0; pvTagData: Pointer = nil):
@@ -2767,8 +2718,8 @@ begin
     begin
       lvRequest.CheckClearSendBuffer;
       lvRequest.UnBindingSendBuffer;
-      Self.RequestDisconnect();
-      FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},lvContext{$ENDIF});
+      Self.RequestDisconnect();   
+      FOwner.ReleaseSendRequest(lvRequest);
     end;
     {$ELSE}
 
@@ -2793,7 +2744,7 @@ begin
       lvRequest.UnBindingSendBuffer;
       Self.RequestDisconnect();
 
-      FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},lvContext{$ENDIF});
+      FOwner.ReleaseSendRequest(lvRequest);
     end;
     {$ELSE}
     Result := PostWSASendRequest(lvBuf, len, dtNone, pvTag, pvTagData);
@@ -2829,7 +2780,7 @@ begin
         begin
           lvRequest.UnBindingSendBuffer;
           Self.RequestDisconnect();   
-          FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},lvContext{$ENDIF});
+          FOwner.ReleaseSendRequest(lvRequest);
         end;
         {$ELSE}
         Result := InnerPostSendRequestAndCheckStart(lvRequest);
@@ -2854,51 +2805,6 @@ begin
       end;
     end;
   end;
-end;
-
-function TIocpClientContext.DirectPostWSASendRequest(buf: Pointer; len:
-    Cardinal; pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0;
-    pvTagData: Pointer = nil): Boolean;
-var
-  lvRequest:TIocpSendRequest;
-  s:String;
-begin
-  Result := false;
-  if self.Active then
-  begin
-    {$IFDEF DIOCP_DEBUG}
-    if self.IncReferenceCounter('DirectPostWSASendRequest', Self) then
-    {$ELSE}
-    if self.IncReferenceCounter(STRING_EMPTY) then
-    {$ENDIF}
-    begin
-      try
-        lvRequest := GetSendRequest;
-        lvRequest.SetBuffer(buf, len, pvBufReleaseType);
-        lvRequest.Tag := pvTag;
-        lvRequest.Data := pvTagData;
-        Result := lvRequest.ExecuteSend = 0;
-        if not Result then
-        begin
-          lvRequest.UnBindingSendBuffer;
-          Self.RequestDisconnect();
-          FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},self{$ENDIF});
-        end;
-      finally
-        {$IFDEF DIOCP_DEBUG}
-        self.DecReferenceCounter('DirectPostWSASendRequest', Self);
-        {$ELSE}
-        self.DecReferenceCounter(STRING_EMPTY);
-        {$ENDIF}
-      end;
-    end;
-  end;
-end;
-
-procedure TIocpClientContext.PostWSAShutdownRequest;
-begin
-  if not FActive then exit;
-  PostWSASendRequest(nil, 0, dtNone, -3);
 end;
 
 procedure TIocpClientContext.RecordWorkerEndTick;
@@ -5007,7 +4913,6 @@ var
   lvRet, lvDNACounter:Integer;
   lpNumberOfBytesRecvd: Cardinal;
   lvOwner:TDiocpTcpServer;
-  lvContext:TIocpClientContext;
 begin
   Result := False;
   lpNumberOfBytesRecvd := 0;
@@ -5017,16 +4922,15 @@ begin
 
   FRecvBuffer.buf := pvBuffer;
   FRecvBuffer.len := len;
-  lvContext := FClientContext;
 
   {$IFDEF DIOCP_DEBUG}lvDNACounter := {$ENDIF}InterlockedIncrement(FCounter);
   {$IFDEF DIOCP_DEBUG}
-  if lvContext.IncReferenceCounter(Format(
+  if FClientContext.IncReferenceCounter(Format(
     'TIocpRecvRequest.WSARecvRequest.Post, DNACounter:%d', [lvDNACounter]), Self) then
   {$ELSE}
-  if lvContext.IncReferenceCounter(STRING_EMPTY, nil) then
+  if FClientContext.IncReferenceCounter(STRING_EMPTY, nil) then
   {$ENDIF}
-  try
+  begin
     {$IFDEF DIOCP_DEBUG}
     if FOverlapped.RefCount <> 0 then
     begin
@@ -5065,10 +4969,10 @@ begin
 
         // decReferenceCounter
         {$IFDEF DIOCP_DEBUG}
-        lvContext.RequestDisconnect(
+        FClientContext.DecReferenceCounterAndRequestDisconnect(
           Format('TIocpRecvRequest.WSARecvRequest.Error:%d', [lvRet]), Self);
         {$ELSE}
-        lvContext.RequestDisconnect(STRING_EMPTY, Self);
+        FClientContext.DecReferenceCounterAndRequestDisconnect(STRING_EMPTY, Self);
         {$ENDIF}
 
       end else
@@ -5086,18 +4990,7 @@ begin
       begin
         lvOwner.FDataMoniter.incPostWSARecvCounter;
       end;
-    end;
-  finally
-    if not Result then
-    begin
-     {$IFDEF DIOCP_DEBUG}
-      lvContext.DecReferenceCounter(
-        Format('TIocpRecvRequest.WSARecvRequest.Error:%d', [lvRet])
-         , Self);
-     {$ELSE}
-      lvContext.DecReferenceCounter(STRING_EMPTY, Self);
-     {$ENDIF}
-    end;
+    end;   
   end;
 end;
 
@@ -5138,14 +5031,10 @@ begin
   begin
     FLastMsg := strWSACloseRequest;
     Result := -2;
-  end else if Tag = -3 then
-  begin
-    FLastMsg := strWSACloseRequest;
-    Result := -3;
   end else if (FBuf = nil) or (FLen = 0) then
   begin
     FLastMsg := strWSACloseRequest;
-    Result := -3;
+    Result := -2;
   end else
   begin
     if InnerPostRequest(FBuf, FLen) then
@@ -5403,7 +5292,7 @@ begin
          , Self);
      {$ELSE}
       lvContext.DecReferenceCounter(STRING_EMPTY, Self);
-     {$ENDIF}
+     {$ENDIF}                                           
     end;
   end;
 end;
