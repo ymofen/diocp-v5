@@ -125,8 +125,6 @@ type
 
     procedure DoSetCtxState(const state:Integer);
 
-    // 是否执行关闭
-    function CheckCloseContextBk: Boolean;
   private
     FDebugLocker:Integer;
     FOnRecvingFlag:Byte;
@@ -1370,7 +1368,7 @@ begin
   FSending := false;
 
   {$IFDEF DIOCP_DEBUG}
-  InnerAddToDebugStrings(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), '-----DoCleanUp-----']));
+  AddDebugStrings(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), '-----DoCleanUp-----']));
   {$ENDIF}
 
   if IsDebugMode then
@@ -1613,7 +1611,9 @@ begin
       SetCurrentThreadInfo('InnerCloseContext - 1.3');
       {$ENDIF}
       try
-      
+        {$IFDEF DIOCP_DEBUG}
+        AddDebugStrings(Format('-(%d):%d,%s', [FReferenceCounter, IntPtr(Self), 'DoNotifyDisconnected']));
+        {$ENDIF}
         DoNotifyDisconnected;
 
         if (FOwner<> nil) and (FOwner.FDataMoniter <> nil) then
@@ -1621,7 +1621,7 @@ begin
           FOwner.DataMoniter.IncDisconnectCounter;
         end;
 
-        DoCleanUp;
+
         {$IFDEF DIOCP_DEBUG}
         SetCurrentThreadInfo('InnerCloseContext - 1.4');
         {$ENDIF}
@@ -1664,6 +1664,7 @@ begin
     {$IFDEF DIOCP_DEBUG}
     self.CheckThreadOut();
     {$ENDIF}
+    DoCleanUp;
     // 尝试归还到池
     ReleaseBack;
   end;
@@ -1851,6 +1852,7 @@ begin
   Self.DebugInfo :=Format('[%d]执行完成->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
 
 
+  // 可能Close时，另外一个指向innerCloseContext
   if lvDoClose then InnerCloseContext(pvDoShutDown)
   else FRawSocket.Close(pvDoShutDown);
 
@@ -3936,29 +3938,6 @@ end;
 function TDiocpCustomContext.CheckActivityTimeOutEx(pvTimeOut:Integer): Boolean;
 begin
   Result := (FLastActivity <> 0) and (tick_diff(FLastActivity, GetTickCount) > Cardinal(pvTimeOut));
-end;
-
-function TDiocpCustomContext.CheckCloseContextBk: Boolean;
-var
-  v:Boolean;
-begin
-  DoCtxStateLock;
-  v := (FCtxStateFlag = 2) and (FReferenceCounter = 0);
-  if v then
-  begin
-    FCtxStateFlag := 11;     // 等待关闭
-  end;
-  DoCtxStateUnLock;
-
-  if v then
-  begin
-
-    InnerCloseContext(False);
-    Result := true;
-  end else
-  begin
-    Result := False;
-  end;
 end;
 
 procedure TDiocpCustomContext.CheckKickOut(pvTimeOut:Integer);
