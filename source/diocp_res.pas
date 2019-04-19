@@ -28,6 +28,7 @@ resourcestring
   strSendPostError = '[%d]投递发送数据请求时出现了错误。错误代码:%d';
   strSendZero      = '[%d]投递发送请求数据时遇到0长度数据。进行关闭处理';
   strWSACloseRequest      = '处理投递发送请求数据包时,发现异步关闭请求(Request.Tag = -1)。进行关闭处理!';
+  strWSAShutDownRequest      = '处理投递发送请求数据包时,发现异步ShutDown请求(Request.Tag = -3)!';
   strWSACloseRequestEx = '主动断开连接请求!';
   strSendPushFail  = '[%d]投递发送请求数据包超出队列允许的最大长度[%d/%d]。';
 

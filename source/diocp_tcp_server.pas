@@ -512,6 +512,31 @@ type
         TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
         overload;
 
+    function PostWSASendAndDisconnect(buf: Pointer; len: Cardinal;pvBufReleaseType:
+        TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
+    /// <summary>
+    ///    投递发送请求到IOCP队列
+    ///    post send request to iocp queue, if post successful return true.
+    ///      if request is completed, will call DoSendRequestCompleted procedure
+    ///    如果 长度为0, 则在处理请求时进行关闭。
+    /// </summary>
+    /// <returns>
+    ///    如果投递成功返回true。否则返回false(投递队列已满)
+    /// </returns>
+    /// <param name="buf"> (Pointer) </param>
+    /// <param name="len"> (Cardinal) </param>
+    /// <param name="pvBufReleaseType"> 释放类型 </param>
+    /// <param name="pvTag"> -1: 服务端请求关闭,如延时关闭 </param>
+    /// <param name="pvTagData"> (Pointer) </param>
+    function DirectPostWSASendRequest(buf: Pointer; len: Cardinal;
+        pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer
+        = nil): Boolean; overload;
+    /// <summary>
+    ///   投递关闭请求
+    ///     等待前面的数据发送请求进行关闭后，然后进行断开操作
+    /// </summary>
+    procedure PostWSAShutdownRequest;
+
     /// <summary>
     ///   设置当前的接收线程信息
     /// </summary>
@@ -1840,7 +1865,16 @@ begin
 
       if r = -2 then
       begin
+        FRawSocket.ShutDown();
         RequestDisconnect(strWSACloseRequestEx, lvRequest);
+      end else if r = -3 then
+      begin
+        // 进行ShutDown，
+        //  不请求关闭, 下次投递recv时会出现 错误
+        FRawSocket.ShutDown();
+        {$IFDEF DIOCP_DEBUG}
+        AddDebugString(Format('*(%d):%d,请求ShutDown', [FReferenceCounter, IntPtr(lvRequest)]));
+        {$ENDIF}
       end else
       begin
        /// 踢出连接
@@ -2165,17 +2199,12 @@ begin
   {$ELSE}
   if lvCloseContext then InnerCloseContext else
   begin
-    if FRawSocket.Close() = -1 then
+    if FRawSocket.Close(False) = -1 then
     begin
       {$IFDEF DIOCP_DEBUG}
       __svrLogger.logMessage(strSocketError, [self.SocketHandle, 'CloseSocket时', WSAGetLastError], CORE_DEBUG_FILE);
       {$ENDIF}
     end;
-//
-//    if not FRawSocket.CancelIOEx() then
-//    begin
-//
-//    end;
   end;
   {$ENDIF}
 end;
@@ -2701,6 +2730,18 @@ begin
 end;
 
 
+function TIocpClientContext.PostWSASendAndDisconnect(buf: Pointer; len:
+    Cardinal;pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData:
+    Pointer = nil): Boolean;
+begin
+  Result := DirectPostWSASendRequest(buf, len, pvBufReleaseType, pvTag, pvTagData);
+  self.FRawSocket.ShutDown();
+  //shutdown(SocketHandle, SD_BOTH);
+end;
+
+
+
+
 
 function TIocpClientContext.PostWSASendRequest(buf: Pointer; len: Cardinal;
     pvCopyBuf: Boolean = true; pvTag: Integer = 0; pvTagData: Pointer = nil):
@@ -2726,8 +2767,8 @@ begin
     begin
       lvRequest.CheckClearSendBuffer;
       lvRequest.UnBindingSendBuffer;
-      Self.RequestDisconnect();   
-      FOwner.ReleaseSendRequest(lvRequest);
+      Self.RequestDisconnect();
+      FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},lvContext{$ENDIF});
     end;
     {$ELSE}
 
@@ -2752,7 +2793,7 @@ begin
       lvRequest.UnBindingSendBuffer;
       Self.RequestDisconnect();
 
-      FOwner.ReleaseSendRequest(lvRequest);
+      FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},lvContext{$ENDIF});
     end;
     {$ELSE}
     Result := PostWSASendRequest(lvBuf, len, dtNone, pvTag, pvTagData);
@@ -2788,7 +2829,7 @@ begin
         begin
           lvRequest.UnBindingSendBuffer;
           Self.RequestDisconnect();   
-          FOwner.ReleaseSendRequest(lvRequest);
+          FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},lvContext{$ENDIF});
         end;
         {$ELSE}
         Result := InnerPostSendRequestAndCheckStart(lvRequest);
@@ -2813,6 +2854,51 @@ begin
       end;
     end;
   end;
+end;
+
+function TIocpClientContext.DirectPostWSASendRequest(buf: Pointer; len:
+    Cardinal; pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0;
+    pvTagData: Pointer = nil): Boolean;
+var
+  lvRequest:TIocpSendRequest;
+  s:String;
+begin
+  Result := false;
+  if self.Active then
+  begin
+    {$IFDEF DIOCP_DEBUG}
+    if self.IncReferenceCounter('DirectPostWSASendRequest', Self) then
+    {$ELSE}
+    if self.IncReferenceCounter(STRING_EMPTY) then
+    {$ENDIF}
+    begin
+      try
+        lvRequest := GetSendRequest;
+        lvRequest.SetBuffer(buf, len, pvBufReleaseType);
+        lvRequest.Tag := pvTag;
+        lvRequest.Data := pvTagData;
+        Result := lvRequest.ExecuteSend = 0;
+        if not Result then
+        begin
+          lvRequest.UnBindingSendBuffer;
+          Self.RequestDisconnect();
+          FOwner.ReleaseSendRequest(lvRequest{$IFDEF DIOCP_DEBUG},self{$ENDIF});
+        end;
+      finally
+        {$IFDEF DIOCP_DEBUG}
+        self.DecReferenceCounter('DirectPostWSASendRequest', Self);
+        {$ELSE}
+        self.DecReferenceCounter(STRING_EMPTY);
+        {$ENDIF}
+      end;
+    end;
+  end;
+end;
+
+procedure TIocpClientContext.PostWSAShutdownRequest;
+begin
+  if not FActive then exit;
+  PostWSASendRequest(nil, 0, dtNone, -3);
 end;
 
 procedure TIocpClientContext.RecordWorkerEndTick;
@@ -5052,10 +5138,14 @@ begin
   begin
     FLastMsg := strWSACloseRequest;
     Result := -2;
+  end else if Tag = -3 then
+  begin
+    FLastMsg := strWSACloseRequest;
+    Result := -3;
   end else if (FBuf = nil) or (FLen = 0) then
   begin
     FLastMsg := strWSACloseRequest;
-    Result := -2;
+    Result := -3;
   end else
   begin
     if InnerPostRequest(FBuf, FLen) then

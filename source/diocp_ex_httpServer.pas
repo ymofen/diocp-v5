@@ -1046,7 +1046,7 @@ end;
 
 procedure TDiocpHttpRequest.CloseContext;
 begin
-  FDiocpContext.PostWSACloseRequest();
+  FDiocpContext.PostWSAShutdownRequest();
 end;
 
 function TDiocpHttpRequest.GetCookie(pvCookieName: string): String;
@@ -1136,13 +1136,13 @@ procedure TDiocpHttpRequest.DoResponseEnd;
 begin
   if not (FResponse.FInnerResponse.ResponseCode in [0,200]) then
   begin
-    FDiocpContext.PostWSACloseRequest;
+    FDiocpContext.PostWSAShutdownRequest;
   end else if not FInnerRequest.CheckKeepAlive then
   begin
-    FDiocpContext.PostWSACloseRequest;
+    FDiocpContext.PostWSAShutdownRequest;
   end else if SameText(FResponse.Header.ForceByName('Connection').AsString, 'close') then
   begin
-    FDiocpContext.PostWSACloseRequest;
+    FDiocpContext.PostWSAShutdownRequest;
   end;
   
   Self.Clear;
@@ -2133,7 +2133,7 @@ begin
         FCurrentStreamRemainSize := 0;
         if FCurrentStreamEndAction = 0 then
         begin
-          PostWSACloseRequest;
+          PostWSAShutdownRequest;
         end else
         begin
         
