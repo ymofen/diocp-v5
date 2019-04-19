@@ -525,6 +525,7 @@ begin
     RaiseLastOSError;
   end;
   InterlockedIncrement(__DebugWSACreateCounter);
+  self.FCloseFlag := 0;
 end;
 
 procedure TRawSocket.CreateTcpSocket;
