@@ -512,7 +512,7 @@ type
         TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
         overload;
 
-    function PostWSASendAndDisconnect(buf: Pointer; len: Cardinal;pvBufReleaseType:
+    function PostWSASendAndShutDown(buf: Pointer; len: Cardinal;pvBufReleaseType:
         TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
     /// <summary>
     ///    投递发送请求到IOCP队列
@@ -2730,9 +2730,9 @@ begin
 end;
 
 
-function TIocpClientContext.PostWSASendAndDisconnect(buf: Pointer; len:
-    Cardinal;pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData:
-    Pointer = nil): Boolean;
+function TIocpClientContext.PostWSASendAndShutDown(buf: Pointer; len: Cardinal;
+    pvBufReleaseType: TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer
+    = nil): Boolean;
 begin
   Result := DirectPostWSASendRequest(buf, len, pvBufReleaseType, pvTag, pvTagData);
   self.FRawSocket.ShutDown();

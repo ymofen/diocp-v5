@@ -157,6 +157,7 @@ type
     FDebugInfo:string;
     FCheckThreadId: THandle;
     {$ENDIF}
+    FCloseFlag:Integer;
     FIPVersion: Integer;
     FSocketHandle: TSocket;
     procedure CheckDestroyHandle;
@@ -297,6 +298,7 @@ implementation
 var
   __WSAStartupDone:Boolean;
 
+
 //function CancelIoEx(hFile: THandle; lpOverlapped:LPOVERLAPPED): BOOL; stdcall; external kernel32 name 'CancelIoEx';
 
 function TranslateTInAddrToString(const sockaddr; const AIPVersion:
@@ -381,10 +383,19 @@ function TRawSocket.Close(pvShutdown: Boolean = true): Integer;
 var
   lvTempSocket: TSocket;
 begin
+  // 避免多线程操作
+  if InterlockedCompareExchange(FCloseFlag, 1, 0) <> 0 then
+  begin
+    Exit;
+  end;
+
   {$IFDEF DIOCP_DEBUG}
-  CheckThreadIn('CLOSE');
+  //CheckThreadIn('CLOSE');
   try
   {$ENDIF}
+
+
+
   lvTempSocket := FSocketHandle;
   if lvTempSocket <> INVALID_SOCKET then
   begin
@@ -413,7 +424,7 @@ begin
   end;
   {$IFDEF DIOCP_DEBUG}
   finally
-    CheckThreadOut();
+    //CheckThreadOut();
   end;
   {$ENDIF}
 end;
@@ -525,6 +536,7 @@ begin
     RaiseLastOSError;
   end;
   InterlockedIncrement(__DebugWSACreateCounter);
+  FCloseFlag := 0;
 end;
 
 procedure TRawSocket.CreateUdpOverlappedSocket;
@@ -536,6 +548,7 @@ begin
     RaiseLastOSError;
   end;
   InterlockedIncrement(__DebugWSACreateCounter);
+  FCloseFlag := 0;
 end;
 
 destructor TRawSocket.Destroy;
