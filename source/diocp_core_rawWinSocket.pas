@@ -19,7 +19,11 @@ unit diocp_core_rawWinSocket;
 interface
 
 uses
-  windows, SysUtils, diocp_winapi_winsock2, diocp_sockets_utils;
+  windows, SysUtils, diocp_winapi_winsock2, diocp_sockets_utils
+  {$IFDEF DIOCP_DEBUG}
+  , utils_strings
+  {$ENDIF}
+  ;
 
 
 
@@ -149,6 +153,10 @@ type
   /// </summary>
   TRawSocket = class(TObject)
   private
+    {$IFDEF DIOCP_DEBUG}
+    FDebugInfo:string;
+    FCheckThreadId: THandle;
+    {$ENDIF}
     FIPVersion: Integer;
     FSocketHandle: TSocket;
     procedure CheckDestroyHandle;
@@ -234,6 +242,10 @@ type
     function CancelIO: Boolean;
 
     function CancelIOEx: Boolean;
+    {$IFDEF DIOCP_DEBUG}
+    procedure CheckThreadIn(const pvDebugInfo: String);
+    procedure CheckThreadOut;
+    {$ENDIF}
 
     /// <summary>
     ///  The shutdown function disables sends or receives on a socket.
@@ -369,6 +381,10 @@ function TRawSocket.Close(pvShutdown: Boolean = true): Integer;
 var
   lvTempSocket: TSocket;
 begin
+  {$IFDEF DIOCP_DEBUG}
+  CheckThreadIn('CLOSE');
+  try
+  {$ENDIF}
   lvTempSocket := FSocketHandle;
   if lvTempSocket <> INVALID_SOCKET then
   begin
@@ -395,6 +411,11 @@ begin
   begin
     Result := 0;
   end;
+  {$IFDEF DIOCP_DEBUG}
+  finally
+    CheckThreadOut();
+  end;
+  {$ENDIF}
 end;
 
 function TRawSocket.Connect(const pvAddr: string; pvPort: Integer): Boolean;
@@ -553,6 +574,26 @@ begin
     InterlockedIncrement(__DebugWSACloseCounter);
   end;
 end;
+
+{$IFDEF DIOCP_DEBUG}
+procedure TRawSocket.CheckThreadIn(const pvDebugInfo: String);
+begin
+  if FCheckThreadId <> 0 then
+  begin
+    //s := GetDebugString;
+    raise Exception.CreateFmt('%s=>(%d,%d)当前对象已经被其他线程正在使用',
+       [pvDebugInfo, utils_strings.GetCurrentThreadID, FCheckThreadId]);
+  end;
+  FCheckThreadId := utils_strings.GetCurrentThreadID;
+  FDebugInfo := pvDebugInfo;
+end;
+
+procedure TRawSocket.CheckThreadOut;
+begin
+  FDebugInfo := STRING_EMPTY;
+  FCheckThreadId := 0;
+end;
+{$ENDIF}
 
 function TRawSocket.GetIpAddrByName(const host:string): String;
 var
