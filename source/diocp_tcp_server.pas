@@ -247,7 +247,7 @@ type
     ///   减少引用计数，并请求关闭
     ///   当引用计数器 = 0时，会调用断开函数(InnerCloseContext)
     /// </summary>
-    procedure DecReferenceCounterAndRequestDisconnect(const pvDebugInfo: string;
+    procedure DecReferenceCounterAndRequestDisconnectBk(const pvDebugInfo: string;
         pvObj: TObject= nil);
 
 
@@ -2018,7 +2018,7 @@ begin
   if lvCloseContext then InnerCloseContext;
 end;
 
-procedure TIocpClientContext.DecReferenceCounterAndRequestDisconnect(const
+procedure TIocpClientContext.DecReferenceCounterAndRequestDisconnectBk(const
     pvDebugInfo: string; pvObj: TObject= nil);
 var
   lvCloseContext:Boolean;
@@ -2051,7 +2051,7 @@ begin
         Assert(FReferenceCounter >=0);
       end else
       begin
-        FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnect:%d, DebugInfo:%s',
+        FOwner.logMessage('TIocpClientContext.DecReferenceCounterAndRequestDisconnectBk:%d, DebugInfo:%s',
             [FReferenceCounter, FDebugStrings.Text], CORE_DEBUG_FILE, lgvError);
       end;
       {$ENDIF}
@@ -2165,7 +2165,17 @@ begin
   {$ELSE}
   if lvCloseContext then InnerCloseContext else
   begin
-    FRawSocket.Close;
+    if FRawSocket.Close() = -1 then
+    begin
+      {$IFDEF DIOCP_DEBUG}
+      __svrLogger.logMessage(strSocketError, [self.SocketHandle, 'CloseSocket时', WSAGetLastError], CORE_DEBUG_FILE);
+      {$ENDIF}
+    end;
+//
+//    if not FRawSocket.CancelIOEx() then
+//    begin
+//
+//    end;
   end;
   {$ENDIF}
 end;
@@ -4911,6 +4921,7 @@ var
   lvRet, lvDNACounter:Integer;
   lpNumberOfBytesRecvd: Cardinal;
   lvOwner:TDiocpTcpServer;
+  lvContext:TIocpClientContext;
 begin
   Result := False;
   lpNumberOfBytesRecvd := 0;
@@ -4920,15 +4931,16 @@ begin
 
   FRecvBuffer.buf := pvBuffer;
   FRecvBuffer.len := len;
+  lvContext := FClientContext;
 
   {$IFDEF DIOCP_DEBUG}lvDNACounter := {$ENDIF}InterlockedIncrement(FCounter);
   {$IFDEF DIOCP_DEBUG}
-  if FClientContext.IncReferenceCounter(Format(
+  if lvContext.IncReferenceCounter(Format(
     'TIocpRecvRequest.WSARecvRequest.Post, DNACounter:%d', [lvDNACounter]), Self) then
   {$ELSE}
-  if FClientContext.IncReferenceCounter(STRING_EMPTY, nil) then
+  if lvContext.IncReferenceCounter(STRING_EMPTY, nil) then
   {$ENDIF}
-  begin
+  try
     {$IFDEF DIOCP_DEBUG}
     if FOverlapped.RefCount <> 0 then
     begin
@@ -4967,10 +4979,10 @@ begin
 
         // decReferenceCounter
         {$IFDEF DIOCP_DEBUG}
-        FClientContext.DecReferenceCounterAndRequestDisconnect(
+        lvContext.RequestDisconnect(
           Format('TIocpRecvRequest.WSARecvRequest.Error:%d', [lvRet]), Self);
         {$ELSE}
-        FClientContext.DecReferenceCounterAndRequestDisconnect(STRING_EMPTY, Self);
+        lvContext.RequestDisconnect(STRING_EMPTY, Self);
         {$ENDIF}
 
       end else
@@ -4988,7 +5000,18 @@ begin
       begin
         lvOwner.FDataMoniter.incPostWSARecvCounter;
       end;
-    end;   
+    end;
+  finally
+    if not Result then
+    begin
+     {$IFDEF DIOCP_DEBUG}
+      lvContext.DecReferenceCounter(
+        Format('TIocpRecvRequest.WSARecvRequest.Error:%d', [lvRet])
+         , Self);
+     {$ELSE}
+      lvContext.DecReferenceCounter(STRING_EMPTY, Self);
+     {$ENDIF}
+    end;
   end;
 end;
 
@@ -5290,7 +5313,7 @@ begin
          , Self);
      {$ELSE}
       lvContext.DecReferenceCounter(STRING_EMPTY, Self);
-     {$ENDIF}                                           
+     {$ENDIF}
     end;
   end;
 end;

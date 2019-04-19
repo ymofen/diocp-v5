@@ -154,7 +154,7 @@ type
     procedure CheckDestroyHandle;
   public
     function SocketValid: Boolean;
-    procedure Close(pvShutdown: Boolean = true);
+    function Close(pvShutdown: Boolean = true): Integer;
     procedure CreateTcpSocket;
 
     procedure DoInitialize;
@@ -365,15 +365,13 @@ begin
   Result := Windows.CancelIo(FSocketHandle);
 end;
 
-procedure TRawSocket.Close(pvShutdown: Boolean = true);
+function TRawSocket.Close(pvShutdown: Boolean = true): Integer;
 var
   lvTempSocket: TSocket;
 begin
   lvTempSocket := FSocketHandle;
   if lvTempSocket <> INVALID_SOCKET then
   begin
-    FSocketHandle := INVALID_SOCKET;
-    
     if pvShutdown then
     begin
       // To assure that all data is sent and received on a connected socket before it is closed,
@@ -381,12 +379,21 @@ begin
       diocp_winapi_winsock2.shutdown(lvTempSocket, SD_BOTH);
     end;
 
-    Closesocket(lvTempSocket);
+    Result := Closesocket(lvTempSocket);
+    if Result = 0 then
+    begin
+      FSocketHandle := INVALID_SOCKET;
+      InterlockedIncrement(__DebugWSACloseCounter);
+    {$IFDEF DIOCP_DEBUG}
+    end else
+    begin
+      Assert(False, Format('πÿ±’“Ï≥£:%d', [WSAGetLastError]));
+    {$ENDIF}
+    end;
 
-    InterlockedIncrement(__DebugWSACloseCounter);
   end else
   begin
-    //Assert(false, 'xxx');
+    Result := 0;
   end;
 end;
 

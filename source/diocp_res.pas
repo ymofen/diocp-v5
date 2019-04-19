@@ -19,6 +19,7 @@ resourcestring
   strRecvError     = '[%d]响应接收请求时出现了错误。错误代码:%d!';
   strRecvEngineOff = '[%d]响应接收请求时发现IOCP服务关闭';
   strRecvPostError = '[%d]投递接收请求时出现了错误。错误代码:%d!'; //'TIocpRecvRequest.PostRequest Error:%d'
+  strSocketError = '[%d]%s出现了错误。错误代码:%d!';
   strRecvResponseErr='[%d]-[%d]响应接收请求时发现请求的引用计数器异常:%d,应该为0';
 
   strSendEngineOff = '[%d]响应发送数据请求时发现IOCP服务关闭';
