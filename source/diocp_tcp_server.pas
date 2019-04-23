@@ -3470,6 +3470,13 @@ begin
       pvObject.Free;
     end;
     Result := true;
+
+  end else
+  begin
+    Result := False;
+{$IFDEF DIOCP_DEBUG}
+    Assert(False);
+{$ENDIF}
   end;
 
 end;
