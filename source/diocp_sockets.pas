@@ -223,7 +223,7 @@ type
     procedure SetOwner(const Value: TDiocpCustom);
 
     /// 与RequestDisconnect一致, 方便记录日志
-    procedure InnerKickOut;
+    procedure InnerKickOutX;
 
     procedure InnerAddToDebugStrings(pvMsg:String); overload;
     procedure InnerAddToDebugStrings(const pvMsg: string; const args: array of
@@ -1667,11 +1667,14 @@ begin
     SetCurrentThreadInfo('InnerCloseContext - 1.5');
 
     FOwner.RemoveFromOnOnlineList(Self);
+    SetCurrentThreadInfo('InnerCloseContext - 1.5.1');
 
     // 设置Socket状态
     SetSocketState(ssDisconnected);
+    SetCurrentThreadInfo('InnerCloseContext - 1.5.2');
     Inc(FDisconnectedCounter);
     DoSetCtxState(0);
+    SetCurrentThreadInfo('InnerCloseContext - 1.5.3');
     // 尝试归还到池
     ReleaseBack;
     SetCurrentThreadInfo('InnerCloseContext - 1.6');
@@ -1825,30 +1828,34 @@ end;
 
 procedure TDiocpCustomContext.RequestDisconnect(pvReason: string =
     STRING_EMPTY; pvObj: TObject = nil; pvDoShutDown: Boolean = True);
-begin
-  Self.DebugInfo :=Format('[%d]进入->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
-  if (not FActive) and (not FRawSocket.SocketValid) then
-  begin
-    self.DebugInfo := '请求断开时,发现已经断开';
-    Exit;
-  end;
-
+begin     
 {$IFDEF DIOCP_DEBUG}
   FOwner.logMessage('(%d)断开请求信息:%s, 当前引用计数:%d', [SocketHandle, pvReason, FReferenceCounter],
       strRequestDisconnectFileID);
-{$ENDIF}
-
-
+      
   Assert(FContextLocker <> nil, 'error...');
+{$ENDIF}  
 
   DoCtxStateLock;
   try
+    Self.DebugInfo :=Format('[%d]进入->RequestDisconnect:%d', [self.SocketHandle, self.FReferenceCounter]);
+    if (not FActive) and (not FRawSocket.SocketValid) then
+    begin
+      self.DebugInfo := '请求断开时,发现已经断开';
+      Exit;
+    end;
+
     {$IFDEF DIOCP_DEBUG}
     if pvReason <> '' then
     begin
       AddDebugStrings(Format('*(%d):%d,%s', [FReferenceCounter, IntPtr(pvObj), pvReason]));
     end;
     {$ENDIF}
+
+    if FRequestDisconnect then
+    begin
+      Exit;
+    end;
 
     if not FRequestDisconnect then
     begin
@@ -1865,12 +1872,13 @@ begin
     FRawSocket.Close(pvDoShutDown);
   end;
 
-  {$IFDEF DIOCP_DEBUG}
-  if (FRawSocket.SocketValid) then
-  begin
-    call_int3();
-  end;
-  {$ENDIF}
+//  {$IFDEF DIOCP_DEBUG}
+//  if (FRawSocket.SocketValid) then
+//  begin
+//    if IsDebugMode then    
+//      call_int3();
+//  end;
+//  {$ENDIF}
   
 end;
 
@@ -2550,10 +2558,10 @@ begin
 
         Self.AddDebugStrings(Format('%d, 执行KickOut', [lvKickOutList[i].SocketHandle]));
         SetCurrentThreadInfo('TDiocpCustom.KickOut-2.2');
-        lvKickOutList[i].InnerKickOut();
+        lvKickOutList[i].RequestDisconnect('超时检测主动断开');
         SetCurrentThreadInfo('TDiocpCustom.KickOut-2.3');
         {$ELSE}
-        lvKickOutList[i].InnerKickOut();
+        lvKickOutList[i].RequestDisconnect();
         {$ENDIF}
         Inc(Result);
       end;
@@ -3960,7 +3968,7 @@ procedure TDiocpCustomContext.CheckKickOut(pvTimeOut:Integer);
 begin
   if CheckActivityTimeOut(pvTimeOut) then
   begin
-    InnerKickOut;
+    self.RequestDisconnect('超时主动断开');
   end;
 end;
 
@@ -4071,7 +4079,7 @@ begin
   end;
 end;
 
-procedure TDiocpCustomContext.InnerKickOut;
+procedure TDiocpCustomContext.InnerKickOutX;
 var
   lvCloseContext:Boolean;
   pvDebugInfo:String;

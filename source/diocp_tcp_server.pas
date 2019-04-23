@@ -1698,14 +1698,20 @@ begin
     end;
   finally
     {$IFDEF DIOCP_DEBUG}
+    SetCurrentThreadInfo('(s)InnerCloseContext - 1.5');
     InnerLock;
     AddDebugString(Format('*(%d):Disconnected, DNA:%d', [self.FReferenceCounter, self.FContextDNA]));
-    InnerUnLock; 
+    InnerUnLock;
+    SetCurrentThreadInfo('(s)InnerCloseContext - 1.5.1');
+    FOwner.RemoveFromOnOnlineList(Self);
+    SetCurrentThreadInfo('(s)InnerCloseContext - 1.5.2');
+    ReleaseBack();
+    SetCurrentThreadInfo('(s)InnerCloseContext - 1.5.9');
+    {$ELSE}
+    FOwner.RemoveFromOnOnlineList(Self);
+    ReleaseBack();
     {$ENDIF}
 
-    FOwner.RemoveFromOnOnlineList(Self);
-
-    ReleaseBack();
 
   end;
 

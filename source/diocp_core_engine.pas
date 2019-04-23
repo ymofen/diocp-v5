@@ -1265,7 +1265,7 @@ begin
         begin
           if tick_diff(lvLastRequest.FRespondStartTickCount, lvTickcount) > pvTimeOut then
           begin
-            lvStrings.Add(Format('t_s:%d, t_now:%d', [lvLastRequest.FRespondStartTickCount, lvTickcount]));
+            lvStrings.Add(Format('%d, t_s:%d, t_now:%d', [lvWorker.ThreadID, lvLastRequest.FRespondStartTickCount, lvTickcount]));
             lvStrings.Add(Format(strDebug_WorkerTitle, [i + 1]));
             lvWorker.WriteStateINfo(lvStrings);
             inc(j);
