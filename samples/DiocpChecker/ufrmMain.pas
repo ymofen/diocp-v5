@@ -21,6 +21,7 @@ type
     btnCloseSocket: TButton;
     chkShutDown: TCheckBox;
     btnCancelIoEx: TButton;
+    btnShutDown: TButton;
     procedure btnCancelIoExClick(Sender: TObject);
     procedure btnCloseIOHandleClick(Sender: TObject);
     procedure btnCreateClientSocketClick(Sender: TObject);
@@ -28,6 +29,7 @@ type
     procedure btnRefreshClick(Sender: TObject);
     procedure btnStartClick(Sender: TObject);
     procedure btnCloseSocketClick(Sender: TObject);
+    procedure btnShutDownClick(Sender: TObject);
   private
     { Private declarations }
     FRawSocket: TRawSocket;
@@ -134,6 +136,11 @@ end;
 procedure TfrmMain.btnCloseSocketClick(Sender: TObject);
 begin
   FRawSocket.Close(chkShutDown.Checked);
+end;
+
+procedure TfrmMain.btnShutDownClick(Sender: TObject);
+begin
+  FRawSocket.ShutDown();
 end;
 
 procedure TfrmMain.InnerPostCacnelIoExRequest(Sender: TObject);

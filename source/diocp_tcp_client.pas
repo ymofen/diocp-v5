@@ -329,17 +329,20 @@ begin
 end;
 
 procedure TIocpRemoteContext.CheckDoReConnect;
-begin
-
+begin     
   if not (SocketState in [ssConnecting, ssConnected]) then
   begin
     if Owner.Active then
     begin
+      {$IFDEF DIOCP_DEBUG}
       AddDebugStrings('*(*)执行重连请求!');
+      {$ENDIF}
       ConnectASync;
     end else
     begin
+      {$IFDEF DIOCP_DEBUG}
       AddDebugStrings('*(*)CheckDoReConnect::Check Owner is deactive!');
+      {$ENDIF}
     end;
   end;
 end;
@@ -475,15 +478,13 @@ begin
       DoConnected;
     end else
     begin
-      {$IFDEF DEBUG_ON}
+      {$IFDEF DIOCP_DEBUG}
       Owner.logMessage(strConnectError,  [self.Host, self.Port,  TIocpConnectExRequest(pvObject).ErrorCode]);
       {$ENDIF}
 
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
 
       DoConnectFail;
-
-
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;

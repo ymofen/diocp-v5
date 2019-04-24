@@ -2201,7 +2201,6 @@ begin
      Assert(FWSARecvRef = 0, Format('OnRecvÊÂ¼þÉÐÎ´½áÊø, FWSARecvRef:%d',[FWSARecvRef]));
   end;
 
-{$ENDIF}
 
   if IsDebugMode then
   begin
@@ -2215,8 +2214,16 @@ begin
     begin
       Assert(FSendRequestLink.Count = 0);
     end;
+
+    if FRawSocket.SocketValid then
+    begin
+      sfLogger.logMessage(Format('[%d]:%s', [self.SocketHandle, self.FDebugStrings.Text]), 'debugstr');
+      Assert(False);
+    end;
   end;
 
+
+{$ENDIF}
   FRawSocket.Close;
   FRawSocket.Free;
 

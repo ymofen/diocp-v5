@@ -20,6 +20,7 @@ object frmMain: TfrmMain
     Height = 185
     Align = alTop
     TabOrder = 0
+    ExplicitTop = -6
     object btnRefresh: TButton
       Left = 24
       Top = 48
@@ -100,6 +101,15 @@ object frmMain: TfrmMain
       TabOrder = 8
       OnClick = btnCancelIoExClick
     end
+    object btnShutDown: TButton
+      Left = 512
+      Top = 17
+      Width = 129
+      Height = 25
+      Caption = 'btnShutDown'
+      TabOrder = 9
+      OnClick = btnShutDownClick
+    end
   end
   object mmoInfo: TMemo
     Left = 0
@@ -110,5 +120,6 @@ object frmMain: TfrmMain
     Lines.Strings = (
       'mmoInfo')
     TabOrder = 1
+    ExplicitTop = 191
   end
 end

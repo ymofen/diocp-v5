@@ -162,7 +162,18 @@ type
     FSocketHandle: TSocket;
     procedure CheckDestroyHandle;
   public
+    constructor Create;
     function SocketValid: Boolean;
+
+
+    /// <summary>
+    ///
+    /// </summary>
+    /// <returns>
+    ///   0: 关闭成功
+    ///   1: 没有进行关闭
+    ///  -1: 关闭有错误
+    /// </returns>
     function Close(pvShutdown: Boolean = true): Integer;
     procedure CreateTcpSocket;
 
@@ -352,6 +363,12 @@ begin
 
 end;
 
+constructor TRawSocket.Create;
+begin
+  inherited Create;
+  FSocketHandle := INVALID_SOCKET;
+end;
+
 function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;
 var
   sockaddr: array[0..127] of byte;
@@ -398,9 +415,11 @@ function TRawSocket.Close(pvShutdown: Boolean = true): Integer;
 var
   lvTempSocket: TSocket;
 begin
+
   // 避免多线程操作
   if InterlockedCompareExchange(FCloseFlag, 1, 0) <> 0 then
   begin
+    Result := 1;
     Exit;
   end;
 
@@ -412,7 +431,7 @@ begin
 
 
   lvTempSocket := FSocketHandle;
-  if lvTempSocket <> INVALID_SOCKET then
+  if (lvTempSocket <> INVALID_SOCKET) then
   begin
     if pvShutdown then
     begin
@@ -435,7 +454,7 @@ begin
 
   end else
   begin
-    Result := 0;
+    Result := 1;
   end;
   {$IFDEF DIOCP_DEBUG}
   finally

@@ -9,6 +9,15 @@ const
   BytePerMB = BytePerKB * 1024;
   BytePerGB = BytePerMB * 1024;
 
+  CTX_STATE_INITIAL = 0;           // 初始状态
+  CTX_STATE_CONNECTING = 1;        // 正在连接
+  CTX_STATE_CONNECTED  = 2;        // 连接成功
+  CTX_STATE_WAITFOR_CLOSE = 11;    // 等待关闭
+  CTX_STATE_CLOSING = 12;          // 关闭中
+
+  // 初始状态 -> 正在连接 -> 连接成功 -> 等待关闭 -> 关闭中 -> 初始状态
+  // 初始状态 -> 正在连接
+
 type
   TWorkDoneCallBack = procedure(pvData:Pointer; pvCode:Integer) of object;
 

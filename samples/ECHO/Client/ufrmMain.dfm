@@ -34,6 +34,8 @@ object frmMain: TfrmMain
     object tsMonitor: TTabSheet
       Caption = #30417#25511#38754#26495
       ImageIndex = 1
+      ExplicitLeft = 7
+      ExplicitTop = 25
     end
     object tsOperator: TTabSheet
       Caption = #25805#20316

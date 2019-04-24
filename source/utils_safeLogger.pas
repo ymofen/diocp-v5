@@ -646,14 +646,18 @@ begin
   begin
     Assert(False, '记录日志信息未空!');
   end;
+  {$IFDEF DIOCP_DEBUG}
   SetCurrentThreadInfo(Name +  ':logMessage START');
   try
+  {$ENDIF}
     if not FEnable then exit;
 
     if not (pvLevel in FLogFilter) then Exit;
 
     try
+      {$IFDEF DIOCP_DEBUG}
       SetCurrentThreadInfo(Name +  ':logMessage START - 1.0');
+      {$ENDIF}
       {$IFDEF USE_QUEUE_POOL}
       lvPData :=TLogDataObject(__dataObjectPool.DeQueueObject);
       SetCurrentThreadInfo(Name +  ':logMessage START - 1.1');
@@ -670,7 +674,9 @@ begin
       lvPData.FLogLevel := pvLevel;
       lvPData.FMsg := pvMsg;
       lvPData.FMsgType := pvMsgType;
+      {$IFDEF DIOCP_DEBUG}
       SetCurrentThreadInfo(Name +  ':logMessage START - 2.0');
+      {$ENDIF}
 
       AtomicIncrement(__logCounter);
 
@@ -684,7 +690,9 @@ begin
       end;
       {$ENDIF}
 
+      {$IFDEF DIOCP_DEBUG}
       SetCurrentThreadInfo(Name +  ':logMessage START - 3.0');
+      {$ENDIF}
     {$IFDEF MSWINDOWS}
       InterlockedIncrement(FPostCounter);
     {$ELSE}
@@ -711,9 +719,11 @@ begin
         SafeWriteFileMsg(Format(STRING_ERR_POSTLOGERR, [pvMsg, e.Message]), 'sfLogger_err_');
       end;
     end;
+  {$IFDEF DIOCP_DEBUG}
   finally
-    SetCurrentThreadInfo(Name +  ':logMessage finally');
+    SetCurrentThreadInfo(Name +  ':logMessage finally-' + pvMsg);
   end;
+  {$ENDIF}
 end;
 
 procedure TSafeLogger.logMessage(const pvMsg: string; const args: array of

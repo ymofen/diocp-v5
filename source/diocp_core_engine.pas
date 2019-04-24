@@ -30,7 +30,7 @@ uses
   , diocp_winapi_winsock2
   , utils_strings
 
-  , ComObj, ActiveX, utils_locker;
+  , ComObj, ActiveX, utils_locker, DateUtils;
 
 
 {$IF CompilerVersion> 23}
@@ -355,8 +355,9 @@ type
     FCoInitialized:Boolean;
 
     FData: Pointer;
+    FFLastRequestClassName: string;
 
-    FLastRequest:TIocpRequest;
+    //FLastRequest:TIocpRequest;
 
     FHintInfo: string;
 
@@ -395,10 +396,13 @@ type
     /// </summary>
     property Data: Pointer read FData write FData;
 
+
     /// <summary>
     ///   the last handle respond iocp request
     /// </summary>
-    property LastRequest: TIocpRequest read FLastRequest;
+    //property LastRequest: TIocpRequest read FLastRequest;
+
+
 
     /// <summary>
     ///   单线程访问
@@ -832,15 +836,10 @@ begin
         Inc(FResponseCounter);
         FLastResponseStart := Now();
         lvTempRequest := lpOverlapped.iocpRequest;
-        FLastRequest := lvTempRequest;
         try
           if lvTempRequest.__free_flag > 0 then
           begin
             Assert(false, 'error');
-          end;
-          if FLastRequest = nil then
-          begin
-            Assert(FLastRequest<>NIL);
           end;
 
           FLastResponseClassStr := lvTempRequest.ClassName;
@@ -962,17 +961,17 @@ begin
         boolToStr(CheckFlag(WORKER_ISWATING), true),
         boolToStr(CheckFlag(WORKER_RESERVED), true)]));
 
-    lvLastRequest := FLastRequest;
-
-    if (lvLastRequest <> nil) then
-    begin
-      s := lvLastRequest.getStateINfo;
-      if s <> '' then
-      begin
-        pvStrings.Add(strDebug_Request_Title);
-        pvStrings.Add(s);
-      end;
-    end;
+//    lvLastRequest := FLastRequest;
+//
+//    if (lvLastRequest <> nil) then
+//    begin
+//      s := lvLastRequest.getStateINfo;
+//      if s <> '' then
+//      begin
+//        pvStrings.Add(strDebug_Request_Title);
+//        pvStrings.Add(s);
+//      end;
+//    end;
   end;
 end;
 
@@ -1215,11 +1214,11 @@ begin
       begin
         lvWorker := TIocpWorker(FWorkerList[i]);
 
-        lvLastRequest := lvWorker.FLastRequest;
+        //lvLastRequest := lvWorker.FLastRequest;
 
-        if (lvLastRequest<> nil) and (lvWorker.checkFlag(WORKER_ISBUSY)) then
+        if (lvWorker.checkFlag(WORKER_ISBUSY)) then
         begin
-          if GetTickCount - lvLastRequest.FRespondStartTickCount > pvTimeOut then
+          if (MSecsPerDay * (Now - lvWorker.FLastResponseStart)) > pvTimeOut then
           begin
             lvStrings.Add(Format(strDebug_WorkerTitle, [i + 1]));
             lvStrings.Add(pvThreadStackFunc(lvWorker));
@@ -1248,24 +1247,23 @@ var
   i, j:Integer;
   lvWorker:TIocpWorker;
   lvTickcount:Cardinal;
-  lvLastRequest:TIocpRequest;
+  lvNow:TDateTime;
 begin
   lvStrings := TStringList.Create;
   try
     j := 0;
-    lvTickcount := GetTickCount;
+    lvNow := Now;
     lvStrings.Add(Format(strDebugINfo, [BoolToStr(self.FActive, True), self.WorkerCount]));
     self.FWorkerLocker.lock;
     try
       for i := 0 to FWorkerList.Count - 1 do
       begin
         lvWorker := TIocpWorker(FWorkerList[i]);
-        lvLastRequest := lvWorker.LastRequest;
-        if (lvLastRequest <> nil) and (lvWorker.CheckFlag(WORKER_ISBUSY)) then
+        if (lvWorker.CheckFlag(WORKER_ISBUSY)) then
         begin
-          if tick_diff(lvLastRequest.FRespondStartTickCount, lvTickcount) > pvTimeOut then
+          if (MSecsPerDay * (lvNow - lvWorker.FLastResponseStart)) > pvTimeOut then
           begin
-            lvStrings.Add(Format('%d, t_s:%d, t_now:%d', [lvWorker.ThreadID, lvLastRequest.FRespondStartTickCount, lvTickcount]));
+            lvStrings.Add(Format('%d, response start:%s', [lvWorker.ThreadID, TraceDateString(lvWorker.FLastResponseStart)]));
             lvStrings.Add(Format(strDebug_WorkerTitle, [i + 1]));
             lvWorker.WriteStateINfo(lvStrings);
             inc(j);
