@@ -522,6 +522,7 @@ begin
       Result := false;  //Á¬½Ó³¬Ê±
 //      lvErr := WSAGetLastError;
       closesocket(FSocketHandle);
+      FSocketHandle := INVALID_SOCKET;
 //      Result := lvErr = 0;
     end else
     begin

@@ -104,7 +104,7 @@ type
 
     procedure DecodeFirstLine;
 
-    function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
+    function CheckConnect(const pvHost: string; pvPort: Integer): Boolean;
     procedure CheckSocketSendResult(pvSocketResult:Integer);
     function GetActive: Boolean;
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
@@ -751,7 +751,7 @@ begin
   end;
 end;
 
-function TDiocpHttpClient.CheckConnect(pvHost: string; pvPort: Integer):
+function TDiocpHttpClient.CheckConnect(const pvHost: string; pvPort: Integer):
     Boolean;
 var
   lvReConnect:Boolean;
