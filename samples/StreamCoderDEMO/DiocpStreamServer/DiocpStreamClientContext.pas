@@ -3,12 +3,14 @@ unit DiocpStreamClientContext;
 interface
 
 uses
-  SysUtils, Classes, Windows, Math, diocp_tcp_server, DiocpStreamProtocol;
+  SysUtils, Classes, Windows, Math, diocp_tcp_server, DiocpStreamProtocol,
+  utils_strings;
 
 
 type
   TDiocpStreamClientContext = class(TIocpClientContext)
   private
+    FSendLock:Integer;
     FStreamObject: TDiocpStreamObject;
   protected
     procedure DoCleanUp;override;
@@ -111,22 +113,29 @@ var
   r : Integer;
   lvStreamObject:TDiocpStreamObject;
 begin
+
   lvStreamObject := TDiocpStreamObject.Create;
   try
     lvStreamObject.WrapContent(pvObject);
     lvStreamObject.ResetReadPosition;
-    while True do
-    begin
-      r := lvStreamObject.ReadBlock(@lvBlock[0], MAX_BLOCK_SIZE);
-      if (r = 0) then
+    SpinLock(FSendLock);    // ·¢ËÍËø
+    try
+      while True do
       begin
-        Break;
+        r := lvStreamObject.ReadBlock(@lvBlock[0], MAX_BLOCK_SIZE);
+        if (r = 0) then
+        begin
+          Break;
+        end;
+        PostWSASendRequest(@lvBlock[0], r);
       end;
-      PostWSASendRequest(@lvBlock[0], r);
+    finally
+      SpinUnLock(FSendLock);
     end;
   finally
     lvStreamObject.Free;
   end;
+
 end;
 
 end.

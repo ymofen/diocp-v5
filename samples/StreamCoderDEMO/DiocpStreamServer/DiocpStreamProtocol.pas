@@ -7,7 +7,7 @@ uses
   Classes, SysUtils;
 
 const
-  MAX_BLOCK_SIZE = 1024 * 1;   // 500K
+  MAX_BLOCK_SIZE = 1024 * 4;   // 500K
   MAX_OBJECT_SIZE = 1024 * 1024 * 10;  //最大对象大小 10M , 大于10M 则会认为错误的包。
   SYNC_PACK_FLAG = $D10;
   //PACK_FLAG  + CRC_VALUE + STREAM_LEN + STREAM_DATA
