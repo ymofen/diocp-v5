@@ -846,7 +846,7 @@ procedure BufferToHex(pvBuffer: Pointer; outText: PDCharW; BufSize: Integer);
 
 
 function RandomVal(const max: Cardinal): Cardinal;
-
+function StrNextNO(const S: string; Value: integer): string;
 
 
 {$IF RTLVersion<24}
@@ -3353,6 +3353,40 @@ begin
     Result := Result mod max;
   end;
 end;
+
+function FillChr(const ACount: Integer; AChr: Char = ' '): string;
+var
+  i: Integer;
+begin
+  SetLength(Result, ACount);
+  for i := 1 to ACount do
+  begin
+    Result[i] := AChr;
+  end;
+end;
+
+function StrNextNO(const S: string; Value: integer): string;
+var
+  s2: string;
+  s3: string;
+  i: integer;
+begin
+  s2 := '';
+  for i := length(s) downto 1 do
+    if s[i] in ['0'..'9'] then
+      s2 := s[i] + s2
+    else
+      break;
+  if length(s2) < length(s) then
+    s3 := Copy(s, 1, length(s) - length(s2))
+  else
+    s3 := '';
+  s2 := IntToStr(StrToInt(s2) + value);
+  if length(s2) + length(s3) < length(s) then
+    s2 := FillChr(length(s) - length(s3) - length(s2), '0') + s2;
+  Result := s3 + s2;
+end;
+
 
 {$IFDEF MSWINDOWS}
 

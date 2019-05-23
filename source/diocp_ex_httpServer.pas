@@ -2490,8 +2490,13 @@ begin
           begin
             if FCurrentRequest.FInnerRequest.ContentLength = 0 then
             begin
-              self.RequestDisconnect('无效的POST/PUT请求数据', self);
-              Exit;
+              lvTempRequest := FCurrentRequest;
+              // 避免断开后还回对象池，造成重复还回
+              FCurrentRequest := nil;
+              InnerPushRequest(lvTempRequest);
+
+//              self.RequestDisconnect('无效的POST/PUT请求数据', self);
+//              Exit;
             end;
           end else if SameText(FCurrentRequest.FInnerRequest.Method, '_PING') then
           begin
