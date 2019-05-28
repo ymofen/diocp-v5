@@ -20,7 +20,6 @@ object frmMain: TfrmMain
     Height = 185
     Align = alTop
     TabOrder = 0
-    ExplicitTop = -6
     object btnRefresh: TButton
       Left = 24
       Top = 48
@@ -120,6 +119,5 @@ object frmMain: TfrmMain
     Lines.Strings = (
       'mmoInfo')
     TabOrder = 1
-    ExplicitTop = 191
   end
 end

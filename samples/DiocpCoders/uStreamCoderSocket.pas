@@ -10,7 +10,11 @@ type
   {$if CompilerVersion < 18}
     TBytes = array of Byte;
   {$IFEND}
-
+  // 25:XE5
+  {$IF CompilerVersion<=25}
+  IntPtr=Integer;
+  {$IFEND}
+  
   TStreamCoderSocket = class(TObject)
   private
     class function SendStream(pvSocket: ICoderSocket; pvStream: TStream): Integer;
@@ -39,8 +43,6 @@ implementation
 
   //PACK_FLAG  + CRC_VALUE + STREAM_LEN + STREAM_DATA
 
-uses
-  utils_byteTools;
 
 function verifyData(const buf; len: Cardinal): Cardinal;
 var
@@ -75,6 +77,17 @@ resourcestring
   strSendException_NotEqual = '发送Buffer错误指定发送%d,实际发送:%d';
 
 
+function swap32(const v: Integer): Integer;
+var
+  lvPByte : PByte;
+begin
+  result := v;
+  lvPByte := PByte(@result);
+  PByte(lvPByte)^ := byte(v shr 24);
+  PByte(IntPtr(lvPByte) + 1)^ := byte(v shr 16);
+  PByte(IntPtr(lvPByte) + 2)^ := byte(v shr 8);
+  PByte(IntPtr(lvPByte) + 3)^ := byte(v);
+end;
 
 
 
@@ -104,7 +117,7 @@ begin
 
   //headlen
   pvSocket.recvBuf(@lvReadL, SizeOf(lvReadL));
-  lvDataLen := TByteTools.swap32(lvReadL);
+  lvDataLen := swap32(lvReadL);
 
   //文件头不能过大
   if lvDataLen > MAX_OBJECT_SIZE  then
@@ -181,7 +194,7 @@ begin
     lvStream.Write(lvVerifyValue, SizeOf(lvVerifyValue));
 
 
-    lvWriteIntValue := TByteTools.swap32(lvDataLen);
+    lvWriteIntValue := swap32(lvDataLen);
 
     // stream len
     lvStream.Write(lvWriteIntValue, SizeOf(lvWriteIntValue));

@@ -330,7 +330,7 @@ end;
 
 procedure TIocpRemoteContext.CheckDoReConnect;
 begin     
-  if not (SocketState in [ssConnecting, ssConnected]) then
+  if self.CtxStateFlag = CTX_STATE_INITIAL then  
   begin
     if Owner.Active then
     begin
@@ -409,6 +409,7 @@ begin
 
   ReCreateSocket;
 
+  DoSetCtxState(CTX_STATE_CONNECTING);
   if not PostConnectRequest then
   begin
     DoConnectFail;
@@ -440,6 +441,7 @@ begin
 
   // 状态一定要设定
   SetSocketState(ssDisconnected);
+  DoSetCtxState(CTX_STATE_INITIAL);
 end;
 
 procedure TIocpRemoteContext.DoBeforeReconnect(var vAllowReconnect: Boolean);

@@ -26,6 +26,7 @@ uses
 type
   TASyncWorker = class;
   TOnASyncEvent = procedure(pvASyncWorker: TASyncWorker) of object;
+  TOnNoneEvent = procedure() of object;
   TOnASyncGlobalEvent = procedure(pvASyncWorker: TASyncWorker);
   TASyncWorker = class(TThread)
   private
@@ -34,6 +35,7 @@ type
     FDataTag: Integer;
     FOnAsyncEvent: TOnASyncEvent;
     FOnNotifyEvent: TNotifyEvent;
+    FOnNoneEvent: TOnNoneEvent;
     procedure SetDataObj(const Value: TObject);
   public
     constructor Create(AOnAsyncEvent: TOnASyncEvent);
@@ -83,7 +85,8 @@ type
 function ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
     pvDataObject: TObject = nil; pvDataTag: Integer = 0): TASyncWorker;
 
-procedure ASyncExecute(const pvCallBack: TNotifyEvent; const pvSender: TObject);
+procedure ASyncExecute(const pvCallBack: TNotifyEvent; const pvSender: TObject); overload;
+procedure ASyncExecute(const pvCallBack: TOnNoneEvent); overload;
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 
@@ -256,6 +259,19 @@ begin
   {$ENDIF}
 end;
 
+procedure ASyncExecute(const pvCallBack: TOnNoneEvent); overload;
+var
+  lvWorker:TASyncWorker;
+begin
+  lvWorker := TASyncWorker.Create(nil);
+  lvWorker.FOnNoneEvent := pvCallBack;
+  {$IFDEF UNICODE}
+  lvWorker.Start;
+  {$ELSE}
+  lvWorker.Resume;
+  {$ENDIF}
+end;
+
 constructor TASyncWorker.Create(AOnAsyncEvent: TOnASyncEvent);
 begin
   inherited Create(True);
@@ -272,6 +288,10 @@ begin
   if Assigned(FOnNotifyEvent) then
   begin
     FOnNotifyEvent(FDataObj);
+  end;
+  if Assigned(FOnNoneEvent) then
+  begin
+    FOnNoneEvent();
   end;
 end;
 

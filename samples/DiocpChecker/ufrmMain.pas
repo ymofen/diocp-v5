@@ -39,6 +39,7 @@ type
     FBuff:array[0..4096-1] of AnsiChar;
     FNumberOfBytesRecvd:Cardinal;
     FRecvdFlag: Cardinal;
+    procedure ASyncShutDown();
     procedure OnRecvResponse(pvSender:TObject);
     procedure OnCancelIoExResponse(pvSender:TObject);
     procedure InnerPostRecvRequest(Sender: TObject);
@@ -76,6 +77,12 @@ begin
   FRecvRequest.Free;
   FCacnelIoExRequest.Free;
   inherited Destroy;
+end;
+
+procedure TfrmMain.ASyncShutDown;
+begin
+  FRawSocket.ShutDown;
+  FRawSocket.CancelIOEx;
 end;
 
 procedure TfrmMain.btnCancelIoExClick(Sender: TObject);
@@ -140,7 +147,7 @@ end;
 
 procedure TfrmMain.btnShutDownClick(Sender: TObject);
 begin
-  FRawSocket.ShutDown();
+  ASyncExecute(self.ASyncShutDown);
 end;
 
 procedure TfrmMain.InnerPostCacnelIoExRequest(Sender: TObject);
@@ -189,6 +196,13 @@ procedure TfrmMain.OnRecvResponse(pvSender:TObject);
 begin
   sfLogger.logMessage(Format('投递的接收请求已经响应,Error:%d, byteSize:%d', [FRecvRequest.ErrorCode, FRecvRequest.BytesTransferred]));
   FRecvRequest.CheckThreadOut;
+
+  if FRecvRequest.ErrorCode = 0 then
+  begin
+    FRecvRequest.CheckThreadIn;
+    InnerPostRecvRequest(nil);
+//    ASyncExecute(InnerPostRecvRequest, nil);
+  end;
 end;
 
 

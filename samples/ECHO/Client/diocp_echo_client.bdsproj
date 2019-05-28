@@ -134,7 +134,7 @@
 			<Directories Name="PackageDCPOutputDir"></Directories>
 			<Directories Name="SearchPath"></Directories>
 			<Directories Name="Packages"></Directories>
-			<Directories Name="Conditionals">DEBUG</Directories>
+			<Directories Name="Conditionals">DEBUG;DIOCP_DEBUG;</Directories>
 			<Directories Name="DebugSourceDirs"></Directories>
 			<Directories Name="UsePackages">False</Directories>
 		</Directories>

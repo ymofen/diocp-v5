@@ -16,7 +16,7 @@ const
   CTX_STATE_CLOSING = 12;          // 关闭中
 
   // 初始状态 -> 正在连接 -> 连接成功 -> 等待关闭 -> 关闭中 -> 初始状态
-  // 初始状态 -> 正在连接
+  // 初始状态 -> 正在连接 -> 初始状态(连接失败)
 
 type
   TWorkDoneCallBack = procedure(pvData:Pointer; pvCode:Integer) of object;

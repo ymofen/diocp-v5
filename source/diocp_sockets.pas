@@ -139,8 +139,6 @@ type
     procedure DoCtxStateLock({$IFDEF DIOCP_DEBUG} const pvDebugStr:string{$ENDIF});
     procedure DoCtxStateUnLock;
 
-    procedure DoSetCtxState(const state:Integer);
-
     // 是否执行关闭
     function CheckCloseContext: Boolean;
   private
@@ -320,6 +318,7 @@ type
     ///   投递的发送请求响应时执行，一响应，马上执行，Errcode <> 0也会响应
     /// </summary>
     procedure DoSendRequestRespnonse(pvRequest: TIocpSendRequest); virtual;
+    procedure DoSetCtxState(const state:Integer);
 
 
     /// <summary>
@@ -1333,6 +1332,7 @@ begin
   FCreateSN := InterlockedIncrement(__create_sn);
 
   FSocketState := ssDisconnected;
+  FCtxStateFlag := CTX_STATE_INITIAL;
   FDebugStrings := TStringList.Create;
   FReferenceCounter := 0;
   FDisconnectedCounter := 0;
@@ -1586,7 +1586,7 @@ begin
   ;
 end;
 
-procedure TDiocpCustomContext.DoSetCtxState(const state: Integer);
+procedure TDiocpCustomContext.DoSetCtxState(const state:Integer);
 begin
   DoCtxStateLock({$IFDEF DIOCP_DEBUG}'DoSetCtxState:' + IntToStr(state){$ENDIF});
   FCtxStateFlag := state;
@@ -1608,6 +1608,12 @@ begin
    Assert(Self<> nil);
    if FReferenceCounter < 0 then
    begin
+     Result := false;
+     Exit;
+   end;
+
+   if FReqDisFlag = 1 then
+   begin      // 请求断线了
      Result := false;
      Exit;
    end;
@@ -1787,6 +1793,7 @@ end;
 
 procedure TDiocpCustomContext.PostCloseRequest;
 begin
+  DoSetCtxState(CTX_STATE_CLOSING);
   // 单线程投递
   self.Owner.IocpEngine.PostRequest(FCloseRequest);
 end;
@@ -1910,11 +1917,13 @@ var
 begin
   if AtomicCmpExchange(self.FReqDisFlag, 1, 0) = 0 then
   begin
+    DoSetCtxState(CTX_STATE_WAITFOR_CLOSE);
     self.FDisconnectedReason := pvReason;
     // cancel
+    // 有时候都无效(doss_gw,反应了这种现象,shutdown后，执行的postWSRecv依然可以)
     //FRawSocket.ShutDown();
-    FRawSocket.CancelIOEx;
-    //FRawSocket.Close(False);
+    //FRawSocket.CancelIOEx;
+    FRawSocket.Close(pvDoShutDown);
     //   FRawSocket.CancelIO;
   end;
 end;
