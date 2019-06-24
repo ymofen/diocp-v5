@@ -3427,10 +3427,13 @@ begin
   lvContext := FContext;
   if lvContext.incReferenceCounter('InnerPostRequest::WSASend_Start', self) then
   try
+    {$IFDEF DIOCP_DEBUG}
     if lvContext.FSendQueueSize > 0 then
     begin
       Assert(lvContext.FSendQueueSize > 0, '发送多线程');
     end;
+    {$ENDIF}
+    
     {$IFDEF TRACE_IOCP_SEND}
     TByteTools.AppendBufToFile(buf, len, Format('%d_%s.send', [lvContext.SocketHandle, FormatDateTime('hhnn', Now())]));
     {$ENDIF}

@@ -4862,6 +4862,7 @@ var
   lvPostSucc:Boolean;
 begin
   inherited;
+  lvPostSucc := False;
   lvContext := FClientContext;
   try
     {$IFDEF DIOCP_DEBUG}
@@ -5319,6 +5320,13 @@ begin
   if lvContext.IncReferenceCounter(STRING_EMPTY, self) then
   {$ENDIF}
   try
+    {$IFDEF DIOCP_DEBUG}
+    if lvContext.FSendQueueSize > 0 then
+    begin
+      Assert(lvContext.FSendQueueSize > 0, '发送多线程');
+    end;
+    {$ENDIF}
+
     {$IFDEF TRACE_IOCP_SEND}
     TByteTools.AppendBufToFile(buf, len, Format('%s_%d_%s.send', [lvContext.RemoteAddr, lvContext.RemotePort, FormatDateTime('hhnnsszzz', Now())]));
     {$ENDIF}
