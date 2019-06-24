@@ -90,10 +90,13 @@ type
   TIocpSendRequest = class;
   TIocpDisconnectExRequest = class;
 
-  TDataReleaseType = (dtNone, dtFreeMem, dtDispose);
+  TDataReleaseType = (dtNone, dtFreeMem, dtFreeTagDataAsObject, dtBufReleaseRef, dtDispose);
 
   TIocpClientContextClass = class of TIocpClientContext;
 
+  TOnContextEvent = procedure(pvClientContext: TIocpClientContext; pvTag:Integer; pvTagData:Pointer) of object;
+  
+      
   TOnContextError = procedure(pvClientContext: TIocpClientContext; errCode:
       Integer) of object;
 
@@ -264,6 +267,8 @@ type
     FDisconnectedReason:String;
 
     FAlive:Boolean;
+    
+    
 
     FInnerLockerFlag: Integer;
 
@@ -1004,6 +1009,8 @@ type
 
   TDiocpTcpServer = class(TComponent)
   private
+    FClosingFlag:Byte;
+    
     FListeners: TDiocpListeners;
 
     // 接收数据Link
@@ -1108,6 +1115,7 @@ type
     FOwnerEngine:Boolean;
     FSendBufCacheSize: Integer;
     FUseAsyncRecvQueue: Boolean;
+    
     procedure CheckDoDestroyEngine;
     function InnerCreateSendRequest: TIocpSendRequest;
     function InnerCreateRecvRequest: TIocpRecvRequest;
@@ -1138,6 +1146,8 @@ type
     function ReleaseSendRequest(pvObject:TIocpSendRequest{$IFDEF DIOCP_DEBUG}; pvCtx:TIocpClientContext{$ENDIF}): Boolean;
 
     procedure DoAfterOpen; virtual;
+
+    procedure DoBeforeOpen; virtual;
 
     procedure DoAfterClose; virtual;
 
@@ -1233,6 +1243,12 @@ type
         Boolean = true; pvTag: Integer = 0; pvTagData: Pointer = nil): Integer;
 
     /// <summary>
+    ///   在线循环事件
+    /// </summary>
+    function OnlineClientsCallBack(pvCallBack: TOnContextEvent; pvTag: Integer;
+        pvTagData: Pointer): Integer;
+
+    /// <summary>
     ///   创建数据监控中心实例
     /// </summary>
     procedure CreateDataMonitor;
@@ -1269,6 +1285,11 @@ type
     procedure SafeStop;
 
     procedure Open;
+
+    /// <summary>
+    ///   是否可以工作
+    /// </summary>
+    function CanWork: Boolean;
 
     procedure Close;
     function GetDebugString: String;
@@ -1320,6 +1341,7 @@ type
 
 
     property Logger: TSafeLogger read FLogger;
+
 
 
   published
@@ -2985,6 +3007,11 @@ begin
   FOwnerEngine := pvOwner;
 end;
 
+function TDiocpTcpServer.CanWork: Boolean;
+begin
+  Result := FActive and (self.FClosingFlag = 0);
+end;
+
 procedure TDiocpTcpServer.CheckCreatePoolObjects(pvMaxNum:Integer);
 var
   i, j:Integer;
@@ -3021,6 +3048,8 @@ begin
   begin
     FRecvBuffLink := NewBufferPool(self.FWSARecvBufferSize, 0);
   end;
+  
+  DoBeforeOpen();
 
   if FListeners.FList.Count = 0 then
   begin
@@ -3203,14 +3232,17 @@ begin
          pvRequest.FClientContext.FRawSocket.SocketHandle, 0);
       if lvRet = 0 then
       begin     // binding error
+
         lvErrCode := GetLastError;
 
-        {$IFDEF WRITE_LOG}
-        logMessage(
-            'bind2IOCPHandle(%d) in TDiocpTcpServer.DoAcceptExResponse occur Error :%d',
-            [pvRequest.FClientContext.RawSocket.SocketHandle, lvErrCode]);
-        {$ENDIF}
-
+        if pvRequest.FOwner.CanWork then
+        begin
+          {$IFDEF WRITE_LOG}
+          logMessage(
+              'bind2IOCPHandle(%d) in TDiocpTcpServer.DoAcceptExResponse occur Error :%d',
+              [pvRequest.FClientContext.RawSocket.SocketHandle, lvErrCode]);
+          {$ENDIF}
+        end;
         DoClientContextError(pvRequest.FClientContext, lvErrCode);
 
         pvRequest.FClientContext.FRawSocket.Close;
@@ -3548,53 +3580,58 @@ procedure TDiocpTcpServer.SafeStop;
 begin
   if FActive then
   begin
-    if FIocpEngine.WorkingCount = 0 then
-    begin
-      Assert(False);
+    FClosingFlag := 1;
+    try
+      if FIocpEngine.WorkingCount = 0 then
+      begin
+        Assert(False);
+      end;
+
+      FListeners.Close;
+      FDefaultListener.Close;
+
+      DisconnectAll;
+
+      // 等等所有的投递的AcceptEx请求回归
+      // 感谢 Xjumping  990669769, 反馈bug
+      FListeners.WaitForCancel(12000);
+      FDefaultListener.WaitForCancel(10000);
+
+
+      if not WaitForContext(20000) then
+      begin  // wait time out
+        Sleep(10);
+
+        // 等待Context断开超时
+        SafeWriteFileMsg('等待Context断开超时', Self.Name + '_SafeStopTimeOut');
+      end;
+
+      FOnlineContextList.FreeAllDataAsObject;
+      FOnlineContextList.Clear;
+
+      FListeners.ClearObjects;
+      FDefaultListener.FAcceptorMgr.ClearObjects;
+
+      FSendRequestPool.FreeDataObject;
+      FSendRequestPool.Clear;
+
+      FRecvRequestPool.FreeDataObject;
+      FRecvRequestPool.Clear;
+
+      if Assigned(FRecvBuffLink) then
+      begin
+        FreeBufferPool(FRecvBuffLink);
+        FRecvBuffLink := nil;
+      end;
+
+      DoAfterClose;
+
+      /// 切换到关闭状态
+      FActive := false;
+    finally
+      FClosingFlag := 0;
     end;
-
-    FListeners.Close;
-    FDefaultListener.Close;
-
-    DisconnectAll;
-
-    // 等等所有的投递的AcceptEx请求回归
-    // 感谢 Xjumping  990669769, 反馈bug
-    FListeners.WaitForCancel(12000);
-    FDefaultListener.WaitForCancel(10000);
-
-
-    if not WaitForContext(20000) then
-    begin  // wait time out
-      Sleep(10);
-
-      // 等待Context断开超时
-      SafeWriteFileMsg('等待Context断开超时', Self.Name + '_SafeStopTimeOut');
-    end;
-
-    FOnlineContextList.FreeAllDataAsObject;
-    FOnlineContextList.Clear;
-
-    FListeners.ClearObjects;
-    FDefaultListener.FAcceptorMgr.ClearObjects;
-
-    FSendRequestPool.FreeDataObject;
-    FSendRequestPool.Clear;
-
-    FRecvRequestPool.FreeDataObject;
-    FRecvRequestPool.Clear;
-
-    if Assigned(FRecvBuffLink) then
-    begin
-      FreeBufferPool(FRecvBuffLink);
-      FRecvBuffLink := nil;
-    end;
-
-    DoAfterClose;
-
-    /// 切换到关闭状态
-    FActive := false;
-  end; 
+  end;
 end;
 
 procedure TDiocpTcpServer.SetActive(pvActive:Boolean);
@@ -3682,6 +3719,11 @@ end;
 procedure TDiocpTcpServer.DoAfterOpen;
 begin
 
+end;
+
+procedure TDiocpTcpServer.DoBeforeOpen;
+begin
+  
 end;
 
 procedure TDiocpTcpServer.DoCleanUpSendRequest;
@@ -4184,6 +4226,41 @@ begin
   end;
 end;
 
+function TDiocpTcpServer.OnlineClientsCallBack(pvCallBack: TOnContextEvent;
+    pvTag: Integer; pvTagData: Pointer): Integer;
+var
+  I:Integer;
+  lvBucket: PDHashData;
+  lvContext: TIocpClientContext;
+begin
+  Result := 0;
+  FLocker.lock('GetOnlineContextList');
+  try
+    for I := 0 to FOnlineContextList.BucketSize - 1 do
+    begin
+      lvBucket := FOnlineContextList.Buckets[I];
+      while lvBucket<>nil do
+      begin
+        if lvBucket.Data <> nil then
+        begin
+          lvContext := TIocpClientContext(lvBucket.Data);
+          if lvContext.LockContext(STRING_EMPTY, nil) then
+          try
+            pvCallBack(lvContext, pvTag, pvTagData);
+            Inc(Result);
+          finally
+            lvContext.UnLockContext(STRING_EMPTY, nil);
+          end;
+        end;
+        lvBucket:=lvBucket.Next;
+      end;
+    end;
+  finally
+    FLocker.unLock;
+  end;
+  
+end;
+
 function TDiocpTcpServer.PostBufferToOnlineClients(pvBuf:Pointer;
     pvLen:Integer; pvCopyBuf: Boolean = true; pvTag: Integer = 0; pvTagData:
     Pointer = nil): Integer;
@@ -4396,10 +4473,13 @@ procedure TIocpAcceptorMgr.PostAcceptExRequest;
 var
   lvRequest:TIocpAcceptExRequest;
   i:Integer;
-begin
+begin            
   if not FListenSocket.SocketValid then Exit;
   i :=0;
+  {$IFDEF DIOCP_DEBUG}
   Assert(FOwner <> nil);
+  {$ENDIF}
+  if not self.FOwner.CanWork then Exit;
 
   try
     lvRequest := GetRequestObject;
@@ -5075,6 +5155,15 @@ begin
     case FSendBufferReleaseType of
       dtDispose: Dispose(FBuf);
       dtFreeMem: FreeMem(FBuf);
+      dtFreeTagDataAsObject :
+        begin
+          TObject(self.Data).Free;
+          self.Data := nil;
+        end;
+      dtBufReleaseRef:
+        begin
+          ReleaseRef(FBuf);
+        end;
     end;
   end;
   FWSABuf.len := 0;

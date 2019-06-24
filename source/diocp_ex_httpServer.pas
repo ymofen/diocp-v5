@@ -685,8 +685,7 @@ type
 
     procedure InnerTriggerDoRequest;
 
-    procedure OnBlockBufferWrite(pvSender:TObject; pvBuffer:Pointer;
-        pvLength:Integer);
+
 
     procedure DoSendBufferCompleted(pvBuffer: Pointer; len: Cardinal; pvBufferTag:
         Integer; pvTagData: Pointer; pvErrorCode: Integer); override;
@@ -739,6 +738,9 @@ type
     /// 归还到对象池，进行清理工作
     /// </summary>
     procedure DoCleanUp; override;
+
+    procedure OnBlockBufferWrite(pvSender:TObject; pvBuffer:Pointer;
+        pvLength:Integer); virtual;
 
     /// <summary>
     /// 接收到客户端的Http协议数据, 进行解码成TDiocpHttpRequest，响应Http请求
@@ -821,7 +823,7 @@ type
     procedure OnSessionRemove(pvData:Pointer);
   protected
     procedure DoAfterOpen; override;
-    procedure DoAfterClose;override;
+    procedure DoAfterClose; override;
 
     /// <summary>
     ///   当创建新的连接对象时会调用的函数
@@ -2669,7 +2671,7 @@ begin
   FSessionObjectPool.WaitFor(10000);
   FSessionObjectPool.Free;
   FreeBufferPool(FBlockBufferPool);
-  inherited;
+  inherited Destroy;
 end;
 
 procedure TDiocpHttpServer.CheckSessionTimeOut;

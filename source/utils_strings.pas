@@ -437,7 +437,7 @@ function StrSkipChars(const src :String; pvChars:TSysCharSet): String;
 ///   从左边开始获取几个字符串
 /// </summary>
 function LeftStr(const s:string; count:Integer): String;
-
+function LeftChar(const s:string): Char;
 /// <summary>
 ///   从右边开始获取几个字符串
 /// </summary>
@@ -3205,6 +3205,11 @@ begin
   end;  
 end;
 
+function LeftChar(const s:string): Char;
+begin
+  Result := PChar(s)^;
+end;
+
 function PosStr(const sub, s: string): Integer;
 begin
   Result := Pos(sub, s);
@@ -3541,6 +3546,8 @@ begin
   else
     Result := c;
 end;
+
+
 
 
 
