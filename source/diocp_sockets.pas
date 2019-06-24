@@ -37,6 +37,9 @@ uses
   diocp_core_rawWinSocket, SyncObjs, Windows, SysUtils,
   utils_safeLogger,
   utils_hashs,
+  {$IFDEF TRACE_IOCP_SEND}
+  utils_byteTools,
+  {$ENDIF}
   {$IFDEF DIOCP_DEBUG}
   utils_threadinfo,
   {$ENDIF}
@@ -152,6 +155,7 @@ type
     FCheckThreadInDebugInfo:String;
     FDebugLocker:Integer;
     {$ENDIF}
+    FCheckStartFlag:Byte;
     FOnRecvingFlag:Byte;
     FCloseingFlag:Byte;
     FCloseSocketFlag:Byte;
@@ -1295,7 +1299,8 @@ begin
 
   if lvRequest <> nil then
   begin
-     InnerPostSendRequest(lvRequest);
+    InnerPostSendRequest(lvRequest);
+    Result := True;
   end;
 end;
 
@@ -3422,6 +3427,13 @@ begin
   lvContext := FContext;
   if lvContext.incReferenceCounter('InnerPostRequest::WSASend_Start', self) then
   try
+    if lvContext.FSendQueueSize > 0 then
+    begin
+      Assert(lvContext.FSendQueueSize > 0, '发送多线程');
+    end;
+    {$IFDEF TRACE_IOCP_SEND}
+    TByteTools.AppendBufToFile(buf, len, Format('%d_%s.send', [lvContext.SocketHandle, FormatDateTime('hhnn', Now())]));
+    {$ENDIF}
     AtomicIncrement(lvContext.FSendQueueSize);
     lvRet := WSASend(lvContext.FRawSocket.SocketHandle,
                       @FWSABuf,
@@ -4045,6 +4057,7 @@ end;
 procedure TDiocpCustomContext.DoSendRequestRespnonse(pvRequest:
     TIocpSendRequest);
 begin
+  self.FCheckStartFlag := 0;
   FLastActivity := GetTickCount;
   AtomicDecrement(FSendQueueSize);
 end;
@@ -4122,6 +4135,7 @@ begin
       FOwner.FDataMoniter.incPushSendQueueCounter;
     end;
     CheckNextSendRequest;
+    FCheckStartFlag := 1;
   end;
 end;
 
