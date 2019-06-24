@@ -1010,6 +1010,7 @@ type
   TDiocpTcpServer = class(TComponent)
   private
     FClosingFlag:Byte;
+    FOpeningFlag:Byte;
     
     FListeners: TDiocpListeners;
 
@@ -3009,7 +3010,7 @@ end;
 
 function TDiocpTcpServer.CanWork: Boolean;
 begin
-  Result := FActive and (self.FClosingFlag = 0);
+  Result := (FActive and (self.FClosingFlag = 0)) or (FOpeningFlag = 1);
 end;
 
 procedure TDiocpTcpServer.CheckCreatePoolObjects(pvMaxNum:Integer);
@@ -3040,34 +3041,40 @@ end;
 procedure TDiocpTcpServer.CheckOpen(pvInitalizeNum:Integer);
 begin
   if FActive then Exit;
+
+  FOpeningFlag := 1;
+  try
   
-  // 开启IOCP引擎
-  FIocpEngine.CheckStart;
+    // 开启IOCP引擎
+    FIocpEngine.CheckStart;
 
-  if UseAsyncRecvQueue then
-  begin
-    FRecvBuffLink := NewBufferPool(self.FWSARecvBufferSize, 0);
-  end;
+    if UseAsyncRecvQueue then
+    begin
+      FRecvBuffLink := NewBufferPool(self.FWSARecvBufferSize, 0);
+    end;
   
-  DoBeforeOpen();
+    DoBeforeOpen();
 
-  if FListeners.FList.Count = 0 then
-  begin
-    FDefaultListener.FListenAddress := FDefaultListenAddress;
-    FDefaultListener.FListenPort := FPort;
-    FDefaultListener.FIPVersion := IP_V4;
-    FDefaultListener.Start(FIocpEngine);
-    FDefaultListener.PostAcceptExRequest(pvInitalizeNum);
-  end else
-  begin
-    FListeners.Start(FIocpEngine);
-    FListeners.PostAcceptExRequest(pvInitalizeNum);
+    if FListeners.FList.Count = 0 then
+    begin
+      FDefaultListener.FListenAddress := FDefaultListenAddress;
+      FDefaultListener.FListenPort := FPort;
+      FDefaultListener.FIPVersion := IP_V4;
+      FDefaultListener.Start(FIocpEngine);
+      FDefaultListener.PostAcceptExRequest(pvInitalizeNum);
+    end else
+    begin
+      FListeners.Start(FIocpEngine);
+      FListeners.PostAcceptExRequest(pvInitalizeNum);
+    end;
+
+    FActive := True;
+
+    DoAfterOpen;
+    if Assigned(FOnAfterOpen) then FOnAfterOpen(Self);
+  finally
+    FOpeningFlag := 0;
   end;
-
-  FActive := True;
-
-  DoAfterOpen;
-  if Assigned(FOnAfterOpen) then FOnAfterOpen(Self);
 end;
 
 
