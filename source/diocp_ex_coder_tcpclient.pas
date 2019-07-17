@@ -56,7 +56,7 @@ type
     ///   on recved data, run in iocp worker thread
     /// </summary>
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; errCode: WORD); override;
-
+    procedure OnConnected; override;
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -211,6 +211,17 @@ begin
      ReleaseRef(pvBuffer);
   end;
   {$ENDIF}
+
+end;
+
+procedure TIocpCoderRemoteContext.OnConnected;
+begin
+  inherited;
+  if FCoderExchange <> nil then
+  begin
+    FCoderExchange.CleanUp;
+  end;
+
 
 end;
 

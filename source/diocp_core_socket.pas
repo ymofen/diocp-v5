@@ -34,9 +34,38 @@ type
     ///    0:连接成功
     ///   -1:连接出现错误
     ///   -2:连接超时
+    ///   -3:select时有错误fdError
     /// </returns>
-    function ConnectTimeOut(const pvAddr: string; pvPort: Integer;
-        pvTimeOutSecs:Integer): Integer;
+    function ConnectTimeOut(const pvAddr: string; pvPort: Integer; pvTimeOutSecs:Integer): Integer;
+
+    /// <summary>
+    ///   建立连接
+    /// </summary>
+    /// <returns>
+    ///    0:连接成功
+    ///   -1:连接出现错误
+    ///   -2:连接超时
+    /// </returns>
+    function Connect(const pvAddr: string; pvPort: Integer): Integer;
+
+    /// <summary>
+    ///   是否有数据可以读取
+    /// </summary>
+    /// <returns>
+    ///    1: 可以进行接收操作(recv)
+    ///    0: 接收数据超时
+    ///   -1: 出现异常
+    /// </returns>
+    function CanRead(pvTimeOutSecs: Integer): Integer;
+
+    /// <summary>
+    ///   接收数据
+    /// </summary>
+    /// <returns>
+    ///   >0: 接收数据长度
+    ///    0: 接收数据超时
+    ///   -1: 出现异常
+    /// </returns>
     function RecvBufTimeOut(pvBuf: Pointer; pvLen, pvTimeOutSecs: Integer): Integer;
 
     property SocketHandle: THandle read FSocketHandle;
@@ -49,12 +78,60 @@ var
   __WSAStartupDone:Boolean;
 {$ENDIF}
 
+function TDiocpSocket.CanRead(pvTimeOutSecs: Integer): Integer;
+var
+  rc:Integer;
+  tm: TIMEVAL;
+  fdRead, fdError: {$IFDEF MSWINDOWS}TFdSet{$ELSE}FD_SET{$ENDIF};
+begin
+  tm.tv_sec := pvTimeOutSecs;
+  tm.tv_usec := 0;
+
+  FD_ZERO(fdRead);
+  FD_ZERO(fdError);
+{$IFDEF MSWINDOWS}
+  FD_SET(FSocketHandle, fdRead);
+  FD_SET(FSocketHandle, fdError);
+{$ELSE}
+  __FD_SET(FSocketHandle, fdRead);
+  __FD_SET(FSocketHandle, fdError);
+{$ENDIF}
+  rc := select(FSocketHandle + 1, @fdRead, nil, @fdError, @tm);
+  if (rc > 0) then
+  begin
+    if FD_ISSET(FSocketHandle, fdRead) and (not FD_ISSET(FSocketHandle, fdError)) then
+    begin
+      Result := 1;
+      exit;
+    end;
+    Result := 0;
+  end else
+  begin
+    Result := rc;
+  end;
+end;
+
+function TDiocpSocket.Connect(const pvAddr: string; pvPort: Integer): Integer;
+var
+  Addr: sockaddr_in;
+begin
+  Addr.sin_family := AF_INET;
+  Addr.sin_port := htons(pvPort);
+  {$IFDEF MSWINDOWS}
+  Addr.sin_addr.S_addr := inet_addr(PAnsichar(UTF8Encode(pvAddr)));
+  {$ELSE}
+  Addr.sin_addr.S_addr := inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
+  {$ENDIF}
+  Result := {$IFDEF MSWINDOWS}winsock.{$ELSE}Posix.SysSocket.{$ENDIF}CONNECT(FSocketHandle, {$IFDEF MSWINDOWS}sockaddr_in{$ELSE}sockaddr{$ENDIF}(Addr), SizeOf(Addr));
+end;
+
 function TDiocpSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
     pvTimeOutSecs:Integer): Integer;
 var
-  Addr: sockaddr_in;
   tm: TIMEVAL;
-  lvFlag, r: Integer;
+  r: Integer;
+  Addr: sockaddr_in;
+
   fdWrite, fdError: {$IFDEF MSWINDOWS}TFdSet{$ELSE}FD_SET{$ENDIF};
 begin
   FD_ZERO(fdWrite);
@@ -67,13 +144,7 @@ begin
   _FD_SET(FSocketHandle, fdError);
 {$ENDIF}
 
-  Addr.sin_family := AF_INET;
-  Addr.sin_port := htons(pvPort);
-  {$IFDEF MSWINDOWS}
-  Addr.sin_addr.S_addr := inet_addr(PAnsichar(UTF8Encode(pvAddr)));
-  {$ELSE}
-  Addr.sin_addr.S_addr := inet_addr(MarshaledAString(UTF8Encode(pvAddr)));
-  {$ENDIF}
+
   tm.tv_sec := pvTimeOutSecs;
   tm.tv_usec := 0;
   if not SetOptionNoneBlock(True) then
@@ -82,35 +153,48 @@ begin
     exit;
   end;
 
-  CONNECT(FSocketHandle, {$IFDEF MSWINDOWS}sockaddr_in{$ELSE}sockaddr{$ENDIF}(Addr), SizeOf(Addr));
-
-  r := select(FSocketHandle + 1, nil, @fdWrite, @fdError, @tm);
-  if r >=0 then
+  r := self.Connect(pvAddr, pvPort);
+  if r = -1 then
   begin
-    if FD_ISSET(FSocketHandle, fdError) then
+    r := GetLastError;
+    if r <> {$IFDEF MSWINDOWS}WSAEWOULDBLOCK{$ELSE}EWOULDBLOCK{$ENDIF} then
     begin
       Result := -1;
-      Exit;
-    end;
-
-    if not FD_ISSET(FSocketHandle, fdWrite) then
-    begin
-      // 超时
-      Result := -2;
       exit;
     end;
 
-  end else
-  begin
-    Result := -1;
-    exit;
+    r := select(FSocketHandle + 1, nil, @fdWrite, @fdError, @tm);
+    if r >=0 then
+    begin
+      if FD_ISSET(FSocketHandle, fdError) then
+      begin
+  //      r := WSAGetLastError;
+
+        Result := -3;
+        Exit;
+      end;
+
+      if not FD_ISSET(FSocketHandle, fdWrite) then
+      begin
+        // 超时
+        Result := -2;
+        exit;
+      end;
+
+    end else
+    begin
+      Result := -1;
+      exit;
+    end;
+
+    if not SetOptionNoneBlock(False) then
+    begin
+      Result := -1;
+      exit;
+    end;
   end;
 
-  if not SetOptionNoneBlock(False) then
-  begin
-    Result := -1;
-    exit;
-  end;
+  Result := 0;
 end;
 
 { TDiocpSocket }
@@ -136,34 +220,14 @@ function TDiocpSocket.RecvBufTimeOut(pvBuf: Pointer; pvLen, pvTimeOutSecs:
     Integer): Integer;
 var
   rc:Integer;
-  tm: TIMEVAL;
-  fdRead, fdError: {$IFDEF MSWINDOWS}TFdSet{$ELSE}FD_SET{$ENDIF};
 begin
-  tm.tv_sec := pvTimeOutSecs;
-  tm.tv_usec := 0;
-
-  FD_ZERO(fdRead);
-  FD_ZERO(fdError);
-{$IFDEF MSWINDOWS}
-  FD_SET(FSocketHandle, fdRead);
-  FD_SET(FSocketHandle, fdError);
-{$ELSE}
-  __FD_SET(FSocketHandle, fdRead);
-  __FD_SET(FSocketHandle, fdError);
-{$ENDIF}
-  rc := select(FSocketHandle + 1, @fdRead, nil, @fdError, @tm);
-  if (rc > 0) then
+  rc := CanRead(pvTimeOutSecs);
+  if (rc = 1) then
   begin
-    if FD_ISSET(FSocketHandle, fdRead) and (not FD_ISSET(FSocketHandle, fdError)) then
-    begin
-       Result := recv(FSocketHandle, pvBuf^, pvLen, 0);
-    end else
-    begin
-      Result := 0;
-    end;
+    Result := recv(FSocketHandle, pvBuf^, pvLen, 0);
   end else
   begin
-    Result := 0;
+    Result := rc;
   end;
 end;
 
