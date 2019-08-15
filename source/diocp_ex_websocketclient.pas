@@ -43,7 +43,7 @@ type
 
     procedure CheckSendPing(pvInterval: Cardinal = 20000);
 
-    procedure SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte);
+    function SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte): Boolean;
 
     procedure SendText(const s: string);
 
@@ -275,14 +275,15 @@ begin
 
 end;
 
-procedure TDiocpWebSocketContext.SendBuffer(buf: Pointer; len: Cardinal; opcode: Byte);
+function TDiocpWebSocketContext.SendBuffer(buf: Pointer; len: Cardinal; opcode:
+    Byte): Boolean;
 var
   lvWSFrame: TDiocpWebSocketFrame;
 begin
   lvWSFrame := TDiocpWebSocketFrame.Create;
   try
     lvWSFrame.EncodeBuffer(buf, len, true, opcode, FMasked);
-    PostWSASendRequest(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
+    Result := PostWSASendRequest(lvWSFrame.Buffer.Memory, lvWSFrame.Buffer.Length);
   finally
     lvWSFrame.Free;
   end;

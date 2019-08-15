@@ -798,6 +798,9 @@ function ParseNumeric(var S: PChar; var ANum: Extended): Boolean;
 function ParseHex(var p: PChar; var Value: Int64): Integer;
 function ParseInt(var S: PChar; var ANum: Int64): Integer;
 
+function CheckStrAllIsAsciiChar(const s:string): Boolean;
+function CheckStrAllIsLetterChar(const s:string): Boolean;
+
 {$if CompilerVersion < 20}
 function CharInSet(const C: Char; const CharSet: TSysCharSet): Boolean;
 {$ifend}
@@ -895,6 +898,7 @@ procedure FreeAsDisposeProc(var pvData: Pointer);
 /// </summary>
 function CmpIntValForSortFun(List: TStringList; Index1, Index2: Integer):
     Integer;
+
 
 var
   __app_root: string;
@@ -3545,6 +3549,42 @@ begin
     Result := DCharW(PWord(@c)^ xor $20)
   else
     Result := c;
+end;
+
+function CheckStrAllIsLetterChar(const s:string): Boolean;
+var
+  Ptr:PChar;
+begin
+  Result := False;
+  Ptr := PChar(s);
+  while Ptr^ <> #0 do
+  begin
+    Result := ((Ptr^ >= 'A') and (Ptr^ <= 'Z')) or ((Ptr^ >= 'a') and (Ptr^ <= 'z'));
+    Inc(Ptr);
+    if not Result then
+    begin
+      Exit;
+    end;       
+  end;
+
+end;
+
+function CheckStrAllIsAsciiChar(const s:string): Boolean;
+var
+  Ptr:PChar;
+begin
+  Result := False;
+  Ptr := PChar(s);
+  while Ptr^ <> #0 do
+  begin
+    // #20 为空格, #126 为~, 包含了可读的Ascii字符
+    Result := (Ptr^ >= #20) and (Ptr^ <= #126);
+    Inc(Ptr);
+    if not Result then
+    begin
+      Exit;
+    end;       
+  end;
 end;
 
 
