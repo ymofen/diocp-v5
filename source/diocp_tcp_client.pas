@@ -413,6 +413,9 @@ begin
   if not PostConnectRequest then
   begin
     DoConnectFail;
+
+    // 连接失败, 检测是否需要回归到池
+    self.CheckReleaseBack;
   end;
 end;
 
@@ -487,6 +490,7 @@ begin
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
 
       DoConnectFail;
+      self.CheckReleaseBack;
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;

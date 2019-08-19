@@ -285,6 +285,8 @@ type
 
     procedure DoNotifyDisconnected;
 
+    procedure CheckReleaseBack;
+
   protected
     /// <summary>
     ///    dec RequestCounter then check counter and Request flag for Disonnect
@@ -1577,6 +1579,11 @@ begin
   end;
   FOnRecvingFlag := 0;
 
+end;
+
+procedure TDiocpCustomContext.CheckReleaseBack;
+begin
+  if self.FOwnePool <> nil then self.ReleaseBack;
 end;
 
 procedure TDiocpCustomContext.DoSendBufferCompleted(pvBuffer: Pointer;
