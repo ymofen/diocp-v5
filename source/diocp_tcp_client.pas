@@ -202,9 +202,19 @@ type
     procedure DisconnectAll;  override;
 
     /// <summary>
-    ///   添加一个连对象
+    ///   添加一个连对象(添加到一个List中，DiocpTcpClient对象释放时进行清理释放)
+    ///   该连接，可以重复使用
     /// </summary>
     function Add: TIocpRemoteContext;
+
+    /// <summary>
+    ///   移除一个链接,并进行释放
+    /// </summary>
+    /// <returns>
+    ///  true: 移除成功进行释放
+    ///  false: 不是当前对象添加的连接
+    /// </returns>
+    function RemoveAndFree(aCtx:TIocpRemoteContext): Boolean;
 
     /// <summary>
     ///   pvContext是否是当前列表中的对象
@@ -854,6 +864,21 @@ begin
   finally
     DecOperaOptions(OPERA_SHUTDOWN_CONNECT);
   end;
+end;
+
+function TDiocpTcpClient.RemoveAndFree(aCtx:TIocpRemoteContext): Boolean;
+begin
+  FListLocker.Enter;
+  try
+    Result := FList.Remove(aCtx);
+    if Result then
+    begin
+      aCtx.Free;
+    end;
+  finally
+    FListLocker.Leave;
+  end;
+
 end;
 
 procedure TDiocpTcpClient.SetDisableAutoConnect(const Value: Boolean);
