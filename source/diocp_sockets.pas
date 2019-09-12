@@ -67,7 +67,7 @@ type
       of object;
 
   TOnContextBufferEvent = procedure(pvContext: TDiocpCustomContext; pvBuff: Pointer; len:
-      Cardinal; pvBufferTag, pvErrorCode: Integer) of object;
+      Cardinal; pvBufferTag:Integer; pvBufferTagData: Pointer; pvErrorCode: Integer) of object;
 
   TOnBufferReceived = procedure(pvContext: TDiocpCustomContext; buf: Pointer; len:
       cardinal; pvErrorCode: Integer) of object;
@@ -926,7 +926,8 @@ type
     FUseObjectPool: Boolean;
 
     procedure DoSendBufferCompletedEvent(pvContext: TDiocpCustomContext; pvBuff:
-        Pointer; len: Cardinal; pvBufferTag, pvErrorCode: Integer);
+        Pointer; len: Cardinal; pvBufferTag:Integer; pvBufferTagData:Pointer;
+        pvErrorCode: Integer);
         
 
     procedure OnIocpException(pvRequest:TIocpRequest; E:Exception);
@@ -2301,7 +2302,7 @@ begin
     if pvObject.FBuf <> nil then
     begin
       /// Buff处理完成, 响应事件
-      DoSendBufferCompletedEvent(pvObject.FContext, pvObject.FBuf, pvObject.FLen, pvObject.Tag, pvObject.ErrorCode);
+      DoSendBufferCompletedEvent(pvObject.FContext, pvObject.FBuf, pvObject.FLen, pvObject.Tag, pvObject.Data, pvObject.ErrorCode);
     end;
 
 
@@ -2422,8 +2423,8 @@ begin
 end;
 
 procedure TDiocpCustom.DoSendBufferCompletedEvent(pvContext:
-    TDiocpCustomContext; pvBuff: Pointer; len: Cardinal; pvBufferTag,
-    pvErrorCode: Integer);
+    TDiocpCustomContext; pvBuff: Pointer; len: Cardinal; pvBufferTag:Integer;
+    pvBufferTagData:Pointer; pvErrorCode: Integer);
 begin
   if pvContext <> nil then
   begin
@@ -2439,10 +2440,10 @@ begin
   
   try
     if Assigned(pvContext.FOnSendBufferCompleted) then
-      pvContext.FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvErrorCode);
+      pvContext.FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvBufferTagData, pvErrorCode);
 
     if Assigned(FOnSendBufferCompleted) then
-      FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvErrorCode);
+      FOnSendBufferCompleted(pvContext, pvBuff, len, pvBufferTag, pvBufferTagData, pvErrorCode);
   except
     on e:Exception do
     begin

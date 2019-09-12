@@ -18,9 +18,7 @@ unit diocp_core_engine;
 
 interface
 
-{$IFDEF DEBUG}
-  {$DEFINE DEBUG_ON}
-{$ENDIF}
+{$I 'diocp.inc'}
 
 uses
   Windows, diocp_sockets_utils, SysUtils, Classes, SyncObjs

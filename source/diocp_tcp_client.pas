@@ -870,7 +870,7 @@ function TDiocpTcpClient.RemoveAndFree(aCtx:TIocpRemoteContext): Boolean;
 begin
   FListLocker.Enter;
   try
-    Result := FList.Remove(aCtx);
+    Result := FList.Remove(aCtx) <> -1;
     if Result then
     begin
       aCtx.Free;
