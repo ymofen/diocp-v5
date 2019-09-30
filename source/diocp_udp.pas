@@ -1,3 +1,5 @@
+unit diocp_udp;
+
 (*
  *	 Unit owner: d10.ÃÏµÿœ“
  *	       blog: http://www.cnblogs.com/dksoft
@@ -13,7 +15,7 @@
   {$DEFINE WRITE_LOG}
 {$ENDIF}
 
-unit diocp_udp;
+
 
 interface
 

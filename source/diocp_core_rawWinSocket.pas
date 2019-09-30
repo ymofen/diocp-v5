@@ -689,7 +689,7 @@ var
   r:Integer;
 begin
   r := SizeOf(bNoDelay);
-  getsockopt(FSocketHandle,SOL_SOCKET,TCP_NODELAY,PAnsiChar(@bNoDelay),r);
+  getsockopt(FSocketHandle,IPPROTO_TCP,TCP_NODELAY,PAnsiChar(@bNoDelay),r);
   Result := bNoDelay;
 end;
 
@@ -1010,7 +1010,8 @@ var
   bNoDelay: BOOL;
 begin
   bNoDelay := pvOption;
-  Result := setsockopt(FSocketHandle, SOL_SOCKET, TCP_NODELAY, @bNoDelay, SizeOf(bNoDelay)) <> SOCKET_ERROR;
+  // level 如果是 SOL_SOCKET, 会导致小包 变慢,原因尚未明朗
+  Result := setsockopt(FSocketHandle, IPPROTO_TCP, TCP_NODELAY, @bNoDelay, SizeOf(bNoDelay)) <> SOCKET_ERROR;
 end;
 
 function TRawSocket.SetReadTimeOut(const pvTimeOut: Cardinal): Integer;

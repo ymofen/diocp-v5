@@ -1107,6 +1107,9 @@ begin
   else if lvExt = '.css' then
   begin
     Result := 'text/css';
+  end else if lvExt = '.apk' then
+  begin
+    Result := 'application/vnd.android.package-archive'
   end
   else if lvExt = '.json' then
   begin

@@ -3,12 +3,25 @@ unit utils_regex;
 interface
 
 uses
-  PerlRegEx, SysUtils, utils_strings;
+  SysUtils, utils_strings
+{$IF (RTLVersion>=26)}
+  , System.RegularExpressions
+{$ELSE}
+  , PerlRegEx
+{$ENDIF}
+  ;
+
 
 type
+
   TRegExHelper = class(TObject)
   private
+    {$IF (RTLVersion>=26)}
+    FRegEx : TRegEx;
+    {$ELSE}
     FRegEx: TPerlRegEx;
+    {$ENDIF}
+
     FRegExPattern:String;
     FDataString:string;
     FMatchedString:string;
@@ -34,7 +47,12 @@ function GetArea(const S, pvLeft, pvRight: string; const pvIndex: Integer = 1):
     string;
 var
   lvCurr: Integer;
+  {$IF (RTLVersion>=26)}
+  FRegEx : TRegEx;
+  {$ELSE}
   FRegEx: TPerlRegEx;
+  {$ENDIF}
+
 begin
   Result := ''; 
   FRegEx := TPerlRegEx.Create;

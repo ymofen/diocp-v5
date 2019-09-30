@@ -9,6 +9,8 @@ interface
 
 {$I 'diocp.inc'}
 
+{$DEFINE DIOCP_SSL}
+
 uses
   Classes
   {$IFDEF POSIX}
@@ -17,7 +19,11 @@ uses
   , diocp_core_rawWinSocket
   , diocp_winapi_winsock2
   , SysConst
+  {$IFDEF DIOCP_SSL}
+  , utils_openssl
   {$ENDIF}
+  {$ENDIF}
+
   , SysUtils, utils_URL, utils_strings, diocp_ex_http_common, utils_BufferPool;
 
 
@@ -84,6 +90,9 @@ type
     FTimeOut: Integer;
     
     FConnectTimeOut:Integer;
+
+
+
     /// <summary>
     ///  CheckRecv buffer
     /// </summary>
@@ -109,6 +118,12 @@ type
     function GetActive: Boolean;
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
+  private
+    {$IFDEF DIOCP_SSL}
+    FSSLCtx: PSSL_CTX;
+    FSsl: PSSL;
+    procedure DoSSLAfterConnect;
+    {$ENDIF}
   public
     /// <summary>
     ///   不清理Cookie
@@ -502,6 +517,8 @@ begin
   begin
     FRequestHeader.Add('Cookie:' + FRawCookie);
   end;
+
+
   
 
   if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
@@ -774,6 +791,19 @@ begin
     {$IFDEF MSWINDOWS}
 //    FRawSocket.SetSendBufferLength(BLOCK_SIZE);
 //    FRawSocket.SetRecvBufferLength(BLOCK_SIZE);
+
+    if SameText(FURL.Protocol, 'https') then
+    begin
+      {$IFDEF DIOCP_SSL}
+      if not ssl_isready then
+      begin
+        raise EDiocpHttpClient.Create('SSL加载失败,请检测SSL文件是否存在!');
+      end;
+
+      {$ENDIF}
+
+    end;
+
     if FTimeOut > 0 then
     begin
       FRawSocket.SetReadTimeOut(FTimeOut);
@@ -793,6 +823,16 @@ begin
       begin
         raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
       end;
+
+      if SameText(FURL.Protocol, 'https') then
+      begin
+        {$IFDEF DIOCP_SSL}
+        Self.DoSSLAfterConnect;
+        {$ENDIF}
+
+      end;
+
+
       {$ELSE}
       if not FRawSocket.Connect(lvIpAddr, pvPort) then
       begin
@@ -818,6 +858,39 @@ begin
   Result := True;
 
 end;
+
+{$IFDEF DIOCP_SSL}
+procedure TDiocpHttpClient.DoSSLAfterConnect;
+var
+  lvMethod:PSSL_METHOD;
+  lvRet:cInt;
+begin
+  if FSSLCtx = nil then
+  begin
+    lvMethod := SSL_MethodV23();
+    FSSLCtx := SSL_CTX_new(lvMethod);
+    if FSSLCtx = nil then
+    begin
+      raise Exception.Create('SSL Create CTX Fail.');
+    end;
+  end;
+
+  if FSsl <> nil then
+  begin
+    SSL_free(FSsl);
+    FSsl := nil;
+  end;
+
+  FSsl := SSL_new(FSSLCtx);
+  SSL_set_fd(FSsl, self.FRawSocket.SocketHandle);
+  
+  if SSL_connect(FSsl) = -1 then
+  begin
+
+  
+  end;
+end;
+{$ENDIF}
 
 procedure TDiocpHttpClient.CheckRecv(buf: Pointer; len: cardinal);
 var

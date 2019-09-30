@@ -1539,7 +1539,8 @@ var
 begin
   if ResponseAFileETag(pvFileName) then
   begin
-    Response.ContentType := GetContentTypeFromFileExt(ExtractFileExt(pvFileName), 'text/html');
+    if Length(Response.ContentType) = 0 then
+       Response.ContentType := GetContentTypeFromFileExt(ExtractFileExt(pvFileName), 'text/html');
     lvFileStream := TFileStream.Create(pvFileName, fmOpenRead or fmShareDenyNone);
     ResponseAStream(lvFileStream, nil);
   end;
