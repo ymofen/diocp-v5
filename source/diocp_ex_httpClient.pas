@@ -9,7 +9,7 @@ interface
 
 {$I 'diocp.inc'}
 
-{$DEFINE DIOCP_SSL}
+{.$DEFINE DIOCP_SSL}
 
 uses
   Classes
@@ -120,10 +120,12 @@ type
         Integer);
   private
     {$IFDEF DIOCP_SSL}
-    FSSLCtx: PSSL_CTX;
-    FSsl: PSSL;
+    FSSLCtx: utils_openssl.PSSL_CTX;
+    FSsl: utils_openssl.PSSL;
     procedure DoSSLAfterConnect;
     {$ENDIF}
+
+    function DoRecvBuff(var data; const len: Cardinal): Integer;
   public
     /// <summary>
     ///   不清理Cookie
@@ -135,8 +137,10 @@ type
     /// </summary>
     procedure Reset();
 
+    {$IFDEF DIOCP_SSL}
+    procedure DoTestGetSSL(const url:string);
 
-    
+    {$ENDIF}
 
     constructor Create(AOwner: TComponent); override;
     
@@ -648,7 +652,8 @@ begin
 
   while True do
   begin
-    nBufLength := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
+    nBufLength := DoRecvBuff(lvTempBuffer[0], BLOCK_SIZE);
+    //nBufLength := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
     CheckSocketRecvResult(nBufLength);
     if nBufLength = 0 then
     begin
@@ -788,10 +793,6 @@ begin
     FRawSocket.CreateTcpSocket;
     FRawSocket.DoInitialize();
 
-    {$IFDEF MSWINDOWS}
-//    FRawSocket.SetSendBufferLength(BLOCK_SIZE);
-//    FRawSocket.SetRecvBufferLength(BLOCK_SIZE);
-
     if SameText(FURL.Protocol, 'https') then
     begin
       {$IFDEF DIOCP_SSL}
@@ -799,11 +800,10 @@ begin
       begin
         raise EDiocpHttpClient.Create('SSL加载失败,请检测SSL文件是否存在!');
       end;
-
       {$ENDIF}
-
     end;
 
+    {$IFDEF MSWINDOWS}
     if FTimeOut > 0 then
     begin
       FRawSocket.SetReadTimeOut(FTimeOut);
@@ -815,23 +815,23 @@ begin
     {$ENDIF}
 
     // 进行域名解析
-    lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
+    lvIpAddr := GetIpAddrByName(pvHost);
 
     try
       {$IFDEF MSWINDOWS}
-      if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
-      begin
-        raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
-      end;
-
-      if SameText(FURL.Protocol, 'https') then
-      begin
-        {$IFDEF DIOCP_SSL}
-        Self.DoSSLAfterConnect;
-        {$ENDIF}
-
-      end;
-
+//      if SameText(FURL.Protocol, 'https') then
+//      begin
+//        if not FRawSocket.Connect(lvIpAddr, pvPort) then
+//        begin
+//          raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+//        end;
+//      end else
+//      begin
+        if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
+        begin
+          raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+        end;
+      //end;
 
       {$ELSE}
       if not FRawSocket.Connect(lvIpAddr, pvPort) then
@@ -839,13 +839,18 @@ begin
         RaiseLastOSError;
       end;
       {$ENDIF}
+
+      if SameText(FURL.Protocol, 'https') then
+      begin
+        {$IFDEF DIOCP_SSL}
+        Self.DoSSLAfterConnect;
+        {$ENDIF}
+      end;
     except
       on e:exception do
       begin
         raise Exception.Create(Format('连接服务器(%s:%d)异常:%s', [lvIpAddr, pvPort, e.Message]));
-
-      end;
-
+      end;  
     end;
 
     Inc(FReConnectCounter);
@@ -867,12 +872,20 @@ var
 begin
   if FSSLCtx = nil then
   begin
-    lvMethod := SSL_MethodV23();
-    FSSLCtx := SSL_CTX_new(lvMethod);
+    lvMethod := utils_openssl.SSLv23_client_method();
+    if lvMethod = nil then
+    begin
+      raise Exception.Create('建立SSL Client所用的method失败!');
+    end;
+
+    FSSLCtx := utils_openssl.SSL_CTX_new(lvMethod); //初始化上下文情景
     if FSSLCtx = nil then
     begin
-      raise Exception.Create('SSL Create CTX Fail.');
+      raise Exception.Create('创建客户端SSL_CTX失败!');
     end;
+
+    // 口令
+    SSL_CTX_set_cipher_list(FSslCtx, SSL_CipherList);
   end;
 
   if FSsl <> nil then
@@ -881,15 +894,89 @@ begin
     FSsl := nil;
   end;
 
-  FSsl := SSL_new(FSSLCtx);
-  SSL_set_fd(FSsl, self.FRawSocket.SocketHandle);
-  
-  if SSL_connect(FSsl) = -1 then
+  FSsl := utils_openssl.SSL_new(FSSLCtx); //申请SSL会话的环境,参数就是前面我们申请的 SSL通讯方式。返回当前的SSL 连接环境的指针。
+  if FSsl = nil then
   begin
-
-  
+    raise Exception.Create('申请SSL会话的环境失败!');
   end;
+ 
+  utils_openssl.SSL_set_fd(FSsl, FRawSocket.SocketHandle); //绑定读写套接字
+  lvRet := utils_openssl.SSL_connect(FSsl);
+
+  if lvRet = -1 then
+  begin
+    lvRet := SSL_get_error(FSsl, lvRet);
+    if SSL_IsFatalErr(lvRet) then
+    begin
+      raise EDiocpHttpClient.Create(Format('SSL SSL_connect 异常:%d', [lvRet]));
+    end;
+  end;
+
 end;
+
+
+procedure TDiocpHttpClient.DoTestGetSSL(const url: string);
+var
+  Host: string;
+  Port: Word;
+  
+  ctxClient: utils_openssl.PSSL_CTX; //SSL上下文
+  methClient: utils_openssl.PSSL_METHOD;
+  sRemoteIP: string;
+
+  sslClient: utils_openssl.PSSL;
+  pStr: Pchar;
+  buf: array[0..4095] of Char;
+  nRet: integer;
+  strSend: string;
+begin
+
+  FURL.SetURL(url);
+
+
+  sRemoteIP := GetIpAddrByName(FURL.Host);
+  if sRemoteIP = '' then
+  begin
+    raise Exception.Create('获取远程IP地址失败!');
+
+  end;
+ 
+
+  FRawSocket.CreateTcpSocket;
+  FRawSocket.DoInitialize;
+  FRawSocket.Connect(sRemoteIP, Port);
+
+  methClient := utils_openssl.SSLv23_client_method();
+  if methClient = nil then
+  begin
+    raise Exception.Create('建立SSL Client所用的method失败!');
+  end;
+ 
+  ctxClient := utils_openssl.SSL_CTX_new(methClient); //初始化上下文情景
+  if ctxClient = nil then
+  begin
+    raise Exception.Create('创建客户端SSL_CTX失败!');
+  end;
+
+      // 口令
+  SSL_CTX_set_cipher_list(ctxClient, SSL_CipherList);
+ 
+  sslClient := utils_openssl.SSL_new(ctxClient); //申请SSL会话的环境,参数就是前面我们申请的 SSL通讯方式。返回当前的SSL 连接环境的指针。
+  if sslClient = nil then
+  begin
+    FRawSocket.Close(False);
+    raise Exception.Create('申请SSL会话的环境失败!');
+
+  end;
+
+  utils_openssl.SSL_set_fd(sslClient, FRawSocket.SocketHandle); //绑定读写套接字
+  if utils_openssl.SSL_connect(sslClient) = -1 then
+  begin
+    raise Exception.Create('err connect');
+  end;
+
+end;
+
 {$ENDIF}
 
 procedure TDiocpHttpClient.CheckRecv(buf: Pointer; len: cardinal);
@@ -1027,6 +1114,19 @@ begin
   end;
 end;
 
+function TDiocpHttpClient.DoRecvBuff(var data; const len: Cardinal): Integer;
+begin
+  {$IFDEF DIOCP_SSL}
+  if FSsl <> nil then
+  begin
+    result := utils_openssl.SSL_read(FSsl, @data, len);
+  end else
+  {$ENDIF}
+  begin
+    result := FRawSocket.RecvBuf(data, len);
+  end;
+end;
+
 function TDiocpHttpClient.GetActive: Boolean;
 begin
   Result := FRawSocket.SocketValid;
@@ -1138,6 +1238,15 @@ procedure TDiocpHttpClient.OnBufferWrite(pvSender: TObject; pvBuffer: Pointer;
 var
   r:Integer;
 begin
+{$IFDEF DIOCP_SSL}
+  r := SSL_write(FSsl, pvBuffer, pvLength);
+  CheckSocketSendResult(r);
+  if r <> pvLength then
+  begin
+    FRawSocket.Close();
+    raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
+  end;                                                                                                                     
+{$ELSE}
   r := FRawSocket.SendBuf(pvBuffer^, pvLength);
   CheckSocketSendResult(r);
   if r <> pvLength then
@@ -1145,6 +1254,7 @@ begin
     FRawSocket.Close();
     raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
   end;
+{$ENDIF}
 end;
 
 procedure TDiocpHttpClient.Reset;

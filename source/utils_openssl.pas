@@ -3,11 +3,51 @@ unit utils_openssl;
 interface
 
 uses
-  Windows, SyncObjs;
+  SyncObjs
+  {$IFDEF MSWINDOWS}
+  , windows
+  {$ENDIF}
+  ;
+
+{
+  OpenSSL 下载:
+  https://indy.fulgan.com/SSL/
+  https://github.com/leenjewel/openssl_for_ios_and_android
+
+  OpenSSL iOS静态库下载:
+  https://indy.fulgan.com/SSL/OpenSSLStaticLibs.7z
+
+  LibreSSL 下载:
+  http://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
+
+  Linux下需要安装libssl开发包
+  sudo apt-get install libssl-dev
+}
 
 const
-  SSLEAY_DLL = 'ssleay32.dll';
-  LIBEAY_DLL = 'libeay32.dll';
+  SSLEAY_DLL =
+  {$IFDEF MSWINDOWS}
+      'ssleay32.dll'
+  {$ENDIF}
+  {$IFDEF POSIX}
+    {$IFDEF __SSL_STATIC__}
+      'libssl.a'
+    {$ELSE}
+      'libssl.so'
+    {$ENDIF}
+  {$ENDIF};
+
+  LIBEAY_DLL =
+    {$IFDEF MSWINDOWS}
+      'libeay32.dll'
+    {$ENDIF}
+    {$IFDEF POSIX}
+      {$IFDEF __SSL_STATIC__}
+        'libcrypto.a'
+      {$ELSE}
+        'libcrypto.so'
+      {$ENDIF}
+    {$ENDIF};
   
   SSL_FILETYPE_PEM = 1;
   EVP_PKEY_RSA = 6;
@@ -48,8 +88,12 @@ const
   
 type
  { ctype }
+  {$IFDEF POSIX}
+  PCharA = MarshaledAString
+  {$ELSE}
   StringA = AnsiString;
   PCharA = PAnsiChar;
+  {$ENDIF}           
   PCharW = PWideChar;
   qword = int64;  // Keep h2pas "uses ctypes" headers working with delphi.
   ptruint = cardinal;
@@ -106,7 +150,7 @@ type
 
 
 const
-  SSL_CipherList :StringA = 'ECDHE-ECDSA-AES128-GCM-SHA256:' +
+  SSL_CipherList :PCharA = 'ECDHE-ECDSA-AES128-GCM-SHA256:' +
     'ECDHE-RSA-AES128-GCM-SHA256:' +
     'ECDHE-RSA-AES256-GCM-SHA384:' +
     'ECDHE-ECDSA-AES256-GCM-SHA384:' +
@@ -158,15 +202,21 @@ var
   SSL_CTX_use_RSAPrivateKey_file : function(ctx: PSSL_CTX; const _file: PCharA; _type: cInt):cInt; cdecl;
   SSL_CTX_check_private_key : function(ctx: PSSL_CTX):cInt; cdecl;
   SSL_set_fd : function(s: PSSL; fd: Integer):Integer cdecl;
+
   SSL_MethodV23:  function:PSSL_METHOD; cdecl;
+  TLSv1_client_method:  function:PSSL_METHOD; cdecl;
+  SSLv23_client_method:  function:PSSL_METHOD; cdecl;
+
 
   SSL_new : function(ctx: PSSL_CTX):PSSL; cdecl;
   SSL_free : procedure(ssl: PSSL); cdecl;
   SSL_accept : function(ssl: PSSL):cInt; cdecl;
+  SSL_connect: function(ssl: PSSL):cInt; cdecl;
   SSL_read: function(s: PSSL; buf: Pointer; num: Integer): Integer; cdecl;
   SSL_write: function(s: PSSL; const buf: Pointer; num: Integer): Integer; cdecl;
   SSL_state: function(s: PSSL): Integer; cdecl;
   SSL_set_bio: procedure(s: PSSL; rbio, wbio: PBIO); cdecl;
+  SSL_set_connect_state: procedure(s: PSSL); cdecl;
   SSL_set_accept_state: procedure(s: PSSL); cdecl;
   SSL_do_handshake: function(S: PSSL): Integer; cdecl;
   SSL_get_error: function(s: PSSL; ret_code: Integer): Integer; cdecl;
@@ -248,11 +298,15 @@ end;
 function LoadSsl: Boolean;
 begin
   result := False;
+  {$IFDEF MSWINDOWS}
   if __libeay_handle = 0 then __libeay_handle := LoadLibrary(LIBEAY_DLL);
   If __ssleay_handle = 0 Then __ssleay_handle := LoadLibrary(SSLEAY_DLL);
 
+  {$ELSE}
+  if __libeay_handle = 0 then __libeay_handle := SafeLoadLibrary(LIBEAY_DLL);
+  If __ssleay_handle = 0 Then __ssleay_handle := SafeLoadLibrary(SSLEAY_DLL);
+  {$ENDIF}
   if __ssleay_handle = 0 then exit;
-
   @SSL_library_init := GetProcAddress(__ssleay_handle, 'SSL_library_init');
   @SSL_load_error_strings := GetProcAddress(__ssleay_handle, 'SSL_load_error_strings');
   @SSL_CTX_new := GetProcAddress(__ssleay_handle, 'SSL_CTX_new');
@@ -269,12 +323,17 @@ begin
   @SSL_new := GetProcAddress(__ssleay_handle, 'SSL_new');
   @SSL_free := GetProcAddress(__ssleay_handle, 'SSL_free');
   @SSL_accept := GetProcAddress(__ssleay_handle, 'SSL_accept');
+  @SSL_connect := GetProcAddress(__ssleay_handle, 'SSL_connect');
   @SSL_read := GetProcAddress(__ssleay_handle, 'SSL_read');
   @SSL_write := GetProcAddress(__ssleay_handle, 'SSL_write');
   @SSL_state := GetProcAddress(__ssleay_handle, 'SSL_state');
   @SSL_MethodV23 := GetProcAddress(__ssleay_handle, 'SSLv23_method');
+  @TLSv1_client_method := GetProcAddress(__ssleay_handle, 'TLSv1_client_method');
+  @SSLv23_client_method := GetProcAddress(__ssleay_handle, 'SSLv23_client_method');
+
   @SSL_set_bio := GetProcAddress(__ssleay_handle, 'SSL_set_bio');
   @SSL_set_accept_state := GetProcAddress(__ssleay_handle, 'SSL_set_accept_state');
+  @SSL_set_connect_state := GetProcAddress(__ssleay_handle, 'SSL_set_connect_state');
   @SSL_do_handshake := GetProcAddress(__ssleay_handle, 'SSL_do_handshake');
   @SSL_get_error := GetProcAddress(__ssleay_handle, 'SSL_get_error');
 

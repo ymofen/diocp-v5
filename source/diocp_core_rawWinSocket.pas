@@ -192,7 +192,6 @@ type
     function Bind(const pvAddr: string; pvPort: Integer): Boolean;
     function Listen(const backlog: Integer = 0): Boolean;
 
-    function GetIpAddrByName(const host:string): String;
 
     function GetLocalPort: Word;
 
@@ -296,6 +295,8 @@ function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
 function TranslateTInAddrToString(const sockaddr; const AIPVersion:
     Integer): string;
+
+function GetIpAddrByName(const host:string): String;
 
 var
   __DebugWSACreateCounter:Integer;
@@ -566,7 +567,7 @@ end;
 procedure TRawSocket.CreateTcpSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  FSocketHandle := socket(AF_INET, SOCK_STREAM, 0);
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;
@@ -644,7 +645,7 @@ begin
 end;
 {$ENDIF}
 
-function TRawSocket.GetIpAddrByName(const host:string): String;
+function GetIpAddrByName(const host:string): String;
 var
   lvhostInfo:PHostEnt;
 //  lvErr:Integer;

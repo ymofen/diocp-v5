@@ -3,7 +3,7 @@ unit utils_URL;
 interface
 
 uses
-  utils_strings;
+  utils_strings, SysUtils;
 
 
 type
@@ -111,7 +111,15 @@ begin
   end else
   begin  // 没有指定Port
     FHost := lvTempStr;
-    FPort := '80';
+    if SameStr(FProtocol, 'https') then
+    begin
+      FPort := '443';
+    end else
+    begin
+      FPort := '80';
+    end;
+
+
   end;
   
   if lvP = nil then FURI := '/' else FURI := lvP;          
