@@ -241,6 +241,8 @@ type
     function SetRecvBufferLength(const len:Integer): Integer;
     function Readable(pvTimeOut:Integer): Boolean;
 
+    function GetIpAddrByName(const host:string): String;
+
     /// <summary>
     ///  -1:出现了异常
     /// </summary>
@@ -646,6 +648,25 @@ end;
 {$ENDIF}
 
 function GetIpAddrByName(const host:string): String;
+var
+  lvhostInfo:PHostEnt;
+//  lvErr:Integer;
+begin
+  lvhostInfo := gethostbyname(PAnsiChar(AnsiString(host)));
+
+  if lvhostInfo = nil then
+    RaiseLastOSError;
+
+//  lvErr := WSAGetLastError;
+//  if lvErr <> 0 then
+//  begin
+//    RaiseLastOSError(lvErr);
+//  end;
+
+  Result :=string(inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^));
+end;
+
+function TRawSocket.GetIpAddrByName(const host: string): String;
 var
   lvhostInfo:PHostEnt;
 //  lvErr:Integer;
