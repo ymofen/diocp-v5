@@ -871,10 +871,6 @@ begin
   FListLocker.Enter;
   try
     Result := FList.Remove(aCtx) <> -1;
-    if Result then
-    begin
-      aCtx.Free;
-    end;
   finally
     FListLocker.Leave;
   end;
