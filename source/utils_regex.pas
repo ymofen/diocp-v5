@@ -8,7 +8,7 @@ uses
   , System.RegularExpressions
 {$ELSE}
   , PerlRegEx
-{$ENDIF}
+{$IFEND}
   ;
 
 
@@ -22,7 +22,7 @@ type
     FMatchFlag:Integer;
     {$ELSE}
     FRegEx: TPerlRegEx;
-    {$ENDIF}
+    {$IFEND}
 
     FRegExPattern:String;
     FDataString:string;
@@ -56,7 +56,7 @@ var
   lvMatch:TMatch;
   {$ELSE}
   FRegEx: TPerlRegEx;
-  {$ENDIF}
+  {$IFEND}
 
 begin
   Result := '';
@@ -95,7 +95,7 @@ begin
   finally
     FRegEx.Free;
   end;
-  {$ENDIF}
+  {$IFEND}
 end;
 
 function IsMatch(const pvRegExPattern, pvDataString:string): Boolean;
@@ -116,8 +116,8 @@ begin
   {$IF (RTLVersion>=26)}
   Result := TRegEx.Escape(str);
   {$ELSE}
-  Result := TPerlRegEx.EscapeRegExPattern(str);
-  {$ENDIF}
+  Result := TPerlRegEx.EscapeRegExChars(str);
+  {$IFEND}
 end;
 
 constructor TRegExHelper.Create;
@@ -126,7 +126,7 @@ begin
   {$IF (RTLVersion>=26)}
   {$ELSE}
   FRegEx := TPerlRegEx.Create();
-  {$ENDIF}
+  {$IFEND}
 end;
 
 destructor TRegExHelper.Destroy;
@@ -134,7 +134,7 @@ begin
   {$IF (RTLVersion>=26)}
   {$ELSE}
   FreeAndNil(FRegEx);
-  {$ENDIF}
+  {$IFEND}
   inherited Destroy;
 end;
 
@@ -153,7 +153,7 @@ begin
   Result := FMatch.Success;
   {$ELSE}
   Result := FRegEx.MatchAgain;
-  {$ENDIF}
+  {$IFEND}
 end;
 
 function TRegExHelper.GetMatchedText: String;
@@ -171,7 +171,7 @@ begin
   begin
     FMatchedString := FRegEx.MatchedText;
   end;
-  {$ENDIF}
+  {$IFEND}
   Result := FMatchedString;
 end;
 
@@ -184,7 +184,7 @@ begin
   {$ELSE}
   FRegEx.RegEx := pvRegExPattern;
   FRegEx.Subject := FDataString;
-  {$ENDIF}
+  {$IFEND}
 end;
 
 end.

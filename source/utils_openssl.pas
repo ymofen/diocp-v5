@@ -3,7 +3,7 @@ unit utils_openssl;
 interface
 
 uses
-  SyncObjs
+  SyncObjs, SysUtils
   {$IFDEF MSWINDOWS}
   , windows
   {$ENDIF}
@@ -85,8 +85,14 @@ const
   CRYPTO_UNLOCK	= 2;
   CRYPTO_READ   = 4;
   CRYPTO_WRITE  = 8;
+
+  SSL_VERIFY_NONE                             = 0;
+  SSL_VERIFY_PEER                             = 1;
+  SSL_VERIFY_FAIL_IF_NO_PEER_CERT             = 2;
+  SSL_VERIFY_CLIENT_ONCE                      = 4;
   
 type
+  ESsl = class(Exception);
  { ctype }
   {$IFDEF POSIX}
   PCharA = MarshaledAString
@@ -172,6 +178,8 @@ const
     '!SRP:' +
     '!CAMELLIA';
 
+
+
 type
   SSL_Ptr         = Pointer;
   PSSL_CTX        = Pointer;
@@ -188,7 +196,13 @@ type
 
   PBIO            = Pointer;
   PBIO_METHOD     = Pointer;
-
+  PX509           = Pointer;
+  PPX509          = ^PX509;
+  PX509_STORE     = Pointer;
+  PX509_STORE_CTX = Pointer;
+  
+  pem_password_cb         = function(buf: Pointer; size: Integer; rwflag: Integer; userdata: Pointer): Integer; cdecl;
+  setVerify_cb            = function(Ok: Integer; StoreCtx: PX509_STORE_CTX): Integer; cdecl;
 
 var
   SSL_library_init: function:cInt; cdecl;
@@ -197,10 +211,12 @@ var
   SSL_CTX_free : procedure(arg0: PSSL_CTX) cdecl;
   SSL_CTX_set_cipher_list: function(arg0: PSSL_CTX; str: PCharA):cInt; cdecl;
   SSL_CTX_set_default_passwd_cb_userdata: procedure(ctx: PSSL_CTX; u: SSL_Ptr); cdecl;
+  SSL_CTX_set_verify: procedure(ctx: PSSL_CTX; mode: Integer; callback: setVerify_cb); cdecl;
   SSL_CTX_load_verify_locations: function(ctx: PSSL_CTX; const CAfile: PCharA; const CApath: PCharA):cInt; cdecl;
   SSL_CTX_use_certificate_file: function(ctx: PSSL_CTX; const _file: PCharA; _type: cInt):cInt; cdecl;
   SSL_CTX_use_RSAPrivateKey_file : function(ctx: PSSL_CTX; const _file: PCharA; _type: cInt):cInt; cdecl;
   SSL_CTX_check_private_key : function(ctx: PSSL_CTX):cInt; cdecl;
+  SSL_CTX_use_certificate: function (ctx: PSSL_CTX; cert: PX509): Integer; cdecl;
   SSL_set_fd : function(s: PSSL; fd: Integer):Integer cdecl;
 
   SSL_MethodV23:  function:PSSL_METHOD; cdecl;
@@ -229,6 +245,11 @@ var
   BIO_s_mem: function : PBIO_METHOD; cdecl;
   BIO_read: function (b: PBIO; Buf: Pointer; Len: Integer): Integer; cdecl;
   BIO_write:function (b: PBIO; Buf: Pointer; Len: Integer): Integer; cdecl;
+
+
+  PEM_read_bio_X509: function(bp: PBIO; x: PPX509; cb: pem_password_cb; u: Pointer): PX509; cdecl;
+  PEM_read_bio_X509_AUX: function(bp: PBIO; x: PPX509; cb: pem_password_cb; u: Pointer): PX509; cdecl;
+  //PEM_read_bio_PrivateKey: function(bp: PBIO; x: PPEVP_PKEY; cb: pem_password_cb; u: Pointer): PEVP_PKEY; cdecl;
 
   CRYPTO_num_locks: function: cInt; cdecl;
   CRYPTO_set_locking_callback:procedure(cb: SSL_Ptr); cdecl;
@@ -312,9 +333,11 @@ begin
   @SSL_CTX_new := GetProcAddress(__ssleay_handle, 'SSL_CTX_new');
   @SSL_CTX_free := GetProcAddress(__ssleay_handle, 'SSL_CTX_free');
   @SSL_CTX_set_cipher_list := GetProcAddress(__ssleay_handle, 'SSL_CTX_set_cipher_list');
+  @SSL_CTX_set_verify := GetProcAddress(__ssleay_handle, 'SSL_CTX_set_verify');
   @SSL_CTX_set_default_passwd_cb_userdata := GetProcAddress(__ssleay_handle, 'SSL_CTX_set_default_passwd_cb_userdata');
   @SSL_CTX_load_verify_locations := GetProcAddress(__ssleay_handle, 'SSL_CTX_load_verify_locations');
   @SSL_CTX_use_certificate_file := GetProcAddress(__ssleay_handle, 'SSL_CTX_use_certificate_file');
+  @SSL_CTX_use_certificate := GetProcAddress(__ssleay_handle, 'SSL_CTX_use_certificate');
   @SSL_CTX_use_RSAPrivateKey_file := GetProcAddress(__ssleay_handle, 'SSL_CTX_use_RSAPrivateKey_file');
   @SSL_CTX_check_private_key := GetProcAddress(__ssleay_handle, 'SSL_CTX_check_private_key');
   
