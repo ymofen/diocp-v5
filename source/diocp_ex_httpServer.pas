@@ -54,6 +54,7 @@ const
   BLOCK_BUFFER_TAG = 10000;
 
   BLOCK_STREAM_BUFFER_TAG = 1000;
+  
 
   Context_Type_WebSocket = 1;
 
@@ -632,6 +633,8 @@ type
 
     FRequestingFlag:Byte;
 
+
+
     /// <summary>
     ///   响应引用计数
     /// </summary>
@@ -698,7 +701,8 @@ type
     function GetResponsing: Boolean;
 
     procedure InnerDoSendStreamDone(pvCode:Integer);
-
+  protected
+     FFlashBufferPostTag:Integer;
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -2016,6 +2020,22 @@ var
 begin
   self.Lock;
   try
+    {$IFDEF DIOCP_SSL}
+    FBlockBuffer.Lock;
+    try
+      l := FBufferPool.FBlockSize;
+      GetMem(lvBuffer, l);
+      r := self.FCurrentStream.Read(lvBuffer^, l);
+      Dec(self.FCurrentStreamRemainSize, r);
+      self.FFlashBufferPostTag := BLOCK_STREAM_BUFFER_TAG;
+      FBlockBuffer.Append(lvBuffer, r); 
+      FBlockBuffer.FlushBuffer;
+
+    finally
+      self.FFlashBufferPostTag := 0;
+      FBlockBuffer.UnLock;
+    end;
+    {$ELSE}
     lvBuffer := GetBuffer(FBufferPool);
     l := FBufferPool.FBlockSize;
     r := self.FCurrentStream.Read(lvBuffer^, l);
@@ -2026,6 +2046,7 @@ begin
       ReleaseRef(lvBuffer);
       InnerDoSendStreamDone(-1);
     end;
+    {$ENDIF}
   finally
     self.UnLock;
   end;
@@ -2119,7 +2140,12 @@ begin
     ReleaseRef(pvBuffer);
   end else if pvBufferTag = BLOCK_STREAM_BUFFER_TAG then
   begin
+    {$IFDEF DIOCP_SSL}
+    // SSL SSL发送数据(dtFreeTagDataAsObject))
+
+    {$ELSE}
     ReleaseRef(pvBuffer);
+    {$ENDIF}
   end;
   {$ENDIF}
 
@@ -2610,6 +2636,8 @@ begin
   finally
     self.UnLock;
   end;
+
+
 
   InterlockedIncrement(FResponseRef);
   CheckSendStreamBlock;
