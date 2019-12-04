@@ -815,7 +815,7 @@ begin
     {$ENDIF}
 
     // 进行域名解析
-    lvIpAddr := GetIpAddrByName(pvHost);
+    lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
 
     try
       {$IFDEF MSWINDOWS}

@@ -740,6 +740,11 @@ begin
   Result := select(0, nil, @lvFDSet, nil, @lvTime_val); 
 end;
 
+function GetIpAddrByName(const pvHost: string): string;
+begin
+  Result := ResolvingHostName(pvHost);
+end;
+
 function TRawSocket.GetIpAddrByName(const pvHost: string): string;
 begin
   Result := ResolvingHostName(pvHost);
