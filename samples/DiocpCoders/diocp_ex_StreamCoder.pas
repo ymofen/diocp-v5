@@ -21,6 +21,8 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
+
+    procedure CleanUp; override;
     
     /// <summary>
     ///   解码收到的数据,如果有接收到数据,调用该方法,进行解码
@@ -189,6 +191,12 @@ begin
   pvBufWriter.Append(@lvbuf[0],lvDataLen);
 
   
+end;
+
+procedure TDiocpStreamCoderExchange.CleanUp;
+begin
+  inherited;
+  FRecvStreamObj.Clear;
 end;
 
 constructor TDiocpStreamCoderExchange.Create;
