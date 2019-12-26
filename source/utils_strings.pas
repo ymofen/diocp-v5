@@ -73,6 +73,7 @@ const
 type
   TDataProc = procedure(pvData:Pointer);
   TDataEvent = procedure(pvData:Pointer) of object;
+  TStringEvent = procedure(pvSender:TObject; const str:string) of object;
   TBufferFuncEvent = function(pvSender:TObject; const Buffer; Count:Int64):Int64 of object;
   
   TExceptionNotifyEvent = procedure(pvSender: TObject; pvException: Exception;

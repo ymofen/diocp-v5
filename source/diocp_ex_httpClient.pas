@@ -119,6 +119,7 @@ type
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   private
+    FRaiseOnResponseOnExceptCode: Boolean;
     {$IFDEF DIOCP_SSL}
     FSSLCtx: utils_openssl.PSSL_CTX;
     FSsl: utils_openssl.PSSL;
@@ -133,7 +134,9 @@ type
     procedure Cleanup;
 
     /// <summary>
-    ///   复位，清理Cookie
+    ///   复位
+    ///   清理Cookie
+    ///   复位设定
     /// </summary>
     procedure Reset();
 
@@ -176,6 +179,9 @@ type
     /// </summary>
     property KeepAliveTimeOut: Cardinal read FKeepAliveTimeOut write FKeepAliveTimeOut;
     property LastActivity: Cardinal read FLastActivity;
+
+    property RaiseOnResponseOnExceptCode: Boolean read FRaiseOnResponseOnExceptCode
+        write FRaiseOnResponseOnExceptCode;
     property ReConnectCounter: Integer read FReConnectCounter;
 
     /// <summary>
@@ -192,7 +198,7 @@ type
     ///    Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
     /// </summary>
     property RequestAccept: String read FRequestAccept write FRequestAccept;
-        
+
     /// <summary>
     ///  POST请求时, 内容数据类型
     /// </summary>
@@ -207,8 +213,8 @@ type
     property ResponseResultCode: Integer read GetResponseResultCode;
 
     property ResponseHeader: TStringList read FResponseHeader;
-    
-    
+
+
     /// <summary>
     ///   响应得到的头信息
     ///   返回的数据类型
@@ -228,6 +234,8 @@ type
     ///   11: HTTP/1.1
     /// </summary>
     property ResponseHttpVersionValue: Integer read FResponseHttpVersionValue;
+
+
 
 
 
@@ -368,6 +376,7 @@ end;
 constructor TDiocpHttpClient.Create(AOwner: TComponent);
 begin
   inherited;
+  FRaiseOnResponseOnExceptCode := true;
   FBufferWriter := TBlockBuffer.Create(__writeBufferPool);
   FBufferWriter.OnBufferWrite := OnBufferWrite;
   FCreatTheadID := GetCurrentThreadID;
@@ -1098,19 +1107,22 @@ procedure TDiocpHttpClient.DoAfterResponse;
 var
   lvCode:Integer;
 begin
-  lvCode := ResponseResultCode;
-  if lvCode = 200 then
+  if FRaiseOnResponseOnExceptCode then
   begin
-    ; // OK
-  end else if lvCode= -1 then
-  begin
-    raise Exception.Create(Format('错误的ResponseHttpCode[%d]', [lvCode]));
-  end else
-  begin
-    {$IFDEF TRACE_LOG}
-    FHttpBuffer.ContentBuilder.SaveToFile(__app_root + 'response.dat');
-    {$ENDIF}
-    raise Exception.Create(Format('错误的ResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
+    lvCode := ResponseResultCode;
+    if lvCode = 200 then
+    begin
+      ; // OK
+    end else if lvCode= -1 then
+    begin
+      raise Exception.Create(Format('错误的ResponseHttpCode[%d]', [lvCode]));
+    end else
+    begin
+      {$IFDEF TRACE_LOG}
+      FHttpBuffer.ContentBuilder.SaveToFile(__app_root + 'response.dat');
+      {$ENDIF}
+      raise Exception.Create(Format('错误的ResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
+    end;
   end;
 end;
 
@@ -1260,6 +1272,7 @@ end;
 procedure TDiocpHttpClient.Reset;
 begin
   self.Cleanup;
+  FRaiseOnResponseOnExceptCode := True;
   FResponseCookie := STRING_EMPTY;
 end;
 
