@@ -1531,7 +1531,7 @@ begin
     begin
       Inc(i); // skip the % char
       try
-        s := Format('$%s%s', ['$', ASrc[i], ASrc[i+1]]);
+        s := Format('$%s%s', [URLChar(ASrc[i]), URLChar(ASrc[i+1])]);
         Result[j] := URLChar(StrToInt(s));
       except end;
       Inc(i, 1);  // 再跳过一个字符.
