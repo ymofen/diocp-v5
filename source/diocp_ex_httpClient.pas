@@ -157,6 +157,7 @@ type
     procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
         Boolean);
 
+    function DecodeUtf8AsString: string;
     function GetResponseBodyAsString: string;
 
     property Active: Boolean read GetActive;
@@ -760,7 +761,7 @@ begin
     lvRawHeader := FRequestHeaderBuilder.ToString();
     len := Length(lvRawHeader);
     FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
-    {$IFDEF DEBUG}
+    {$IFDEF TRACE_LOG}
     WriteStringToUtf8NoBOMFile('request.dat', lvRawHeader);
     {$ENDIF}
   {$ENDIF}
@@ -772,6 +773,9 @@ begin
     begin
       len := FRequestBody.Size;
       FBufferWriter.Append(FRequestBody.Memory, len);
+      {$IFDEF TRACE_LOG}
+      FRequestBody.SaveToFile('request.body.dat');
+      {$ENDIF}
     end;
 
     FBufferWriter.FlushBuffer;
@@ -1107,6 +1111,10 @@ procedure TDiocpHttpClient.DoAfterResponse;
 var
   lvCode:Integer;
 begin
+  {$IFDEF TRACE_LOG}
+  FHttpBuffer.HeaderBuilder.SaveToFile(__app_root + 'response.header.dat');
+  FHttpBuffer.ContentBuilder.SaveToFile(__app_root + 'response.dat');
+  {$ENDIF}
   if FRaiseOnResponseOnExceptCode then
   begin
     lvCode := ResponseResultCode;
@@ -1118,9 +1126,7 @@ begin
       raise Exception.Create(Format('´íÎóµÄResponseHttpCode[%d]', [lvCode]));
     end else
     begin
-      {$IFDEF TRACE_LOG}
-      FHttpBuffer.ContentBuilder.SaveToFile(__app_root + 'response.dat');
-      {$ENDIF}
+
       raise Exception.Create(Format('´íÎóµÄResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
     end;
   end;
@@ -1142,6 +1148,11 @@ end;
 function TDiocpHttpClient.GetActive: Boolean;
 begin
   Result := FRawSocket.SocketValid;
+end;
+
+function TDiocpHttpClient.DecodeUtf8AsString: string;
+begin
+  Result := ReadStringFromStream(FResponseBody, True);
 end;
 
 function TDiocpHttpClient.GetResponseBodyAsString: string;
