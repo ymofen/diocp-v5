@@ -277,12 +277,13 @@ end;
 
 procedure TForm1.btnConvertToDValueClick(Sender: TObject);
 var
-  lvDValue:TDValue;
+  lvDValue, lvList:TDValue;
 begin
   if not cdsDemo.Active then raise Exception.Create('DEMO数据集尚未初始化');
   
   lvDValue := TDValue.Create();
-  ConvertDataSetToDValue(self.cdsDemo, lvDValue);
+  lvList := lvDValue.ForceByName('list').AsArray();  // 不需要单独释放
+  ConvertDataSetToDValue(self.cdsDemo, lvList);
   mmoJSONData.Clear;
   mmoJSONData.Lines.Add(JSONEncode(lvDValue));
   lvDValue.Free;
