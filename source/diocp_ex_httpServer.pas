@@ -1026,7 +1026,6 @@ procedure TDiocpHttpRequest.Clear;
 begin
   if FRange <> nil then FRange.Clear;
   FResponse.Clear;
-  FReleaseLater := false;
   FInnerRequest.DoCleanUp;
   FInnerWebSocketFrame.DoCleanUp;
   FWebSocketContentBuffer.Clear;
@@ -2868,6 +2867,7 @@ begin
     Result.FDiocpHttpServer := Self;
     Result.FOwnerPool := FRequestPool;
     Result.Clear;
+    Result.FReleaseLater := false;
   end else
   begin
     Result := TDiocpHttpRequest.Create;
