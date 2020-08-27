@@ -30,8 +30,7 @@ uses
 const
   END_BYTES: array [0 .. 3] of Byte = (13, 10, 13, 10);
 
-  /// 头部最大10K
-  MAX_HEADER_BUFFER_SIZE = 1024 * 10;
+
 
 type
 {$IF CompilerVersion < 18}
@@ -546,6 +545,10 @@ function URLDecode(const pvInputStr: string; pvConvertUtf8: Boolean = true):
 function URLDecode(const pvInputStr: string; pvEncoding: TEncoding): String;
     overload;
 {$ENDIF}
+
+var
+  // 头部最大10K
+  MAX_HEADER_BUFFER_SIZE :Integer = 1024 * 10;
 
 implementation
 

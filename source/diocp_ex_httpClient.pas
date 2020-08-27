@@ -1262,14 +1262,18 @@ var
   r:Integer;
 begin
 {$IFDEF DIOCP_SSL}
-  r := SSL_write(FSsl, pvBuffer, pvLength);
-  CheckSocketSendResult(r);
-  if r <> pvLength then
+  if FSsl <> nil then
   begin
-    FRawSocket.Close();
-    raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
-  end;                                                                                                                     
-{$ELSE}
+    r := SSL_write(FSsl, pvBuffer, pvLength);
+    CheckSocketSendResult(r);
+    if r <> pvLength then
+    begin
+      FRawSocket.Close();
+      raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
+    end;
+    exit;
+  end;
+{$ENDIF}
   r := FRawSocket.SendBuf(pvBuffer^, pvLength);
   CheckSocketSendResult(r);
   if r <> pvLength then
@@ -1277,7 +1281,7 @@ begin
     FRawSocket.Close();
     raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
   end;
-{$ENDIF}
+
 end;
 
 procedure TDiocpHttpClient.Reset;
