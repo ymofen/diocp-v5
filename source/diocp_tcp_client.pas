@@ -156,7 +156,8 @@ type
     ///  检测使用重新连接 ,单线程使用，仅供DoAutoReconnect调用
     ///    间隔最少5秒以上
     /// </summary>
-    procedure DoAutoReconnect(pvASyncWorker:TASyncWorker);
+    procedure DoAutoReconnect(pvFileWritter: TSingleFileWriter;
+        pvASyncWorker:TASyncWorker);
 
     /// <summary>
     ///    检测使用重新连接 ,单线程使用，仅供DoASyncCycle调用
@@ -656,7 +657,8 @@ begin
 
 end;
 
-procedure TDiocpTcpClient.DoAutoReconnect(pvASyncWorker:TASyncWorker);
+procedure TDiocpTcpClient.DoAutoReconnect(pvFileWritter: TSingleFileWriter;
+    pvASyncWorker:TASyncWorker);
 var
   i: Integer;
   lvContext:TIocpRemoteContext;
@@ -671,13 +673,18 @@ begin
       for i := 0 to FList.Count - 1 do
       begin
         if pvASyncWorker.Terminated then Break;
-
-
-        lvContext := TIocpRemoteContext(FList[i]);
-        lvContext.DoBeforeReconnect(vAllow);
-        if vAllow then
-        begin
-          lvContext.CheckDoReConnect;
+        try
+          lvContext := TIocpRemoteContext(FList[i]);
+          lvContext.DoBeforeReconnect(vAllow);
+          if vAllow then
+          begin
+            lvContext.CheckDoReConnect;
+          end;
+        except
+          on e:Exception do
+          begin
+            pvFileWritter.LogMessage('DoAutoReconnect出现了异常:%s', [e.Message]);
+          end;
         end;
       end;
     finally
@@ -818,12 +825,12 @@ procedure TDiocpTcpClient.DoASyncWork(pvFileWritter: TSingleFileWriter;
 begin
   if tick_diff(FAutoConnectTick, GetTickCount) > 5000 then
   begin
+    FAutoConnectTick := GetTickCount;
     if not self.DisableAutoConnect then
     begin
-      DoAutoReconnect(pvASyncWorker);
+      DoAutoReconnect(pvFileWritter, pvASyncWorker);
     end;
     DoASyncCycle(pvASyncWorker);
-    FAutoConnectTick := GetTickCount;
   end;
 end;
 
