@@ -683,7 +683,9 @@ begin
         except
           on e:Exception do
           begin
-            pvFileWritter.LogMessage('DoAutoReconnect出现了异常:%s', [e.Message]);
+            {$IFDEF DEBUG}
+            pvFileWritter.LogMessage('DoAutoReconnect[%d]出现了异常:%s', [i, e.Message]);
+            {$ENDIF}
           end;
         end;
       end;

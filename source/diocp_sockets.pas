@@ -2682,6 +2682,7 @@ begin
         on e:Exception do
         begin
           lvFileWriter.LogMessage('ERR:' + e.Message);
+          self.FASyncInvoker.WaitForSleep(1000);
         end;  
       end;
     end;

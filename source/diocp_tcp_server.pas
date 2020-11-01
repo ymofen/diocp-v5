@@ -517,6 +517,9 @@ type
         TDataReleaseType; pvTag: Integer = 0; pvTagData: Pointer = nil): Boolean;
         overload;
 
+
+    procedure SetMaxAcceptNum(pvMax:Integer);
+
     /// <summary>
     ///   设置当前的接收线程信息
     /// </summary>
@@ -558,6 +561,8 @@ type
     property RemotePort: Integer read FRemotePort;
     property RequestDisconnectFlag: Boolean read FRequestDisconnectFlag;
     property SendQueueSize: Integer read FSendQueueSize;
+
+
 
     /// <summary>
     ///   请注意
@@ -1715,8 +1720,10 @@ begin
     except
       on e:Exception do
       begin
+        {$IFDEF DIOCP_DEBUG}
         sfLogger.LogMessage(
           Format('InnerCloseContext(%s):%s', [lvDebugStep, e.Message]), CORE_LOG_FILE);
+        {$ENDIF}
       end;
     end;
   finally
@@ -2428,8 +2435,10 @@ begin
         except
           on e:Exception do
           begin
+            {$IFDEF DIOCP_DEBUG}
             sfLogger.LogMessage(
               Format('DoConnected:%s', [e.Message]), CORE_LOG_FILE);
+            {$ENDIF}
           end;
         end;
 
@@ -2864,6 +2873,11 @@ begin
   finally
     InnerUnLock;
   end;
+end;
+
+procedure TIocpClientContext.SetMaxAcceptNum(pvMax: Integer);
+begin
+  ;
 end;
 
 procedure TIocpClientContext.SetOwner(const Value: TDiocpTcpServer);
@@ -4221,6 +4235,7 @@ end;
 procedure TDiocpTcpServer.OnIocpException(pvRequest:TIocpRequest; E:Exception);
 begin
   try
+    {$IFDEF DIOCP_DEBUG}
     if pvRequest <> nil then
     begin
       LogMessage('未处理异常:%s, 请求(%s)信息:%s',[E.Message, pvRequest.ClassName, pvRequest.Remark],
@@ -4229,6 +4244,7 @@ begin
     begin
       LogMessage('未处理异常:%s',[E.Message], CORE_LOG_FILE, lgvError);
     end;
+    {$ENDIF}
   except
   end;
 end;
@@ -4516,12 +4532,16 @@ begin
       // 归还到对象池
       ReleaseRequestObject(lvRequest);
 
+      {$IFDEF DIOCP_DEBUG}
       FOwner.logMessage('TIocpAcceptorMgr.PostAcceptExRequest errCounter:%d', [i], CORE_LOG_FILE);
+      {$ENDIF}
     end;
   except
     on E:Exception do
     begin
+       {$IFDEF DIOCP_DEBUG}
        FOwner.logMessage('TIocpAcceptorMgr.PostAcceptExRequest Err:%s', [e.Message], CORE_LOG_FILE);
+       {$ENDIF}
     end;
   end;
 end;
@@ -4756,11 +4776,12 @@ begin
     if lvRetCode = 0 then
     begin     // binding error
       lvErrCode := GetLastError;
+      {$IFDEF DIOCP_DEBUG}
       FOwner.logMessage(
          Format(strAcceptExError,
            [FClientContext.FRawSocket.SocketHandle, lvErrCode, 'TIocpAcceptExRequest.PostRequest(SOCKET_REUSE)'])
          , CORE_LOG_FILE);
-
+      {$ENDIF}
       FClientContext.FRawSocket.close;
       if (FOwner.FDataMoniter <> nil) then
         FOwner.FDataMoniter.incHandleDestroyCounter;
@@ -4804,11 +4825,14 @@ begin
     lvErrCode := WSAGetLastError;
     Result := lvErrCode = WSA_IO_PENDING;
     if not Result then
-    begin 
+    begin
+      {$IFDEF DIOCP_DEBUG}
       FOwner.logMessage(
          Format(strAcceptExError,
            [FClientContext.FRawSocket.SocketHandle, lvErrCode, 'TIocpAcceptExRequest.PostRequest'])
          , CORE_LOG_FILE);
+      {$ENDIF}
+
 
       FOwner.DoClientContextError(FClientContext, lvErrCode);
 
