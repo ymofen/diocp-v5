@@ -38,6 +38,10 @@ object frmMain: TfrmMain
     object tsOperator: TTabSheet
       Caption = #25805#20316
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object pnlOpera_Top: TPanel
         Left = 0
         Top = 0
@@ -96,6 +100,7 @@ object frmMain: TfrmMain
           Width = 913
           Height = 151
           Align = alClient
+          ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
           Lines.Strings = (
             '0123456789')
           TabOrder = 0
@@ -106,6 +111,7 @@ object frmMain: TfrmMain
           Width = 913
           Height = 89
           Align = alBottom
+          ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
           TabOrder = 1
         end
       end
@@ -113,6 +119,10 @@ object frmMain: TfrmMain
     object tsEvent: TTabSheet
       Caption = #20107#20214
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object grpOnConnected: TGroupBox
         AlignWithMargins = True
         Left = 3
@@ -140,6 +150,7 @@ object frmMain: TfrmMain
           Width = 899
           Height = 129
           Align = alClient
+          ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
           Lines.Strings = (
             '0123456789')
           TabOrder = 1
@@ -167,6 +178,7 @@ object frmMain: TfrmMain
             Top = 7
             Width = 66
             Height = 21
+            ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
             TabOrder = 0
             Text = '10'
           end
@@ -187,6 +199,7 @@ object frmMain: TfrmMain
           Width = 899
           Height = 82
           Align = alClient
+          ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
           Lines.Strings = (
             'mmoIntervalData')
           TabOrder = 1
@@ -225,6 +238,7 @@ object frmMain: TfrmMain
       Top = 10
       Width = 121
       Height = 21
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       TabOrder = 1
       Text = '127.0.0.1'
     end
@@ -233,6 +247,7 @@ object frmMain: TfrmMain
       Top = 10
       Width = 100
       Height = 21
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       TabOrder = 2
       Text = '9983'
     end
@@ -259,6 +274,7 @@ object frmMain: TfrmMain
       Top = 10
       Width = 114
       Height = 21
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       TabOrder = 5
       Text = '1000'
     end
@@ -385,6 +401,7 @@ object frmMain: TfrmMain
       Width = 921
       Height = 174
       Align = alClient
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       Lines.Strings = (
         'iocp tcp client demo')
       TabOrder = 0

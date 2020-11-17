@@ -2,10 +2,14 @@ unit diocp_ex_http_common;
 
 interface
 
+
+
 {$I 'diocp.inc'}
 {$IF CompilerVersion>= 28}    // XE7:28
 {$DEFINE USE_NetEncoding}
 {$IFEND}
+
+{$DEFINE USE_ZLIBExGZ}
 
 uses
   utils_strings, SysUtils, utils_dvalue

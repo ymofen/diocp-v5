@@ -518,6 +518,7 @@ type
         overload;
 
 
+
     procedure SetMaxAcceptNum(pvMax:Integer);
 
     /// <summary>
@@ -3184,7 +3185,7 @@ var
         {$ENDIF}
       end;
     end;
-    // 设置listen即可 UpdateAcceptContext会把listenr的socket进行复制 
+    // 设置listen即可 UpdateAcceptContext会把listenr的socket进行复制
 //    if Result then
 //    begin
 //      if FKeepAlive then

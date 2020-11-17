@@ -37,6 +37,7 @@ object Form1: TForm1
       Top = 8
       Width = 360
       Height = 21
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       TabOrder = 1
       Text = 'ws://echo.websocket.org'
     end
@@ -64,6 +65,7 @@ object Form1: TForm1
       Width = 666
       Height = 223
       Align = alClient
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       Lines.Strings = (
         'mmoRecv')
       TabOrder = 0
@@ -83,6 +85,7 @@ object Form1: TForm1
         Width = 666
         Height = 126
         Align = alClient
+        ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
         Lines.Strings = (
           'mmoSend')
         TabOrder = 0

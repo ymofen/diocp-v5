@@ -711,7 +711,7 @@ end;
 function TfrmMain.DoLoadFile(pvRequest:TDiocpHttpRequest): Boolean;
 var
   lvDefaultFile:string;
-  lvExt:string;
+  lvExt, lvstr:string;
 begin
   pvRequest.DecodeURLParam(True);
   lvDefaultFile := pvRequest.URLParams.GetValueByName('downfile', STRING_EMPTY);
@@ -735,13 +735,50 @@ begin
   begin
     pvRequest.Response.ClearContent;
     lvExt :=LowerCase(ExtractFileExt(lvDefaultFile));
+
     pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
     //pvRequest.Response.SetResponseFileName('x.file');
     //pvRequest.ResponseAFile(lvDefaultFile);
  //   pvRequest.ResponseAStream(TFileStream.Create(lvDefaultFile, fmOpenRead), OnResposeStreamDone);
     pvRequest.Response.LoadFromFile(lvDefaultFile);
-    pvRequest.SendResponse();
-    pvRequest.DoResponseEnd;
+
+    if (StrIndexOf(lvExt, ['.js', '.html', '.htm', '.css']) <> -1)
+      and
+       (PosWStr('gzip', pvRequest.RequestAcceptEncoding) > 0) then  // 进行压缩
+    begin
+      if pvRequest.ResponseAFileETag(lvDefaultFile) then
+      begin      // 处理头的ETag， 如果返回false，已经响应
+        pvRequest.Response.LoadFromFile(lvDefaultFile);
+        pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'gzip';
+        lvstr := pvRequest.Response.Header.GetValueByName('Content-Encoding', '');
+        if Pos('zlib', lvstr) > 0 then
+        begin
+          pvRequest.Response.ZLibContent;
+        end else if Pos('lzo', lvstr) > 0 then
+        begin
+          pvRequest.Response.LZOCompressContent;
+        end else if Pos('gzip', lvstr) > 0 then
+        begin
+          pvRequest.Response.GZipContent;
+        end else if Pos('deflate', lvstr) > 0 then
+        begin
+          pvRequest.Response.DeflateCompressContent;
+        end;
+        pvRequest.SendResponse();
+        pvRequest.DoResponseEnd;
+      end else
+      begin
+        // ETag 自动回收pvRequest
+      end;
+
+    end else
+    begin
+      pvRequest.ResponseAFileEx(lvDefaultFile);
+    end;
+
+
+
+
     Result := True;
   end else
   begin

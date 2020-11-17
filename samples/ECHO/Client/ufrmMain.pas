@@ -255,7 +255,8 @@ var
 begin
   SpinLock(FSpinLock);
   try
-    FIocpClientSocket.Open; 
+    FIocpClientSocket.Open;
+
     lvClient := FIocpClientSocket.Add;
     lvClient.Host := edtHost.Text;
     lvClient.Port := StrToInt(edtPort.Text);

@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, diocp_task, StdCtrls, utils_async,
-  utils_queues, Vcl.ExtCtrls;
+  utils_queues, ExtCtrls;
 
 type
   TfrmMain = class(TForm)

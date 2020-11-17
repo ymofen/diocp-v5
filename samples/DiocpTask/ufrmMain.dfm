@@ -34,6 +34,7 @@ object frmMain: TfrmMain
     Top = 136
     Width = 625
     Height = 218
+    ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
     Lines.Strings = (
       'Memo1')
     TabOrder = 1
