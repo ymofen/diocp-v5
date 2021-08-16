@@ -26,7 +26,7 @@ type
   /// <summary>
   ///   hash value type
   /// </summary>
-  TDHashValueType = Cardinal;
+  TDHashValueType = THandle;
 
   PDHashData=^TDHashData;
   TDHashData=record
@@ -76,8 +76,8 @@ type
 
     procedure SetOnCompare(const Value: TOnDataCompare);
     
-    procedure SetValues(pvHashValue: Cardinal; const Value: Pointer);
-    function GetValues(pvHashValue: Cardinal): Pointer;
+    procedure SetValues(pvHashValue: THandle; const Value: Pointer);
+    function GetValues(pvHashValue: THandle): Pointer;
   private
     function GetValueMap(const pvKey: String): Pointer;
     procedure SetBucketAutoSize(const Value: Boolean);
@@ -202,9 +202,9 @@ type
 
     property ValueMap[const pvKey:String]: Pointer read GetValueMap write SetValueMap;
 
-    property Values[pvHashValue: Cardinal]: Pointer read GetValues write SetValues; default;
+    property Values[pvHashValue: THandle]: Pointer read GetValues write SetValues; default;
 
-    
+
   end;
 
   TDHashTableSafe = class(TDHashTable)
@@ -693,7 +693,7 @@ begin
   end;
 end;
 
-function TDHashTable.GetValues(pvHashValue: Cardinal): Pointer;
+function TDHashTable.GetValues(pvHashValue: THandle): Pointer;
 begin
   Result := FindFirstData(pvHashValue);
 end;
@@ -862,7 +862,7 @@ begin
   end;    
 end;
 
-procedure TDHashTable.SetValues(pvHashValue: Cardinal; const Value: Pointer);
+procedure TDHashTable.SetValues(pvHashValue: THandle; const Value: Pointer);
 begin
   SetData(pvHashValue, Value);
 end;

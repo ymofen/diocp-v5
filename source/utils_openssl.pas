@@ -249,7 +249,7 @@ var
 
   PEM_read_bio_X509: function(bp: PBIO; x: PPX509; cb: pem_password_cb; u: Pointer): PX509; cdecl;
   PEM_read_bio_X509_AUX: function(bp: PBIO; x: PPX509; cb: pem_password_cb; u: Pointer): PX509; cdecl;
-  //PEM_read_bio_PrivateKey: function(bp: PBIO; x: PPEVP_PKEY; cb: pem_password_cb; u: Pointer): PEVP_PKEY; cdecl;
+ // PEM_read_bio_PrivateKey: function(bp: PBIO; x: PPEVP_PKEY; cb: pem_password_cb; u: Pointer): PEVP_PKEY; cdecl;
 
   CRYPTO_num_locks: function: cInt; cdecl;
   CRYPTO_set_locking_callback:procedure(cb: SSL_Ptr); cdecl;

@@ -157,6 +157,7 @@ type
      ///   GetLow4Bit($81) = $01
      /// </summary>
      class function GetLow4Bit(const pvByte:Byte): Byte;
+     class function HexStrToRawString(const pvHexStr: String): string; overload;
 
      /// <summary>
      ///   设置高4位的值
@@ -164,7 +165,27 @@ type
      ///   SetHigh4Bit($81, $FE) = $F1
      /// </summary>
      class procedure SetHigh4Bit(var vByte: Byte; pvHigh4Bit: Byte);
+
   end;
+
+/// <summary>
+///   0: 小端
+///   1: 大端
+/// </summary>
+{
+    short int x;
+
+　　char x0,x1;
+
+　　x=0x1122;
+
+　　x0=((char*)&x)[0]; //低地址单元
+
+　　x1=((char*)&x)[1]; //高地址单元
+
+　　若x0=0x11,则是大端; 若x0=0x22,则是小端......
+}
+function CheckIsLittleEndian: Boolean;
 
 implementation
 
@@ -172,6 +193,23 @@ const
   U1 :UInt64 = 1;
 
 
+
+function CheckIsLittleEndian: Boolean;
+var
+  lvWord:Word;
+  lvPtr:PByte;
+begin
+  lvWord := $1122;
+  lvPtr := PByte(@lvWord);
+  if lvPtr^ = $22 then
+  begin
+    Result := true;
+  end else begin
+    Result := False;
+  end;
+
+
+end;
 
 class procedure TByteTools.AppendBufToFile(pvBuf:Pointer; pvBufLength:Integer;
     pvFileName:string);
@@ -339,6 +377,24 @@ begin
   r := HexToBin(lvStr, outBuf);
   Assert(r = l, 'TByteTools.HexStrToBytes');
   Result := r;  
+end;
+
+class function TByteTools.HexStrToRawString(const pvHexStr: String): string;
+var
+  lvStr:String;
+  lvBytes:TBytes;
+var
+  l, r:Integer;
+begin
+  lvStr := StringReplace(pvHexStr, ' ', '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #13, '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #10, '', [rfReplaceAll]);
+  l := Length(lvStr);
+  l := l shr 1;
+  SetLength(lvBytes, l + 1);
+  r := HexToBin(lvStr, @lvBytes[0]);
+  lvBytes[Length(lvBytes)] := 0;
+  Result := StrPas(PAnsiChar(@lvBytes[0]));
 end;
 
 class function TByteTools.HexToBin(pvHexStr: String;

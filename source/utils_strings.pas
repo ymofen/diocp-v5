@@ -234,7 +234,8 @@ type
     function Append(v:Integer): TDBufferBuilder; overload;
     function Append(v:Double): TDBufferBuilder; overload;
     function AppendUtf8(const str: String): TDBufferBuilder;
-
+    function AppendByte(const aByte:Byte): TDBufferBuilder;
+    function AppendWord(const w:Word): TDBufferBuilder; 
     /// <summary>
     ///  推荐用该方法
     /// </summary>
@@ -244,6 +245,7 @@ type
     function AppendBreakLineBytes: TDBufferBuilder;
     function Append(const str: string; pvConvertToUtf8Bytes: Boolean):
         TDBufferBuilder; overload;
+
     function AppendQuoteStr(const str: string): TDBufferBuilder;
     function AppendSingleQuoteStr(const str: string): TDBufferBuilder;
     function AppendLine(const str: string): TDBufferBuilder;
@@ -266,6 +268,8 @@ type
     function ReadBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
 
     function PeekBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
+
+    function ReadData(var vDest; pvStart, pvLength: Integer): Integer;
 
     /// <summary>
     ///   读取一个字节
@@ -316,6 +320,8 @@ type
     function ReArrange: TDBufferBuilder;
 
     function GetInstanceSize: Integer;
+    function Replace(const data; startIdx, l:Integer): TDBufferBuilder;
+
 
 
 
@@ -2288,6 +2294,7 @@ begin
   Result := AppendBuffer(@aByte, 1);
 end;
 
+
 function TDBufferBuilder.Append(const str: string; pvConvertToUtf8Bytes:
     Boolean): TDBufferBuilder;
 var
@@ -2309,6 +2316,43 @@ end;
 function TDBufferBuilder.Append(const w: Word): TDBufferBuilder;
 begin
   Result := AppendBuffer(@w, 2);
+end;
+
+function TDBufferBuilder.AppendWord(const w:Word): TDBufferBuilder;
+begin
+  Result := AppendBuffer(@w, 2);
+end;
+
+function TDBufferBuilder.AppendByte(const aByte:Byte): TDBufferBuilder;
+begin
+  Result := AppendBuffer(@aByte, 1);
+end;
+
+function TDBufferBuilder.Replace(const data; startIdx, l:Integer):
+    TDBufferBuilder;
+var
+  l1 :Integer;
+begin
+  if FBufferLocked then
+  begin
+    raise Exception.Create('Buffer Locked');
+  end;
+  if startIdx > FSize  then
+  begin
+    startIdx := FSize;
+  end;
+  
+  l1 := (startIdx + l) - FSize;
+  if l1 > 0 then
+  begin
+    CheckNeedSize(l1);
+  end;
+  Move(data, FData[startIdx], l);
+  if l1 > 0 then
+  begin
+    Inc(FSize, l1);
+  end;
+
 end;
 
 function TDBufferBuilder.AppendBreakLineBytes: TDBufferBuilder;
@@ -2644,6 +2688,23 @@ end;
 function TDBufferBuilder.GetInstanceSize: Integer;
 begin
   Result := FCapacity;
+end;
+
+function TDBufferBuilder.ReadData(var vDest; pvStart, pvLength: Integer):
+    Integer;
+begin
+  if pvStart >= self.FSize then
+  begin
+    Result := 0;
+    exit;
+  end;
+  
+  if pvStart + pvLength > self.FSize then
+  begin
+    pvLength := self.FSize - pvStart;
+  end;
+  Move(self.FData[pvStart], vDest, pvLength);
+  Result := pvLength;
 end;
 
 function TDBufferBuilder.Seek(const Offset: Int64; Origin: TSeekOrigin): Int64;
