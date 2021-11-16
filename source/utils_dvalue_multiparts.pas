@@ -123,7 +123,7 @@ begin
       lvValue := lvItem.FindByName('value');
       if (lvName <> nil) and (lvValue <> nil) then
       begin
-        lvFileNameItem := lvItem.FindByName('fileName');
+        lvFileNameItem := lvItem.FindByName('fileName');       
         if lvFileNameItem <> nil then
         begin
           pvBuilder.AppendRawStr('--').AppendRawStr(lvBoundary).AppendBreakLineBytes;

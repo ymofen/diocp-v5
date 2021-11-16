@@ -87,6 +87,7 @@ type
     FResponseHeader: TStringList;
     FResponseSize: Integer;
     FResponseHttpVersionValue: Integer;
+    FPostSize:Integer;
     FTimeOut: Integer;
     
     FConnectTimeOut:Integer;
@@ -180,6 +181,7 @@ type
     /// </summary>
     property KeepAliveTimeOut: Cardinal read FKeepAliveTimeOut write FKeepAliveTimeOut;
     property LastActivity: Cardinal read FLastActivity;
+    property PostSize: Integer read FPostSize;
 
     property RaiseOnResponseOnExceptCode: Boolean read FRaiseOnResponseOnExceptCode
         write FRaiseOnResponseOnExceptCode;
@@ -1281,7 +1283,7 @@ begin
     FRawSocket.Close();
     raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
   end;
-
+  FPostSize := FPostSize + r;
 end;
 
 procedure TDiocpHttpClient.Reset;

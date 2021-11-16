@@ -1841,13 +1841,28 @@ var
 begin
   //lvFixedHeader := MakeHeader('302 Temporarily Moved', 'HTTP/1.0', false, '', '', 0);
   lvFixedHeader := MakeHeader('307 Temporary Redirect', 'HTTP/1.0', false, '', '', 0);
-
   lvFixedHeader := lvFixedHeader + 'Location: ' + pvURL + HTTPLineBreak;
-
   lvFixedHeader := FixHeader(lvFixedHeader);
-
   len := Length(lvFixedHeader);
-  FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
+
+  //   ≈‰ssl
+  FDiocpContext.FBlockBuffer.Lock;
+  try
+    FDiocpContext.WriteResponseBuffer(PAnsiChar(lvFixedHeader),len);
+    FDiocpContext.FlushResponseBuffer;
+  finally
+    FDiocpContext.FBlockBuffer.UnLock;
+  end;
+//
+//  //lvFixedHeader := MakeHeader('302 Temporarily Moved', 'HTTP/1.0', false, '', '', 0);
+//  lvFixedHeader := MakeHeader('307 Temporary Redirect', 'HTTP/1.0', false, '', '', 0);
+//
+//  lvFixedHeader := lvFixedHeader + 'Location: ' + pvURL + HTTPLineBreak;
+//
+//  lvFixedHeader := FixHeader(lvFixedHeader);
+//
+//  len := Length(lvFixedHeader);
+//  FDiocpContext.PostWSASendRequest(PAnsiChar(lvFixedHeader), len);
 end;
 
 procedure TDiocpHttpResponse.SetChunkedBuffer(pvBuffer:Pointer; pvLen:Integer);
@@ -2029,6 +2044,7 @@ begin
       self.FFlashBufferPostTag := BLOCK_STREAM_BUFFER_TAG;
       FBlockBuffer.Append(lvBuffer, r); 
       FBlockBuffer.FlushBuffer;
+      FreeMem(lvBuffer);
 
     finally
       self.FFlashBufferPostTag := 0;
