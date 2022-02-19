@@ -74,6 +74,7 @@ type
     FRequestAcceptEncoding: String;
     FRawCookie:String;
 
+
     FResponseResultCode:Integer;
 
     FRequestBody: TMemoryStream;
@@ -122,6 +123,7 @@ type
   private
     FRaiseOnResponseOnExceptCode: Boolean;
     {$IFDEF DIOCP_SSL}
+    FSslFlag:Integer;
     FSSLCtx: utils_openssl.PSSL_CTX;
     FSsl: utils_openssl.PSSL;
     procedure DoSSLAfterConnect;
@@ -808,6 +810,10 @@ begin
     FRawSocket.CreateTcpSocket;
     FRawSocket.DoInitialize();
 
+    {$IFDEF DIOCP_SSL}
+    self.FSslFlag := 0;
+    {$ENDIF}
+
     if SameText(FURL.Protocol, 'https') then
     begin
       {$IFDEF DIOCP_SSL}
@@ -858,6 +864,7 @@ begin
       if SameText(FURL.Protocol, 'https') then
       begin
         {$IFDEF DIOCP_SSL}
+        self.FSslFlag := 1;
         Self.DoSSLAfterConnect;
         {$ENDIF}
       end;
@@ -1137,7 +1144,7 @@ end;
 function TDiocpHttpClient.DoRecvBuff(var data; const len: Cardinal): Integer;
 begin
   {$IFDEF DIOCP_SSL}
-  if FSsl <> nil then
+  if (FSsl <> nil) and (Self.FSslFlag = 1) then
   begin
     result := utils_openssl.SSL_read(FSsl, @data, len);
   end else
@@ -1264,7 +1271,7 @@ var
   r:Integer;
 begin
 {$IFDEF DIOCP_SSL}
-  if FSsl <> nil then
+  if (FSsl <> nil) and (self.FSslFlag = 1) then
   begin
     r := SSL_write(FSsl, pvBuffer, pvLength);
     CheckSocketSendResult(r);
