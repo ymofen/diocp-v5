@@ -59,6 +59,9 @@ begin
   sfLogger.setAppender(TStringsAppender.Create(mmoRecv.Lines));
   sfLogger.AppendInMainThread := True;
   FWsClient := NewWsClient();
+  FWsClient.Masked := true;
+  FWsClient.HttpOrigin := '';
+
   FWsClient.OnRecv := OnRecv;
   FWsClient.OnDisconnectedEvent := OnDisconnected;
   FWsClient.OnShakeHand := OnShakeHand;
@@ -105,7 +108,7 @@ end;
 
 procedure TForm1.OnShakeHand(Sender:TObject);
 begin
-  //mmoRecv.Lines.Add(FWsClient.HttpBuffer.HeaderBuilder.ToRAWString);
+  mmoRecv.Lines.Add(FWsClient.HttpBuffer.HeaderBuilder.ToRAWString);
 end;
 
 procedure TForm1.WsSendPing(pvTimeWheel:TDTimeWheel; pvUserData:Pointer);

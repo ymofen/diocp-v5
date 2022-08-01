@@ -21,6 +21,7 @@ type
 
     FWsFrame: TDiocpWebSocketFrame;
     FHttpBuffer: THttpBuffer;
+    FHttpOrigin: string;
     FOnRecv: TNotifyEvent;
     FOnShakeHand: TNotifyEvent;
 
@@ -54,7 +55,9 @@ type
     property WebSocketContentBuffer: TDBufferBuilder read FWebSocketContentBuffer;
     property OnRecv: TNotifyEvent read FOnRecv write FOnRecv;
     property OnShakeHand: TNotifyEvent read FOnShakeHand write FOnShakeHand;
+    property HttpOrigin: string read FHttpOrigin write FHttpOrigin;
     property Masked: Boolean read FMasked write FMasked;
+
 
   end;
 
@@ -254,14 +257,54 @@ begin
   // Sec-WebSocket-Key: pAwC+w4+DLzmrLTUuBG4cQ==
   // Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
 
-  FHeaderBuilder.URI := FURL.URI;
+  //GET ws://127.0.0.1:16001/ws/service HTTP/1.1
+  //Host: 127.0.0.1:16001
+  //Connection: Upgrade
+  //Pragma: no-cache
+  //Cache-Control: no-cache
+  //User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36
+  //Upgrade: websocket
+  //Origin: http://139.199.181.47:8090
+  //Sec-WebSocket-Version: 13
+  //Accept-Encoding: gzip, deflate, br
+  //Accept-Language: zh-CN,zh;q=0.9
+  //Sec-WebSocket-Key: w3MBoVLXJCFObHwstYZeRg==
+  //Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+
+
+  FHeaderBuilder.URI := FWsUrl; //FURL.URI;
   FHeaderBuilder.URLParams := FURL.ParamStr;
   // FHeaderBuilder.URI := FWsUrl;
   FHeaderBuilder.Method := 'GET';
 
+  FHeaderBuilder.SetHeader('Pragma', 'no-cache');
+  FHeaderBuilder.SetHeader('Cache-Control', 'no-cache');
+
+  // 有些服务器会检测跨域问题, 所以需要设定
+  if Length(self.FHttpOrigin) = 0 then
+  begin
+    if FURL.Protocol ='ws' then
+    begin
+      s := Format('%s://%s', ['http', self.FURL.RawHostStr]);
+    end else
+    begin
+      s := Format('%s://%s', ['https', self.FURL.RawHostStr]);
+    end;
+
+    FHeaderBuilder.SetHeader('Origin', s);
+  end else
+  begin
+    FHeaderBuilder.SetHeader('Origin', self.FHttpOrigin);
+  end;
+
+
+  FHeaderBuilder.SetHeader('Accept-Encoding', 'gzip, deflate, br');
+  FHeaderBuilder.SetHeader('Accept-Language', 'zh-CN,zh;q=0.9');
+
   FHeaderBuilder.SetHeader('Connection', 'Upgrade');
   FHeaderBuilder.SetHeader('Upgrade', 'websocket');
   FHeaderBuilder.SetHeader('Host', FURL.RawHostStr);
+  FHeaderBuilder.SetHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36');
   // FHeaderBuilder.SetHeader('Origin', 'file://');
   FHeaderBuilder.SetHeader('Sec-WebSocket-Version', '13');
   FHeaderBuilder.SetHeader('Sec-WebSocket-Key', Base64Encode('Diocp' + NowString));

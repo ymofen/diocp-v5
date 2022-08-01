@@ -18,7 +18,7 @@ object Form1: TForm1
     Top = 0
     Width = 929
     Height = 288
-    ActivePage = tsDataSet
+    ActivePage = tsJSON
     Align = alTop
     TabOrder = 0
     object tsJSON: TTabSheet

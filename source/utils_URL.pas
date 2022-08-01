@@ -52,6 +52,11 @@ type
     ///   ²ÎÊý
     /// </summary>
     property ParamStr: String read FParamStr write FParamStr;
+
+    /// <summary>
+    ///   host:port 127.0.0.1:9983
+    ///   www.baidu.com
+    /// </summary>
     property RawHostStr: String read FRawHostStr;
 
     /// <summary>

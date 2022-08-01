@@ -2008,27 +2008,39 @@ begin
 end;
 
 function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
-{$IFNDEF UNICODE}
-var
-  lvRawStr:AnsiString;
-  l:Cardinal;
-{$ELSE}
 var
   lvBytes:TBytes;
-{$ENDIF}
+  lvRawStr:AnsiString;
+  l:Cardinal;
 begin
-{$IFDEF UNICODE}
-  SetLength(lvBytes, pvLen); 
-  Move(pvBuff^, lvBytes[0], pvLen);
-  Result := TEncoding.UTF8.GetString(lvBytes);
-  //Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
-{$ELSE}
   l := pvLen;
   SetLength(lvRawStr, l);
   Move(pvBuff^, PansiChar(lvRawStr)^, l);
   Result := UTF8Decode(lvRawStr);
-{$ENDIF}
 end;
+// UNICODE ÈÝÒ×³öÏÖ´íÎó
+//function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
+//{$IFNDEF UNICODE}
+//var
+//  lvRawStr:AnsiString;
+//  l:Cardinal;
+//{$ELSE}
+//var
+//  lvBytes:TBytes;
+//{$ENDIF}
+//begin
+//{$IFDEF UNICODE}
+//  SetLength(lvBytes, pvLen);
+//  Move(pvBuff^, lvBytes[0], pvLen);
+//  Result := TEncoding.UTF8.GetString(lvBytes);
+//  //Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
+//{$ELSE}
+//  l := pvLen;
+//  SetLength(lvRawStr, l);
+//  Move(pvBuff^, PansiChar(lvRawStr)^, l);
+//  Result := UTF8Decode(lvRawStr);
+//{$ENDIF}
+//end;
 
 function SpanPointer(const pvStart, pvEnd: PByte): Integer;
 begin

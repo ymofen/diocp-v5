@@ -121,6 +121,7 @@ type
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   private
+    FLastRequestHeader: String;
     FRaiseOnResponseOnExceptCode: Boolean;
     {$IFDEF DIOCP_SSL}
     FSslFlag:Integer;
@@ -172,6 +173,8 @@ type
     
     property CustomeHeader: TStrings read FCustomeHeader;
 
+
+
     /// <summary>
     ///   是否保持连接状态
     /// </summary>
@@ -183,6 +186,8 @@ type
     /// </summary>
     property KeepAliveTimeOut: Cardinal read FKeepAliveTimeOut write FKeepAliveTimeOut;
     property LastActivity: Cardinal read FLastActivity;
+    property LastRequestHeader: String read FLastRequestHeader write
+        FLastRequestHeader;
     property PostSize: Integer read FPostSize;
 
     property RaiseOnResponseOnExceptCode: Boolean read FRaiseOnResponseOnExceptCode
@@ -550,11 +555,13 @@ begin
     end;
     FStringBuilder.Append(FStringBuilder.LineBreak);   // 最后添加一个回车符
   {$IFDEF UNICODE}
-    lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
+    FLastRequestHeader := FStringBuilder.ToString();
+    lvRawHeader := TEncoding.Default.GetBytes(FLastRequestHeader);
     len := Length(lvRawHeader);
     FBufferWriter.Append(@lvRawHeader[0], len);
   {$ELSE}
-    lvRawHeader := FStringBuilder.ToString();
+    FLastRequestHeader := FStringBuilder.ToString();
+    lvRawHeader := FLastRequestHeader;
     len := Length(lvRawHeader);
     FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
   {$ENDIF}

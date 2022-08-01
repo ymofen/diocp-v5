@@ -39,7 +39,7 @@ object Form1: TForm1
       Height = 21
       ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       TabOrder = 1
-      Text = 'ws://echo.websocket.org'
+      Text = 'ws://127.0.0.1:16001/ws/service'
     end
     object btnDisconnect: TButton
       Left = 451
