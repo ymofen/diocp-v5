@@ -45,12 +45,17 @@
 (*                                                            *)
 (**************************************************************)
 
+{
+  yangmf
+    兼容低版本的编码(2022-08-11 15:05:29)
+}
+
 unit AES;                  
 
 interface
 
 uses
-  SysUtils, Classes, Math, ElAES;
+  SysUtils, Classes, Math, ElAES, utils_strings;
 
 const
   SDestStreamNotCreated = 'Dest stream not created.';
@@ -110,32 +115,34 @@ var
   AESKey128: TAESKey128;
   AESKey192: TAESKey192;
   AESKey256: TAESKey256;
+  KeyBytes:TBytes;
 begin
   Result := '';
   SS := TStringStream.Create(Value);
   DS := TStringStream.Create('');
   try
+    KeyBytes := utils_strings.StringToUtf8Bytes(Key, False);
     Size := SS.Size;
     DS.WriteBuffer(Size, SizeOf(Size));
     {  --  128 位密匙最大长度为 16 个字符 --  }
     if KeyBit = kb128 then
     begin
       FillChar(AESKey128, SizeOf(AESKey128), 0 );
-      Move(PChar(Key)^, AESKey128, Min(SizeOf(AESKey128), Length(Key)));
+      Move(KeyBytes[0], AESKey128, Min(SizeOf(AESKey128), Length(KeyBytes)));
       EncryptAESStreamECB(SS, 0, AESKey128, DS);
     end;
     {  --  192 位密匙最大长度为 24 个字符 --  }
     if KeyBit = kb192 then
     begin
       FillChar(AESKey192, SizeOf(AESKey192), 0 );
-      Move(PChar(Key)^, AESKey192, Min(SizeOf(AESKey192), Length(Key)));
+      Move(KeyBytes[0], AESKey192, Min(SizeOf(AESKey192), Length(KeyBytes)));
       EncryptAESStreamECB(SS, 0, AESKey192, DS);
     end;
     {  --  256 位密匙最大长度为 32 个字符 --  }
     if KeyBit = kb256 then
     begin
       FillChar(AESKey256, SizeOf(AESKey256), 0 );
-      Move(PChar(Key)^, AESKey256, Min(SizeOf(AESKey256), Length(Key)));
+      Move(KeyBytes[0], AESKey256, Min(SizeOf(AESKey256), Length(KeyBytes)));
       EncryptAESStreamECB(SS, 0, AESKey256, DS);
     end;
     Result := StrToHex(DS.DataString);
@@ -154,32 +161,35 @@ var
   AESKey128: TAESKey128;
   AESKey192: TAESKey192;
   AESKey256: TAESKey256;
+  KeyBytes:TBytes;
 begin
   Result := '';
   SS := TStringStream.Create(HexToStr(Value));
   DS := TStringStream.Create('');
   try
+    KeyBytes := utils_strings.StringToUtf8Bytes(Key, False);
     Size := SS.Size;
     SS.ReadBuffer(Size, SizeOf(Size));
     {  --  128 位密匙最大长度为 16 个字符 --  }
     if KeyBit = kb128 then
     begin
       FillChar(AESKey128, SizeOf(AESKey128), 0 );
-      Move(PChar(Key)^, AESKey128, Min(SizeOf(AESKey128), Length(Key)));
+      Move(KeyBytes[0], AESKey128, Min(SizeOf(AESKey128), Length(KeyBytes)));
       DecryptAESStreamECB(SS, SS.Size - SS.Position, AESKey128, DS);
     end;
     {  --  192 位密匙最大长度为 24 个字符 --  }
     if KeyBit = kb192 then
     begin
       FillChar(AESKey192, SizeOf(AESKey192), 0 );
-      Move(PChar(Key)^, AESKey192, Min(SizeOf(AESKey192), Length(Key)));
+      Move(KeyBytes[0], AESKey192, Min(SizeOf(AESKey192), Length(KeyBytes)));
       DecryptAESStreamECB(SS, SS.Size - SS.Position, AESKey192, DS);
     end;
     {  --  256 位密匙最大长度为 32 个字符 --  }
     if KeyBit = kb256 then
     begin
       FillChar(AESKey256, SizeOf(AESKey256), 0 );
-      Move(PChar(Key)^, AESKey256, Min(SizeOf(AESKey256), Length(Key)));
+      Move(KeyBytes[0], AESKey256, Min(SizeOf(AESKey256), Length(KeyBytes)));
+      //Move(PChar(Key)^, AESKey256, Min(SizeOf(AESKey256), Length(Key)));
       DecryptAESStreamECB(SS, SS.Size - SS.Position, AESKey256, DS);
     end;
     Result := DS.DataString;
@@ -197,6 +207,7 @@ var
   AESKey128: TAESKey128;
   AESKey192: TAESKey192;
   AESKey256: TAESKey256;
+  KeyBytes:TBytes;
 begin
   if Dest = nil then
   begin
@@ -206,6 +217,7 @@ begin
   end;
 
   try
+    KeyBytes := utils_strings.StringToUtf8Bytes(Key, False);
     Src.Position:= 0;
     Count:= Src.Size;
     Dest.Write(Count, SizeOf(Count));
@@ -213,21 +225,21 @@ begin
     if KeyBit = kb128 then
     begin
       FillChar(AESKey128, SizeOf(AESKey128), 0 );
-      Move(PChar(Key)^, AESKey128, Min(SizeOf(AESKey128), Length(Key)));
+      Move(KeyBytes[0], AESKey128, Min(SizeOf(AESKey128), Length(KeyBytes)));
       EncryptAESStreamECB(Src, 0, AESKey128, Dest);
     end;
     {  --  192 位密匙最大长度为 24 个字符 --  }
     if KeyBit = kb192 then
     begin
       FillChar(AESKey192, SizeOf(AESKey192), 0 );
-      Move(PChar(Key)^, AESKey192, Min(SizeOf(AESKey192), Length(Key)));
+      Move(KeyBytes[0], AESKey192, Min(SizeOf(AESKey192), Length(KeyBytes)));
       EncryptAESStreamECB(Src, 0, AESKey192, Dest);
     end;
     {  --  256 位密匙最大长度为 32 个字符 --  }
     if KeyBit = kb256 then
     begin
       FillChar(AESKey256, SizeOf(AESKey256), 0 );
-      Move(PChar(Key)^, AESKey256, Min(SizeOf(AESKey256), Length(Key)));
+      Move(KeyBytes[0], AESKey256, Min(SizeOf(AESKey256), Length(KeyBytes)));
       EncryptAESStreamECB(Src, 0, AESKey256, Dest);
     end;
 
@@ -246,6 +258,8 @@ var
   AESKey128: TAESKey128;
   AESKey192: TAESKey192;
   AESKey256: TAESKey256;
+  KeyBytes:TBytes;
+
 begin
   if Dest = nil then
   begin
@@ -255,6 +269,9 @@ begin
   end;
 
   try
+    KeyBytes := utils_strings.StringToUtf8Bytes(Key, False);
+
+
     Src.Position:= 0;
     OutPos:= Dest.Position;
     Src.ReadBuffer(Count, SizeOf(Count));
@@ -262,7 +279,7 @@ begin
     if KeyBit = kb128 then
     begin
       FillChar(AESKey128, SizeOf(AESKey128), 0 );
-      Move(PChar(Key)^, AESKey128, Min(SizeOf(AESKey128), Length(Key)));
+      Move(KeyBytes[0], AESKey128, Min(SizeOf(AESKey128), Length(KeyBytes)));
       DecryptAESStreamECB(Src, Src.Size - Src.Position,
         AESKey128, Dest);
     end;
@@ -270,7 +287,7 @@ begin
     if KeyBit = kb192 then
     begin
       FillChar(AESKey192, SizeOf(AESKey192), 0 );
-      Move(PChar(Key)^, AESKey192, Min(SizeOf(AESKey192), Length(Key)));
+      Move(KeyBytes[0], AESKey192, Min(SizeOf(AESKey192), Length(KeyBytes)));
       DecryptAESStreamECB(Src, Src.Size - Src.Position,
         AESKey192, Dest);
     end;
@@ -278,7 +295,7 @@ begin
     if KeyBit = kb256 then
     begin
       FillChar(AESKey256, SizeOf(AESKey256), 0 );
-      Move(PChar(Key)^, AESKey256, Min(SizeOf(AESKey256), Length(Key)));
+      Move(KeyBytes[0], AESKey256, Min(SizeOf(AESKey256), Length(KeyBytes)));
       DecryptAESStreamECB(Src, Src.Size - Src.Position,
         AESKey256, Dest);
     end;

@@ -2732,7 +2732,7 @@ function bind(s: TSocket; const name: PSOCKADDR; const namelen: Integer): Intege
 {$EXTERNALSYM bind}
 function closesocket(s: TSocket): Integer; stdcall;
 {$EXTERNALSYM closesocket}
-function connect(s: TSocket; var name: TSockAddr; namelen: Integer): Integer; stdcall;
+function connect(s: TSocket; name: PSockAddr; namelen: Integer): Integer; stdcall;
 {$EXTERNALSYM connect}
 function ioctlsocket(s: TSocket; cmd: Longint; var argp: u_long): Integer; stdcall;
 {$EXTERNALSYM ioctlsocket}
@@ -2746,6 +2746,11 @@ function htonl(hostlong: u_long): u_long; stdcall;
 {$EXTERNALSYM htonl}
 function htons(hostshort: u_short): u_short; stdcall;
 {$EXTERNALSYM htons}
+
+function inet_pton(af:Integer; src, dst: PAnsiChar): Integer; stdcall;
+{$EXTERNALSYM inet_pton}
+
+
 function inet_addr(cp: PAnsiChar): u_long; stdcall;
 {$EXTERNALSYM inet_addr}
 function inet_ntoa(inaddr: in_addr): PAnsiChar; stdcall;
@@ -3318,6 +3323,7 @@ function getsockopt; external ws2_32 name 'getsockopt';
 function htonl; external ws2_32 name 'htonl';
 function htons; external ws2_32 name 'htons';
 function inet_addr; external ws2_32 name 'inet_addr';
+function inet_pton; external ws2_32 name 'inet_pton';
 function inet_ntoa; external ws2_32 name 'inet_ntoa';
 function listen; external ws2_32 name 'listen';
 function ntohl; external ws2_32 name 'ntohl';

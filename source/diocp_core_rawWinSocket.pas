@@ -226,6 +226,7 @@ type
 
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
 
+    function ConnectV6(const pvAddr: string; pvPort: Integer): Boolean;
     /// <summary>
     ///   超时连接, 返回失败，表示连接超时
     /// </summary>
@@ -477,7 +478,19 @@ begin
     sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
     sin_port :=  htons(pvPort);
   end;
-  Result := diocp_winapi_winsock2.Connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn))  = 0;
+  Result := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn))  = 0;
+end;
+
+function TRawSocket.ConnectV6(const pvAddr: string; pvPort: Integer): Boolean;
+var
+  sockaddr: TSockAddrIn6;
+begin
+  FillChar(sockaddr, SizeOf(TSockAddrIn6), 0);
+  PSockAddrIn6(@sockaddr).sin6_family := DIOCP_PF_INET6;
+  PSockAddrIn6(@sockaddr).sin6_port := htons(pvPort);
+  inet_pton(AF_INET6, PAnsichar(AnsiString(pvAddr)),PAnsichar(@PSockAddrIn6(@sockaddr).sin6_addr));
+
+  Result := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn6))  = 0;
 end;
 
 function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
@@ -503,7 +516,7 @@ begin
     sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
     sin_port :=  htons(pvPort);
   end;
-  lvRet := diocp_winapi_winsock2.Connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn));
+  lvRet := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn));
   if lvRet = 0 then
   begin  // 连接成功
     lvFlags := 0;  // 非阻塞模式
@@ -569,7 +582,14 @@ end;
 procedure TRawSocket.CreateTcpSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := socket(AF_INET, SOCK_STREAM, 0);
+  if FIPVersion = IP_V6 then
+  begin
+     FSocketHandle := socket(AF_INET6, SOCK_STREAM, 0);
+  end else
+  begin
+     FSocketHandle := socket(AF_INET, SOCK_STREAM, 0);
+  end;
+
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;
@@ -577,6 +597,7 @@ begin
   InterlockedIncrement(__DebugWSACreateCounter);
   FCloseFlag := 0;
 end;
+
 
 procedure TRawSocket.CreateUdpOverlappedSocket;
 begin

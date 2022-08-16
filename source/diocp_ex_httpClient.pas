@@ -121,6 +121,7 @@ type
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
   private
+    FHostIpV6: Boolean;
     FLastRequestHeader: String;
     FRaiseOnResponseOnExceptCode: Boolean;
     {$IFDEF DIOCP_SSL}
@@ -172,6 +173,7 @@ type
     property ConnectTimeOut: Integer read FConnectTimeOut write FConnectTimeOut;
     
     property CustomeHeader: TStrings read FCustomeHeader;
+    property HostIpV6: Boolean read FHostIpV6 write FHostIpV6;
 
 
 
@@ -254,6 +256,9 @@ type
     ///   读取和发送超时, 单位ms
     /// </summary>
     property TimeOut: Integer read FTimeOut write FTimeOut;
+
+
+
 
 
   end;
@@ -814,6 +819,31 @@ begin
 
   if lvReConnect then
   begin
+    if utils_strings.PosStr(':', pvHost) > 0 then
+    begin
+      lvIpAddr := pvHost;
+      FRawSocket.IPVersion := IP_V6;
+    end else
+    begin
+      if FURL.IPVersion = IP_V6 then
+      begin
+        FRawSocket.IPVersion := IP_V6;
+        lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
+      end else
+      begin
+        // 进行域名解析
+        lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
+        if utils_strings.PosStr(':', lvIpAddr) > 0 then
+        begin
+          FRawSocket.IPVersion := IP_V6;
+        end else
+        begin
+          FRawSocket.IPVersion := IP_V4;
+        end;
+      end;
+
+    end;
+
     FRawSocket.CreateTcpSocket;
     FRawSocket.DoInitialize();
 
@@ -842,9 +872,6 @@ begin
 
     {$ENDIF}
 
-    // 进行域名解析
-    lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
-
     try
       {$IFDEF MSWINDOWS}
 //      if SameText(FURL.Protocol, 'https') then
@@ -855,9 +882,18 @@ begin
 //        end;
 //      end else
 //      begin
-        if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
+        if FRawSocket.IPVersion = IP_V6 then
         begin
-          raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+          if not FRawSocket.ConnectV6(lvIpAddr, pvPort) then
+          begin
+            RaiseLastOSError;
+          end;
+        end else
+        begin
+          if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
+          begin
+            raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+          end;
         end;
       //end;
 
