@@ -23,6 +23,20 @@ unit utils_strings;
 
 interface
 
+{$IFNDEF DEBUG}     // INLINE不好调试
+{$IF defined(FPC) or (RTLVersion>=18))}
+  {$DEFINE HAVE_INLINE}
+{$IFEND HAVE_INLINE}
+{$ENDIF}
+
+// 进行调试
+{.$UNDEF HAVE_INLINE}
+{.$DEFINE DIOCP_DEBUG_HINT}
+
+/// 如果不进行sleep会跑满cpu。
+/// spinlock 交换失败时会执行sleep
+{$DEFINE SPINLOCK_SLEEP}
+
 {$if CompilerVersion>= 28}    // XE7:28
   {$DEFINE USE_NetEncoding}
 {$ifend}
@@ -36,7 +50,9 @@ uses
     , System.NetEncoding
 {$ENDIF}
 {$ENDIF}
-
+{$IFDEF POSIX}
+    , Posix.String_, Posix.Time,Posix.SysTypes
+{$ENDIF}
 {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
     , AnsiStrings
 {$IFEND >=XE5}
@@ -48,9 +64,21 @@ const
 {$IFDEF MSWINDOWS}
   STRING_EMPTY_A :AnsiString = '';
 {$ENDIF}
+{$IF (RTLVersion>=26)}
+  STRING_EMPTY_W: String = '';
+{$ELSE}
   STRING_EMPTY_W: WideString = '';
+{$IFEND >=XE5}
 
 type
+  TDataProc = procedure(pvData:Pointer);
+  TDataEvent = procedure(pvData:Pointer) of object;
+  TStringEvent = procedure(pvSender:TObject; const str:string) of object;
+  TBufferFuncEvent = function(pvSender:TObject; const Buffer; Count:Int64):Int64 of object;
+  
+  TExceptionNotifyEvent = procedure(pvSender: TObject; pvException: Exception;
+      pvTag: Integer) of object;
+
 {$IFDEF MSWINDOWS}
   RAWString = AnsiString;
 {$ELSE}
@@ -162,6 +190,21 @@ type
   end;
 
 
+  TDStreamAdapter = class(TStream)
+  private
+    FOnWrite: TBufferFuncEvent;
+  public
+    function Read(var Buffer; Count: Longint): Longint; override;
+    function Seek(Offset: Longint; Origin: Word): Longint; overload; override;
+    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload;
+        override;
+    function Write(const Buffer; Count: Longint): Longint; override;
+    procedure SetSize(NewSize: Longint); override;
+  public
+    property OnWrite: TBufferFuncEvent read FOnWrite write FOnWrite;
+  end;
+
+
   TDBufferBuilder = class(TStream)
   private
     FData: TBytes;
@@ -170,6 +213,7 @@ type
     FCapacity :Integer;
     FBufferLocked:Boolean;
     FLineBreak: String;
+    FTagPtr: Pointer;
 
     procedure CheckNeedSize(pvSize: LongInt); overload;
     procedure CheckNeedSize(pvOffset, pvSize: LongInt); overload;
@@ -178,6 +222,7 @@ type
   public
     constructor Create;
     procedure Clear;
+    procedure DecBuf(n:Integer);  // 减少数据
     function Append(const aByte:Byte): TDBufferBuilder; overload;
     function Append(const w:Word):TDBufferBuilder; overload;
     function Append(const c: Char): TDBufferBuilder; overload;
@@ -189,10 +234,18 @@ type
     function Append(v:Integer): TDBufferBuilder; overload;
     function Append(v:Double): TDBufferBuilder; overload;
     function AppendUtf8(const str: String): TDBufferBuilder;
+    function AppendByte(const aByte:Byte): TDBufferBuilder;
+    function AppendWord(const w:Word): TDBufferBuilder; 
+    /// <summary>
+    ///  推荐用该方法
+    /// </summary>
+    function AppendStringAsUTF8(const str:DStringW): TDBufferBuilder;
+
     function AppendRawStr(const pvRawStr: RAWString): TDBufferBuilder;
     function AppendBreakLineBytes: TDBufferBuilder;
     function Append(const str: string; pvConvertToUtf8Bytes: Boolean):
         TDBufferBuilder; overload;
+
     function AppendQuoteStr(const str: string): TDBufferBuilder;
     function AppendSingleQuoteStr(const str: string): TDBufferBuilder;
     function AppendLine(const str: string): TDBufferBuilder;
@@ -216,6 +269,8 @@ type
 
     function PeekBuffer(pvBuffer:PByte; pvLength:Integer): Cardinal;
 
+    function ReadData(var vDest; pvStart, pvLength: Integer): Integer;
+
     /// <summary>
     ///   读取一个字节
     /// </summary>
@@ -238,6 +293,8 @@ type
 
     function DecodeUTF8: string;
 
+    function ToString: String;
+
     function ToRAWString: RAWString;
 
     /// <summary>
@@ -254,7 +311,7 @@ type
     function Read(var Buffer; Count: Longint): Longint; override;
     function Seek(Offset: Longint; Origin: Word): Longint; overload; override;
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; overload;  override;
-    function Write(const Buffer; Count: Longint): Integer; override;
+    function Write(const Buffer; Count: Longint): Longint; override;
     procedure SetSize(NewSize: Longint); override;
 
     /// <summary>
@@ -263,6 +320,8 @@ type
     function ReArrange: TDBufferBuilder;
 
     function GetInstanceSize: Integer;
+    function Replace(const data; startIdx, l:Integer): TDBufferBuilder;
+
 
 
 
@@ -281,21 +340,33 @@ type
     /// </summary>
     property Remain: Integer read GetRemain;
 
+
+    property TagPtr: Pointer read FTagPtr write FTagPtr;
+
+
+
+
   end;
 
 
   TDStringWBuilder = class(TObject)
   private
+    FBlockSize:Integer;
+    FInitiCapacity:Integer;
     FData: TCharWArray;
     FPosition: Integer;
     FCapacity :Integer;
     FLineBreak: DStringW;
     procedure CheckNeedSize(pvSize: LongInt);
+    procedure SetBlockSize(pvBlockSize:Integer);
     function GetLength: Integer;
   public
-    constructor Create;
+    constructor Create;overload;
+    constructor Create(pvInitCapacity, pvBlockSize: Integer); overload;
+
     procedure Clear;
     procedure ClearContent;
+    function DecChar(i: Word): TDStringWBuilder;
     function Append(c: DCharW): TDStringWBuilder; overload;
     function Append(const str: DStringW): TDStringWBuilder; overload;
     function Append(const str, pvLeftStr, pvRightStr: DStringW): TDStringWBuilder;
@@ -304,11 +375,14 @@ type
         overload;
     function Append(v:Integer): TDStringWBuilder; overload;
     function Append(v:Double): TDStringWBuilder; overload;
+    function Append(SWB:TDStringWBuilder):TDStringWBuilder; overload;
     function AppendQuoteStr(const str: DStringW): TDStringWBuilder;
     function AppendSingleQuoteStr(const str: DStringW): TDStringWBuilder;
     function AppendLine(const str: DStringW): TDStringWBuilder;
 
+
     function ToString: DStringW;{$IFDEF UNICODE}override;{$ENDIF}
+    function WStrPtr: PDCharW;
     property Length: Integer read GetLength;
 
     procedure SaveToFile(const pvFile: String);
@@ -355,6 +429,34 @@ function SkipUntilEx(var p:PChar; pvChars: TSysCharSet): Integer;
 function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
 
 /// <summary>
+///   跳过N个字符
+/// </summary>
+function SkipN(p: PChar; n: Integer): PChar;
+
+
+/// <summary>
+///   跳过字符
+/// </summary>
+function StrSkipChars(const src :String; pvChars:TSysCharSet): String;
+
+
+/// <summary>
+///   从左边开始获取几个字符串
+/// </summary>
+function LeftStr(const s:string; count:Integer): String;
+function LeftChar(const s:string): Char;
+/// <summary>
+///   从右边开始获取几个字符串
+/// </summary>
+function RightStr(const s:string; count:Integer): String;
+
+/// <summary>
+///   右边的第一个字符
+/// </summary>
+function RightChar(const s:string): Char;
+
+
+/// <summary>
 ///   跳过字符串
 ///   // p = pchar("abcabcefggg");
 ///   // 执行后 p = "efgg"
@@ -370,6 +472,8 @@ function SkipChars(var p:PChar; pvChars: TSysCharSet): Integer;
 /// <param name="pvIgnoreCase"> 忽略大小写 </param>
 function SkipStr(var P:PChar; pvSkipStr: PChar; pvIgnoreCase: Boolean = true):
     Integer;
+
+
 
 
 /// <summary>
@@ -408,6 +512,7 @@ function LeftUntil(var p: PChar; pvChars: TSysCharSet; var vLeftStr: string):
     Integer; overload;
 
 
+
 /// <summary>
 ///   从左边开始截取字符串
 /// </summary>
@@ -441,8 +546,14 @@ function SplitStrings(const s: String; pvStrings: TStrings; pvSpliterChars:
 /// <param name="s"> 源字符串 </param>
 /// <param name="pvStrings"> 输出到的字符串列表 </param>
 /// <param name="pvSpliterChars"> 分隔符 </param>
-function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet):
-    TArrayStrings;
+function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet;
+    pvSkipSpliterChars: Boolean = false): TArrayStrings;
+
+function SplitNToArrayStr(const s: String; pvSpliterChars: TSysCharSet; pvMaxN:
+    Integer; pvSkipSpliterChars: Boolean = false): TArrayStrings;
+
+function JoinArrayStrings(const pvArrayStrings: TArrayStrings; const
+    pvSplitStr: DStringW): DStringW;
 
 
 /// <summary>
@@ -505,6 +616,13 @@ function StringsValueOfName(pvStrings: TStrings; const pvName: string;
 function GetStrValueOfName(const pvStr, pvName: string; pvSplitChars,
     pvEndChars: TSysCharSet): string;
 
+/// <summary>
+///   > 0 找到
+/// </summary>
+function PosStr(const sub, s: string): Integer;
+
+function PosWStr(const sub, s: DStringW): Integer;
+
 
 /// <summary>
 ///   查找PSub在P中出现的第一个位置
@@ -520,6 +638,7 @@ function GetStrValueOfName(const pvStr, pvName: string; pvSplitChars,
 /// <param name="PSub"> 要搜(字符串) </param>
 function StrStr(P:PChar; PSub:PChar): PChar;
 
+
 /// <summary>
 ///   查找PSub在P中出现的第一个位置
 ///   忽略大小写
@@ -534,6 +653,42 @@ function StrStr(P:PChar; PSub:PChar): PChar;
 /// <param name="PSub"> 要搜(字符串) </param>
 function StrStrIgnoreCase(P, PSub: PChar): PChar;
 
+/// <summary>
+///   比较两个Buff是否相等
+/// </summary>
+/// <returns> 0: 相等, r := p1-p2 </returns>
+function CompareBuf(p1, p2: Pointer; len: Integer): Integer;
+
+/// <param name="compareLen">-1：全部比较, 0: 比较到其中一个结束</param>
+/// <returns> 0: 相等, r := p1-p2 </returns>
+function CompareStrIgnoreCase(const s1, s2:PChar; compareLen:Integer): Integer;
+function CompareWStrIgnoreCase(const s1, s2:PDCharW; compareLen:Integer): Integer;
+
+/// <summary>
+///   填充N个字符
+/// </summary>
+function FillNChr(const ACount: Integer; AChr: Char = ' '): string;
+
+/// <summary>
+///   填充字符串
+///   StrAddPrefix('A01', 5, '0') = 00A01
+/// </summary>
+function StrAddPrefix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+
+/// <summary>
+///   填充字符串
+///   StrAddSuffix('A01', 5, '0') = 00A01
+/// </summary>
+function StrAddSuffix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+
+/// <summary>
+///   确定最后一个字符为suffixChar否则添加
+/// </summary>
+function CheckAddSuffix(const s: string; pvCheckChars: TSysCharSet; suffixChar:
+    Char): string;
+
 
 /// <summary>
 ///  字符转大写
@@ -541,11 +696,13 @@ function StrStrIgnoreCase(P, PSub: PChar): PChar;
 /// </summary>
 function UpperChar(c: Char): Char;
 
+function UpperCharW(c: DCharW): DCharW;
+
 /// <summary>
 ///  aStr是否在Strs列表中
 /// </summary>
 /// <returns>
-///   如果在列表中返回true
+///   返回在列表中的位置，否则返回-1
 /// </returns>
 /// <param name="pvStr"> sensors,1,3.1415926,1.1,1.2,1.3 </param>
 /// <param name="pvStringList"> (array of string) </param>
@@ -584,7 +741,7 @@ function StringToUtf8Bytes(const pvData: string; pvProcessEndByte: Boolean = fal
 
 
 function StringWToUtf8Bytes(const Source: PDCharW; SourceChars:Cardinal;
-    pvDest: TBytes; MaxDestBytes: Cardinal): Cardinal; overload;
+    pvDest: Pointer; MaxDestBytes: Cardinal): Cardinal; overload;
 
 function StringWToUtf8Bytes(const pvSourceData: DStringW): TBytes; overload;
 
@@ -648,6 +805,9 @@ function ParseNumeric(var S: PChar; var ANum: Extended): Boolean;
 function ParseHex(var p: PChar; var Value: Int64): Integer;
 function ParseInt(var S: PChar; var ANum: Int64): Integer;
 
+function CheckStrAllIsAsciiChar(const s:string): Boolean;
+function CheckStrAllIsLetterChar(const s:string): Boolean;
+
 {$if CompilerVersion < 20}
 function CharInSet(const C: Char; const CharSet: TSysCharSet): Boolean;
 {$ifend}
@@ -659,8 +819,12 @@ function GetCurrentThreadID: Cardinal;
 function ObjectHexAddr(pvObj:TObject): String;
 function ObjectIntStrAddr(pvObj:TObject): String;
 
+function ToUtc(pvDateTime:TDateTime): TDateTime;
+
 function DateTimeString(pvDateTime:TDateTime): string; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 function NowString: String; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+
+function DateTimeStrToDateTime(const strDateTime:string):TDateTime;
 
 function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 
@@ -673,16 +837,167 @@ function NewPString(const s: string): PString;
 
 function GetStringFromPString(const p:Pointer): string;
 
+function NewPDStringW(const s:DStringW): PDStringW;
+
+function GetDStringWFromPtr(const p:Pointer): DStringW;
+
 function NewMapKeyString(const key:Integer; const s:string): PMAPKeyString;
 
 
 procedure PrintDebugString(s:string); {$IFDEF HAVE_INLINE} inline;{$ENDIF}
 
-function PosWStr(sub: DStringW; const s: DStringW): Integer;
+
+function HashStr(const pvStrData:String): Integer;
+function HashPtr(const p:Pointer;l:Integer): Integer;
+
+function NewIDString: DStringW;
+
+procedure BufferToHex(pvBuffer: Pointer; outText: PDCharW; BufSize: Integer);
 
 
+function RandomVal(const max: Cardinal): Cardinal;
+function StrNextNO(const S: string; Value: integer): string;
+
+
+{$IF RTLVersion<24}
+function AtomicCmpExchange(var Target: Integer; Value: Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+function AtomicDecrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+{$IFEND <XE5}
+
+
+
+procedure SpinLock(var Target:Integer; var WaitCounter:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+procedure SpinLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF} overload;
+procedure SpinUnLock(var Target:Integer); {$IFDEF HAVE_INLINE} inline;{$ENDIF}overload;
+
+{$IF RTLVersion < 18}
+function InterlockedIncrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedIncrement';
+{$EXTERNALSYM InterlockedIncrement}
+function InterlockedDecrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedDecrement';
+{$EXTERNALSYM InterlockedDecrement}
+function InterlockedExchange(var Target: Integer; Value: Integer): Integer; stdcall;external kernel32 name 'InterlockedExchange';
+{$EXTERNALSYM InterlockedExchange}
+function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint; Comperand: Longint): Longint stdcall;external kernel32 name 'InterlockedCompareExchange';
+{$EXTERNALSYM InterlockedCompareExchange}
+
+function InterlockedExchangeAdd(Addend: PLongint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
+function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
+
+{$IFEND <D2007}
+
+
+{$IFDEF MSWINDOWS}
+//http://code.google.com/p/omnithreadlibrary/source/browse/branches/x64/OtlSync.pas?r=1071
+function CAS64(const oldData, newData: int64; var destination): boolean;
+function AtomicAdd64(var Target:Int64; n:Int64): Int64; 
+function __InterlockedCompareExchange64(var Destination: Int64; Exchange: Int64; Comparand: Int64): Int64; stdcall;
+{$ELSE}
+
+{$ENDIF}
+
+procedure FreeAsObjectProc(var pvData: Pointer);
+procedure FreeAsDisposeProc(var pvData: Pointer);
+
+/// <summary>
+///   排序TStrings使用
+/// </summary>
+function CmpIntValForSortFun(List: TStringList; Index1, Index2: Integer):
+    Integer;
+
+
+var
+  __app_root: string;
+  __default_datetime_fmt:string;
 
 implementation
+
+
+procedure FreeAsObjectProc(var pvData: Pointer);
+var
+  lvObj:TObject;
+begin
+  lvObj := TObject(pvData);
+  FreeAndNil(lvObj);
+  pvData := nil; 
+end;
+
+procedure FreeAsDisposeProc(var pvData: Pointer);
+begin
+  Dispose(pvData);
+end;
+
+
+
+
+procedure SpinLock(var Target:Integer; var WaitCounter:Integer);
+begin
+  while AtomicCmpExchange(Target, 1, 0) <> 0 do
+  begin
+    AtomicIncrement(WaitCounter);
+//    {$IFDEF MSWINDOWS}
+//      SwitchToThread;
+//    {$ELSE}
+//      TThread.Yield;
+//    {$ENDIF}
+    {$IFDEF SPINLOCK_SLEEP}
+    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+    {$ENDIF}
+  end;
+end;
+
+procedure SpinLock(var Target:Integer);
+begin
+  while AtomicCmpExchange(Target, 1, 0) <> 0 do
+  begin
+    {$IFDEF SPINLOCK_SLEEP}
+    Sleep(1);    // 1 对比0 (线程越多，速度越平均)
+    {$ENDIF}
+  end;
+end;
+
+
+procedure SpinUnLock(var Target:Integer);
+begin
+  if AtomicCmpExchange(Target, 0, 1) <> 1 then
+  begin
+    Assert(False, 'SpinUnLock::AtomicCmpExchange(Target, 0, 1) <> 1');
+  end;
+end;
+
+
+
+{$IF RTLVersion<24}
+function AtomicCmpExchange(var Target: Integer; Value: Integer;
+  Comparand: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedCompareExchange(Target, Value, Comparand);
+{$ELSE}
+  Result := TInterlocked.CompareExchange(Target, Value, Comparand);
+{$ENDIF}
+end;
+
+function AtomicIncrement(var Target: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedIncrement(Target);
+{$ELSE}
+  Result := TInterlocked.Increment(Target);
+{$ENDIF}
+end;
+
+function AtomicDecrement(var Target: Integer): Integer; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InterlockedDecrement(Target);
+{$ELSE}
+  Result := TInterlocked.Decrement(Target);
+{$ENDIF}
+end;
+
+{$IFEND <XE5}
 
 
 
@@ -691,17 +1006,27 @@ type
   TMSVCStrStr = function(s1, s2: PAnsiChar): PAnsiChar; cdecl;
   TMSVCStrStrW = function(s1, s2: PWChar): PWChar; cdecl;
   TMSVCMemCmp = function(s1, s2: Pointer; len: Integer): Integer; cdecl;
+  TMSInterlockedCompareExchange64 = function(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall;
+
 
 var
   hMsvcrtl: HMODULE;
+  hKernel32: HMODULE;
 
 {$IFDEF UNICODE}
   VCStrStrW: TMSVCStrStrW;
 {$ELSE}
   VCStrStr: TMSVCStrStr;
 {$ENDIF}
-//  VCMemCmp: TMSVCMemCmp;
+  VCMemCmp: TMSVCMemCmp;
+
+  InterlockedCompareExchange64Locker:Integer;
+  InterlockedCompareExchange64Func :TMSInterlockedCompareExchange64;
 {$ENDIF}
+
+var
+  __DateFormat: TFormatSettings;
+
 
 procedure PrintDebugString(s:string);
 begin
@@ -712,6 +1037,19 @@ begin
   OutputDebugString(PAnsiChar(s));
   {$ENDIF}
   {$ENDIF}
+
+end;
+
+function __xp_InterlockedCompareExchange64(var Val: Int64; Exchange, Compare: Int64): Int64; stdcall; {$IFDEF HAVE_INLINE}inline;{$ENDIF HAVE_INLINE}
+begin 
+  SpinLock(InterlockedCompareExchange64Locker);
+  Result := Val;
+  if val = Compare  then
+  begin
+    Result := Compare;
+    Val := Exchange;
+  end;
+  SpinUnLock(InterlockedCompareExchange64Locker);
 
 end;
 
@@ -786,7 +1124,11 @@ begin
   l := Length(s);
   SetLength(lvStr, l);
   times := 0;
+  {$IFDEF MSWINDOWS}
   for i := 1 to l do
+  {$ELSE}
+  for i := Low(s) to high(s) do
+  {$ENDIF}
   begin
     if not CharInSet(s[i], pvCharSets) then
     begin
@@ -797,6 +1139,24 @@ begin
   SetLength(lvStr, times);
   Result := lvStr;
 end;
+
+
+function CmpIntValForSortFun(List: TStringList; Index1, Index2: Integer):
+    Integer;
+var
+  v1, v2:Integer;
+begin
+  v1 := StrToInt64Def(List[index1], 0);
+  v2 := StrToInt64Def(List[Index2], 0);
+  Result := CompareValue(v1, v2);
+//  if v1<v2 then
+//    result:=-1
+//  else if v2=v2 then
+//    Result:=0
+//  else
+//    Result:=1;
+end;
+
 
 
 function StrIndexOf(const pvStr: string; const pvStringList: array of string):
@@ -1081,8 +1441,8 @@ begin
   end;
 end;
 
-function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet):
-    TArrayStrings;
+function SplitToArrayStr(const s: String; pvSpliterChars: TSysCharSet;
+    pvSkipSpliterChars: Boolean = false): TArrayStrings;
 var
   p:PChar;
   lvValue : String;
@@ -1107,6 +1467,7 @@ begin
     // 跳过开头
     r := LeftUntil(P, pvSpliterChars, lvValue);
 
+
     if r = -1 then
     begin    // 没有匹配到
       if P^ <> #0 then
@@ -1125,7 +1486,12 @@ begin
       Inc(idx);
       Inc(P);
     end;
+
+    if (pvSkipSpliterChars) then  // 跳过分隔符？
+      SkipChars(P, pvSpliterChars);
   end;
+
+  SetLength(Result, idx + 1);
 end;
 
 
@@ -1182,7 +1548,7 @@ begin
     begin
       Inc(i); // skip the % char
       try
-        s := Format('$%s%s', ['$', ASrc[i], ASrc[i+1]]);
+        s := Format('$%s%s', [URLChar(ASrc[i]), URLChar(ASrc[i+1])]);
         Result[j] := URLChar(StrToInt(s));
       except end;
       Inc(i, 1);  // 再跳过一个字符.
@@ -1499,7 +1865,6 @@ end;
 function StartWith(P:PChar; pvStart:PChar; pvIgnoreCase: Boolean = true):
     Boolean;
 var
-  lvSubUP: String;
   PSubUP : PChar;
 begin
   Result := False;
@@ -1569,6 +1934,7 @@ begin
 {$ELSE}
   lvRawStr := UTF8Encode(pvData);
   Result := Length(lvRawStr);
+  if Result > Length(pvBytes) then Result := Length(pvBytes);
   Move(PAnsiChar(lvRawStr)^, pvBytes[0], Result);
 {$ENDIF}
 end;
@@ -1653,27 +2019,39 @@ begin
 end;
 
 function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
-{$IFNDEF UNICODE}
-var
-  lvRawStr:AnsiString;
-  l:Cardinal;
-{$ELSE}
 var
   lvBytes:TBytes;
-{$ENDIF}
+  lvRawStr:AnsiString;
+  l:Cardinal;
 begin
-{$IFDEF UNICODE}
-  SetLength(lvBytes, pvLen); 
-  Move(pvBuff^, lvBytes[0], pvLen);
-  Result := TEncoding.UTF8.GetString(lvBytes);
-  //Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
-{$ELSE}
   l := pvLen;
   SetLength(lvRawStr, l);
   Move(pvBuff^, PansiChar(lvRawStr)^, l);
   Result := UTF8Decode(lvRawStr);
-{$ENDIF}
 end;
+// UNICODE 容易出现错误
+//function Utf8BufferToString(pvBuff: PByte; pvLen: Integer): string;
+//{$IFNDEF UNICODE}
+//var
+//  lvRawStr:AnsiString;
+//  l:Cardinal;
+//{$ELSE}
+//var
+//  lvBytes:TBytes;
+//{$ENDIF}
+//begin
+//{$IFDEF UNICODE}
+//  SetLength(lvBytes, pvLen);
+//  Move(pvBuff^, lvBytes[0], pvLen);
+//  Result := TEncoding.UTF8.GetString(lvBytes);
+//  //Result := TEncoding.UTF8.GetString(pvBytes, pvOffset, Length(pvBytes) - pvOffset);
+//{$ELSE}
+//  l := pvLen;
+//  SetLength(lvRawStr, l);
+//  Move(pvBuff^, PansiChar(lvRawStr)^, l);
+//  Result := UTF8Decode(lvRawStr);
+//{$ENDIF}
+//end;
 
 function SpanPointer(const pvStart, pvEnd: PByte): Integer;
 begin
@@ -1803,9 +2181,9 @@ procedure TDStringBuilder.CheckNeedSize(pvSize: LongInt);
 var
   lvCapacity:LongInt;
 begin
-  if FPosition + pvSize > FCapacity then
+  if (FPosition + pvSize) >= FCapacity then
   begin
-    lvCapacity := (FPosition + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    lvCapacity := (FPosition + pvSize + BUFFER_BLOCK_SIZE) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);     
   end;
@@ -1865,11 +2243,14 @@ var
 begin
   l := Length;
   SetLength(Result, l);
-{$IFDEF UNICODE}
-  Move(FData[0], PChar(Result)^, l shl 1);
-{$ELSE}
-  Move(FData[0], PChar(Result)^, l);
-{$ENDIF}
+  if l > 0 then
+  begin
+  {$IFDEF UNICODE}
+    Move(FData[0], PChar(Result)^, l shl 1);
+  {$ELSE}
+    Move(FData[0], PChar(Result)^, l);
+  {$ENDIF}
+  end;
 end;
 
 constructor TDBufferBuilder.Create;
@@ -1936,6 +2317,7 @@ begin
   Result := AppendBuffer(@aByte, 1);
 end;
 
+
 function TDBufferBuilder.Append(const str: string; pvConvertToUtf8Bytes:
     Boolean): TDBufferBuilder;
 var
@@ -1959,6 +2341,43 @@ begin
   Result := AppendBuffer(@w, 2);
 end;
 
+function TDBufferBuilder.AppendWord(const w:Word): TDBufferBuilder;
+begin
+  Result := AppendBuffer(@w, 2);
+end;
+
+function TDBufferBuilder.AppendByte(const aByte:Byte): TDBufferBuilder;
+begin
+  Result := AppendBuffer(@aByte, 1);
+end;
+
+function TDBufferBuilder.Replace(const data; startIdx, l:Integer):
+    TDBufferBuilder;
+var
+  l1 :Integer;
+begin
+  if FBufferLocked then
+  begin
+    raise Exception.Create('Buffer Locked');
+  end;
+  if startIdx > FSize  then
+  begin
+    startIdx := FSize;
+  end;
+  
+  l1 := (startIdx + l) - FSize;
+  if l1 > 0 then
+  begin
+    CheckNeedSize(l1);
+  end;
+  Move(data, FData[startIdx], l);
+  if l1 > 0 then
+  begin
+    Inc(FSize, l1);
+  end;
+
+end;
+
 function TDBufferBuilder.AppendBreakLineBytes: TDBufferBuilder;
 begin
   if FBufferLocked then
@@ -1966,6 +2385,7 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(2);
+  Assert((FSize + 2) < self.FCapacity);
   FData[FSize] := 13;
   FData[FSize +1 ] := 10;
   Inc(FSize, 2);
@@ -1981,6 +2401,10 @@ begin
     raise Exception.Create('Buffer Locked');
   end;
   CheckNeedSize(pvLength);
+  if (FSize + pvLength) >= self.FCapacity then
+  begin
+   Assert((FSize + pvLength) < self.FCapacity);
+  end;
 
   // 在最后添加
   Move(pvBuffer^, FData[FSize], pvLength);
@@ -2022,6 +2446,27 @@ begin
   Result := Append('''').Append(str).Append('''');
 end;
 
+function TDBufferBuilder.AppendStringAsUTF8(const str:DStringW):
+    TDBufferBuilder;
+var
+  l, l1, l2: Integer;
+begin
+  if FBufferLocked then
+  begin
+    raise Exception.Create('Buffer Locked');
+  end;
+
+  Result := Self;
+  if System.Length(str) = 0 then Exit;
+  l1 := System.Length(str);
+  l2 := l1 shl 1 + l1;
+  CheckNeedSize(l1);
+  l := StringWToUtf8Bytes(PDCharW(str), l1, @FData[FSize], l2);
+  Inc(FSize, l);
+  // 移动Position
+  FPosition := FSize;
+end;
+
 function TDBufferBuilder.AppendUtf8(const str: String): TDBufferBuilder;
 var
   lvBytes:TBytes;
@@ -2035,9 +2480,9 @@ procedure TDBufferBuilder.CheckNeedSize(pvSize: LongInt);
 var
   lvCapacity:LongInt;
 begin
-  if FSize + pvSize > FCapacity then
+  if (FSize + pvSize) >= FCapacity then
   begin
-    lvCapacity := (FSize + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    lvCapacity := (FSize + pvSize + BUFFER_BLOCK_SIZE) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);
   end;
@@ -2047,9 +2492,9 @@ procedure TDBufferBuilder.CheckNeedSize(pvOffset, pvSize: LongInt);
 var
   lvCapacity:LongInt;
 begin
-  if pvOffset + pvSize > FCapacity then
+  if (pvOffset + pvSize) >= FCapacity then
   begin
-    lvCapacity := (pvOffset + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    lvCapacity := (pvOffset + pvSize + BUFFER_BLOCK_SIZE) AND (not (BUFFER_BLOCK_SIZE - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);
   end;
@@ -2072,8 +2517,18 @@ begin
 //  {$ENDIF}
 end;
 
+procedure TDBufferBuilder.DecBuf(n: Integer);
+begin
+  Dec(FSize, n);
+end;
+
 function TDBufferBuilder.DecodeUTF8: string;
 begin
+  if FSize =0 then
+  begin
+    Result := STRING_EMPTY;
+    exit;
+  end;
 {$IFDEF MSWINDOWS}
   Result := Utf8BufferToString(@FData[0], FSize);
 {$ELSE}
@@ -2142,6 +2597,7 @@ end;
 
 function TDBufferBuilder.MemoryBuffer(const pvIndex: Integer): PByte;
 begin
+  Assert(pvIndex < self.FCapacity);
   Result := @FData[pvIndex];
 end;
 
@@ -2257,6 +2713,23 @@ begin
   Result := FCapacity;
 end;
 
+function TDBufferBuilder.ReadData(var vDest; pvStart, pvLength: Integer):
+    Integer;
+begin
+  if pvStart >= self.FSize then
+  begin
+    Result := 0;
+    exit;
+  end;
+  
+  if pvStart + pvLength > self.FSize then
+  begin
+    pvLength := self.FSize - pvStart;
+  end;
+  Move(self.FData[pvStart], vDest, pvLength);
+  Result := pvLength;
+end;
+
 function TDBufferBuilder.Seek(const Offset: Int64; Origin: TSeekOrigin): Int64;
 begin
   case Origin of
@@ -2290,12 +2763,30 @@ begin
 {$ELSE}
   CheckNeedSize(2);
   FData[FSize] := 0;
-  FData[FSize + 1] := 0; 
-  Result := TEncoding.UTF8.GetString(FData, 0, self.Length);
+  FData[FSize + 1] := 0;
+  result := AnsiStrings.StrPas(PAnsiChar(@FData[0]));
+  //Result := UTF8Decode(@FData[0]);
+  //Result := TEncoding.Default.GetString(FData, 0, self.Length);
 {$ENDIF}
 end;
 
-function TDBufferBuilder.Write(const Buffer; Count: Longint): Integer;
+function TDBufferBuilder.ToString: String;
+begin
+  CheckNeedSize(2);
+  FData[FSize] := 0;
+  FData[FSize + 1] := 0; 
+{$IFDEF MSWINDOWS}
+  {$IF (RTLVersion>=26) and (not Defined(NEXTGEN))}
+  TEncoding.Default.GetString(FData, 0, self.Length);
+  {$ELSE}
+  Result := StrPas(PAnsiChar(@FData[0]));
+  {$IFEND >=XE5}
+{$ELSE}  
+  Result := TEncoding.Default.GetString(FData, 0, self.Length);
+{$ENDIF}
+end;
+
+function TDBufferBuilder.Write(const Buffer; Count: Longint): Longint;
 begin
   if FBufferLocked then
   begin
@@ -2393,10 +2884,10 @@ begin
 {$IFDEF UNICODE}
   Result := TEncoding.Default.GetBytes(pvData);
 {$ELSE}
+  // 应该保持一致不值后面加\0
   lvRawStr := pvData;
-  SetLength(Result, Length(lvRawStr) + 1);
+  SetLength(Result, Length(lvRawStr));
   Move(PAnsiChar(lvRawStr)^, Result[0], Length(lvRawStr));
-  Result[Length(Result) -1] := 0;
 {$ENDIF}
 end;
 
@@ -2429,9 +2920,21 @@ begin
   Result := IntToStr(IntPtr(pvObj));
 end;
 
+
+function DateTimeStrToDateTime(const strDateTime:string): TDateTime;
+begin
+  Result := SysUtils.StrToDateTime(strDateTime, __DateFormat);
+end;
+
 function DateTimeString(pvDateTime:TDateTime): string;
 begin
-  Result := FormatDateTime('yyyy-MM-dd hh:nn:ss.zzz', pvDateTime);
+  if pvDateTime = 0 then
+  begin
+    Result := '0000-00-00 00:00:00.000'
+  end else
+  begin
+    Result := FormatDateTime(__default_datetime_fmt, pvDateTime);
+  end;
 end;
 
 function NowString: String;
@@ -2543,7 +3046,7 @@ begin
   end;
 end;
 
-function PosWStr(sub: DStringW; const s: DStringW): Integer;
+function PosWStr(const sub, s: DStringW): Integer;
 begin
   Result := Pos(sub, s);
 end;
@@ -2576,47 +3079,48 @@ begin
   Move(pvBuffer^, PDCharW(Result)^, pvBufLength);
 end;
 
-function StringWToUtf8Bytes(const Source: PDCharW; SourceChars:Cardinal;
-    pvDest: TBytes; MaxDestBytes: Cardinal): Cardinal;
+function StringWToUtf8Bytes(const Source: PDCharW; SourceChars: Cardinal;
+    pvDest: Pointer; MaxDestBytes: Cardinal): Cardinal;
 var
   i, count: Cardinal;
   c: Cardinal;
+  lvDest:PByte;
 begin
   Result := 0;
   if Source = nil then Exit;
   count := 0;
   i := 0;
-  if Length(pvDest) > 0then
+  if pvDest <> nil then
   begin
+    lvDest := PByte(pvDest);
     while (i < SourceChars) and (count < MaxDestBytes) do
     begin
       c := Cardinal(Source[i]);
       Inc(i);
       if c <= $7F then
       begin
-        pvDest[count] := (c);
+        lvDest^ := (c); inc(lvDest);
         Inc(count);
       end
       else if c > $7FF then
       begin
         if count + 3 > MaxDestBytes then
           break;
-        pvDest[count] := ($E0 or (c shr 12));
-        pvDest[count+1] := ($80 or ((c shr 6) and $3F));
-        pvDest[count+2] := ($80 or (c and $3F));
+        lvDest^ := ($E0 or (c shr 12)); inc(lvDest);
+        lvDest^ := ($80 or ((c shr 6) and $3F));inc(lvDest);
+        lvDest^ := ($80 or (c and $3F));inc(lvDest);
         inc(count,3);
       end
       else //  $7F < Source[i] <= $7FF
       begin
         if count + 2 > MaxDestBytes then
           break;
-        pvDest[count] := ($C0 or (c shr 6));
-        pvDest[count+1] := ($80 or (c and $3F));
+        lvDest^ := ($C0 or (c shr 6)); inc(lvDest);
+        lvDest^ := ($80 or (c and $3F)); inc(lvDest);
         Inc(count,2);
       end;
     end;
-    if count >= MaxDestBytes then count := MaxDestBytes-1;
-    pvDest[count] := 0;
+    Assert(count <= MaxDestBytes, '有越界的可能,检测代码(StringWToUtf8Bytes)');
   end
   else
   begin    // 只计算长度
@@ -2633,31 +3137,546 @@ begin
       Inc(count);
     end;
   end;
-  Result := count+1;  // convert zero based index to byte count
+  Result := count;
 end;
 
 function StringWToUtf8Bytes(const pvSourceData: DStringW): TBytes; overload;
 var
-  L: Integer;
-  Temp: UTF8String;
+  L, l1: Integer;
 begin
   if length(pvSourceData) = 0 then
   begin
     SetLength(Result, 0);
     Exit;
   end;
-  SetLength(Result, Length(pvSourceData) * 3); // SetLength includes space for null terminator
-  L := StringWToUtf8Bytes(PWideChar(pvSourceData), Length(pvSourceData), Result, Length(Result));
+  l1 := Length(pvSourceData);
+  l1 := l1 shl 1 + l1;
+  SetLength(Result, l1); // SetLength includes space for null terminator
+  L := StringWToUtf8Bytes(PWideChar(pvSourceData), Length(pvSourceData), @Result[0], Length(Result));
   if L > 0 then
-    SetLength(Result, L-1)   // 去掉最后0
+    SetLength(Result, L)   // 去掉最后0
   else
     SetLength(Result, 0);
 end;
 
+function NewPDStringW(const s:DStringW): PDStringW;
+begin
+  New(Result);
+  Result^ := s;
+end;
+
+function GetDStringWFromPtr(const p:Pointer): DStringW;
+begin
+  if p = nil then
+  begin
+    Result := STRING_EMPTY;
+  end else
+  begin
+    Result := PDStringW(p)^;
+  end;
+end;
+
+function FillNChr(const ACount: Integer; AChr: Char = ' '): string;
+var
+  i: Integer;
+begin
+  SetLength(Result, ACount);
+  for i := 1 to ACount do
+  begin
+    Result[i] := AChr;
+  end;
+end;
+
+function StrAddPrefix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+begin
+  Result := FillNChr(pvTotalWidth - length(s), pvFillChar) + s;
+end;
+
+function SplitNToArrayStr(const s: String; pvSpliterChars: TSysCharSet; pvMaxN:
+    Integer; pvSkipSpliterChars: Boolean = false): TArrayStrings;
+var
+  p:PChar;
+  lvValue : String;
+  idx, r:Integer;
+begin
+  if (pvMaxN <= 0) then
+  begin
+    Result := SplitToArrayStr(s, pvSpliterChars, pvSkipSpliterChars);
+    Exit;
+  end else if pvMaxN = 1 then
+  begin
+    SetLength(Result, 1);
+    Result[0] := s;
+    Exit;
+  end;
+
+  SetLength(Result, pvMaxN);
+
+  p := PChar(s);
+  idx := 0;
+  while True do
+  begin
+    // 跳过开头
+    r := LeftUntil(P, pvSpliterChars, lvValue);
+    if r = -1 then
+    begin    // 没有匹配到
+      if P^ <> #0 then
+      begin  // 最后一个字符
+        // 添加到列表中
+        SetLength(Result, idx + 1);
+        Result[idx] := P;
+      end;
+      Exit;
+    end else
+    begin
+      Result[idx] := lvValue;
+      Inc(idx);
+      Inc(P);
+    end;
+
+    if (pvSkipSpliterChars) then  // 跳过分隔符？
+      SkipChars(P, pvSpliterChars);
+
+    if (idx + 1) = pvMaxN then
+    begin
+      Result[idx] := P;
+      Exit;
+    end;
+  end;
+
+  SetLength(Result, idx + 1);
+
+end;
+
+function StrSkipChars(const src :String; pvChars:TSysCharSet): String;
+var
+  lvPtr:PChar;
+begin
+  lvPtr := PChar(src);
+  SkipChars(lvPtr, pvChars);
+  Result := lvPtr;
+end;
+
+function RightStr(const s:string; count:Integer): String;
+var
+  lvPtr :PChar;
+  l:Integer;
+begin
+  l := Length(s);
+  if l < count then
+  begin
+    Result :=s ;
+  end else
+  begin
+    lvPtr := PChar(s);
+    Result := SkipN(lvPtr, l - count);
+  end;
+end;
+
+function SkipN(p: PChar; n: Integer): PChar;
+var
+  i:Integer;
+begin
+  i := 0;
+  while (p^ <> #0) and (i<n) do
+  begin
+    Inc(P);
+    Inc(i);
+  end;
+  Result := P;   
+end;
+
+function LeftStr(const s:String; count:Integer): string;
+begin
+  Result := s;
+  if Length(Result) > count then
+  begin
+    SetLength(Result, count);
+  end;  
+end;
+
+function LeftChar(const s:string): Char;
+begin
+  Result := PChar(s)^;
+end;
+
+function PosStr(const sub, s: string): Integer;
+begin
+  Result := Pos(sub, s);
+end;
+
+function IncMinute(const AValue: TDateTime;
+  const ANumberOfMinutes: Int64): TDateTime;
+begin
+  Result := ((AValue * MinsPerDay) + ANumberOfMinutes) / MinsPerDay;
+end;
+
+function ToUtc(pvDateTime:TDateTime): TDateTime;
+{$IFDEF MSWINDOWS}
+var
+  pTime: _TIME_ZONE_INFORMATION;
+{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  GetTimeZoneInformation(pTime);//获取时区
+  Result := IncMinute(pvDateTime, pTime.Bias);
+{$ENDIF}
+end;
+
+function StrAddSuffix(const s:string; pvTotalWidth:Integer; pvFillChar:Char):
+    String;
+begin
+  Result :=s + FillNChr(pvTotalWidth - length(s), pvFillChar);
+end;
+
+function JoinArrayStrings(const pvArrayStrings: TArrayStrings; const
+    pvSplitStr: DStringW): DStringW;
+var
+  i: Integer;
+  lvSB:TDStringWBuilder;
+begin
+  lvSB := TDStringWBuilder.Create;
+  try
+    for i := 0 to length(pvArrayStrings) - 1 do
+    begin
+      if (i > 0) then lvSB.Append(pvSplitStr);
+      lvSB.Append(pvArrayStrings[i]);
+
+    end;
+    Result := lvSB.ToString;
+  finally
+    lvSB.Free;
+  end;
+end;
+
+function RightChar(const s:string): Char;
+var
+  lvPtr :PChar;
+  l:Integer;
+begin
+  l := Length(s);
+  if l = 0 then
+  begin
+    Result := #0;
+  end else
+  begin
+    lvPtr := PChar(s);
+    lvPtr := SkipN(lvPtr, l -1);
+    Result := lvPtr^
+  end;
+
+end;
+
+function CheckAddSuffix(const s: string; pvCheckChars: TSysCharSet; suffixChar:
+    Char): string;
+begin
+  if RightChar(s) in pvCheckChars then
+  begin
+    Result := s;
+  end else
+  begin
+    Result := s + suffixChar;
+  end;
+end;
+
+function HashPtr(const p:Pointer;l:Integer): Integer;
+var
+  ps:PInteger;
+  lr:Integer;
+begin
+  Result:=0;
+  if l>0 then
+  begin
+    ps:=p;
+    lr:=(l and $03);      //check length is multi 4
+    l:=(l and $FFFFFFFC); //
+    while l>0 do
+    begin
+      Result:=((Result shl 5) or (Result shr 27)) xor ps^;
+      Inc(ps);
+      Dec(l,4);
+    end;
+    if lr<>0 then
+    begin
+      l:=0;
+      Move(ps^,l,lr);
+      Result:=((Result shl 5) or (Result shr 27)) xor l;
+    end;
+  end;
+end;
+
+procedure BufferToHex(pvBuffer: Pointer; outText: PDCharW; BufSize: Integer);
+const
+  Convert: array[0..15] of DCharW = ('0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F');
+var
+  I: Integer;
+  Buffer:PByte;
+begin
+  Buffer:=PByte(pvBuffer);
+
+  for I := 0 to BufSize - 1 do
+  begin
+    outText[0] := Convert[Byte(Buffer^) shr 4];
+    outText[1] := Convert[Byte(Buffer^) and $F];
+    Inc(outText, 2);
+    Inc(Buffer);
+  end;
+end;
+
+function HashStr(const pvStrData:String): Integer;
+begin
+  Result := HashPtr(PChar(pvStrData), Length(pvStrData) * SizeOf(Char));
+end;
+
+function NewIDString: DStringW;
+var
+  lvGuid:TGUID;
+begin
+  CreateGUID(lvGuid);
+  SetLength(Result, SizeOf(TGUID) * 2);
+  BufferToHex(@lvGuid, PDCharW(Result), SizeOf(TGUID));
+end;
+
+function RandomVal(const max: Cardinal): Cardinal;
+var
+  lvGuid:TGUID;
+begin
+  CreateGUID(lvGuid);
+  Result := lvGuid.D2 + lvGuid.D3 + lvGuid.D1;  //   Cardinal(HashPtr(@lvGuid, SizeOf(TGUID)));
+  if max > 0 then
+  begin
+    Result := Result mod max;
+  end;
+end;
+
+function FillChr(const ACount: Integer; AChr: Char = ' '): string;
+var
+  i: Integer;
+begin
+  SetLength(Result, ACount);
+  for i := 1 to ACount do
+  begin
+    Result[i] := AChr;
+  end;
+end;
+
+function StrNextNO(const S: string; Value: integer): string;
+var
+  s2: string;
+  s3: string;
+  i: integer;
+begin
+  s2 := '';
+  for i := length(s) downto 1 do
+    if s[i] in ['0'..'9'] then
+      s2 := s[i] + s2
+    else
+      break;
+  if length(s2) < length(s) then
+    s3 := Copy(s, 1, length(s) - length(s2))
+  else
+    s3 := '';
+  s2 := IntToStr(StrToInt(s2) + value);
+  if length(s2) + length(s3) < length(s) then
+    s2 := FillChr(length(s) - length(s3) - length(s2), '0') + s2;
+  Result := s3 + s2;
+end;
+
+
+{$IFDEF MSWINDOWS}
+
+function CAS64(const oldData, newData: int64; var destination): boolean;
+asm
+{$IFNDEF CPUX64}
+  push  edi
+  push  ebx
+  mov   edi, destination
+  mov   ebx, low newData
+  mov   ecx, high newData
+  mov   eax, low oldData
+  mov   edx, high oldData
+  lock cmpxchg8b [edi]
+  pop   ebx
+  pop   edi
+{$ELSE CPUX64}
+  mov   rax, oldData
+  lock cmpxchg [destination], newData
+{$ENDIF ~CPUX64}
+  setz  al
+end; { CAS64 }
+
+
+
+
+
+function __InterlockedCompareExchange64;
+begin
+  Result := InterlockedCompareExchange64Func(Destination, Exchange, Comparand);
+end;
+
+function AtomicAdd64(var Target:Int64; n:Int64): Int64;
+var
+  r, Old: Int64;
+begin
+  repeat
+    Old := Target;
+    Result := Old + n;
+    r := InterlockedCompareExchange64Func(Target, Result, Old);
+    if r = Old then
+    begin
+      break;
+    end;
+  until (1=1);
+end;
+{$ENDIF}
+
+function CompareBuf(p1, p2: Pointer; len: Integer): Integer;
+begin
+  if len = 0 then
+    Result := 0
+  else
+  begin
+    {$IFDEF MSWINDOWS}
+      Result := VCMemCmp(p1, p2, len)
+    {$ELSE}
+      Result := memcmp(p1, p2, len);
+    {$ENDIF}
+  end;
+end;
+
+function CompareStrIgnoreCase(const s1, s2:PChar; compareLen:Integer): Integer;
+var
+  lvP1, lvP2:PChar;
+  j:Integer;
+begin
+  j := 0;
+  Result := 0;
+  lvP1 := s1;
+  lvP2 := s2;
+  while true do
+  begin
+    if (compareLen=0) and ((lvP1^ = #0) or (lvP2^ = #0)) then
+    begin
+      Break;
+    end else if (j=compareLen) then
+    begin
+      Break;
+    end else if (lvP1^=#0) and (lvP2^=#0) then
+    begin
+      break;
+    end;
+
+    Result := Ord(lvP1^)-Ord(lvP2^);
+    if Result <> 0 then
+      Result := Ord(UpCase(lvP1^)) - Ord(UpCase(lvP2^));
+
+    if Result <> 0 then
+    begin
+      Break;
+    end;
+    inc(lvP1);
+    Inc(lvP2);
+    Inc(j);
+  end;
+end;
+
+function CompareWStrIgnoreCase(const s1, s2:PDCharW; compareLen:Integer):
+    Integer;
+var
+  lvP1, lvP2:PDCharW;
+  j:Integer;
+begin
+  j := 0;
+  Result := 0;  // 默认相等
+  lvP1 := s1;
+  lvP2 := s2;
+  while true do
+  begin
+    if (compareLen=0) and ((lvP1^ = #0) or (lvP2^ = #0)) then
+    begin
+      Break;
+    end else if (j=compareLen) then
+    begin
+      Break;
+    end else if (lvP1^=#0) and (lvP2^=#0) then
+    begin
+      break;
+    end;
+    Result := Ord(lvP1^)-Ord(lvP2^);
+    if Result <> 0 then
+      Result := Ord(UpperCharW(lvP1^)) - Ord(UpperCharW(lvP2^));
+
+    if Result <> 0 then
+    begin
+      Break;
+    end;
+    inc(lvP1);
+    Inc(lvP2);
+    Inc(j);
+  end;
+
+end;
+
+function UpperCharW(c: DCharW): DCharW;
+begin
+  if (c >= #$61) and (c <= #$7A) then
+    Result := DCharW(PWord(@c)^ xor $20)
+  else
+    Result := c;
+end;
+
+function CheckStrAllIsLetterChar(const s:string): Boolean;
+var
+  Ptr:PChar;
+begin
+  Result := False;
+  Ptr := PChar(s);
+  while Ptr^ <> #0 do
+  begin
+    Result := ((Ptr^ >= 'A') and (Ptr^ <= 'Z')) or ((Ptr^ >= 'a') and (Ptr^ <= 'z'));
+    Inc(Ptr);
+    if not Result then
+    begin
+      Exit;
+    end;       
+  end;
+
+end;
+
+function CheckStrAllIsAsciiChar(const s:string): Boolean;
+var
+  Ptr:PChar;
+begin
+  Result := False;
+  Ptr := PChar(s);
+  while Ptr^ <> #0 do
+  begin
+    // #20 为空格, #126 为~, 包含了可读的Ascii字符
+    Result := (Ptr^ >= #20) and (Ptr^ <= #126);
+    Inc(Ptr);
+    if not Result then
+    begin
+      Exit;
+    end;       
+  end;
+end;
+
+
+
+
+
 constructor TDStringWBuilder.Create;
 begin
   inherited Create;
+{$if CompilerVersion> 18}    // Delphi7 or later
   FLineBreak := DCharW(13) + DCharW(10);
+{$else}
+  FLineBreak := #13#10;
+{$ifend}
+  FInitiCapacity := 0;
+  Clear;
+  SetBlockSize(512);
 end;
 
 function TDStringWBuilder.Append(c: DCharW): TDStringWBuilder;
@@ -2728,7 +3747,8 @@ var
 begin
   if FPosition + pvSize > FCapacity then
   begin
-    lvCapacity := (FPosition + pvSize + (BUFFER_BLOCK_SIZE - 1)) AND (not (BUFFER_BLOCK_SIZE - 1));
+    // block的倍数 但是不会比size小
+    lvCapacity := (FPosition + pvSize + (FBlockSize - 1)) AND (not (FBlockSize - 1));
     FCapacity := lvCapacity;
     SetLength(FData, FCapacity);     
   end;
@@ -2740,8 +3760,8 @@ begin
 
   // modify by ymf
   // 2017-01-10 17:36:13
-  FCapacity := 0;
-  SetLength(FData, 0);
+  FCapacity := FInitiCapacity;
+  SetLength(FData, FCapacity);
 end;
 
 procedure TDStringWBuilder.ClearContent;
@@ -2751,6 +3771,33 @@ begin
   begin
     FillChar(FData[0], FCapacity, 0);
   end;
+end;
+
+constructor TDStringWBuilder.Create(pvInitCapacity, pvBlockSize: Integer);
+begin
+  inherited Create;
+{$if CompilerVersion> 18}    // Delphi7 or later
+  FLineBreak := DCharW(13) + DCharW(10);
+{$else}
+  FLineBreak := #13#10;
+{$ifend}
+  FInitiCapacity := pvInitCapacity;
+
+  Clear;
+  if pvBlockSize = 0 then pvBlockSize := 128;
+  SetBlockSize(pvBlockSize);
+end;
+
+function TDStringWBuilder.DecChar(i: Word): TDStringWBuilder;
+begin
+  if i > FPosition then
+  begin
+    FPosition := 0;
+  end else
+  begin
+    Dec(FPosition, i);
+  end;
+  Result := Self;
 end;
 
 function TDStringWBuilder.GetLength: Integer;
@@ -2780,6 +3827,21 @@ begin
   if l <> 0 then pvStream.WriteBuffer(FData[0], l);
 end;
 
+procedure TDStringWBuilder.SetBlockSize(pvBlockSize: Integer);
+var
+  j, i:Integer;
+begin
+  j := pvBlockSize;
+  i := 0;
+  while j > 0 do
+  begin
+    j := j shr 1;
+    Inc(i);
+  end;
+  Dec(i, 2);
+  FBlockSize := 2 shl i;
+end;
+
 function TDStringWBuilder.ToString: DStringW;
 var
   l:Integer;
@@ -2789,33 +3851,108 @@ begin
   Move(FData[0], PDCharW(Result)^, l shl 1); 
 end;
 
-initialization
-
-{$IFDEF MSWINDOWS}
-
-{$IFDEF UNICODE}
-VCStrStrW := nil;
-{$ELSE}
-VCStrStr := nil;
-{$ENDIF}
-//VCMemCmp := nil;
-hMsvcrtl := LoadLibrary('msvcrt.dll');
-if hMsvcrtl <> 0 then
+function TDStringWBuilder.WStrPtr: PDCharW;
 begin
-  {$IFDEF UNICODE}
-  VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
-  {$ELSE}
-  VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
-  {$ENDIF}
-  //VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
+  Result := @FData[0];
 end;
-{$ENDIF}
+
+function TDStringWBuilder.Append(SWB: TDStringWBuilder): TDStringWBuilder;
+var
+  l:Integer;
+begin
+  Result := Self;
+  l := SWB.Length;
+  if l = 0 then Exit;
+  CheckNeedSize(l);
+
+  Move(SWB.FData[0], FData[FPosition], l shl 1);
+
+
+  Inc(FPosition, l);
+end;
+
+{ TDStreamAdapter }
+
+function TDStreamAdapter.Read(var Buffer; Count: Longint): Longint;
+begin
+  Result := 0;
+end;
+
+function TDStreamAdapter.Seek(Offset: Longint; Origin: Word): Longint;
+begin
+  Result := 0;
+end;
+
+function TDStreamAdapter.Seek(const Offset: Int64; Origin: TSeekOrigin): Int64;
+begin
+  Result := 0;
+end;
+
+procedure TDStreamAdapter.SetSize(NewSize: Longint);
+begin
+  inherited;
+
+end;
+
+function TDStreamAdapter.Write(const Buffer; Count: Longint): Longint;
+begin
+  if Assigned(FOnWrite) then
+  begin
+    Result := FOnWrite(Self,Buffer,Count);
+  end else
+  begin
+    Result := 0;
+  end;
+end;
+
+initialization  
+  __DateFormat.DateSeparator := '-';
+  __DateFormat.TimeSeparator := ':';
+  __DateFormat.ShortDateFormat := 'yyyy-MM-dd';
+  __DateFormat.LongDateFormat := 'yyyy-MM-dd';
+  __DateFormat.ShortTimeFormat := 'HH:nn:ss';
+  __DateFormat.LongTimeFormat := 'HH:nn:ss';
+  __app_root := ExtractFilePath(ParamStr(0));
+  __default_datetime_fmt := 'yyyy-MM-dd hh:nn:ss.zzz';
+
+  {$IFDEF MSWINDOWS}
+
+  {$IFDEF UNICODE}
+  VCStrStrW := nil;
+  {$ELSE}
+  VCStrStr := nil;
+  {$ENDIF}
+  VCMemCmp := nil;
+  hMsvcrtl := LoadLibrary('msvcrt.dll');
+  if hMsvcrtl <> 0 then
+  begin
+    {$IFDEF UNICODE}
+    VCStrStrW := TMSVCStrStrW(GetProcAddress(hMsvcrtl, 'wcsstr'));
+    {$ELSE}
+    VCStrStr := TMSVCStrStr(GetProcAddress(hMsvcrtl, 'strstr'));
+    {$ENDIF}
+    VCMemCmp := TMSVCMemCmp(GetProcAddress(hMsvcrtl, 'memcmp'));
+  end;
+
+  hKernel32 := LoadLibrary(kernel32);
+  if hKernel32 <> 0 then
+  begin
+    InterlockedCompareExchange64Func := TMSInterlockedCompareExchange64(GetProcAddress(hKernel32, 'InterlockedCompareExchange64'));
+  end;
+
+  if not Assigned(InterlockedCompareExchange64Func) then
+    InterlockedCompareExchange64Func := @__xp_InterlockedCompareExchange64;
+
+  {$ENDIF}
 
 finalization
 
 {$IFDEF MSWINDOWS}
 if hMsvcrtl <> 0 then
   FreeLibrary(hMsvcrtl);
+
+if hKernel32 <> 0 then
+  FreeLibrary(hKernel32);
 {$ENDIF}
 
 end.

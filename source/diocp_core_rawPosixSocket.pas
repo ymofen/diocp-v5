@@ -101,8 +101,6 @@ type
     function SendBuf(const data; const len: Cardinal): Integer;
     function SendBufTo(const data; const len: Integer): Integer;
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
-
-
     function ConnectTimeOut(const pvAddr: string; pvPort: Integer; pvMs:Cardinal):
         Boolean;
 
@@ -378,9 +376,11 @@ end;
 
 function TranslateStringToTInAddr(const AIP: string; var AInAddr; const AIPVersion: Integer):Boolean;
 var
-  LIP: String;
+  LIP, s: String;
   //
   i:Integer;
+
+  ipV:Word;
 
   vAddress : array [0..7] of Word;
 
@@ -388,8 +388,13 @@ var
 
   function __fetch(var lvPtr:PChar; pvChars: TSysCharSet):string;
   begin
-    LeftUntil(lvPtr, pvChars, Result);
-    Inc(lvPtr);
+    if LeftUntil(lvPtr, pvChars, Result) = 0 then
+    begin
+      Inc(lvPtr);
+    end else
+    begin
+      Result := lvPtr;
+    end;
   end;
 
 begin
@@ -403,8 +408,10 @@ begin
       begin
         lvIPPtr := PChar(LIP);
         for I := 0 to 7 do begin
-          Psockaddr_in6(@AInAddr)^.sin6_addr.s6_addr16[I] :=
-            htons(MyStrToInt('$' + __fetch(lvIPPtr, [':']), 0));
+          s := __fetch(lvIPPtr, [':']);
+          ipV := MyStrToInt('$' + s, 0);
+          Psockaddr_in6(@AInAddr)^.sin6_addr.{$IFDEF MACOS}__s6_addr16[I]{$ELSE}s6_addr16[I]{$ENDIF MACOS} :=
+            htons(ipV);
         end;
         Result := true;
       end;
@@ -463,6 +470,67 @@ begin
             + IntToStr(TIdIn4Addr(AInAddr).S_un_b.s_b4);
 end;
 
+function TranslateTInAddrToStringV6(var AInAddr): string;
+type
+ TIdSunB = packed record
+    s_b1, s_b2, s_b3, s_b4: UInt8;
+  end;
+
+  TIdSunW = packed record
+    s_w1, s_w2: UInt16;
+  end;
+
+  PIdIn6Addr = ^TIdIn6Addr;
+  TIdIn6Addr = packed record
+    case Integer of
+    0: (s6_addr: packed array [0..16-1] of UInt8);
+    1: (s6_addr16: packed array [0..8-1] of UInt16);
+  end;
+var
+  i:Integer;
+begin
+  Result := '';
+  for i := 0 to 7 do begin
+    Result := Result + IntToHex(htons(TIdIn6Addr(AInAddr).s6_addr16[i]), 1) + ':';
+  end;
+  SetLength(Result, Length(Result)-1);
+end;
+
+function ResolvingHostNameV6(const pvHost: string): string;
+var
+  LAddrInfo: pAddrInfo;
+  LHints: AddrInfo;
+  LRetVal: Integer;
+  M: TMarshaller;
+begin
+  //IMPORTANT!!!
+  //
+  //The Hints structure must be zeroed out or you might get an AV.
+  //I've seen this in Mac OS X
+  FillChar(LHints, SizeOf(LHints), 0);
+  LHints.ai_family := AF_INET6;
+  LHints.ai_socktype := SOCK_STREAM;
+  LAddrInfo := nil;
+
+  LRetVal := getaddrinfo(M.AsAnsi(pvHost).ToPointer, nil, LHints, LAddrInfo);
+  if LRetVal <> 0 then
+  begin
+    if LRetVal = EAI_SYSTEM then
+    begin
+      RaiseLastOSError;
+    end
+    else
+    begin
+      raise Exception.CreateFmt('Error resolving Address %s: %s (%d)',
+        [pvHost, gai_strerror(LRetVal), LRetVal]);
+    end;
+  end;
+  try
+    Result := TranslateTInAddrToStringV6(PSockAddr_In6( LAddrInfo^.ai_addr)^.sin6_addr);
+  finally
+    freeaddrinfo(LAddrInfo^);
+  end;
+end;
 
 function ResolvingHostName(const pvHost: string): string;
 var
@@ -588,7 +656,8 @@ var
 
   tv: timeval;
   Timeptr: PTimeval;
-  valopt,vallen: Cardinal;
+  valopt,vallen: socklen_t;
+
 begin
   // 获取原标志
   lvFlags := fcntl(FSocketHandle, F_GETFL, 0);
@@ -740,9 +809,22 @@ begin
   Result := select(0, nil, @lvFDSet, nil, @lvTime_val); 
 end;
 
-function TRawSocket.GetIpAddrByName(const pvHost: string): string;
+function GetIpAddrByName(const pvHost: string): string;
 begin
   Result := ResolvingHostName(pvHost);
+end;
+
+
+function TRawSocket.GetIpAddrByName(const pvHost: string): string;
+begin
+  if FIPVersion = IP_V6 then
+  begin
+    Result := ResolvingHostNameV6(pvHost);
+  end else
+  begin
+    Result := ResolvingHostName(pvHost);
+  end;
+
 end;
 
 function TRawSocket.GetPeerInfo(var vIp: longword; var vPort: Integer):

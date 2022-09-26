@@ -38,6 +38,7 @@ function JSONParser(const s: string; pvDValue: TDValue): Integer;
 function JSONEncode(v: TDValue; ADoEscape: Boolean = true; ADoFormat: Boolean =
     true; pvExceptValueTypes: TDValueDataTypes = [vdtInterface, vdtObject,
     vdtPtr]): String;
+function NewDValueFromJSONString(const s:String): TDValue;
 
 function JSONParseFromUtf8NoBOMFile(pvFile:string; pvDValue:TDValue): Integer;
 function JSONParseFromFile(pvFile:string; pvDValue:TDValue): Integer;
@@ -51,7 +52,7 @@ procedure JSONEscapeWithoutDoEscape(ABuilder: TDStringBuilder; const S: String);
 
 procedure JSONEscape(ABuilder: TDStringBuilder; const S: DStringW; ADoEscape: Boolean);
 
-function StringJSONEscape(const s:String): String;
+function StringJSONEscape(const s: String; ADoEscape: Boolean = false): String;
 
 
     
@@ -370,7 +371,7 @@ begin
         Inc(ptrData);
         Result := 0;
         Exit;
-      end else if CharInSet(ptrData^, [#32, #9, #13, #10]) then  // space, tab, \r, \n
+      end else if CharInSet(ptrData^, [#32, #9, #13, #10, '''', ',', '"']) then  // space, tab, \r, \n
       begin  
         pvParser.FLastStrValue := Copy(lvStart, 0, ptrData - lvStart);
         if JSONSkipSpaceAndComment(ptrData, pvParser) = -1 then
@@ -629,6 +630,7 @@ begin
         end;
         if JSONParseEx(ptrData, lvChild, pvParser, pvBuilder) = -1 then
         begin
+          lvChild.RemoveFromParent;
           Result := -1;
           exit;
         end;
@@ -904,24 +906,36 @@ begin
   if FileExists(pvFile) then
   begin
     s := LoadTextFromFile(pvFile);
-    Result := JSONParser(s, pvDValue);
+    if JSONParser(s, pvDValue) = 0 then
+    begin
+      Result := 1;
+    end else
+    begin
+      Result := 0;
+    end;
   end else
   begin
     Result := 0;
   end; 
 end;
 
-function StringJSONEscape(const s:String): String;
+function StringJSONEscape(const s: String; ADoEscape: Boolean = false): String;
 var
   lvSB:TDStringBuilder;
 begin
   lvSB := TDStringBuilder.Create;
   try
-    JSONEscape(lvSB, s, False);
+    JSONEscape(lvSB, s, ADoEscape);
     Result := lvSB.ToString;
   finally
     lvSB.Free;
   end;
+end;
+
+function NewDValueFromJSONString(const s:String): TDValue;
+begin
+  Result := TDValue.Create;
+  JSONParser(s, Result);
 end;
 
 end.

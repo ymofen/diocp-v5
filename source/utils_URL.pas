@@ -3,13 +3,17 @@ unit utils_URL;
 interface
 
 uses
-  utils_strings;
+  utils_strings, SysUtils;
 
+const
+  IP_V4 = 0;
+  IP_V6 = 1;
 
 type
   TURL = class(TObject)
   private
     FRawHostStr:String;
+    FIPVersion :Integer;
 
     FHost: string;
     FUser: String;
@@ -52,12 +56,19 @@ type
     ///   参数
     /// </summary>
     property ParamStr: String read FParamStr write FParamStr;
+
+    /// <summary>
+    ///   host:port 127.0.0.1:9983
+    ///   www.baidu.com
+    /// </summary>
     property RawHostStr: String read FRawHostStr;
 
     /// <summary>
     ///   URI部分
     /// </summary>
     property URI: String read FURI;
+
+    property IPVersion:Integer read FIPVersion;
   end;
 
 
@@ -101,22 +112,52 @@ begin
     lvTempStr := lvP;
     lvP := nil;
   end;
+  // [fe80::1585:bd1d:faca:1be2]:8081
   FRawHostStr := lvTempStr;
   lvTempP := PChar(lvTempStr);
-  FHost := LeftUntil(lvTempP, [':']);
-  if FHost <> '' then
+  if lvTempP^ = '[' then
   begin
+    Inc(lvTempP);
+    FIPVersion := IP_V6;
+    FHost := LeftUntil(lvTempP, [']']);
+    Inc(lvTempP);
     SkipChars(lvTempP, [':']);
     FPort := lvTempP;
+    if length(FPort) =0 then
+    begin
+      if SameStr(FProtocol, 'https') then
+      begin
+        FPort := '443';
+      end else
+      begin
+        FPort := '80';
+      end;
+    end;
   end else
-  begin  // 没有指定Port
-    FHost := lvTempStr;
-    FPort := '80';
+  begin
+    FHost := LeftUntil(lvTempP, [':']);
+
+    if FHost <> '' then
+    begin
+      SkipChars(lvTempP, [':']);
+      FPort := lvTempP;
+    end else
+    begin  // 没有指定Port
+      FHost := lvTempStr;
+      if SameStr(FProtocol, 'https') then
+      begin
+        FPort := '443';
+      end else
+      begin
+        FPort := '80';
+      end;
+    end;
   end;
   
   if lvP = nil then FURI := '/' else FURI := lvP;          
 end;
 
+// http://[fe80::1585:bd1d:faca:1be2]:8081/
 procedure TURL.SetURL(pvURL: String);
 var
   lvPSave, lvPUrl:PChar;
@@ -129,6 +170,7 @@ begin
   FPassword := '';
   FUser := '';
   FURI := '';
+  FIPVersion := IP_V4;
 
   lvPUrl := PChar(pvURL);
 

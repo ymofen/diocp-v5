@@ -3,14 +3,26 @@ unit utils_dvalue_msgpack;
 interface
 
 uses
-  utils_dvalue, utils_strings, classes, SysUtils, utils_BufferAdapter;
+  utils_dvalue, utils_strings, classes,
+  {$IFDEF USE_AES}
+  AES, 
+  {$ENDIF}
+  SysUtils, utils_BufferAdapter;
 
 procedure MsgPackEncode(pvInDValue: TDValue; pvOutStream: TStream;
     pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
+
+procedure MsgPackEncodeAES(pvInDValue: TDValue; pvOutStream: TStream; const
+    pvKey: string; pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject,
+    vdtPtr]);
+
 procedure MsgPackEncode2File(pvInDValue: TDValue; pvFileName: String;
     pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject, vdtPtr]);
 
 procedure MsgPackParseFromStream(pvInStream: TStream; pvOutDValue: TDValue);
+
+procedure MsgPackParseFromAESStream(pvInStream: TStream; pvOutDValue: TDValue;
+    const pvKey: string);
 
 procedure MsgPackParseFromBuffer(pvInBuffer:Pointer; pvSize:Integer;
     pvOutDValue: TDValue);
@@ -1038,6 +1050,47 @@ begin
   finally
     lvFileStream.Free;
   end;                                                     
+end;
+
+procedure MsgPackEncodeAES(pvInDValue: TDValue; pvOutStream: TStream; const
+    pvKey: string; pvIgnoreTypes: TDValueDataTypes = [vdtInterface, vdtObject,
+    vdtPtr]);
+var
+  lvSrc:TStream;
+  lvDest:TMemoryStream;
+begin
+  {$IFDEF USE_AES}
+  lvSrc := TMemoryStream.Create;
+  try
+    MsgPackEncode(pvInDValue, lvSrc);
+    lvSrc.Position := 0;
+    EncryptStream(lvSrc, pvKey, pvOutStream);
+  finally
+    lvSrc.Free;
+  end;
+  {$ELSE}
+  Assert(false, '工程中需要定义编译宏 USE_AES');
+  {$ENDIF}
+end;
+
+procedure MsgPackParseFromAESStream(pvInStream: TStream; pvOutDValue: TDValue;
+    const pvKey: string);
+var
+  lvDest:TMemoryStream;
+begin
+  {$IFDEF USE_AES}
+  lvDest := TMemoryStream.Create;
+  try
+    lvDest.Position := 0;
+    DecryptStream(pvInStream, pvKey, lvDest);
+    lvDest.Position := 0;
+    MsgPackParseFromStream(lvDest, pvOutDValue);
+  finally
+    lvDest.Free;
+  end;
+  {$ELSE}
+  Assert(false, '工程中需要定义编译宏 USE_AES');
+  {$ENDIF}
 end;
 
 end.

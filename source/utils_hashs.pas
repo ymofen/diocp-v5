@@ -26,7 +26,7 @@ type
   /// <summary>
   ///   hash value type
   /// </summary>
-  TDHashValueType = Cardinal;
+  TDHashValueType = THandle;
 
   PDHashData=^TDHashData;
   TDHashData=record
@@ -76,12 +76,12 @@ type
 
     procedure SetOnCompare(const Value: TOnDataCompare);
     
-    procedure SetValues(pvHashValue: Cardinal; const Value: Pointer);
-    function GetValues(pvHashValue: Cardinal): Pointer;
+    procedure SetValues(pvHashValue: THandle; const Value: Pointer);
+    function GetValues(pvHashValue: THandle): Pointer;
   private
-    function GetValueMap(pvKey:String): Pointer;
+    function GetValueMap(const pvKey: String): Pointer;
     procedure SetBucketAutoSize(const Value: Boolean);
-    procedure SetValueMap(pvKey:String; const Value: Pointer);
+    procedure SetValueMap(const pvKey: String; const Value: Pointer);
   protected
     FBucketAutoSize: Boolean;
   public
@@ -161,7 +161,7 @@ type
     /// <summary>
     ///   remove data by strKey
     /// </summary>
-    function Remove(pvKey:string):Boolean;
+    function Remove(const pvKey: string): Boolean;
   public
 
 
@@ -185,7 +185,7 @@ type
     /// <summary>
     ///  进行一个赋值，如果键值存在，则不进行赋值， 返回false
     /// </summary>
-    function TrySetValue(pvKey:String; const Value: Pointer): Boolean;
+    function TrySetValue(const pvKey: String; const Value: Pointer): Boolean;
 
     property Buckets[AIndex: Cardinal]: PDHashData read GetBuckets;
 
@@ -200,11 +200,11 @@ type
     /// 是否自动调整桶大小
     property BucketAutoSize: Boolean read FBucketAutoSize write SetBucketAutoSize;
 
-    property ValueMap[pvKey:String]: Pointer read GetValueMap write SetValueMap;
+    property ValueMap[const pvKey:String]: Pointer read GetValueMap write SetValueMap;
 
-    property Values[pvHashValue: Cardinal]: Pointer read GetValues write SetValues; default;
+    property Values[pvHashValue: THandle]: Pointer read GetValues write SetValues; default;
 
-    
+
   end;
 
   TDHashTableSafe = class(TDHashTable)
@@ -528,7 +528,7 @@ begin
   Dispose(vData);
 end;
 
-function TDHashTable.Remove(pvKey: string): Boolean;
+function TDHashTable.Remove(const pvKey: string): Boolean;
 var
   lvIndex, lvHashValue:Cardinal;
   lvCurrData, lvPrior:PDHashData;
@@ -668,7 +668,7 @@ begin
   end;
 end;
 
-function TDHashTable.GetValueMap(pvKey:String): Pointer;
+function TDHashTable.GetValueMap(const pvKey: String): Pointer;
 var
   lvCurrData:PDHashData;
   lvIndex, lvHashValue:Cardinal;
@@ -693,7 +693,7 @@ begin
   end;
 end;
 
-function TDHashTable.GetValues(pvHashValue: Cardinal): Pointer;
+function TDHashTable.GetValues(pvHashValue: THandle): Pointer;
 begin
   Result := FindFirstData(pvHashValue);
 end;
@@ -820,7 +820,7 @@ begin
     FOnCompare := Value;
 end;
 
-procedure TDHashTable.SetValueMap(pvKey:String; const Value: Pointer);
+procedure TDHashTable.SetValueMap(const pvKey: String; const Value: Pointer);
 var
   lvPData, lvBucket, lvCurrData:PDHashData;
   lvIndex, lvHashValue:Cardinal;
@@ -828,7 +828,7 @@ var
 begin
   lvPData := nil;
   lvDataKey   := LowerCase(pvKey);
-  lvHashValue := hashOf(lvDataKey);
+  lvHashValue := Cardinal(hashOf(lvDataKey));
   
   lvIndex:=lvHashValue mod FBucketSize;
   lvCurrData:=FBuckets[lvIndex];
@@ -862,7 +862,7 @@ begin
   end;    
 end;
 
-procedure TDHashTable.SetValues(pvHashValue: Cardinal; const Value: Pointer);
+procedure TDHashTable.SetValues(pvHashValue: THandle; const Value: Pointer);
 begin
   SetData(pvHashValue, Value);
 end;
@@ -925,14 +925,14 @@ begin
 
 end;
 
-function TDHashTable.TrySetValue(pvKey:String; const Value: Pointer): Boolean;
+function TDHashTable.TrySetValue(const pvKey: String; const Value: Pointer):
+    Boolean;
 var
-  lvPData, lvBucket, lvCurrData:PDHashData;
+  lvBucket, lvCurrData:PDHashData;
   lvIndex, lvHashValue:Cardinal;
   lvDataKey  : String;
 begin
   Result := False;
-  lvPData := nil;
   lvDataKey   := LowerCase(pvKey);
   lvHashValue := hashOf(lvDataKey);
   
@@ -944,7 +944,6 @@ begin
     //compare hash value
     if (lvCurrData.Hash = lvHashValue) and (SameText(lvDataKey, lvCurrData.Key)) then
     begin
-      lvPData := lvCurrData;
       Exit;
     end;
     lvCurrData:=lvCurrData.Next;

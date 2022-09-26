@@ -13,16 +13,19 @@ unit utils_byteTools;
 interface
 
 uses
-  SysUtils, Classes;
+  SysUtils, Classes, utils_strings;
 
 type
-  {$IF RTLVersion<25}
-  IntPtr=Integer;
-  {$IFEND IntPtr}
 
-  {$if CompilerVersion < 18} //before delphi 2007
-  TBytes = array of Byte;
-  {$ifend}
+// 在utils_strings中存在，避免重复定义，造成D7无法编译
+//  {$IF RTLVersion<25}
+//  IntPtr=Integer;
+//  {$IFEND IntPtr}
+//
+//  {$if CompilerVersion < 18} //before delphi 2007
+//  TBytes = array of Byte;
+//  {$ifend}
+
 
   TByteTools = class(TObject)
   public
@@ -46,7 +49,11 @@ type
      /// </summary>
      class function HexToBin(pvHexStr:String; buf:Pointer):Integer;
 
-     class function HexStrToBytes(pvHexStr:String): TBytes;
+     class function HexStrToBytes(pvHexStr:String): TBytes; overload;
+
+     class function HexStrToBytes(pvHexStr:String; outBuf:Pointer):Integer; overload;
+     
+     
 
      /// <summary>
      ///  16进制字符到二进制
@@ -85,6 +92,8 @@ type
      ///   生成数据校验码
      /// </summary>
      class function verifyData(const buf; len:Cardinal): Cardinal;
+
+     class function crc16(const buf; len:Cardinal): Byte;
 
      /// <summary>
      ///  生成数据校验码
@@ -148,6 +157,7 @@ type
      ///   GetLow4Bit($81) = $01
      /// </summary>
      class function GetLow4Bit(const pvByte:Byte): Byte;
+     class function HexStrToRawString(const pvHexStr: String): string; overload;
 
      /// <summary>
      ///   设置高4位的值
@@ -155,7 +165,27 @@ type
      ///   SetHigh4Bit($81, $FE) = $F1
      /// </summary>
      class procedure SetHigh4Bit(var vByte: Byte; pvHigh4Bit: Byte);
+
   end;
+
+/// <summary>
+///   0: 小端
+///   1: 大端
+/// </summary>
+{
+    short int x;
+
+　　char x0,x1;
+
+　　x=0x1122;
+
+　　x0=((char*)&x)[0]; //低地址单元
+
+　　x1=((char*)&x)[1]; //高地址单元
+
+　　若x0=0x11,则是大端; 若x0=0x22,则是小端......
+}
+function CheckIsLittleEndian: Boolean;
 
 implementation
 
@@ -163,6 +193,23 @@ const
   U1 :UInt64 = 1;
 
 
+
+function CheckIsLittleEndian: Boolean;
+var
+  lvWord:Word;
+  lvPtr:PByte;
+begin
+  lvWord := $1122;
+  lvPtr := PByte(@lvWord);
+  if lvPtr^ = $22 then
+  begin
+    Result := true;
+  end else begin
+    Result := False;
+  end;
+
+
+end;
 
 class procedure TByteTools.AppendBufToFile(pvBuf:Pointer; pvBufLength:Integer;
     pvFileName:string);
@@ -213,6 +260,34 @@ begin
   Result := TEncoding.Default.GetString(lvBytes);
   {$ENDIF}
 
+end;
+
+class function TByteTools.crc16(const buf; len:Cardinal): Byte;
+var
+  lvPtr:PByte;
+  iCheckSum:Byte;
+  i: Integer;
+begin
+  // $GPGGA,092108.00,3030.32313974,N,11423.63228885,E,1,28,0.5,149.258,M,-14.263,M,,*4A
+  lvPtr := @buf;
+  i := len;
+
+  // first
+  iCheckSum := Byte(lvPtr^);
+  Inc(lvPtr);
+  Dec(i);
+
+  while i > 0 do  
+  begin
+    if i = 1 then
+    begin
+      i := 1;
+    end;
+    iCheckSum := iCheckSum xor Byte(lvPtr^);
+    Inc(lvPtr);
+    Dec(i);
+  end;
+  Result := iCheckSum;
 end;
 
 class function TByteTools.FileToBytes(pvFileName:string): TBytes;
@@ -286,6 +361,40 @@ begin
   SetLength(Result, l);
   r := HexToBin(lvStr, @Result[0]);
   Assert(r = l, 'TByteTools.HexStrToBytes');
+end;
+
+class function TByteTools.HexStrToBytes(pvHexStr: String;
+  outBuf: Pointer): Integer;
+var
+  lvStr:String;
+  l, r:Integer;
+begin
+  lvStr := StringReplace(pvHexStr, ' ', '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #13, '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #10, '', [rfReplaceAll]);
+  l := Length(lvStr);
+  l := l shr 1;
+  r := HexToBin(lvStr, outBuf);
+  Assert(r = l, 'TByteTools.HexStrToBytes');
+  Result := r;  
+end;
+
+class function TByteTools.HexStrToRawString(const pvHexStr: String): string;
+var
+  lvStr:String;
+  lvBytes:TBytes;
+var
+  l, r:Integer;
+begin
+  lvStr := StringReplace(pvHexStr, ' ', '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #13, '', [rfReplaceAll]);
+  lvStr := StringReplace(lvStr, #10, '', [rfReplaceAll]);
+  l := Length(lvStr);
+  l := l shr 1;
+  SetLength(lvBytes, l + 1);
+  r := HexToBin(lvStr, @lvBytes[0]);
+  lvBytes[Length(lvBytes)] := 0;
+  Result := StrPas(PAnsiChar(@lvBytes[0]));
 end;
 
 class function TByteTools.HexToBin(pvHexStr: String;
@@ -430,7 +539,7 @@ var
   lvPtr:PChar;
 begin
   l1 := Length(Split);
-  SetLength(Result, Integer(len * 8 + l1 * len));
+  SetLength(Result, Integer(len) * 8 + l1 * Integer(len));
   lvPtr := PChar(Result);
   lvBuf := @v;
   for i := 0 to (len * 8 - 1) do

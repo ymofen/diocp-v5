@@ -187,5 +187,14 @@ object Form1: TForm1
       TabOrder = 15
       OnClick = btnAttachObjectClick
     end
+    object btnRefBuffer: TButton
+      Left = 464
+      Top = 122
+      Width = 110
+      Height = 25
+      Caption = 'btnRefBuffer'
+      TabOrder = 16
+      OnClick = btnRefBufferClick
+    end
   end
 end

@@ -55,6 +55,7 @@ type
     FContext: TObject;
   public
     constructor Create; virtual;
+    procedure CleanUp; virtual;
     property Context: TObject read FContext write FContext;
   end;
 
@@ -119,6 +120,11 @@ implementation
 
 
 { TDiocpEncoder }
+
+procedure TDiocpContextCoderExchange.CleanUp;
+begin
+  
+end;
 
 constructor TDiocpContextCoderExchange.Create;
 begin

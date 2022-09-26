@@ -29,6 +29,7 @@ type
     Label1: TLabel;
     Label2: TLabel;
     btnAttachObject: TButton;
+    btnRefBuffer: TButton;
     procedure btnAttachObjectClick(Sender: TObject);
     procedure btnBlockBufferTesterClick(Sender: TObject);
     procedure btnSimpleBlockBufferClick(Sender: TObject);
@@ -39,6 +40,7 @@ type
     procedure btnNewPoolClick(Sender: TObject);
     procedure btnOutOfBoundsClick(Sender: TObject);
     procedure btnPoolInfoClick(Sender: TObject);
+    procedure btnRefBufferClick(Sender: TObject);
     procedure btnSimpleTesterClick(Sender: TObject);
     procedure btnSpeedTesterClick(Sender: TObject);
     procedure btnSpinLockerClick(Sender: TObject);
@@ -92,7 +94,7 @@ begin
   lvBuff := GetBuffer(FPool);
   AttachData(lvBuff, lvObj, FREE_TYPE_OBJECTFREE);
   AddRef(lvBuff);
-  ReleaseRef(lvBuff, False);
+  ReleaseRef(lvBuff, False, STRING_EMPTY);
 end;
 
 procedure TForm1.btnBlockBufferTesterClick(Sender: TObject);
@@ -203,6 +205,23 @@ begin
   sfLogger.logMessage('get:%d, put:%d, addRef:%d, releaseRef:%d, size:%d', [FPool.FGet, FPool.FPut, FPool.FAddRef, FPool.FReleaseRef, FPool.FSize]);
 
   sfLogger.logMessage('threadinfo:' + GetThreadsHintInfo);
+end;
+
+procedure TForm1.btnRefBufferClick(Sender: TObject);
+var
+  lvBuf:Pointer;
+begin
+  lvBuf := GetBuffer(1024);
+  AddRef(lvBuf);
+  AddRef(lvBuf);
+  try
+
+
+  finally
+    ReleaseRef(lvBuf);
+    ReleaseRef(lvBuf);
+  end;
+
 end;
 
 procedure TForm1.btnSimpleTesterClick(Sender: TObject);
@@ -322,7 +341,7 @@ begin
     Assert(GetAttachData(lvBuff, Pointer(lvQueue)) = 0);
     
     Sleep(0);
-    ReleaseRef(lvBuff, False);
+    ReleaseRef(lvBuff, False, STRING_EMPTY);
     inc(i);
   end;
 end;

@@ -19,7 +19,11 @@ unit diocp_core_rawWinSocket;
 interface
 
 uses
-  windows, SysUtils, diocp_winapi_winsock2, diocp_sockets_utils;
+  windows, SysUtils, diocp_winapi_winsock2, diocp_sockets_utils
+  {$IFDEF DIOCP_DEBUG}
+  , utils_strings
+  {$ENDIF}
+  ;
 
 
 
@@ -149,12 +153,28 @@ type
   /// </summary>
   TRawSocket = class(TObject)
   private
+    {$IFDEF DIOCP_DEBUG}
+    FDebugInfo:string;
+    FCheckThreadId: THandle;
+    {$ENDIF}
+    FCloseFlag:Integer;
     FIPVersion: Integer;
     FSocketHandle: TSocket;
     procedure CheckDestroyHandle;
   public
+    constructor Create;
     function SocketValid: Boolean;
-    procedure Close(pvShutdown: Boolean = true);
+
+
+    /// <summary>
+    ///
+    /// </summary>
+    /// <returns>
+    ///   0: 关闭成功
+    ///   1: 没有进行关闭
+    ///  -1: 关闭有错误
+    /// </returns>
+    function Close(pvShutdown: Boolean = true): Integer;
     procedure CreateTcpSocket;
 
     procedure DoInitialize;
@@ -172,7 +192,6 @@ type
     function Bind(const pvAddr: string; pvPort: Integer): Boolean;
     function Listen(const backlog: Integer = 0): Boolean;
 
-    function GetIpAddrByName(const host:string): String;
 
     function GetLocalPort: Word;
 
@@ -207,6 +226,7 @@ type
 
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
 
+    function ConnectV6(const pvAddr: string; pvPort: Integer): Boolean;
     /// <summary>
     ///   超时连接, 返回失败，表示连接超时
     /// </summary>
@@ -218,8 +238,11 @@ type
         pvTimeOut: Integer = 0): Integer;
 
     function SetSendBufferLength(const len:Integer): Integer;
+    function GetSendBufferLength: Integer;
     function SetRecvBufferLength(const len:Integer): Integer;
     function Readable(pvTimeOut:Integer): Boolean;
+
+    function GetIpAddrByName(const host:string): String;
 
     /// <summary>
     ///  -1:出现了异常
@@ -233,6 +256,10 @@ type
     function CancelIO: Boolean;
 
     function CancelIOEx: Boolean;
+    {$IFDEF DIOCP_DEBUG}
+    procedure CheckThreadIn(const pvDebugInfo: String);
+    procedure CheckThreadOut;
+    {$ENDIF}
 
     /// <summary>
     ///  The shutdown function disables sends or receives on a socket.
@@ -258,6 +285,8 @@ type
     /// <param name="pvOption">true 为禁用</param>
     function SetNoDelayOption(pvOption:Boolean): Boolean;
 
+    function GetNoDelayOption: Boolean;
+
     property IPVersion: Integer read FIPVersion write FIPVersion;
 
     property SocketHandle: TSocket read FSocketHandle;
@@ -270,6 +299,8 @@ function tick_diff(tick_start, tick_end: Cardinal): Cardinal;
 function TranslateTInAddrToString(const sockaddr; const AIPVersion:
     Integer): string;
 
+function GetIpAddrByName(const host:string): String;
+
 var
   __DebugWSACreateCounter:Integer;
 
@@ -281,6 +312,22 @@ implementation
 
 var
   __WSAStartupDone:Boolean;
+
+{$IF RTLVersion < 18}
+function InterlockedIncrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedIncrement';
+{$EXTERNALSYM InterlockedIncrement}
+function InterlockedDecrement(var Addend: Integer): Integer; stdcall; external kernel32 name 'InterlockedDecrement';
+{$EXTERNALSYM InterlockedDecrement}
+function InterlockedExchange(var Target: Integer; Value: Integer): Integer; stdcall;external kernel32 name 'InterlockedExchange';
+{$EXTERNALSYM InterlockedExchange}
+function InterlockedCompareExchange(var Destination: Longint; Exchange: Longint; Comperand: Longint): Longint stdcall;external kernel32 name 'InterlockedCompareExchange';
+{$EXTERNALSYM InterlockedCompareExchange}
+
+function InterlockedExchangeAdd(Addend: PLongint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
+function InterlockedExchangeAdd(var Addend: Longint; Value: Longint): Longint; overload; external kernel32 name 'InterlockedExchangeAdd';
+
+{$IFEND <D2007}
+
 
 //function CancelIoEx(hFile: THandle; lpOverlapped:LPOVERLAPPED): BOOL; stdcall; external kernel32 name 'CancelIoEx';
 
@@ -318,6 +365,12 @@ begin
     result := High(Cardinal) - tick_start + tick_end;
   end;
 
+end;
+
+constructor TRawSocket.Create;
+begin
+  inherited Create;
+  FSocketHandle := INVALID_SOCKET;
 end;
 
 function TRawSocket.Bind(const pvAddr: string; pvPort: Integer): Boolean;
@@ -362,15 +415,28 @@ begin
   Result := Windows.CancelIo(FSocketHandle);
 end;
 
-procedure TRawSocket.Close(pvShutdown: Boolean = true);
+function TRawSocket.Close(pvShutdown: Boolean = true): Integer;
 var
   lvTempSocket: TSocket;
 begin
-  lvTempSocket := FSocketHandle;
-  if lvTempSocket <> INVALID_SOCKET then
+
+  // 避免多线程操作
+  if InterlockedCompareExchange(FCloseFlag, 1, 0) <> 0 then
   begin
-    FSocketHandle := INVALID_SOCKET;
-    
+    Result := 1;
+    Exit;
+  end;
+
+  {$IFDEF DIOCP_DEBUG}
+  //CheckThreadIn('CLOSE');
+  try
+  {$ENDIF}
+
+
+
+  lvTempSocket := FSocketHandle;
+  if (lvTempSocket <> INVALID_SOCKET) then
+  begin
     if pvShutdown then
     begin
       // To assure that all data is sent and received on a connected socket before it is closed,
@@ -378,13 +444,27 @@ begin
       diocp_winapi_winsock2.shutdown(lvTempSocket, SD_BOTH);
     end;
 
-    Closesocket(lvTempSocket);
+    Result := Closesocket(lvTempSocket);
+    if Result = 0 then
+    begin
+      FSocketHandle := INVALID_SOCKET;
+      InterlockedIncrement(__DebugWSACloseCounter);
+    {$IFDEF DIOCP_DEBUG}
+    end else
+    begin
+      Assert(False, Format('关闭异常:%d', [WSAGetLastError]));
+    {$ENDIF}
+    end;
 
-    InterlockedIncrement(__DebugWSACloseCounter);
   end else
   begin
-    //Assert(false, 'xxx');
+    Result := 1;
   end;
+  {$IFDEF DIOCP_DEBUG}
+  finally
+    //CheckThreadOut();
+  end;
+  {$ENDIF}
 end;
 
 function TRawSocket.Connect(const pvAddr: string; pvPort: Integer): Boolean;
@@ -398,7 +478,19 @@ begin
     sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
     sin_port :=  htons(pvPort);
   end;
-  Result := diocp_winapi_winsock2.Connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn))  = 0;
+  Result := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn))  = 0;
+end;
+
+function TRawSocket.ConnectV6(const pvAddr: string; pvPort: Integer): Boolean;
+var
+  sockaddr: TSockAddrIn6;
+begin
+  FillChar(sockaddr, SizeOf(TSockAddrIn6), 0);
+  PSockAddrIn6(@sockaddr).sin6_family := DIOCP_PF_INET6;
+  PSockAddrIn6(@sockaddr).sin6_port := htons(pvPort);
+  inet_pton(AF_INET6, PAnsichar(AnsiString(pvAddr)),PAnsichar(@PSockAddrIn6(@sockaddr).sin6_addr));
+
+  Result := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn6))  = 0;
 end;
 
 function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
@@ -424,7 +516,7 @@ begin
     sin_addr.S_addr := inet_addr(PAnsichar(AnsiString(pvAddr)));
     sin_port :=  htons(pvPort);
   end;
-  lvRet := diocp_winapi_winsock2.Connect(FSocketHandle, TSockAddr(sockaddr), sizeof(TSockAddrIn));
+  lvRet := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn));
   if lvRet = 0 then
   begin  // 连接成功
     lvFlags := 0;  // 非阻塞模式
@@ -446,6 +538,7 @@ begin
       Result := false;  //连接超时
 //      lvErr := WSAGetLastError;
       closesocket(FSocketHandle);
+      FSocketHandle := INVALID_SOCKET;
 //      Result := lvErr = 0;
     end else
     begin
@@ -463,9 +556,9 @@ begin
   if FIPVersion = IP_V6 then
   begin
     {$IFDEF UNICODE}
-    FSocketHandle := WSASocketW(AF_INET6, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    FSocketHandle := WSASocketW(AF_INET6, SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED);
     {$ELSE}
-    FSocketHandle := WSASocketA(AF_INET6, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
+    FSocketHandle := WSASocketA(AF_INET6, SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED);
     {$ENDIF}
   end else
   begin
@@ -474,7 +567,7 @@ begin
 //    {$ELSE}
 //    FSocketHandle := WSASocketA(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED);
 //    {$ENDIF}
-    FSocketHandle := WSASocket(AF_INET, SOCK_STREAM, IPPROTO_IP, Nil, 0, WSA_FLAG_OVERLAPPED)
+    FSocketHandle := WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, Nil, 0, WSA_FLAG_OVERLAPPED)
   end;
 
  // FSocketHandle := WSASocket(AF_INET6,SOCK_STREAM, IPPROTO_IPV6, Nil, 0, WSA_FLAG_OVERLAPPED);
@@ -483,18 +576,28 @@ begin
     RaiseLastOSError;
   end;
   InterlockedIncrement(__DebugWSACreateCounter);
+  self.FCloseFlag := 0;
 end;
 
 procedure TRawSocket.CreateTcpSocket;
 begin
   CheckDestroyHandle;
-  FSocketHandle := socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+  if FIPVersion = IP_V6 then
+  begin
+     FSocketHandle := socket(AF_INET6, SOCK_STREAM, 0);
+  end else
+  begin
+     FSocketHandle := socket(AF_INET, SOCK_STREAM, 0);
+  end;
+
   if (FSocketHandle = 0) or (FSocketHandle = INVALID_SOCKET) then
   begin
     RaiseLastOSError;
   end;
   InterlockedIncrement(__DebugWSACreateCounter);
+  FCloseFlag := 0;
 end;
+
 
 procedure TRawSocket.CreateUdpOverlappedSocket;
 begin
@@ -505,6 +608,7 @@ begin
     RaiseLastOSError;
   end;
   InterlockedIncrement(__DebugWSACreateCounter);
+  FCloseFlag := 0;
 end;
 
 destructor TRawSocket.Destroy;
@@ -544,7 +648,46 @@ begin
   end;
 end;
 
-function TRawSocket.GetIpAddrByName(const host:string): String;
+{$IFDEF DIOCP_DEBUG}
+procedure TRawSocket.CheckThreadIn(const pvDebugInfo: String);
+begin
+  if FCheckThreadId <> 0 then
+  begin
+    //s := GetDebugString;
+    raise Exception.CreateFmt('%s=>(%d,%d)当前对象已经被其他线程正在使用',
+       [pvDebugInfo, utils_strings.GetCurrentThreadID, FCheckThreadId]);
+  end;
+  FCheckThreadId := utils_strings.GetCurrentThreadID;
+  FDebugInfo := pvDebugInfo;
+end;
+
+procedure TRawSocket.CheckThreadOut;
+begin
+  FDebugInfo := STRING_EMPTY;
+  FCheckThreadId := 0;
+end;
+{$ENDIF}
+
+function GetIpAddrByName(const host:string): String;
+var
+  lvhostInfo:PHostEnt;
+//  lvErr:Integer;
+begin
+  lvhostInfo := gethostbyname(PAnsiChar(AnsiString(host)));
+
+  if lvhostInfo = nil then
+    RaiseLastOSError;
+
+//  lvErr := WSAGetLastError;
+//  if lvErr <> 0 then
+//  begin
+//    RaiseLastOSError(lvErr);
+//  end;
+
+  Result :=string(inet_ntoa(PInAddr(lvhostInfo^.h_addr_list^)^));
+end;
+
+function TRawSocket.GetIpAddrByName(const host: string): String;
 var
   lvhostInfo:PHostEnt;
 //  lvErr:Integer;
@@ -581,6 +724,24 @@ begin
   Size := SizeOf(TSockAddr);
   getsockname(SocketHandle, lvSockAddr, Size);
   Result := ntohs(lvSockAddr.sin_port);
+end;
+
+function TRawSocket.GetNoDelayOption: Boolean;
+var
+  bNoDelay: BOOL;
+  r:Integer;
+begin
+  r := SizeOf(bNoDelay);
+  getsockopt(FSocketHandle,IPPROTO_TCP,TCP_NODELAY,PAnsiChar(@bNoDelay),r);
+  Result := bNoDelay;
+end;
+
+function TRawSocket.GetSendBufferLength: Integer;
+var
+  r:Integer;
+begin
+  r := 4;
+  getsockopt(FSocketHandle,SOL_SOCKET,SO_SNDBUF,PAnsiChar(@Result),r);
 end;
 
 function TRawSocket.Listen(const backlog: Integer = 0): Boolean;
@@ -892,6 +1053,7 @@ var
   bNoDelay: BOOL;
 begin
   bNoDelay := pvOption;
+  // level 如果是 SOL_SOCKET, 会导致小包 变慢,原因尚未明朗
   Result := setsockopt(FSocketHandle, IPPROTO_TCP, TCP_NODELAY, @bNoDelay, SizeOf(bNoDelay)) <> SOCKET_ERROR;
 end;
 

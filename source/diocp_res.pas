@@ -9,6 +9,15 @@ const
   BytePerMB = BytePerKB * 1024;
   BytePerGB = BytePerMB * 1024;
 
+  CTX_STATE_INITIAL = 0;           // 初始状态
+  CTX_STATE_CONNECTING = 1;        // 正在连接
+  CTX_STATE_CONNECTED  = 2;        // 连接成功
+  CTX_STATE_WAITFOR_CLOSE = 11;    // 等待关闭
+  CTX_STATE_CLOSING = 12;          // 关闭中
+
+  // 初始状态 -> 正在连接 -> 连接成功 -> 等待关闭 -> 关闭中 -> 初始状态
+  // 初始状态 -> 正在连接 -> 初始状态(连接失败)
+
 type
   TWorkDoneCallBack = procedure(pvData:Pointer; pvCode:Integer) of object;
 
@@ -19,6 +28,7 @@ resourcestring
   strRecvError     = '[%d]响应接收请求时出现了错误。错误代码:%d!';
   strRecvEngineOff = '[%d]响应接收请求时发现IOCP服务关闭';
   strRecvPostError = '[%d]投递接收请求时出现了错误。错误代码:%d!'; //'TIocpRecvRequest.PostRequest Error:%d'
+  strSocketError = '[%d]%s出现了错误。错误代码:%d!';
   strRecvResponseErr='[%d]-[%d]响应接收请求时发现请求的引用计数器异常:%d,应该为0';
 
   strSendEngineOff = '[%d]响应发送数据请求时发现IOCP服务关闭';
@@ -27,6 +37,7 @@ resourcestring
   strSendPostError = '[%d]投递发送数据请求时出现了错误。错误代码:%d';
   strSendZero      = '[%d]投递发送请求数据时遇到0长度数据。进行关闭处理';
   strWSACloseRequest      = '处理投递发送请求数据包时,发现异步关闭请求(Request.Tag = -1)。进行关闭处理!';
+  strWSAShutDownRequest      = '处理投递发送请求数据包时,发现异步ShutDown请求(Request.Tag = -3)!';
   strWSACloseRequestEx = '主动断开连接请求!';
   strSendPushFail  = '[%d]投递发送请求数据包超出队列允许的最大长度[%d/%d]。';
 

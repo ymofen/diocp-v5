@@ -82,6 +82,8 @@ type
 
     procedure OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
 
+    procedure OnHttpSvrTestRequest(pvRequest:TDiocpHttpRequest);
+
     function WebSocketPush(const pvData: string; pvExceptContext:
         TDiocpHttpClientContext): Integer;
 
@@ -114,6 +116,13 @@ begin
   FTcpServer.createDataMonitor;
   FTcpServer.OnDiocpHttpRequest := OnHttpSvrRequest;
   FTcpServer.WorkerCount := 5;
+  CheckCreateRequestPoolForTask(20000);
+  //FTcpServer.UseAsyncRecvQueue := true;
+  //StartDiocpLogicWorker(0);
+{$IFDEF DIOCP_HIGH_SPEED}
+{$ELSE}
+  FTcpServer.DisableSession := true;
+{$ENDIF}
   TFMMonitor.createAsChild(pnlMonitor, FTcpServer);
   
   sfLogger.setAppender(TStringsAppender.Create(mmoLog.Lines));
@@ -128,6 +137,7 @@ begin
   //HELLO;
 {$ENDIF}
 end;
+
 
 procedure TfrmMain.OnHttpSvrRequest(pvRequest:TDiocpHttpRequest);
 var
@@ -227,12 +237,14 @@ var
 begin
   //Randomize;
   //Sleep(Random(2000));
-//
-//  pvRequest.Response.ResponseCode := 200;
-//  pvRequest.Response.WriteString('hello');
-//  pvRequest.SendResponse();
-//  pvRequest.DoResponseEnd;
-//  Exit;
+  if pvRequest.RequestURI = '/hello' then
+  begin
+    pvRequest.Response.ResponseCode := 200;
+    pvRequest.Response.WriteString('hello world');
+    pvRequest.SendResponse();
+    pvRequest.DoResponseEnd;
+    Exit;
+  end;
   try
     if chkRecord2File.Checked then
     begin
@@ -437,7 +449,10 @@ begin
       pvRequest.Response.WriteString(s);
     end else if pvRequest.RequestURI = '/logout' then
     begin
-      lvSession.DValues.ForceByName('login').AsBoolean := false;
+      if lvSession <> nil then
+      begin
+        lvSession.DValues.ForceByName('login').AsBoolean := false;
+      end;
       WriteLoginForm();
     end else if pvRequest.RequestURI = '/redirect' then
     begin                                       //重新定向
@@ -479,6 +494,27 @@ begin
         pvRequest.Response.GetResponseHeaderAsString);
     end;
   end;
+end;
+
+procedure TfrmMain.OnHttpSvrTestRequest(pvRequest: TDiocpHttpRequest);
+var
+  lvDValue:TDValue;
+  s:string;
+begin
+  if pvRequest.RequestURI = '/json' then
+  begin
+    pvRequest.Response.ContentType := 'text/json';
+    s := '{"ab":"1111111111111111111111111111111111111111111111111111111111111111111"}';
+//    lvDValue := TDValue.Create;
+//    lvDValue.ForceByName('title').AsString := 'DIOCP-V5 Http 服务演示';
+//    lvDValue.ForceByName('author').AsString := 'D10.天地弦';
+//    lvDValue.ForceByName('time').AsString := DateTimeToStr(Now());
+//    s := JSONEncode(lvDValue);
+//   lvDValue.Free;
+    pvRequest.Response.WriteString(s);
+    pvRequest.SendResponse;
+    pvRequest.DoResponseEnd;
+  end;  
 end;
 
 destructor TfrmMain.Destroy;
@@ -675,7 +711,7 @@ end;
 function TfrmMain.DoLoadFile(pvRequest:TDiocpHttpRequest): Boolean;
 var
   lvDefaultFile:string;
-  lvExt:string;
+  lvExt, lvstr:string;
 begin
   pvRequest.DecodeURLParam(True);
   lvDefaultFile := pvRequest.URLParams.GetValueByName('downfile', STRING_EMPTY);
@@ -699,13 +735,50 @@ begin
   begin
     pvRequest.Response.ClearContent;
     lvExt :=LowerCase(ExtractFileExt(lvDefaultFile));
+
     pvRequest.Response.ContentType := GetContentTypeFromFileExt(lvExt, 'application/stream');
     //pvRequest.Response.SetResponseFileName('x.file');
     //pvRequest.ResponseAFile(lvDefaultFile);
  //   pvRequest.ResponseAStream(TFileStream.Create(lvDefaultFile, fmOpenRead), OnResposeStreamDone);
     pvRequest.Response.LoadFromFile(lvDefaultFile);
-    pvRequest.SendResponse();
-    pvRequest.DoResponseEnd;
+
+    if (StrIndexOf(lvExt, ['.js', '.html', '.htm', '.css']) <> -1)
+      and
+       (PosWStr('gzip', pvRequest.RequestAcceptEncoding) > 0) then  // 进行压缩
+    begin
+      if pvRequest.ResponseAFileETag(lvDefaultFile) then
+      begin      // 处理头的ETag， 如果返回false，已经响应
+        pvRequest.Response.LoadFromFile(lvDefaultFile);
+        pvRequest.Response.Header.ForceByName('Content-Encoding').AsString := 'gzip';
+        lvstr := pvRequest.Response.Header.GetValueByName('Content-Encoding', '');
+        if Pos('zlib', lvstr) > 0 then
+        begin
+          pvRequest.Response.ZLibContent;
+        end else if Pos('lzo', lvstr) > 0 then
+        begin
+          pvRequest.Response.LZOCompressContent;
+        end else if Pos('gzip', lvstr) > 0 then
+        begin
+          pvRequest.Response.GZipContent;
+        end else if Pos('deflate', lvstr) > 0 then
+        begin
+          pvRequest.Response.DeflateCompressContent;
+        end;
+        pvRequest.SendResponse();
+        pvRequest.DoResponseEnd;
+      end else
+      begin
+        // ETag 自动回收pvRequest
+      end;
+
+    end else
+    begin
+      pvRequest.ResponseAFileEx(lvDefaultFile);
+    end;
+
+
+
+
     Result := True;
   end else
   begin

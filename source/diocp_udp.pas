@@ -1,3 +1,5 @@
+unit diocp_udp;
+
 (*
  *	 Unit owner: d10.ÃÏµÿœ“
  *	       blog: http://www.cnblogs.com/dksoft
@@ -13,7 +15,7 @@
   {$DEFINE WRITE_LOG}
 {$ENDIF}
 
-unit diocp_udp;
+
 
 interface
 
@@ -418,6 +420,10 @@ begin
   lvRequest.FWSAToAddr := ToAddr;
   lvRequest.SetBuffer(buf, len, CopyBuf);
   Result := lvRequest.PostRequest();
+  if not Result then
+  begin
+    ReleaseSendRequest(lvRequest);
+  end;
 end;
 
 procedure TDiocpUdp.WSASendTo(pvRemoteIP:String; pvRemotePort:Integer; buf:

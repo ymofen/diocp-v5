@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     Top = 91
     Width = 812
     Height = 364
-    ActivePage = tsOperator
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
@@ -106,6 +106,81 @@ object frmMain: TfrmMain
         OnClick = btnASyncStopClick
       end
     end
+    object tsOpt: TTabSheet
+      Caption = #36873#39033
+      ImageIndex = 3
+      object edtSendSize: TEdit
+        Left = 118
+        Top = 16
+        Width = 83
+        Height = 21
+        Enabled = False
+        TabOrder = 0
+        Text = '500'
+        OnKeyDown = edtSendSizeKeyDown
+      end
+      object chkSendForerver: TCheckBox
+        Left = 15
+        Top = 18
+        Width = 97
+        Height = 17
+        Caption = #19981#20572#21457#36865
+        TabOrder = 1
+        OnClick = chkSendForerverClick
+      end
+      object edtMaxSendSize: TEdit
+        Left = 222
+        Top = 16
+        Width = 83
+        Height = 21
+        TabOrder = 2
+        Text = '10'
+        OnKeyDown = edtMaxSendSizeKeyDown
+      end
+      object btnStartSend: TButton
+        Left = 344
+        Top = 14
+        Width = 75
+        Height = 25
+        Caption = #24320#22987#21457#36865
+        TabOrder = 3
+        OnClick = btnStartSendClick
+      end
+      object edtSendBufLen: TEdit
+        Left = 16
+        Top = 79
+        Width = 121
+        Height = 21
+        TabOrder = 4
+        Text = '65535'
+      end
+      object chkChangeSendBufSize: TCheckBox
+        Left = 16
+        Top = 56
+        Width = 121
+        Height = 17
+        Caption = #20462#25913#21457#36865#32531#23384#22823#23567
+        TabOrder = 5
+        OnClick = chkChangeSendBufSizeClick
+      end
+      object chkSleepOnRecvSend: TCheckBox
+        Left = 16
+        Top = 120
+        Width = 145
+        Height = 17
+        Caption = #25509#25910#21457#36865#20107#20214#20013'Sleep'
+        TabOrder = 6
+        OnClick = chkSleepOnRecvSendClick
+      end
+      object edtRecvSendSleep: TEdit
+        Left = 15
+        Top = 143
+        Width = 121
+        Height = 21
+        TabOrder = 7
+        Text = '0'
+      end
+    end
   end
   object pnlTop: TPanel
     Left = 0
@@ -143,7 +218,7 @@ object frmMain: TfrmMain
       OnClick = btnGetWorkerStateClick
     end
     object btnOpen: TButton
-      Left = 142
+      Left = 138
       Top = 5
       Width = 75
       Height = 25
@@ -250,6 +325,16 @@ object frmMain: TfrmMain
       TabOrder = 14
       OnClick = chkUseBufferPoolClick
     end
+    object chkNagle: TCheckBox
+      Left = 359
+      Top = 60
+      Width = 97
+      Height = 17
+      Caption = #24320#21551'nagle'#31639#27861
+      Checked = True
+      State = cbChecked
+      TabOrder = 15
+    end
   end
   object actlstMain: TActionList
     Left = 248
@@ -270,8 +355,8 @@ object frmMain: TfrmMain
   object tmrKickOut: TTimer
     Interval = 10000
     OnTimer = tmrKickOutTimer
-    Left = 72
-    Top = 144
+    Left = 616
+    Top = 128
   end
   object tmrTest: TTimer
     Enabled = False
@@ -281,7 +366,7 @@ object frmMain: TfrmMain
   end
   object tmrInfo: TTimer
     OnTimer = tmrInfoTimer
-    Left = 144
-    Top = 144
+    Left = 712
+    Top = 128
   end
 end

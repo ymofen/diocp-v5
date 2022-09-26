@@ -17,7 +17,7 @@ interface
 uses
   diocp_tcp_client, diocp_sockets, diocp_coder_baseObject,
   SysUtils, Classes, utils_queues, utils_safeLogger, utils_BufferPool,
-  utils_strings;
+  utils_strings, utils_byteTools;
 
 const
   BLOCK_BUFFER_TAG = 10000;
@@ -56,7 +56,7 @@ type
     ///   on recved data, run in iocp worker thread
     /// </summary>
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; errCode: WORD); override;
-
+    procedure OnConnected; override;
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -196,6 +196,9 @@ begin
   end;
   r := AddRef(pvBuffer, Format('+ OnBlockBufferWrite(%d)', [n]));
   PrintDebugString(Format('+ %2x: %d', [IntPtr(pvBuffer), r]));
+
+ // sfLogger.logMessage(TByteTools.varToHexString(pvBuffer^, pvLength), 'raw');
+
   if not Self.PostWSASendRequest(pvBuffer, pvLength, dtNone, n) then
   begin
     r := ReleaseRef(pvBuffer, '- OnBlockBufferWrite PostWSASendRequest false');
@@ -208,6 +211,17 @@ begin
      ReleaseRef(pvBuffer);
   end;
   {$ENDIF}
+
+end;
+
+procedure TIocpCoderRemoteContext.OnConnected;
+begin
+  inherited;
+  if FCoderExchange <> nil then
+  begin
+    FCoderExchange.CleanUp;
+  end;
+
 
 end;
 
@@ -304,6 +318,7 @@ begin
     try
       FBlockBuffer.ClearBuffer;
       FEncoder.Encode(FCoderExchange, pvObject, FBlockBuffer);
+
       FBlockBuffer.FlushBuffer;
     finally
       UnLock;

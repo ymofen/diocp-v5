@@ -2,10 +2,14 @@ unit diocp_ex_http_common;
 
 interface
 
+
+
 {$I 'diocp.inc'}
 {$IF CompilerVersion>= 28}    // XE7:28
 {$DEFINE USE_NetEncoding}
 {$IFEND}
+
+{$DEFINE USE_ZLIBExGZ}
 
 uses
   utils_strings, SysUtils, utils_dvalue
@@ -14,6 +18,9 @@ uses
 {$ENDIF}
 {$IFDEF USE_Z_LZO}
     , utils_lzo
+{$ENDIF}
+{$IFDEF USE_AES}
+   , AES
 {$ENDIF}
 {$IFDEF USE_ZLIBExGZ}
     , ZLibExGZ, ZLibEx
@@ -27,8 +34,7 @@ uses
 const
   END_BYTES: array [0 .. 3] of Byte = (13, 10, 13, 10);
 
-  /// 头部最大10K
-  MAX_HEADER_BUFFER_SIZE = 1024 * 10;
+
 
 type
 {$IF CompilerVersion < 18}
@@ -47,6 +53,7 @@ type
     FHttpVer: string;
     FMethod: string;
     FURI: string;
+    FURLParams: String;
   public
 
     constructor Create;
@@ -75,12 +82,35 @@ type
     ///   包含参数部分
     /// </summary>
     property URI: string read FURI write FURI;
-
-
-
-
+    property URLParams: String read FURLParams write FURLParams;
 
   end;
+
+  THttpHeader = class(TObject)
+  private
+    FHttpVer: string;
+    FMethod: string;
+    function Decode0ForResp(pvLine:PChar): Integer; virtual; abstract;
+    /// 未实现
+    procedure DecodeLine(const pvLine:PChar);
+  public
+    function ParseHeader(const pvHeader: string): Integer;
+
+    property HttpVer: string read FHttpVer;
+  public  // Request
+    property Method: string read FMethod;
+  end;
+
+  THttpRespHeader = class(THttpHeader)
+  private
+    FHttpCode: Integer;
+    FRespCodeStr: String;
+    function Decode0ForResp(pvLine:PChar): Integer; override;
+  public
+    property HttpCode: Integer read FHttpCode;
+    property RespCodeStr: String read FRespCodeStr;
+  end;
+
 
   THttpRange = class(TObject)
   private
@@ -228,6 +258,8 @@ type
     /// </summary>
     procedure DecodeURLParamAsIE;
 
+    procedure DecodeBodyWithAES(const pvaes:string);
+
 {$IFDEF UNICODE}
     procedure DecodeURLParam(pvEncoding: TEncoding); overload;
 {$ENDIF}
@@ -309,11 +341,17 @@ type
     // 接收数据的Builder
     FRecvBuilder: TDBufferBuilder;
 
+    FTempBuilder: TDBufferBuilder;
+
     FContentBuilder: TDBufferBuilder;
     FContentLength: Int64;
+    FChunkLength: Integer;   // 当前Chunk长度
+    FChunkSize: Integer;     // 当前接收长度
     FHeaderBuilder: TDBufferBuilder;
 
     FRecvSize: Integer;
+
+    FIsChunked: Boolean;
 
     /// <summary>
     /// 解码状态
@@ -349,12 +387,15 @@ type
     /// <param name="pvByte"> (Byte) </param>
     function InputBuffer(pvByte: Byte): Integer;
 
+    procedure SetChunkedBegin();
+
     property ContentBuilder: TDBufferBuilder read FContentBuilder;
     /// <summary>
     /// 需要接收的数据长度
     /// </summary>
     property ContentLength: Int64 read FContentLength write FContentLength;
     property HeaderBuilder: TDBufferBuilder read FHeaderBuilder;
+    property IsChunked: Boolean read FIsChunked write FIsChunked;
 
   end;
 
@@ -404,6 +445,8 @@ type
     /// GZip 压缩
     /// </summary>
     procedure GZipContent;
+
+    procedure AESEncodeContent(const AESKey:string);
 
     procedure DeflateCompressContent;
 
@@ -455,10 +498,18 @@ procedure GZDecompressBufferBuilder(pvBuilder: TDBufferBuilder);
 procedure LZOCompressBufferBuilder(pvBuilder: TDBufferBuilder);
 procedure LZODecompressBufferBuilder(pvBuilder: TDBufferBuilder);
 {$ENDIF}
+
+/// <summary>
+///   生产一个Http响应信息
+/// </summary>
+function MakeHttpResponse(const ResponseContentType, pvResponseContent:
+    DStringW): TBytes;
+
 /// <summary>
 /// [utf8/ansi]->url
 /// </summary>
-function URLEncode(pvStr: string; pvConvertUtf8: Boolean = true): string;
+function URLEncode(const pvStr: String; pvConvertUtf8: Boolean = true):
+    string;
 
 /// <summary>
 /// raw buffer -> url
@@ -499,7 +550,13 @@ function URLDecode(const pvInputStr: string; pvEncoding: TEncoding): String;
     overload;
 {$ENDIF}
 
+var
+  // 头部最大10K
+  MAX_HEADER_BUFFER_SIZE :Integer = 1024 * 10;
+
 implementation
+
+
 
 resourcestring
   { System.NetEncoding }
@@ -752,6 +809,41 @@ begin
   pvBuilder.AppendBuffer(@lvOutBytes[0], l);
 end;
 {$ENDIF}
+
+{$IFDEF USE_AES}
+procedure AESEncryptBufferBuilder(pvBuilder: TDBufferBuilder; const aes_key:string);
+var
+  lvInStream, lvOutStream: TMemoryStream;
+begin
+  lvOutStream := TMemoryStream.Create;
+  try
+    pvBuilder.Position := 0;
+    AES.EncryptStream(pvBuilder, aes_key, lvOutStream);
+    pvBuilder.Clear;
+    pvBuilder.AppendBuffer(lvOutStream.Memory, lvOutStream.Size);
+  finally
+    lvOutStream.Free;
+  end;
+end;
+
+procedure AESDecodeBufferBuilder(pvBuilder: TDBufferBuilder; const aes_key:string);
+var
+  lvInStream, lvOutStream: TMemoryStream;
+begin
+  lvOutStream := TMemoryStream.Create;
+  try
+    pvBuilder.Position := 0;
+    AES.DecryptStream(pvBuilder, aes_key, lvOutStream);
+    pvBuilder.Clear;
+    pvBuilder.AppendBuffer(lvOutStream.Memory, lvOutStream.Size);
+  finally
+    lvOutStream.Free;
+  end;
+end;
+
+{$ENDIF}
+
+
 {$IFDEF USE_ZLIBExGZ}
 
 procedure GZCompressBufferBuilder(pvBuilder: TDBufferBuilder);
@@ -780,7 +872,6 @@ begin
     lvInStream.Free;
     lvOutStream.Free;
   end;
-
 end;
 
 procedure GZDecompressBufferBuilder(pvBuilder: TDBufferBuilder);
@@ -864,7 +955,31 @@ begin
   SetLength(Result, Rp - PChar(Result));
 end;
 
-function URLEncode(pvStr: string; pvConvertUtf8: Boolean = true): string;
+function MakeHttpResponse(const ResponseContentType, pvResponseContent:
+    DStringW): TBytes;
+var
+  l:Integer;
+  lvBuffer:TDBufferBuilder;
+begin
+  lvBuffer := TDBufferBuilder.Create;
+  try
+    l := Length(pvResponseContent);
+    l := StringWToUtf8Bytes(PDCharW(pvResponseContent), l, nil, 0);
+    lvBuffer.AppendStringAsUTF8('HTTP/1.1 200').AppendBreakLineBytes;
+    lvBuffer.AppendStringAsUTF8('Content-Type: ').AppendStringAsUTF8(ResponseContentType).AppendBreakLineBytes;
+    lvBuffer.AppendStringAsUTF8('Content-Length:').AppendStringAsUTF8(IntToStr(l)).AppendBreakLineBytes;
+    lvBuffer.AppendBreakLineBytes;
+
+    lvBuffer.AppendStringAsUTF8(pvResponseContent);
+
+    Result :=  lvBuffer.ToBytes;
+  finally
+    lvBuffer.Free;
+  end;
+end;
+
+function URLEncode(const pvStr: String; pvConvertUtf8: Boolean = true):
+    string;
 var
   lvBytes: TBytes;
 begin
@@ -999,6 +1114,13 @@ begin
   else if lvExt = '.css' then
   begin
     Result := 'text/css';
+  end else if lvExt = '.apk' then
+  begin
+    Result := 'application/vnd.android.package-archive'
+  end
+  else if lvExt = '.json' then
+  begin
+    Result := 'application/json;charset=UTF-8';
   end
   else if (lvExt = '.html') or (lvExt = '.htm') then
   begin
@@ -1015,6 +1137,22 @@ begin
   else if (lvExt = '.png') then
   begin
     Result := 'image/png';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.m3u', -1) = 0 then
+  begin
+    Result := 'audio/mpegurl';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.mp3', -1) = 0 then
+  begin
+    Result := 'audio/mp3';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.mp4', -1) = 0 then
+  begin
+    Result := 'audio/mp4';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.wma', -1) = 0 then
+  begin
+    Result := 'audio/wma';
+  end else if CompareStrIgnoreCase(PChar(lvExt), '.wav', -1) = 0 then
+  begin
+    Result := 'audio/wav';
+
   end
   else
   begin
@@ -1200,14 +1338,21 @@ function THttpRequest.DecodeHeader: Integer;
 var
   lvPtr: PChar;
   lvLine: String;
+  r :Integer;
 begin
   lvPtr := PChar(FRawHeader);
 
   lvLine := LeftUntil(lvPtr, [#13, #10]);
-  Result := DecodeFirstLine(lvLine);
-  if Result = -1 then
+  r := DecodeFirstLine(lvLine);
+  if r = -1 then
   begin
+    Result := -1;
     exit;
+  end else if r = 2 then           
+  begin  // PING
+    Result := 0;
+    Exit;
+
   end;
 
   while true do
@@ -1255,8 +1400,8 @@ begin
   // GET /test?v=abc HTTP/1.1
   lvPtr := PChar(pvLine);
 
-  FMethod := UpperCase(LeftUntil(lvPtr, [' ']));
-  if FMethod = '' then
+  FMethod := UpperCase(LeftUntil(lvPtr, [' ', #13]));
+  if length(FMethod) = 0 then
   begin
     Result := -1;
     exit;
@@ -1288,6 +1433,12 @@ begin
   end
   else if (FMethod = 'CONNECT') then
   begin;
+  end
+  else if (FMethod = '_PING') then
+  begin;
+    FHttpVersionValue := 11;
+    Result := 2;
+    Exit;
   end
   else
   begin
@@ -1338,6 +1489,15 @@ begin
     end;
 
   end;
+end;
+
+procedure THttpRequest.DecodeBodyWithAES(const pvaes: string);
+begin
+{$IFDEF USE_AES}
+  AESDecodeBufferBuilder(FContentBuilder, pvaes);
+{$ELSE}
+  Assert(false, '工程中需要定义编译宏 USE_AES');
+{$ENDIF}  
 end;
 
 procedure THttpRequest.DecodeContentAsFormUrlencoded({$IFDEF UNICODE}
@@ -1421,6 +1581,9 @@ begin
   else if (StrLIComp(lvBuf, 'CONNECT', 7) = 0) then
   begin
     FMethod := 'CONNECT';
+  end else if (StrLIComp(lvBuf, '_PING', 5) = 0) then
+  begin
+    FMethod := '_PING';
   end
   else
   begin
@@ -1561,19 +1724,20 @@ begin
   FFlag := 0;
   FDecodeState := 0;
   FContentLength := -1;
-  FRawHeader := '';
-  FRequestURI := '';
-  FRequestRawURL := '';
+  FRawHeader := STRING_EMPTY;
+  FRequestURI := STRING_EMPTY;
+  FRequestRawURL := STRING_EMPTY;
   FRequestRawCookie := '-1';
   FContentType := '-1';
   FContentCharset := '-1';
   FRequestCookieList.Clear;
-  FRequestRawURLParamStr := '';
+  FRequestRawURLParamStr := STRING_EMPTY;
   FURLParams.Clear;
   FRequestParams.Clear;
   FRequestFormParams.Clear;
   FHeaders.Clear;
   FKeepAlive := -1;
+  FMethod := STRING_EMPTY;
 end;
 
 function THttpRequest.GetCharset: String;
@@ -1666,8 +1830,9 @@ function THttpRequest.InputBuffer(const pvByte: Byte): Integer;
         Result := -1;
         exit;
       end;
-    end
-    else if pvByte = 13 then
+    end;
+
+    if pvByte = 13 then
     begin
       inc(FDecodeState);
     end;
@@ -1801,6 +1966,15 @@ begin
   Result := AddCookie;
   Result.Name := pvName;
   Result.Value := pvValue;
+end;
+
+procedure THttpResponse.AESEncodeContent(const AESKey:string);
+begin
+{$IFDEF USE_AES}
+  AESEncryptBufferBuilder(FContentBuffer, AESKey);
+{$ELSE}
+  Assert(false, '工程中需要定义编译宏 USE_AES');
+{$ENDIF}  
 end;
 
 procedure THttpResponse.ClearCookies;
@@ -1961,12 +2135,17 @@ constructor THttpBuffer.Create;
 begin
   FContentBuilder := TDBufferBuilder.Create;
   FHeaderBuilder := TDBufferBuilder.Create;
+  FTempBuilder := TDBufferBuilder.Create; 
 end;
 
 destructor THttpBuffer.Destroy;
 begin
-  FreeAndNil(FContentBuilder);
-  FreeAndNil(FHeaderBuilder);
+  if FContentBuilder <> nil then
+    FreeAndNil(FContentBuilder);
+  if FHeaderBuilder <> nil then
+    FreeAndNil(FHeaderBuilder);
+  if FTempBuilder <> nil then
+    FreeAndNil(FTempBuilder);
   inherited Destroy;
 end;
 
@@ -1977,6 +2156,9 @@ begin
   if FHeaderBuilder <> nil then
     FHeaderBuilder.Clear;
 
+  if FTempBuilder <> nil then
+    FTempBuilder.Clear;
+
   FRecvBuilder := FHeaderBuilder;
 
   FRecvSize := 0;
@@ -1986,6 +2168,8 @@ begin
 end;
 
 function THttpBuffer.InputBuffer(pvByte: Byte): Integer;
+var
+  str:string;
 
   procedure InnerCaseZero;
   begin
@@ -2001,6 +2185,19 @@ function THttpBuffer.InputBuffer(pvByte: Byte): Integer;
     end;
   end;
 
+  procedure InnerCheckRecvChunkedHeadder;
+  begin
+    if pvByte = 13 then
+    begin
+      inc(FDecodeState);
+    end;
+
+    if FRecvBuilder.Size >= 20 then
+    begin // 长度行——太长
+      FFlag := 0;
+      Result := -2;
+    end;
+  end;
 begin
   Result := 0;
   if FFlag = 0 then
@@ -2013,6 +2210,7 @@ begin
   end;
 
   FRecvBuilder.Append(pvByte);
+  Inc(FChunkSize);
 
   case FDecodeState of
     0:
@@ -2065,7 +2263,69 @@ begin
           exit;
         end;
       end;
+    5:      //  chunked_recv    通过解析头后，调用SetChunkedBegin开启
+      begin
+        InnerCheckRecvChunkedHeadder;
+      end;
+    6:
+      begin   //  chunked_recv_10
+        if pvByte = 10 then
+        begin // Header
+          str := Trim(FTempBuilder.DecodeUTF8);
+          if Length(str) = 0 then
+          begin            // 不正常完成，应该为0
+            Result := 2; // 接收完成
+            FFlag := 0; // 重新开始请求Buffer进行解码
+          end else
+          begin
+            if str = '0' then
+            begin
+              FChunkLength := 2;
+              FChunkSize := 0;
+              FDecodeState := 8; // 还有两个字符#13#10
+              FRecvBuilder := FTempBuilder;
+            end else
+            begin
+              FChunkLength := StrToInt('$' + str) + 2;  // 有个尾巴 #13#10
+              FChunkSize := 0;
+              Inc(FDecodeState);  // 接收数据
+              FRecvBuilder := FContentBuilder;
+            end;
+          end;
+          exit;
+        end else
+        begin     // 有问题
+          Result := -1;
+          FFlag := 0;
+          Exit;
+        end;
+      end;
+    7:
+      begin
+        if FChunkSize = FChunkLength then
+        begin
+          FRecvBuilder.DecBuf(2);  // 去掉#13#10
+          Result := 0; // ContentAsRAWString
+          SetChunkedBegin;        // 重新去接收
+          exit;
+        end;
+      end;
+    8:
+      begin
+        if FChunkSize = FChunkLength then  // 有#13#10
+        begin                  // 解码完成  正常结束
+          Result := 2; // 接收完成
+          FFlag := 0; // 重新开始请求Buffer进行解码
+        end;
+      end;
   end;
+end;
+
+procedure THttpBuffer.SetChunkedBegin;
+begin
+  FTempBuilder.Clear;
+  FRecvBuilder := FTempBuilder;  // 接收头部
+  FDecodeState := 5; 
 end;
 
 constructor THttpRange.Create;
@@ -2118,6 +2378,9 @@ begin
       if length(lvStr) > 0 then
       begin
         lvStart := StrToInt64Def(lvStr, 0);
+      end else
+      begin
+        lvStart := 0;
       end;
       inc(lvPtr);
       if LeftUntil(lvPtr, [',', ' '], lvStr) = 0 then
@@ -2164,6 +2427,9 @@ begin
       Result := -1;
     end;
 
+  end else
+  begin
+    Result := -1;
   end;
 end;
 
@@ -2184,12 +2450,18 @@ procedure THttpHeaderBuilder.Build(outHeader: TStrings);
 var
   i: Integer;
 begin
-  outHeader.Add(Format('%s %s %s', [FMethod, FURI, FHttpVer]));
+  if Length(FURLParams)=0 then
+  begin
+    outHeader.Add(Format('%s %s %s', [FMethod, FURI, FHttpVer]));
+  end else
+  begin
+    outHeader.Add(Format('%s %s %s', [FMethod, FURI + '?' + FURLParams, FHttpVer]));
+  end;
   for i := 0 to FHeaders.Count - 1 do
   begin
     outHeader.Add(FHeaders.Items[i].Name.AsString + ':' + FHeaders.Items[i].AsString)
   end;
-  outHeader.Add(sLineBreak);
+  outHeader.Add('');
 end;
 
 function THttpHeaderBuilder.Build: string;
@@ -2198,6 +2470,9 @@ var
 begin
   lvHeader := TStringList.Create;
   try
+    {$IF RTLVersion >= 18}
+    lvHeader.LineBreak := #13#10;
+    {$IFEND <D2007}
     Build(lvHeader); 
     Result := lvHeader.Text;
   finally
@@ -2223,6 +2498,71 @@ end;
 procedure THttpHeaderBuilder.SetHeader(const pvKey:String; pvValue:String);
 begin
   FHeaders.ForceByName(pvKey).AsString := pvValue;
+end;
+
+procedure THttpHeader.DecodeLine(const pvLine: PChar);
+begin
+  
+end;
+
+function THttpHeader.ParseHeader(const pvHeader: string): Integer;
+var
+  lvPtr: PChar;
+  lvLine: String;
+  r :Integer;
+begin
+  lvPtr := PChar(pvHeader);
+
+  lvLine := LeftUntil(lvPtr, [#13, #10]);
+  Result := Decode0ForResp(PChar(lvLine));
+  if Result = -1 then
+  begin
+    Exit;
+  end;
+
+  while true do
+  begin
+    SkipChars(lvPtr, [#13, #10, ' ', #9]);
+    if LeftUntil(lvPtr, [#13, #10], lvLine) = 0 then
+    begin
+      DecodeLine(PChar(lvLine));
+    end
+    else
+    begin
+      break;
+    end;
+  end;
+
+  Result := 0;
+end;
+
+function THttpRespHeader.Decode0ForResp(pvLine:PChar): Integer;
+var
+  lvStr:String;
+  lvPtr :PChar;
+begin
+  lvPtr := pvLine;
+  Result := -1;
+  if CompareStrIgnoreCase(pvLine, 'HTTP/', 0) = 0 then
+  begin
+    SkipN(lvPtr, 5);
+    if LeftUntil(lvPtr, [' '], self.FHttpVer) <> 0 then
+    begin
+      Exit;
+    end;
+    SkipChars(lvPtr, [' ']);
+    FRespCodeStr :=TrimRight(lvPtr);
+    if LeftUntil(lvPtr, [' ', #13, #10], lvStr) <> 0 then
+    begin
+      Exit;
+    end;
+
+    FHttpCode := StrToIntDef(lvStr, -1);
+    Result := 0;
+  end else
+  begin
+    Result := -1;
+  end;
 end;
 
 end.

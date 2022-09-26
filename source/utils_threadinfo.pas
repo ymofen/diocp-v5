@@ -3,12 +3,11 @@ unit utils_threadinfo;
 interface
 
 uses
-  utils_hashs,
   {$IFDEF MSWINDOWS}
   Windows,
   {$ELSE}
   {$ENDIF}
-  Classes, utils_strings, SysUtils, SyncObjs, utils_BufferPool;
+  Classes, SysUtils, SyncObjs, utils_hashs, utils_strings;
 
 const
   TYPE_NONE = 0;
@@ -258,8 +257,15 @@ function GetCurrentThreadHintInfo: String;
 var
   lvInfoObj:TThreadInfoObject;
 begin
-  lvInfoObj := GetCurrentInfoObject;
-  Result := lvInfoObj.GetHintInfo;
+  try
+    lvInfoObj := GetCurrentInfoObject;
+    Result := lvInfoObj.GetHintInfo;
+  except
+    on e:Exception do
+    begin
+      Result := 'GetCurrentThreadHintInfo Err:' + e.Message;
+    end;
+  end;
 end;
 
 procedure SleepInThread(pvInterval:Cardinal; pvThread:TThread);

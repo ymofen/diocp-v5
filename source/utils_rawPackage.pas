@@ -28,6 +28,8 @@ procedure SetPackageEndIsLineBreak(pvRaw: PRawPackage);
 
 procedure ResetPacakge(pvRaw: PRawPackage);
 
+procedure InitialPack(pvRaw:PRawPackage);
+
 function InputBuffer(pvRaw: PRawPackage; pvData: Byte): Integer;
 
 
@@ -41,6 +43,11 @@ end;
 procedure SetPackageStartBytes(pvRaw: PRawPackage; pvStartBytes: TBytes;
   pvOffset, pvLength: Cardinal);
 begin
+  if pvLength = 0 then
+  begin
+    pvLength := Length(pvStartBytes) - pvOffset;
+  end;
+  
   SetLength(pvRaw.FStartBytes, pvLength);
   pvRaw.FStartBytesLength := pvLength;
   Move(pvStartBytes[pvOffset], pvRaw.FStartBytes[0], pvLength);
@@ -49,6 +56,10 @@ end;
 procedure SetPackageEndBytes(pvRaw: PRawPackage; pvEndBytes: TBytes;
   pvOffset, pvLength: Cardinal);
 begin
+  if pvLength = 0 then
+  begin
+    pvLength := Length(pvEndBytes) - pvOffset;
+  end;
   SetLength(pvRaw.FEndBytes, pvLength);
   pvRaw.FEndBytesLength := pvLength;
   Move(pvEndBytes[pvOffset], pvRaw.FEndBytes[0], pvLength);
@@ -114,6 +125,21 @@ begin
   pvRaw.FEndBytesLength := 2;
   pvRaw.FEndBytes[0] := 13;
   pvRaw.FEndBytes[1] := 10;
+
+end;
+
+procedure InitialPack(pvRaw:PRawPackage);
+begin
+  pvRaw.FStartMatchIndex := 0;
+  pvRaw.FStartBytesLength := 0;
+  SetLength(pvRaw.FStartBytes, 0);
+
+  pvRaw.FEndMatchIndex := 0;
+  pvRaw.FEndBytesLength := 0;
+  SetLength(pvRaw.FEndBytes, 0);
+
+  pvRaw.FRawLength := 0;
+  SetLength(pvRaw.FRawBytes, 0);
 
 end;
 

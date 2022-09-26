@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ActnList, diocp_ex_coder_tcpserver, diocp_ex_StreamCoder,
   diocp_tcp_server, ExtCtrls,
-  ComObj, ComCtrls, utils_safeLogger;
+  ComObj, ComCtrls, utils_safeLogger, System.Actions;
 
 type
   TfrmMain = class(TForm)

@@ -67,7 +67,7 @@ end;
 constructor TSingleFileWriter.Create;
 begin
   inherited Create;
-  FBasePath :=ExtractFilePath(ParamStr(0)) + 'log\';
+  FBasePath :=__app_root + 'log\';
   FFileSN := 0;
   FFilePerSize := 1024 * 1024 * 50;
   FCacheSize := 0;

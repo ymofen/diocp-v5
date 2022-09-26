@@ -2,11 +2,15 @@ unit ufrmMain;
 
 interface
 
+{$IF CompilerVersion>25}  // XE4(VER250)
+  {$DEFINE HAVE_GENERICS}
+{$IFEND}
+
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, utils_DValue, utils_strings, ComCtrls,
   utils_dvalue_multiparts, utils_dvalue_msgpack, utils_base64, utils_dvalue_dataset,
-  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, utils_textfile;
+  DB, DBClient, ComObj, Grids, DBGrids, utils_byteTools, Math;
 
 type
   TForm1 = class(TForm)
@@ -48,11 +52,17 @@ type
     tsLoadFile: TTabSheet;
     btnLoadTextFrom: TButton;
     btnAdd1000: TButton;
+    btnSort: TButton;
+    btnParseDValue: TButton;
+    btnSortDValue: TButton;
+    btnDelete: TButton;
+    btnParseFile: TButton;
     procedure btnAdd1000Click(Sender: TObject);
     procedure btnBase64Click(Sender: TObject);
     procedure btnClearClick(Sender: TObject);
     procedure btnClearTimeOutClick(Sender: TObject);
     procedure btnConvertToDValueClick(Sender: TObject);
+    procedure btnDeleteClick(Sender: TObject);
     procedure btnDValueClick(Sender: TObject);
     procedure btnDValueCloneFromClick(Sender: TObject);
     procedure btnDValueSetLengthClick(Sender: TObject);
@@ -66,15 +76,20 @@ type
     procedure btnObjectTesterClick(Sender: TObject);
     procedure btnParseAFileClick(Sender: TObject);
     procedure btnParseClick(Sender: TObject);
+    procedure btnParseDValueClick(Sender: TObject);
+    procedure btnParseFileClick(Sender: TObject);
     procedure btnParseJSONClick(Sender: TObject);
     procedure btnRemovePathClick(Sender: TObject);
     procedure btnSaveClick(Sender: TObject);
     procedure btnSetJSONClick(Sender: TObject);
+    procedure btnSortClick(Sender: TObject);
+    procedure btnSortDValueClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
     FDValueObj:TDValue;
     FLogObj: TDValue;
+    FDValue: TDValue;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -93,7 +108,7 @@ var
 implementation
 
 uses
-  utils_DValue_JSON;
+  utils_DValue_JSON, utils_textfile;
 
 {$R *.dfm}
 
@@ -187,10 +202,12 @@ constructor TForm1.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FLogObj := TDValue.Create();
+  FDValue := TDValue.Create();
 end;
 
 destructor TForm1.Destroy;
 begin
+  FreeAndNil(FDValue);
   FreeAndNil(FLogObj);
   inherited Destroy;
 end;
@@ -260,12 +277,13 @@ end;
 
 procedure TForm1.btnConvertToDValueClick(Sender: TObject);
 var
-  lvDValue:TDValue;
+  lvDValue, lvList:TDValue;
 begin
   if not cdsDemo.Active then raise Exception.Create('DEMO数据集尚未初始化');
   
   lvDValue := TDValue.Create();
-  ConvertDataSetToDValue(self.cdsDemo, lvDValue);
+  lvList := lvDValue.ForceByName('list').AsArray();  // 不需要单独释放
+  ConvertDataSetToDValue(self.cdsDemo, lvList);
   mmoJSONData.Clear;
   mmoJSONData.Lines.Add(JSONEncode(lvDValue));
   lvDValue.Free;
@@ -346,20 +364,21 @@ var
   lvValue:Integer;
   lvSB:TDStringBuilder;
   s:String;
+  lvBytes:TBytes;
 begin
   lvDValue := TDValue.Create();
   lvDValue.ForceByPath('p2.obj').BindObject(Self, faNone);
   lvDValue.ForceByPath('p2.n').AsInteger := 3;
-  lvDValue.ForceByName('name').AsString := '张三abc';
-  lvDValue.ForceByName('__msgid').AsInteger := 1001;
-  lvDValue.ForceByPath('p1.name').AsString := 'D10.天地弦';
-  lvDValue.ForceByPath('p2.p2_1.name').AsString := 'D10.天地弦';
-  lvDValue.ForceByPath('p2.num').AsInteger := 1;
-
-
-  lvItem := lvDValue.ForceByName('array').AddArrayChild;
-  lvItem.ForceByName('key1').AsString := '数组元素1';
-  lvDValue.ForceByName('array').AddArrayChild.AsString := '数组元素2';
+//  lvDValue.ForceByName('name').AsString := '张三abc';
+//  lvDValue.ForceByName('__msgid').AsInteger := 1001;
+//  lvDValue.ForceByPath('p1.name').AsString := 'D10.天地弦';
+//  lvDValue.ForceByPath('p2.p2_1.name').AsString := 'D10.天地弦';
+//  lvDValue.ForceByPath('p2.num').AsInteger := 1;
+//
+//
+//  lvItem := lvDValue.ForceByName('array').AddArrayChild;
+//  lvItem.ForceByName('key1').AsString := '数组元素1';
+//  lvDValue.ForceByName('array').AddArrayChild.AsString := '数组元素2';
 
   s :=JSONEncode(lvDValue, true, False, [vdtObject]);
   if trim(mmoData.Lines.Text) = '' then
@@ -368,6 +387,9 @@ begin
   end;
 
   lvDValue.Free;
+
+  lvBytes := StringToBytes(Trim(s));
+  mmoData.Lines.Add(TByteTools.varToHexString(lvBytes[0], Length(lvBytes)));
 
   ShowMessage(s);
 end;
@@ -531,7 +553,7 @@ begin
   lvTickCount := GetTickCount;
   MultiPartsParseFromFile(lvDVAlue, 'dvalue_multparts.dat');
   Self.Caption := Format('MultiPartsParseFromFile, time:%d ns', [GetTickCount - lvTickCount]);
-  SavePartValueToFile(lvDVAlue, 'data', 'abc.dat');
+  SavePartValueToFile(lvDVAlue, 'filedata', 'abc.dat');
   ShowMessage(ExtractValueAsUtf8String(lvDVAlue, 'fileID', ''));
   lvDVAlue.Free;
 end;
@@ -543,7 +565,12 @@ begin
   lvDValue := TDValue.Create();
   try
     JSONParser(mmoData.Lines.Text, lvDValue);
-    ShowMessage(JSONEncode(lvDValue, False));
+    ShowMessage(JSONEncode(lvDValue));
+
+    //lvDValue2 := lvDValue.FindByName('maps').Items[0];
+
+
+    //ShowMessage(lvDValue2.ForceByPath('name').AsString);
   finally
     lvDValue.Free;
   end;
@@ -605,6 +632,97 @@ begin
   mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
   lvDValue.Free;
 
+end;
+
+
+function MySort(Item1, Item2: Pointer): Integer;
+var
+  lvItm1, lvItm2:TDValue;
+begin
+  lvItm1 := Item1;
+  lvItm2 := Item2;
+  Result := CompareValue(lvItm1.GetValueByName('id', 0), lvItm2.GetValueByName('id', 0));
+end;
+  
+procedure TForm1.btnParseDValueClick(Sender: TObject);
+begin
+  FDValue.Clear;
+  JSONParser(mmoData.Lines.Text, FDValue);
+end;
+
+procedure TForm1.btnSortClick(Sender: TObject);
+var
+  lvDValue:TDValue;
+
+begin
+  lvDValue := TDValue.Create;
+  JSONParser('{id:2, val:2}', lvDValue.ForceByName('id_2'));
+  JSONParser('{id:1, val:1}', lvDValue.ForceByName('id_1'));
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+
+{$IFDEF HAVE_GENERICS}
+{$ELSE}
+  lvDValue.Sort(MySort);
+{$ENDIF}
+  mmoLog.Lines.Add('after sort');
+  mmoLog.Lines.Add(JSONEncode(lvDValue, false, false));
+  lvDValue.Free;
+
+end;
+
+function UnloadPosiCompareFunc(Item1, Item2: Pointer): Integer;
+var
+  lvItm1, lvItm2:TDValue;
+begin
+  lvItm1 := Item1;
+  lvItm2 := Item2;
+  Result := CompareValue(lvItm1.GetValueByName('icount', 0), lvItm2.GetValueByName('icount', 0));
+  if Result = 0 then
+  begin
+    Result := CompareValue(lvItm1.ForceByName('lasttick').AsDateTime, lvItm2.ForceByName('lasttick').AsDateTime);
+  end;
+  //Result := -Result;
+end;
+
+procedure TForm1.btnDeleteClick(Sender: TObject);
+begin
+  while FDValue.Count > 5 do
+  begin
+    FDValue.Delete(0);
+  end;
+  mmoLog.Lines.Add('after delete');
+  mmoLog.Lines.Add(JSONEncode(FDValue, false, True));
+end;
+
+procedure TForm1.btnParseFileClick(Sender: TObject);
+var
+  s:String;
+var
+  lvDValue, lvDValue2, lvAccountGroup:TDValue;
+begin
+  if not dlgOpenFile.Execute then exit;
+  s := LoadTextFromFile(dlgOpenFile.FileName);
+
+  lvDValue := TDValue.Create();
+  try
+    JSONParser(s, lvDValue);
+    ShowMessage(Format('解析成功, 节点数:%d', [lvDValue.Count]));
+  finally
+    lvDValue.Free;
+  end;
+
+
+end;
+
+procedure TForm1.btnSortDValueClick(Sender: TObject);
+begin
+{$IFDEF HAVE_GENERICS}
+{$ELSE}
+  FDValue.Sort(UnloadPosiCompareFunc);
+{$ENDIF}
+
+  mmoLog.Lines.Add('after sort');
+  mmoLog.Lines.Add(JSONEncode(FDValue, false, True));
 end;
 
 procedure TForm1.Button1Click(Sender: TObject);

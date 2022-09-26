@@ -100,6 +100,15 @@ object frmMain: TfrmMain
       TabOrder = 8
       OnClick = btnCancelIoExClick
     end
+    object btnShutDown: TButton
+      Left = 512
+      Top = 17
+      Width = 129
+      Height = 25
+      Caption = 'btnShutDown'
+      TabOrder = 9
+      OnClick = btnShutDownClick
+    end
   end
   object mmoInfo: TMemo
     Left = 0

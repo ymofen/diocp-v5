@@ -255,6 +255,7 @@ begin
   if FCurrentSendBufferLink <> nil then
   begin
     FCurrentSendBufferLink.Free;
+    FCurrentSendBufferLink := nil;
   end;
   if FSendBlock <> nil then //≤ªµ√œ–
   begin
@@ -798,6 +799,7 @@ begin
           FCurrentSendBufferLink := TBufferLink(FSendingQueue.DeQueue);
           lvStart := true;
         end;
+
       finally
         unLock;
       end;

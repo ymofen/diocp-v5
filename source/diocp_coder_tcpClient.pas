@@ -5,6 +5,7 @@
  *
  *   2015-02-22 08:29:43
  *     DIOCP-V5 发布
+ *   大家尽量使用DiocpTcpSvr进行自己的编码
  *
  *)
 
@@ -68,6 +69,8 @@ type
     ///     只在HandleResponse中调用
     /// </summary>
     procedure PostNextSendRequest; override;
+
+    procedure OnConnected; override;
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -240,6 +243,12 @@ begin
       TDiocpCoderTcpClient(Owner).ReleaseSendRequest(lvSendRequest);
     end;
   end;          
+end;
+
+procedure TIocpCoderRemoteContext.OnConnected;
+begin
+  inherited;
+  FRecvBufferLink.clearBuffer;
 end;
 
 procedure TIocpCoderRemoteContext.OnRecvBuffer(buf: Pointer; len: Cardinal;

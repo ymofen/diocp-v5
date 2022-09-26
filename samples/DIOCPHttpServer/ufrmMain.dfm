@@ -19,7 +19,7 @@ object frmMain: TfrmMain
     Left = 0
     Top = 80
     Width = 856
-    Height = 312
+    Height = 368
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
@@ -29,14 +29,14 @@ object frmMain: TfrmMain
         Left = 0
         Top = 0
         Width = 848
-        Height = 249
+        Height = 305
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
       end
       object pnlHTTPInfo: TPanel
         Left = 0
-        Top = 249
+        Top = 305
         Width = 848
         Height = 35
         Align = alBottom
@@ -125,15 +125,15 @@ object frmMain: TfrmMain
       ImageIndex = 3
       object mmoWebSocketData: TMemo
         Left = 3
-        Top = 3
-        Width = 358
-        Height = 158
+        Top = 34
+        Width = 842
+        Height = 239
         Lines.Strings = (
           #25512#36865#20449#24687#21040#23458#25143#31471)
         TabOrder = 0
       end
       object btnWebSocketPush: TButton
-        Left = 380
+        Left = 3
         Top = 3
         Width = 137
         Height = 25
@@ -257,9 +257,9 @@ object frmMain: TfrmMain
   end
   object mmoLog: TMemo
     Left = 0
-    Top = 392
+    Top = 448
     Width = 856
-    Height = 169
+    Height = 113
     Align = alBottom
     TabOrder = 2
   end

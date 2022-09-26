@@ -9,6 +9,10 @@ uses
   {$ELSE}
 
   {$ENDIF}
+  {$IFDEF POSIX}
+  , Posix.Base, Posix.Unistd, Posix.Signal, Posix.Pthread,
+  Posix.SysTypes
+  {$ENDIF}
   ;
 
 {$IF defined(FPC) or (RTLVersion>=18))}
@@ -22,6 +26,7 @@ uses
 type
   TASyncWorker = class;
   TOnASyncEvent = procedure(pvASyncWorker: TASyncWorker) of object;
+  TOnNoneEvent = procedure() of object;
   TOnASyncGlobalEvent = procedure(pvASyncWorker: TASyncWorker);
   TASyncWorker = class(TThread)
   private
@@ -30,6 +35,7 @@ type
     FDataTag: Integer;
     FOnAsyncEvent: TOnASyncEvent;
     FOnNotifyEvent: TNotifyEvent;
+    FOnNoneEvent: TOnNoneEvent;
     procedure SetDataObj(const Value: TObject);
   public
     constructor Create(AOnAsyncEvent: TOnASyncEvent);
@@ -79,7 +85,8 @@ type
 function ASyncInvoke(pvASyncProc: TOnASyncEvent; pvData: Pointer = nil;
     pvDataObject: TObject = nil; pvDataTag: Integer = 0): TASyncWorker;
 
-procedure ASyncExecute(const pvCallBack: TNotifyEvent; const pvSender: TObject);
+procedure ASyncExecute(const pvCallBack: TNotifyEvent; const pvSender: TObject); overload;
+procedure ASyncExecute(const pvCallBack: TOnNoneEvent); overload;
 
 function CreateManualEvent(pvInitState: Boolean = false): TEvent;
 
@@ -134,16 +141,18 @@ var
   si: SYSTEM_INFO;
 {$ENDIF}
 begin
-  {$IFDEF MSWINDOWS}
-  GetSystemInfo(si);
-  Result := si.dwNumberOfProcessors;
-  {$ELSE}// Linux,MacOS,iOS,Andriod{POSIX}
-  {$IFDEF POSIX}
-  Result := sysconf(_SC_NPROCESSORS_ONLN);
-  {$ELSE}// unkown system, default 1
-  Result := 1;
-  {$ENDIF !POSIX}
-  {$ENDIF !MSWINDOWS}
+{$IFDEF MSWINDOWS}
+    GetSystemInfo(si);
+    Result := si.dwNumberOfProcessors;
+{$ELSE}// Linux,MacOS,iOS,Andriod{POSIX}
+{$IFDEF POSIX}
+{$WARN SYMBOL_PLATFORM OFF}
+    Result := sysconf(_SC_NPROCESSORS_ONLN);
+{$WARN SYMBOL_PLATFORM ON}
+{$ELSE}// 不认识的操作系统，CPU数默认为1
+    Result := 1;
+{$ENDIF !POSIX}
+{$ENDIF !MSWINDOWS}
 end;
 
 {$IF RTLVersion<24}
@@ -227,7 +236,11 @@ begin
   t := GetTickCount;
   while (v <> pvExcept) and ((GetTickCount - t) < Cardinal(pvTimeOut)) do
   begin
+    {$IFDEF MSWINDOWS}
     Sleep(10);
+    {$ELSE}
+    TThread.Sleep(10);
+    {$ENDIF}
   end;        
   Result := v = pvExcept;
 end;
@@ -239,6 +252,19 @@ begin
   lvWorker := TASyncWorker.Create(nil);
   lvWorker.FOnNotifyEvent := pvCallBack;
   lvWorker.DataObj := pvSender;
+  {$IFDEF UNICODE}
+  lvWorker.Start;
+  {$ELSE}
+  lvWorker.Resume;
+  {$ENDIF}
+end;
+
+procedure ASyncExecute(const pvCallBack: TOnNoneEvent); overload;
+var
+  lvWorker:TASyncWorker;
+begin
+  lvWorker := TASyncWorker.Create(nil);
+  lvWorker.FOnNoneEvent := pvCallBack;
   {$IFDEF UNICODE}
   lvWorker.Start;
   {$ELSE}
@@ -262,6 +288,10 @@ begin
   if Assigned(FOnNotifyEvent) then
   begin
     FOnNotifyEvent(FDataObj);
+  end;
+  if Assigned(FOnNoneEvent) then
+  begin
+    FOnNoneEvent();
   end;
 end;
 

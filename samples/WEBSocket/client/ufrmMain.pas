@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, ExtCtrls, StdCtrls, diocp_ex_http_common, diocp_ex_websocketclient,
-  utils_websocket, utils_safeLogger;
+  utils_websocket, utils_safeLogger, utils_dtimewheel;
 
 type
   TForm1 = class(TForm)
@@ -31,8 +31,11 @@ type
     procedure OnShakeHand(Sender:TObject);
     procedure OnDisconnected(Sender:TObject);
     procedure OnRecv(Sender:TObject);
+
+    procedure WsSendPing(pvTimeWheel:TDTimeWheel; pvUserData:Pointer);
   public
     { Public declarations }
+    constructor Create(AOwner: TComponent); override;
   end;
 
 var
@@ -56,6 +59,9 @@ begin
   sfLogger.setAppender(TStringsAppender.Create(mmoRecv.Lines));
   sfLogger.AppendInMainThread := True;
   FWsClient := NewWsClient();
+  FWsClient.Masked := true;
+  FWsClient.HttpOrigin := '';
+
   FWsClient.OnRecv := OnRecv;
   FWsClient.OnDisconnectedEvent := OnDisconnected;
   FWsClient.OnShakeHand := OnShakeHand;
@@ -63,7 +69,7 @@ end;
 
 procedure TForm1.btnConnectClick(Sender: TObject);
 begin
-  FWsClient.HeaderBuilder.SetHeader('subscribeid', '1007');
+  //FWsClient.HeaderBuilder.SetHeader('subscribeid', '1007');
   FWsClient.Open(edtWsUrl.Text);
 end;
 
@@ -83,6 +89,13 @@ begin
   FWsClient.SendBuffer(@lvBytes[0], Length(lvBytes), OPT_TEXT);
 end;
 
+constructor TForm1.Create(AOwner: TComponent);
+begin
+  inherited;
+  InitialDtw(1000);
+  Dtw.AddTask(5000, WsSendPing, nil, 0, nil)
+end;
+
 procedure TForm1.OnDisconnected(Sender: TObject);
 begin
   sfLogger.logMessage('on disconnected');   
@@ -95,7 +108,14 @@ end;
 
 procedure TForm1.OnShakeHand(Sender:TObject);
 begin
-  //mmoRecv.Lines.Add(FWsClient.HttpBuffer.HeaderBuilder.ToRAWString);
+  mmoRecv.Lines.Add(FWsClient.HttpBuffer.HeaderBuilder.ToRAWString);
+end;
+
+procedure TForm1.WsSendPing(pvTimeWheel:TDTimeWheel; pvUserData:Pointer);
+begin
+  if FWsClient.Active then
+    FWsClient.CheckSendPing(5000);
+
 end;
 
 end.

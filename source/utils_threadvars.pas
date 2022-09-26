@@ -8,7 +8,7 @@ uses
   Windows,
   {$ELSE}
   {$ENDIF}
-  Classes, SysUtils, SyncObjs, utils_dvalue, utils_BufferPool;
+  Classes, SysUtils, SyncObjs, utils_dvalue, utils_strings;
 
 const
   MAX_THREADID_VALUE = 65535;

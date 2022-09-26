@@ -9,6 +9,8 @@ interface
 
 {$I 'diocp.inc'}
 
+{.$DEFINE DIOCP_SSL}
+
 uses
   Classes
   {$IFDEF POSIX}
@@ -17,7 +19,11 @@ uses
   , diocp_core_rawWinSocket
   , diocp_winapi_winsock2
   , SysConst
+  {$IFDEF DIOCP_SSL}
+  , utils_openssl
   {$ENDIF}
+  {$ENDIF}
+
   , SysUtils, utils_URL, utils_strings, diocp_ex_http_common, utils_BufferPool;
 
 
@@ -68,6 +74,7 @@ type
     FRequestAcceptEncoding: String;
     FRawCookie:String;
 
+
     FResponseResultCode:Integer;
 
     FRequestBody: TMemoryStream;
@@ -81,9 +88,13 @@ type
     FResponseHeader: TStringList;
     FResponseSize: Integer;
     FResponseHttpVersionValue: Integer;
+    FPostSize:Integer;
     FTimeOut: Integer;
     
     FConnectTimeOut:Integer;
+
+
+
     /// <summary>
     ///  CheckRecv buffer
     /// </summary>
@@ -104,24 +115,40 @@ type
 
     procedure DecodeFirstLine;
 
-    function CheckConnect(pvHost: string; pvPort: Integer): Boolean;
+    function CheckConnect(const pvHost: string; pvPort: Integer): Boolean;
     procedure CheckSocketSendResult(pvSocketResult:Integer);
     function GetActive: Boolean;
     procedure OnBufferWrite(pvSender: TObject; pvBuffer: Pointer; pvLength:
         Integer);
+  private
+    FHostIpV6: Boolean;
+    FLastRequestHeader: String;
+    FRaiseOnResponseOnExceptCode: Boolean;
+    {$IFDEF DIOCP_SSL}
+    FSslFlag:Integer;
+    FSSLCtx: utils_openssl.PSSL_CTX;
+    FSsl: utils_openssl.PSSL;
+    procedure DoSSLAfterConnect;
+    {$ENDIF}
+
+    function DoRecvBuff(var data; const len: Cardinal): Integer;
   public
     /// <summary>
     ///   不清理Cookie
     /// </summary>
-    procedure Cleaup;
+    procedure Cleanup;
 
     /// <summary>
-    ///   复位，清理Cookie
+    ///   复位
+    ///   清理Cookie
+    ///   复位设定
     /// </summary>
     procedure Reset();
 
+    {$IFDEF DIOCP_SSL}
+    procedure DoTestGetSSL(const url:string);
 
-    
+    {$ENDIF}
 
     constructor Create(AOwner: TComponent); override;
     
@@ -135,6 +162,7 @@ type
     procedure SetRequestBodyAsString(pvRequestData: string; pvConvert2Utf8:
         Boolean);
 
+    function DecodeUtf8AsString: string;
     function GetResponseBodyAsString: string;
 
     property Active: Boolean read GetActive;
@@ -145,6 +173,9 @@ type
     property ConnectTimeOut: Integer read FConnectTimeOut write FConnectTimeOut;
     
     property CustomeHeader: TStrings read FCustomeHeader;
+    property HostIpV6: Boolean read FHostIpV6 write FHostIpV6;
+
+
 
     /// <summary>
     ///   是否保持连接状态
@@ -157,6 +188,12 @@ type
     /// </summary>
     property KeepAliveTimeOut: Cardinal read FKeepAliveTimeOut write FKeepAliveTimeOut;
     property LastActivity: Cardinal read FLastActivity;
+    property LastRequestHeader: String read FLastRequestHeader write
+        FLastRequestHeader;
+    property PostSize: Integer read FPostSize;
+
+    property RaiseOnResponseOnExceptCode: Boolean read FRaiseOnResponseOnExceptCode
+        write FRaiseOnResponseOnExceptCode;
     property ReConnectCounter: Integer read FReConnectCounter;
 
     /// <summary>
@@ -173,7 +210,7 @@ type
     ///    Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
     /// </summary>
     property RequestAccept: String read FRequestAccept write FRequestAccept;
-        
+
     /// <summary>
     ///  POST请求时, 内容数据类型
     /// </summary>
@@ -188,8 +225,8 @@ type
     property ResponseResultCode: Integer read GetResponseResultCode;
 
     property ResponseHeader: TStringList read FResponseHeader;
-    
-    
+
+
     /// <summary>
     ///   响应得到的头信息
     ///   返回的数据类型
@@ -213,10 +250,15 @@ type
 
 
 
+
+
     /// <summary>
     ///   读取和发送超时, 单位ms
     /// </summary>
     property TimeOut: Integer read FTimeOut write FTimeOut;
+
+
+
 
 
   end;
@@ -232,7 +274,11 @@ implementation
 
 { TDiocpHttpClient }
 const
+{$IFDEF DEBUG}
+  BLOCK_SIZE = 256;
+{$ELSE}
   BLOCK_SIZE = 1024 * 50;
+{$ENDIF}
 
 resourcestring
   STRING_E_RECV_ZERO = '服务端主动断开关闭';
@@ -245,7 +291,8 @@ resourcestring
   {$ENDIF}
 
 var
-  __trace_id: Integer;
+  //__trace_id: Integer;
+  __root: string;
   __writeBufferPool: PBufferPool;
 
 procedure RaiseLastSendException(LastError: Integer);
@@ -344,6 +391,7 @@ end;
 constructor TDiocpHttpClient.Create(AOwner: TComponent);
 begin
   inherited;
+  FRaiseOnResponseOnExceptCode := true;
   FBufferWriter := TBlockBuffer.Create(__writeBufferPool);
   FBufferWriter.OnBufferWrite := OnBufferWrite;
   FCreatTheadID := GetCurrentThreadID;
@@ -452,7 +500,7 @@ begin
   {$ENDIF}
 end;
 
-procedure TDiocpHttpClient.Cleaup;
+procedure TDiocpHttpClient.Cleanup;
 begin
   FRequestBody.Clear;
   FResponseBody.Clear;
@@ -497,6 +545,8 @@ begin
   begin
     FRequestHeader.Add('Cookie:' + FRawCookie);
   end;
+
+
   
 
   if CheckConnect(FURL.Host, StrToIntDef(FURL.Port, 80)) then
@@ -510,11 +560,13 @@ begin
     end;
     FStringBuilder.Append(FStringBuilder.LineBreak);   // 最后添加一个回车符
   {$IFDEF UNICODE}
-    lvRawHeader := TEncoding.Default.GetBytes(FStringBuilder.ToString());
+    FLastRequestHeader := FStringBuilder.ToString();
+    lvRawHeader := TEncoding.Default.GetBytes(FLastRequestHeader);
     len := Length(lvRawHeader);
     FBufferWriter.Append(@lvRawHeader[0], len);
   {$ELSE}
-    lvRawHeader := FStringBuilder.ToString();
+    FLastRequestHeader := FStringBuilder.ToString();
+    lvRawHeader := FLastRequestHeader;
     len := Length(lvRawHeader);
     FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
   {$ENDIF}
@@ -528,20 +580,28 @@ end;
 procedure TDiocpHttpClient.InnerExecuteRecvResponse;
 var
   lvRawHeader, lvBytes:TBytes;
-  x, l:Integer;
-  lvTempStr, lvRawHeaderStr, lvCookie:String;
+  x, nBufLength:Integer;
+  lvTempStr, lvRawHeaderStr, lvCookie, lvTransferEncoding:String;
   lvBuffer:PByte;
+  lvIsChunked:Boolean;
 
   lvTempBuffer:array[0.. BLOCK_SIZE -1] of Byte;
 
   function DecodeHttp():Integer;
   var
-    r, i:Integer;
+    r, n, l:Integer;
+    vByte:byte;
   begin
     Result := 0;
-    for i := 0 to l - 1 do
+    n := 0;
+    for n := 0 to nBufLength - 1 do
     begin
-      r := FHttpBuffer.InputBuffer(lvTempBuffer[i]);
+      vByte := lvTempBuffer[n];
+//      if n = 0 then
+//      begin
+//        vByte := Integer(vByte) + 1 -1;
+//      end;
+      r := FHttpBuffer.InputBuffer(vByte);
       Inc(FResponseSize);
       if r = 1 then
       begin
@@ -559,17 +619,23 @@ var
         FResponseContentEncoding :=StringsValueOfName(FResponseHeader, 'Content-Encoding', [':'], True);
 
         lvTempStr := StringsValueOfName(FResponseHeader, 'Content-Length', [':'], True);
+        lvTransferEncoding := StringsValueOfName(FResponseHeader, 'Transfer-Encoding', [':'], True);
 
-
-        
-        l := StrToIntDef(lvTempStr, 0);
-        if l = 0  then
+        FHttpBuffer.IsChunked := lvTransferEncoding = 'chunked';
+        if FHttpBuffer.IsChunked then
         begin
-          Result := 1;
-          Break;
+          FHttpBuffer.SetChunkedBegin;     // 开启Chunked解码
         end else
         begin
-          FHttpBuffer.ContentLength := l;
+          if Length(lvTempStr) = 0 then l := 0 else l := StrToIntDef(lvTempStr, 0);
+          if l = 0  then
+          begin
+            Result := 1;
+            Break;
+          end else
+          begin
+            FHttpBuffer.ContentLength := l;
+          end;
         end;
       end else if r = -2 then               
       begin
@@ -609,17 +675,17 @@ var
 
 begin
   FHttpBuffer.DoCleanUp;
-{$IFDEF MSWINDOWS}
 
   while True do
   begin
-    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
-    CheckSocketRecvResult(l);
-    if l = 0 then
+    nBufLength := DoRecvBuff(lvTempBuffer[0], BLOCK_SIZE);
+    //nBufLength := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE);
+    CheckSocketRecvResult(nBufLength);
+    if nBufLength = 0 then
     begin
       // 对方被关闭
       Close;
-      raise TDiocpSocketSendException.Create('与服务器断开连接！');
+      raise TDiocpSocketRecvException.Create('与服务器断开连接！');
     end;
     x := DecodeHttp;
     if x = 1 then
@@ -627,24 +693,7 @@ begin
       Break;
     end;
   end;
-{$ELSE}
-  while True do
-  begin
-    l := FRawSocket.RecvBuf(lvTempBuffer[0], BLOCK_SIZE, FTimeOut);
-    CheckSocketRecvResult(l);
-    if l = 0 then
-    begin
-      // 对方被关闭
-      Close;
-      raise TDiocpSocketSendException.Create('与服务器断开连接！');
-    end;
-    x := DecodeHttp;
-    if x = 1 then
-    begin
-      Break;
-    end;
-  end;
-{$ENDIF}
+
 
 
   FLastActivity := GetTickCount;
@@ -666,7 +715,7 @@ begin
 
   FURL.SetURL(pvURL);
   FRequestHeader.Clear;
-  if FURL.ParamStr = '' then
+  if Length(FURL.ParamStr)=0 then
   begin
     FRequestHeader.Add(Format('POST %s HTTP/1.1', [FURL.URI]));
   end else
@@ -728,7 +777,7 @@ begin
     lvRawHeader := FRequestHeaderBuilder.ToString();
     len := Length(lvRawHeader);
     FBufferWriter.Append(PAnsiChar(lvRawHeader), len);
-    {$IFDEF DEBUG}
+    {$IFDEF TRACE_LOG}
     WriteStringToUtf8NoBOMFile('request.dat', lvRawHeader);
     {$ENDIF}
   {$ENDIF}
@@ -740,6 +789,9 @@ begin
     begin
       len := FRequestBody.Size;
       FBufferWriter.Append(FRequestBody.Memory, len);
+      {$IFDEF TRACE_LOG}
+      FRequestBody.SaveToFile('request.body.dat');
+      {$ENDIF}
     end;
 
     FBufferWriter.FlushBuffer;
@@ -750,7 +802,7 @@ begin
   end;
 end;
 
-function TDiocpHttpClient.CheckConnect(pvHost: string; pvPort: Integer):
+function TDiocpHttpClient.CheckConnect(const pvHost: string; pvPort: Integer):
     Boolean;
 var
   lvReConnect:Boolean;
@@ -767,12 +819,49 @@ begin
 
   if lvReConnect then
   begin
+    if utils_strings.PosStr(':', pvHost) > 0 then
+    begin
+      lvIpAddr := pvHost;
+      FRawSocket.IPVersion := IP_V6;
+    end else
+    begin
+      if FURL.IPVersion = IP_V6 then
+      begin
+        FRawSocket.IPVersion := IP_V6;
+        lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
+      end else
+      begin
+        // 进行域名解析
+        lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
+        if utils_strings.PosStr(':', lvIpAddr) > 0 then
+        begin
+          FRawSocket.IPVersion := IP_V6;
+        end else
+        begin
+          FRawSocket.IPVersion := IP_V4;
+        end;
+      end;
+
+    end;
+
     FRawSocket.CreateTcpSocket;
     FRawSocket.DoInitialize();
 
+    {$IFDEF DIOCP_SSL}
+    self.FSslFlag := 0;
+    {$ENDIF}
+
+    if SameText(FURL.Protocol, 'https') then
+    begin
+      {$IFDEF DIOCP_SSL}
+      if not ssl_isready then
+      begin
+        raise EDiocpHttpClient.Create('SSL加载失败,请检测SSL文件是否存在!');
+      end;
+      {$ENDIF}
+    end;
+
     {$IFDEF MSWINDOWS}
-//    FRawSocket.SetSendBufferLength(BLOCK_SIZE);
-//    FRawSocket.SetRecvBufferLength(BLOCK_SIZE);
     if FTimeOut > 0 then
     begin
       FRawSocket.SetReadTimeOut(FTimeOut);
@@ -783,28 +872,50 @@ begin
 
     {$ENDIF}
 
-    // 进行域名解析
-    lvIpAddr := FRawSocket.GetIpAddrByName(pvHost);
-
     try
       {$IFDEF MSWINDOWS}
-      if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
-      begin
-        raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
-      end;
+//      if SameText(FURL.Protocol, 'https') then
+//      begin
+//        if not FRawSocket.Connect(lvIpAddr, pvPort) then
+//        begin
+//          raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+//        end;
+//      end else
+//      begin
+        if FRawSocket.IPVersion = IP_V6 then
+        begin
+          if not FRawSocket.ConnectV6(lvIpAddr, pvPort) then
+          begin
+            RaiseLastOSError;
+          end;
+        end else
+        begin
+          if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
+          begin
+            raise EDiocpHttpClient.Create(Format(STRING_E_CONNECT_TIMEOUT, [pvHost, pvPort]));
+          end;
+        end;
+      //end;
+
       {$ELSE}
       if not FRawSocket.Connect(lvIpAddr, pvPort) then
       begin
         RaiseLastOSError;
       end;
       {$ENDIF}
+
+      if SameText(FURL.Protocol, 'https') then
+      begin
+        {$IFDEF DIOCP_SSL}
+        self.FSslFlag := 1;
+        Self.DoSSLAfterConnect;
+        {$ENDIF}
+      end;
     except
       on e:exception do
       begin
         raise Exception.Create(Format('连接服务器(%s:%d)异常:%s', [lvIpAddr, pvPort, e.Message]));
-
-      end;
-
+      end;  
     end;
 
     Inc(FReConnectCounter);
@@ -817,6 +928,121 @@ begin
   Result := True;
 
 end;
+
+{$IFDEF DIOCP_SSL}
+procedure TDiocpHttpClient.DoSSLAfterConnect;
+var
+  lvMethod:PSSL_METHOD;
+  lvRet:cInt;
+begin
+  if FSSLCtx = nil then
+  begin
+    lvMethod := utils_openssl.SSLv23_client_method();
+    if lvMethod = nil then
+    begin
+      raise Exception.Create('建立SSL Client所用的method失败!');
+    end;
+
+    FSSLCtx := utils_openssl.SSL_CTX_new(lvMethod); //初始化上下文情景
+    if FSSLCtx = nil then
+    begin
+      raise Exception.Create('创建客户端SSL_CTX失败!');
+    end;
+
+    // 口令
+    SSL_CTX_set_cipher_list(FSslCtx, SSL_CipherList);
+  end;
+
+  if FSsl <> nil then
+  begin
+    SSL_free(FSsl);
+    FSsl := nil;
+  end;
+
+  FSsl := utils_openssl.SSL_new(FSSLCtx); //申请SSL会话的环境,参数就是前面我们申请的 SSL通讯方式。返回当前的SSL 连接环境的指针。
+  if FSsl = nil then
+  begin
+    raise Exception.Create('申请SSL会话的环境失败!');
+  end;
+ 
+  utils_openssl.SSL_set_fd(FSsl, FRawSocket.SocketHandle); //绑定读写套接字
+  lvRet := utils_openssl.SSL_connect(FSsl);
+
+  if lvRet = -1 then
+  begin
+    lvRet := SSL_get_error(FSsl, lvRet);
+    if SSL_IsFatalErr(lvRet) then
+    begin
+      raise EDiocpHttpClient.Create(Format('SSL SSL_connect 异常:%d', [lvRet]));
+    end;
+  end;
+
+end;
+
+
+procedure TDiocpHttpClient.DoTestGetSSL(const url: string);
+var
+  Host: string;
+  Port: Word;
+  
+  ctxClient: utils_openssl.PSSL_CTX; //SSL上下文
+  methClient: utils_openssl.PSSL_METHOD;
+  sRemoteIP: string;
+
+  sslClient: utils_openssl.PSSL;
+  pStr: Pchar;
+  buf: array[0..4095] of Char;
+  nRet: integer;
+  strSend: string;
+begin
+
+  FURL.SetURL(url);
+
+
+  sRemoteIP := GetIpAddrByName(FURL.Host);
+  if sRemoteIP = '' then
+  begin
+    raise Exception.Create('获取远程IP地址失败!');
+
+  end;
+ 
+
+  FRawSocket.CreateTcpSocket;
+  FRawSocket.DoInitialize;
+  FRawSocket.Connect(sRemoteIP, Port);
+
+  methClient := utils_openssl.SSLv23_client_method();
+  if methClient = nil then
+  begin
+    raise Exception.Create('建立SSL Client所用的method失败!');
+  end;
+ 
+  ctxClient := utils_openssl.SSL_CTX_new(methClient); //初始化上下文情景
+  if ctxClient = nil then
+  begin
+    raise Exception.Create('创建客户端SSL_CTX失败!');
+  end;
+
+      // 口令
+  SSL_CTX_set_cipher_list(ctxClient, SSL_CipherList);
+ 
+  sslClient := utils_openssl.SSL_new(ctxClient); //申请SSL会话的环境,参数就是前面我们申请的 SSL通讯方式。返回当前的SSL 连接环境的指针。
+  if sslClient = nil then
+  begin
+    FRawSocket.Close(False);
+    raise Exception.Create('申请SSL会话的环境失败!');
+
+  end;
+
+  utils_openssl.SSL_set_fd(sslClient, FRawSocket.SocketHandle); //绑定读写套接字
+  if utils_openssl.SSL_connect(sslClient) = -1 then
+  begin
+    raise Exception.Create('err connect');
+  end;
+
+end;
+
+{$ENDIF}
 
 procedure TDiocpHttpClient.CheckRecv(buf: Pointer; len: cardinal);
 var
@@ -836,7 +1062,7 @@ begin
     end;
     CheckSocketRecvResult(lvTempL);
 
-    lvPBuf := Pointer(IntPtr(lvPBuf) + Cardinal(lvTempL));
+    lvPBuf := Pointer(IntPtr(lvPBuf) + IntPtr(lvTempL));
     lvReadL := lvReadL + Cardinal(lvTempL);
   end;
 end;
@@ -919,7 +1145,7 @@ begin
   try
     r := FRawSocket.SendBuf(pvBuf^, len);
     CheckSocketRecvResult(r);
-    if r <> len then
+    if r <> Integer(len) then
     begin
       raise Exception.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [len, r]));
     end;
@@ -937,23 +1163,48 @@ procedure TDiocpHttpClient.DoAfterResponse;
 var
   lvCode:Integer;
 begin
-  lvCode := ResponseResultCode;
-  if lvCode = 200 then
+  {$IFDEF TRACE_LOG}
+  FHttpBuffer.HeaderBuilder.SaveToFile(__app_root + 'response.header.dat');
+  FHttpBuffer.ContentBuilder.SaveToFile(__app_root + 'response.dat');
+  {$ENDIF}
+  if FRaiseOnResponseOnExceptCode then
   begin
-    ; // OK
-  end else if lvCode= -1 then
+    lvCode := ResponseResultCode;
+    if lvCode = 200 then
+    begin
+      ; // OK
+    end else if lvCode= -1 then
+    begin
+      raise Exception.Create(Format('错误的ResponseHttpCode[%d]', [lvCode]));
+    end else
+    begin
+
+      raise Exception.Create(Format('错误的ResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
+    end;
+  end;
+end;
+
+function TDiocpHttpClient.DoRecvBuff(var data; const len: Cardinal): Integer;
+begin
+  {$IFDEF DIOCP_SSL}
+  if (FSsl <> nil) and (Self.FSslFlag = 1) then
   begin
-    raise Exception.Create(Format('错误的ResponseHttpCode[%d]', [lvCode]));
+    result := utils_openssl.SSL_read(FSsl, @data, len);
   end else
+  {$ENDIF}
   begin
-    FHttpBuffer.ContentBuilder.SaveToFile('response.dat');
-    raise Exception.Create(Format('错误的ResponseHttpCode[%d]: %s', [lvCode, GetResponseCodeText(lvCode)]));
+    result := FRawSocket.RecvBuf(data, len);
   end;
 end;
 
 function TDiocpHttpClient.GetActive: Boolean;
 begin
   Result := FRawSocket.SocketValid;
+end;
+
+function TDiocpHttpClient.DecodeUtf8AsString: string;
+begin
+  Result := ReadStringFromStream(FResponseBody, True);
 end;
 
 function TDiocpHttpClient.GetResponseBodyAsString: string;
@@ -1062,6 +1313,19 @@ procedure TDiocpHttpClient.OnBufferWrite(pvSender: TObject; pvBuffer: Pointer;
 var
   r:Integer;
 begin
+{$IFDEF DIOCP_SSL}
+  if (FSsl <> nil) and (self.FSslFlag = 1) then
+  begin
+    r := SSL_write(FSsl, pvBuffer, pvLength);
+    CheckSocketSendResult(r);
+    if r <> pvLength then
+    begin
+      FRawSocket.Close();
+      raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
+    end;
+    exit;
+  end;
+{$ENDIF}
   r := FRawSocket.SendBuf(pvBuffer^, pvLength);
   CheckSocketSendResult(r);
   if r <> pvLength then
@@ -1069,11 +1333,13 @@ begin
     FRawSocket.Close();
     raise TDiocpSocketSendException.Create(Format('指定发送的数据长度:%d, 实际发送长度:%d', [pvLength, r]));
   end;
+  FPostSize := FPostSize + r;
 end;
 
 procedure TDiocpHttpClient.Reset;
 begin
-  self.Cleaup;
+  self.Cleanup;
+  FRaiseOnResponseOnExceptCode := True;
   FResponseCookie := STRING_EMPTY;
 end;
 
@@ -1094,8 +1360,11 @@ begin
 end;
 
 initialization
-  __trace_id := 0;
+  //__trace_id := 0;
+  __root := ExtractFilePath(ParamStr(0));
   __writeBufferPool := NewBufferPool(BLOCK_SIZE);
+
+
 
 finalization
   FreeBufferPool(__writeBufferPool);

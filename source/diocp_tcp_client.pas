@@ -27,6 +27,7 @@ uses
   , utils_queues, SyncObjs;
 
 type
+  //TCheck
   /// <summary>
   ///   如果是getFromPool不能进Server的List列表
   /// </summary>
@@ -41,6 +42,10 @@ type
 
     FOnConnectFailEvent: TNotifyContextEvent;
     FOnASyncCycle: TNotifyContextEvent;
+
+    // 阻止重连时间
+    FBlockStartTick:Cardinal;
+    FBlockTime:Cardinal;
 
     FHost: String;
     FPort: Integer;
@@ -58,6 +63,10 @@ type
 
     procedure DoConnectFail;
   protected
+
+    procedure DoBeforeReconnect(var vAllowReconnect: Boolean); virtual;
+  protected
+
     procedure OnConnecteExResponse(pvObject:TObject);
 
     procedure OnDisconnected; override;
@@ -67,6 +76,8 @@ type
     procedure OnConnectFail; virtual;
 
     procedure SetSocketState(pvState:TSocketState); override;
+
+
 
     procedure OnRecvBuffer(buf: Pointer; len: Cardinal; ErrCode: WORD); override;
 
@@ -83,6 +94,7 @@ type
 
     constructor Create; override;
     destructor Destroy; override;
+    procedure BlockReconnectTime(pvMSecs:Cardinal);
     /// <summary>
     ///  阻塞方式建立连接
     ///    连接状态变化: ssDisconnected -> ssConnected/ssDisconnected
@@ -121,6 +133,8 @@ type
 
     property Port: Integer read FPort write FPort;
 
+
+
   end;
 
   /// <summary>
@@ -142,7 +156,8 @@ type
     ///  检测使用重新连接 ,单线程使用，仅供DoAutoReconnect调用
     ///    间隔最少5秒以上
     /// </summary>
-    procedure DoAutoReconnect(pvASyncWorker:TASyncWorker);
+    procedure DoAutoReconnect(pvFileWritter: TSingleFileWriter;
+        pvASyncWorker:TASyncWorker);
 
     /// <summary>
     ///    检测使用重新连接 ,单线程使用，仅供DoASyncCycle调用
@@ -165,10 +180,11 @@ type
   {$ELSE}
     FList: TObjectList;
   {$ENDIF}
-    FListLocker: TCriticalSection;
+
     FTrigerDisconnectEventAfterNoneConnected: Boolean;
     FOnContextConnectFailEvent: TNotifyContextEvent;
   protected
+    FListLocker: TCriticalSection;
     procedure DoAfterOpen;override;
     procedure DoAfterClose; override; 
   public
@@ -180,10 +196,26 @@ type
     /// </summary>
     procedure ClearContexts;
 
+
     /// <summary>
-    ///   添加一个连对象
+    ///   请求断开所有连接，会立刻返回。
+    /// </summary>
+    procedure DisconnectAll;  override;
+
+    /// <summary>
+    ///   添加一个连对象(添加到一个List中，DiocpTcpClient对象释放时进行清理释放)
+    ///   该连接，可以重复使用
     /// </summary>
     function Add: TIocpRemoteContext;
+
+    /// <summary>
+    ///   移除一个链接,并进行释放
+    /// </summary>
+    /// <returns>
+    ///  true: 移除成功进行释放
+    ///  false: 不是当前对象添加的连接
+    /// </returns>
+    function RemoveAndFree(aCtx:TIocpRemoteContext): Boolean;
 
     /// <summary>
     ///   pvContext是否是当前列表中的对象
@@ -283,6 +315,12 @@ begin
   inherited Destroy;
 end;
 
+procedure TIocpRemoteContext.BlockReconnectTime(pvMSecs:Cardinal);
+begin
+  FBlockTime := pvMSecs;
+  FBlockStartTick := GetTickCount;
+end;
+
 function TIocpRemoteContext.CanAutoReConnect: Boolean;
 begin
   Result := FAutoReConnect and (Owner.Active) and (not TDiocpTcpClient(Owner).DisableAutoConnect);
@@ -302,17 +340,20 @@ begin
 end;
 
 procedure TIocpRemoteContext.CheckDoReConnect;
-begin
-
-  if not (SocketState in [ssConnecting, ssConnected]) then
+begin     
+  if self.CtxStateFlag = CTX_STATE_INITIAL then  
   begin
     if Owner.Active then
     begin
+      {$IFDEF DIOCP_DEBUG}
       AddDebugStrings('*(*)执行重连请求!');
+      {$ENDIF}
       ConnectASync;
     end else
     begin
+      {$IFDEF DIOCP_DEBUG}
       AddDebugStrings('*(*)CheckDoReConnect::Check Owner is deactive!');
+      {$ENDIF}
     end;
   end;
 end;
@@ -369,14 +410,23 @@ end;
 procedure TIocpRemoteContext.ConnectASync;
 begin
   if (Owner <> nil) and (not Owner.Active) then raise Exception.CreateFmt(strEngineIsOff, [Owner.Name]);
+  if (Owner <> nil) then
+  begin
+    // 禁止连接
+    if Owner.DisableConnectFlag = 1 then Exit;
+  end;
 
   if SocketState <> ssDisconnected then raise Exception.Create(Format(strCannotConnect, [TSocketStateCaption[SocketState]]));
 
   ReCreateSocket;
 
+  DoSetCtxState(CTX_STATE_CONNECTING);
   if not PostConnectRequest then
   begin
     DoConnectFail;
+
+    // 连接失败, 检测是否需要回归到池
+    self.CheckReleaseBack;
   end;
 end;
 
@@ -401,10 +451,30 @@ begin
   if (Owner <> nil) and (TDiocpTcpClient(Owner).TrigerDisconnectEventAfterNoneConnected) then
   begin
     DoNotifyDisconnected;
-  end else
+  end;
+
+  // 状态一定要设定
+  SetSocketState(ssDisconnected);
+  DoSetCtxState(CTX_STATE_INITIAL);
+end;
+
+procedure TIocpRemoteContext.DoBeforeReconnect(var vAllowReconnect: Boolean);
+begin
+  vAllowReconnect := (FAutoReConnect) and CheckActivityTimeOut(10000);
+  if vAllowReconnect then
   begin
-    // 状态一定要设定
-    SetSocketState(ssDisconnected);
+    if (FBlockStartTick > 0) and (FBlockTime > 0) then
+    begin
+      if tick_diff(FBlockStartTick, GetTickCount) < FBlockTime then
+      begin         // 阻止连接
+        vAllowReconnect := False;
+      end else
+      begin
+        FBlockStartTick := 0;
+        FBlockTime := 0;
+      end;
+    end;
+
   end;
 end;
 
@@ -424,15 +494,14 @@ begin
       DoConnected;
     end else
     begin
-      {$IFDEF DEBUG_ON}
+      {$IFDEF DIOCP_DEBUG}
       Owner.logMessage(strConnectError,  [self.Host, self.Port,  TIocpConnectExRequest(pvObject).ErrorCode]);
       {$ENDIF}
 
       DoError(TIocpConnectExRequest(pvObject).ErrorCode);
 
       DoConnectFail;
-
-
+      self.CheckReleaseBack;
     end;
   finally
     if Owner <> nil then Owner.DecRefCounter;
@@ -552,7 +621,28 @@ begin
   FList.Clear;
   FList.Free;
   FListLocker.Free;
+  FListLocker := nil;
   inherited Destroy;
+end;
+
+procedure TDiocpTcpClient.DisconnectAll;
+var
+  i: Integer;
+  lvContext:TIocpRemoteContext;
+  vAllow:Boolean;
+begin
+  inherited DisconnectAll;
+  if FListLocker = nil then Exit;  
+  FListLocker.Enter;
+  try
+    for i := 0 to FList.Count - 1 do
+    begin
+      lvContext := TIocpRemoteContext(FList[i]);
+      lvContext.RequestDisconnect('主动请求断开所有连接');
+    end;
+  finally
+    FListLocker.Leave;
+  end;
 end;
 
 procedure TDiocpTcpClient.DoAfterOpen;
@@ -567,25 +657,36 @@ begin
 
 end;
 
-procedure TDiocpTcpClient.DoAutoReconnect(pvASyncWorker:TASyncWorker);
+procedure TDiocpTcpClient.DoAutoReconnect(pvFileWritter: TSingleFileWriter;
+    pvASyncWorker:TASyncWorker);
 var
   i: Integer;
   lvContext:TIocpRemoteContext;
+  vAllow:Boolean;
 begin
   if not CheckOperaFlag(OPERA_SHUTDOWN_CONNECT) then
   begin
+    if self.DisableConnectFlag = 1 then Exit;
+    
     FListLocker.Enter;
     try
       for i := 0 to FList.Count - 1 do
       begin
         if pvASyncWorker.Terminated then Break;
-
-        lvContext := TIocpRemoteContext(FList[i]);
-        if (lvContext.FAutoReConnect)
-          and lvContext.CheckActivityTimeOut(10000)
-          then
-        begin
-          lvContext.CheckDoReConnect;
+        try
+          lvContext := TIocpRemoteContext(FList[i]);
+          lvContext.DoBeforeReconnect(vAllow);
+          if vAllow then
+          begin
+            lvContext.CheckDoReConnect;
+          end;
+        except
+          on e:Exception do
+          begin
+            {$IFDEF DEBUG}
+            pvFileWritter.LogMessage('DoAutoReconnect[%d]出现了异常:%s', [i, e.Message]);
+            {$ENDIF}
+          end;
         end;
       end;
     finally
@@ -726,12 +827,12 @@ procedure TDiocpTcpClient.DoASyncWork(pvFileWritter: TSingleFileWriter;
 begin
   if tick_diff(FAutoConnectTick, GetTickCount) > 5000 then
   begin
+    FAutoConnectTick := GetTickCount;
     if not self.DisableAutoConnect then
     begin
-      DoAutoReconnect(pvASyncWorker);
+      DoAutoReconnect(pvFileWritter, pvASyncWorker);
     end;
     DoASyncCycle(pvASyncWorker);
-    FAutoConnectTick := GetTickCount;
   end;
 end;
 
@@ -761,12 +862,28 @@ procedure TDiocpTcpClient.RemoveAllContext;
 begin
   IncOperaOptions(OPERA_SHUTDOWN_CONNECT);
   try
-    DisconnectAll;
-    WaitForContext(30000);
-    ClearContexts();
+    FDisableConnectFlag := 1;
+    try
+      DisconnectAll;
+      WaitForContext(30000);
+      ClearContexts();
+    finally
+      FDisableConnectFlag := 0;
+    end;
   finally
     DecOperaOptions(OPERA_SHUTDOWN_CONNECT);
   end;
+end;
+
+function TDiocpTcpClient.RemoveAndFree(aCtx:TIocpRemoteContext): Boolean;
+begin
+  FListLocker.Enter;
+  try
+    Result := FList.Remove(aCtx) <> -1;
+  finally
+    FListLocker.Leave;
+  end;
+
 end;
 
 procedure TDiocpTcpClient.SetDisableAutoConnect(const Value: Boolean);

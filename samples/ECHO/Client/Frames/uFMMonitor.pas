@@ -48,8 +48,8 @@ implementation
 {$R *.dfm}
 
 resourcestring
-  strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
-  strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度(每秒处理个数):%d';  //post:%d, response:%d, remain:%d
+  strRecv_PostInfo     = '投递:%d, 回应:%d, 剩余:%d 速度:%d 个/秒, %.4f M/秒';  //post:%d, response:%d, remain:%d
+  strSend_Info         = '投递:%d, 回应:%d, 剩余:%d 速度:%d';  //post:%d, response:%d, remain:%d
 
 class function TFMMonitor.createAsChild(pvParent: TWinControl; pvDiocpCustom:
     TDiocpCustom): TFMMonitor;
@@ -117,7 +117,8 @@ begin
        FIocpSocket.DataMoniter.ResponseWSARecvCounter,
        FIocpSocket.DataMoniter.PostWSARecvCounter -
        FIocpSocket.DataMoniter.ResponseWSARecvCounter,
-       FIocpSocket.DataMoniter.Speed_WSARecvResponse
+       FIocpSocket.DataMoniter.Speed_WSARecvResponse,
+       FIocpSocket.DataMoniter.Speed_Recv / (1024 * 1024.00)
      ]
     );
 

@@ -33,6 +33,8 @@ function Base64Encode(buf: PByte; len: Integer; CharsPerLine: Integer = 0):
     string; overload;
 function Base64Encode(pvString: string; CharsPerLine: Integer = 0): string;
     overload;
+function Base64EncodeFile(const pvFile: string; CharsPerLine: Integer = 0):
+    string;
 function Base64Decode(pvSrc:PByte; pvSrcLen:Integer; pvDest:PByte): Integer; overload;
 function Base64Decode(pvSrc:PByte; pvSrcLen:Integer; pvOutStream:TStream):
     Integer; overload;
@@ -608,6 +610,20 @@ var
 begin
   InitDecodeState(State);
   Result := DecodeBuffer(pvSrc, pvOutStream, pvSrcLen, 1, State);
+end;
+
+function Base64EncodeFile(const pvFile: string; CharsPerLine: Integer = 0):
+    string;
+var
+  lvFs:TFileStream;
+begin
+  lvFs := TFileStream.Create(pvFile, fmOpenRead);
+  try
+    lvFs.Position := 0;
+    Result := Base64Encode(lvFs, CharsPerLine);
+  finally
+    lvFs.Free;
+  end;        
 end;
 
 end.

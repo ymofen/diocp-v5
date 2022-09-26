@@ -8,3 +8,7 @@
       清空 ClearContent
       LoadFromFile可以加载文件流
     
+2018-10-07 13:41:48
+  DiocpRequest.AddRef, DecRef
+      添加引用计数器, 异步响应时配套使用。
+  

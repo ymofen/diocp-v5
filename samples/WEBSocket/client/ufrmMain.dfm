@@ -23,7 +23,6 @@ object Form1: TForm1
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 0
-    ExplicitWidth = 522
     object btnConnect: TButton
       Left = 370
       Top = 6
@@ -38,8 +37,9 @@ object Form1: TForm1
       Top = 8
       Width = 360
       Height = 21
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       TabOrder = 1
-      Text = 'ws://127.0.0.1:8003/subscribe'
+      Text = 'ws://127.0.0.1:16001/ws/service'
     end
     object btnDisconnect: TButton
       Left = 451
@@ -59,17 +59,16 @@ object Form1: TForm1
     Align = alClient
     Caption = 'pnlClient'
     TabOrder = 1
-    ExplicitWidth = 522
     object mmoRecv: TMemo
       Left = 1
       Top = 1
       Width = 666
       Height = 223
       Align = alClient
+      ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
       Lines.Strings = (
         'mmoRecv')
       TabOrder = 0
-      ExplicitWidth = 520
     end
     object pnlSend: TPanel
       Left = 1
@@ -80,17 +79,16 @@ object Form1: TForm1
       BevelOuter = bvNone
       Caption = 'pnlSend'
       TabOrder = 1
-      ExplicitWidth = 520
       object mmoSend: TMemo
         Left = 0
         Top = 0
         Width = 666
         Height = 126
         Align = alClient
+        ImeName = #20013#25991' - QQ'#25340#38899#36755#20837#27861
         Lines.Strings = (
           'mmoSend')
         TabOrder = 0
-        ExplicitWidth = 520
       end
       object pnlSendRight: TPanel
         Left = 0
@@ -100,7 +98,6 @@ object Form1: TForm1
         Align = alBottom
         BevelOuter = bvNone
         TabOrder = 1
-        ExplicitWidth = 520
         object btnSend: TButton
           Left = 436
           Top = 3

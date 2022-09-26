@@ -1,6 +1,8 @@
 program Client;
 
 uses
+  FastMM4,
+  FastMM4Messages,
   Forms,
   Unit1 in 'Unit1.pas' {Form1};
 

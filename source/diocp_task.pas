@@ -17,7 +17,7 @@ interface
 
 uses
   diocp_core_engine, SysUtils, utils_queues, Messages, Windows, Classes,
-  SyncObjs, utils_hashs, utils_locker, utils_threadinfo;
+  SyncObjs, utils_hashs, utils_locker, utils_threadinfo, utils_BufferPool;
 
 const
   WM_REQUEST_TASK = WM_USER + 1;
@@ -36,7 +36,7 @@ type
   /// rtPostMessage: use in dll project
   TRunInMainThreadType = (rtSync, rtPostMessage);
 
-  TDataFreeType = (ftNone, ftFreeAsObject, ftUseDispose);
+  TDataFreeType = (ftNone, ftFreeAsObject, ftUseDispose, ftReleaseRef);
 
   TSignalTaskData = class(TObject)
   private
@@ -81,6 +81,7 @@ type
     FTaskData:Pointer;
     procedure DoCleanUp;
     procedure InnerDoTask;
+    procedure InnerDoTaskAction;
   protected
     procedure HandleResponse; override;
     function GetStateINfo: String; override;
@@ -168,10 +169,11 @@ type
 
     /// <summary>
     ///   post a signal task
+    ///   投递失败会安装FreeType处理数据
     /// </summary>
-    procedure SignalATask(pvSignalID: Integer; pvTaskData: Pointer = nil;
+    function SignalATask(pvSignalID: Integer; pvTaskData: Pointer = nil;
         pvDataFreeType: TDataFreeType = ftNone; pvRunInMainThread: Boolean = False;
-        pvRunType: TRunInMainThreadType = rtSync); overload;
+        pvRunType: TRunInMainThreadType = rtSync): Boolean; overload;
 
 
     property Active: Boolean read FActive write SetActive;
@@ -193,7 +195,12 @@ function checkInitializeTaskManager(pvWorkerCount: Integer = 0;
 
 procedure CheckFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
 
+procedure CheckCreateRequestPoolForTask(const pvMax:Integer);
+
 implementation
+
+uses
+  utils_strings;
 
 var
   /// iocpRequestPool
@@ -202,7 +209,7 @@ var
 resourcestring
   strDebugRequest_State = '主线程运行: %s, 完成: %s, 耗时(ms): %d';
   strSignalAlreadyRegisted = '信号(%d)已经注册';
-  strSignalUnRegister = '信号(%d)取消注册';
+  strSignalUnRegister = '信号(%d)未注册或者已经取消注册';
 
 procedure CheckFreeData(var pvData: Pointer; pvDataFreeType: TDataFreeType);
 begin
@@ -214,6 +221,9 @@ begin
   end else if pvDataFreeType = ftUseDispose then
   begin
     Dispose(pvData);
+  end else if pvDataFreeType = ftReleaseRef then
+  begin
+    ReleaseRef(pvData);
   end;
 end;
 
@@ -259,7 +269,6 @@ begin
   inherited Create;
   FLocker := TIocpLocker.Create('iocpTaskLocker');
   FIocpEngine := TIocpEngine.Create();
-  FIocpEngine.setWorkerCount(2);
   FSignalTasks := TDHashTable.Create(17);
   FSignalTasks.OnDelete := OnSignalTaskDelete;
 
@@ -281,16 +290,52 @@ begin
   inherited Destroy;
 end;
 
+function IsClass(Obj: TObject; Cls: TClass): Boolean;
+var
+  Parent: TClass;
+begin
+  Parent := Obj.ClassType;
+  while (Parent <> nil) and (Parent.ClassName <> Cls.ClassName) do
+    Parent := Parent.ClassParent;
+  Result := Parent <> nil;
+end;
+
+
+procedure HandleException();
+begin
+  if GetCapture <> 0 then SendMessage(GetCapture, WM_CANCELMODE, 0, 0);
+  if IsClass(ExceptObject, Exception) then
+  begin
+    if not IsClass(ExceptObject, EAbort) then
+      SysUtils.ShowException(ExceptObject, ExceptAddr);
+  end else
+    SysUtils.ShowException(ExceptObject, ExceptAddr);
+end;
+
+procedure CheckCreateRequestPoolForTask(const pvMax:Integer);
+var
+  i: Integer;
+begin
+  for i := 0 to pvMax - 1 do
+  begin
+    requestPool.EnQueue(TIocpTaskRequest.Create);
+  end;
+end;
+
 procedure TIocpTaskMananger.DoMainThreadWork(var AMsg: TMessage);
 begin
   if AMsg.Msg = WM_REQUEST_TASK then
   begin
     try
-      if not FEnable then Exit;
-      TIocpTaskRequest(AMsg.WPARAM).InnerDoTask();
-    finally
-      if AMsg.LPARAM <> 0 then
-        TEvent(AMsg.LPARAM).SetEvent;
+      try
+        if not FEnable then Exit;
+        TIocpTaskRequest(AMsg.WPARAM).InnerDoTaskAction();
+      finally
+        if AMsg.LPARAM <> 0 then
+          TEvent(AMsg.LPARAM).SetEvent;
+      end;
+    except
+      HandleException();
     end;
   end else
     AMsg.Result := DefWindowProc(FMessageHandle, AMsg.Msg, AMsg.WPARAM, AMsg.LPARAM);
@@ -579,15 +624,16 @@ begin
 
 end;
 
-procedure TIocpTaskMananger.SignalATask(pvSignalID: Integer; pvTaskData:
-    Pointer = nil; pvDataFreeType: TDataFreeType = ftNone; pvRunInMainThread:
-    Boolean = False; pvRunType: TRunInMainThreadType = rtSync);
+function TIocpTaskMananger.SignalATask(pvSignalID: Integer; pvTaskData: Pointer
+    = nil; pvDataFreeType: TDataFreeType = ftNone; pvRunInMainThread: Boolean =
+    False; pvRunType: TRunInMainThreadType = rtSync): Boolean;
 var
   lvSignalData:TSignalTaskData;
 
   lvRequest:TIocpTaskRequest;
   lvTaskWork: TOnTaskWork;
 begin
+  Result := False;
   lvTaskWork := nil;
   if not FEnable then
   begin
@@ -602,7 +648,8 @@ begin
     if lvSignalData = nil then
     begin
       CheckFreeData(pvTaskData, pvDataFreeType);
-      raise Exception.CreateFmt(strSignalUnRegister, [pvSignalID]);
+      Exit;
+      //raise Exception.CreateFmt(strSignalUnRegister, [pvSignalID]);
     end;
 
     lvTaskWork := lvSignalData.FOnTaskWork;
@@ -625,6 +672,7 @@ begin
     lvRequest.FRunInMainThreadType := pvRunType;
 
     InnerPostTask(lvRequest);
+    Result := True;
   except
     // if occur exception, push to requestPool.
     if lvRequest <> nil then requestPool.EnQueue(lvRequest);
@@ -660,7 +708,7 @@ end;
 
 procedure TIocpTaskRequest.DoCleanUp;
 begin
-  self.Remark := '';
+  self.Remark := STRING_EMPTY;
   FOnTaskWork := nil;
   FOnTaskWorkStrData := nil;
   FOnTaskWorkProc := nil;
@@ -728,8 +776,11 @@ begin
       end;
     end;
     FEndTime := GetTickCount;
-  finally 
+  finally
     CheckFreeData(FTaskData, FFreeType);
+    Self.Data := nil;
+    self.FStrData := STRING_EMPTY;
+    self.DoCleanUp;
     requestPool.EnQueue(Self);
     SetCurrentThreadInfo('DiocpTask::HandleResponse - finally end');
   end;
@@ -738,27 +789,32 @@ end;
 procedure TIocpTaskRequest.InnerDoTask;
 begin
   try
-    if Assigned(FOnTaskWork) then
-    begin
-      FOnTaskWork(Self);
-    end else if Assigned(FOnTaskWorkProc) then
-    begin
-      FOnTaskWorkProc(Self);
-    end else if Assigned(FOnTaskWorkStrData) then
-    begin
-      FOnTaskWorkStrData(FStrData);
-    end else if Assigned(FOnTaskWorkActionIdData) then
-    begin
-      FOnTaskWorkActionIdData(FActionID, FStrData);
-    end else if Assigned(FOnTaskWorkNoneData) then
-    begin
-      FOnTaskWorkNoneData();
-    end;
+    InnerDoTaskAction();
   except
     on E:Exception do
     begin
       SafeWriteFileMsg('Task逻辑处理异常:' + E.Message, 'DIOCP_TASK_DEBUG');
     end;
+  end;
+end;
+
+procedure TIocpTaskRequest.InnerDoTaskAction;
+begin 
+  if Assigned(FOnTaskWork) then
+  begin
+    FOnTaskWork(Self);
+  end else if Assigned(FOnTaskWorkProc) then
+  begin
+    FOnTaskWorkProc(Self);
+  end else if Assigned(FOnTaskWorkStrData) then
+  begin
+    FOnTaskWorkStrData(FStrData);
+  end else if Assigned(FOnTaskWorkActionIdData) then
+  begin
+    FOnTaskWorkActionIdData(FActionID, FStrData);
+  end else if Assigned(FOnTaskWorkNoneData) then
+  begin
+    FOnTaskWorkNoneData();
   end;
 end;
 
@@ -778,7 +834,7 @@ end;
 initialization
   requestPool := TBaseQueue.Create;
   requestPool.Name := 'taskRequestPool';
-  checkInitializeTaskManager(2);
+  checkInitializeTaskManager(0);
 
 
 finalization

@@ -6,7 +6,8 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, diocp_tcp_client,
   utils_safeLogger, ComCtrls, diocp_sockets, ExtCtrls, utils_async,
-  utils_BufferPool, utils_fileWriter, diocp_tcp_blockClient, Registry;
+  utils_BufferPool, utils_fileWriter, diocp_tcp_blockClient, Registry,
+  utils_strings, diocp_task;
 
 type
   TEchoContext = class(TIocpRemoteContext)
@@ -254,7 +255,8 @@ var
 begin
   SpinLock(FSpinLock);
   try
-    FIocpClientSocket.Open; 
+    FIocpClientSocket.Open;
+
     lvClient := FIocpClientSocket.Add;
     lvClient.Host := edtHost.Text;
     lvClient.Port := StrToInt(edtPort.Text);
@@ -651,8 +653,8 @@ var
 begin
   lvDValue := TDValue.Create();
   JSONParseFromUtf8NoBOMFile(pvFileName, lvDVAlue);
-  edtHost.Text := lvDValue.ForceByName('host').AsString;
-  edtPort.Text := lvDValue.ForceByName('port').AsString;
+  edtHost.Text := lvDValue.GetValueByName('host', '127.0.0.1');
+  edtPort.Text := lvDValue.GetValueByName('port', '9983');;
   mmoData.Lines.Text := lvDValue.ForceByName('sendText').AsString;
   chkRecvEcho.Checked := lvDValue.ForceByName('chk_recvecho').AsBoolean;
   chkSaveData.Checked := lvDValue.ForceByName('chk_saveonrecv').AsBoolean;

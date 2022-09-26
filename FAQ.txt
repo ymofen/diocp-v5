@@ -91,3 +91,11 @@ A: 客户端连接TIocpRemoteContext支持阻塞方式建立连接(Connect)和�
    Connect 建立连接失败后会抛出异常，不会触发其他事件。
    ConnectASync，建立失败后会触发会依次触发(FOnConnectFail(事件) -> OnConnectFail(成员方法) ->DoNotifyDisconnected(如果Owner.TrigerDisconnectEventAfterNoneConnected为true)/连接状态(ssDisconnected));
    
+Q: 为什么发送小数据会有延时？
+A: Windows的Socket有个nagle算法会造成200ms左右的延时, 为了减少网络拥塞而设计的，它会等待足够的数据才发送出去，如果没有足够的数据，就会等待约200ms（内部计时器超时触发）后发送出去。
+   DIOCP有个NoDelayOption选项，可以尝试打开这个选项。看看有没有改善，记得服务端和客户端都打开，试试看
+   
+Q: 在DLL中使用Diocp要注意什么吗？
+A: 因为Diocp中使用了线程，所以要依靠单元的Finalzation的释放Diocp, 最好的方法DLL导出一个函数，在FreeLibary之前调用该函数，在函数中释放Diocp，关闭Diocp工作线程，Diocp的默认工作线程在diocp_core_engine.pas中，
+   关闭默认Diocp引擎的函数: diocp_core_engine.StopDiocpEngine, 记得在关闭所有Diocp之后调用
+   
