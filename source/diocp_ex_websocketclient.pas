@@ -1,4 +1,9 @@
 unit diocp_ex_websocketclient;
+{
+  2023-06-17 11:21:43
+  添加HeadURIFlag参数  0:头发送完整url(默认), 1：只发送路径和参数部分
+   有的服务器需要完整，有的只需要路径和参数部分
+}
 
 interface
 
@@ -14,6 +19,7 @@ type
     FURL: TURL;
     FWsUrl: String;
     FHeaderBuilder: THttpHeaderBuilder;
+    FHeadURIFlag: Integer;
     /// <summary>
     /// WebSocket接收到的整个数据
     /// </summary>
@@ -55,8 +61,12 @@ type
     property WebSocketContentBuffer: TDBufferBuilder read FWebSocketContentBuffer;
     property OnRecv: TNotifyEvent read FOnRecv write FOnRecv;
     property OnShakeHand: TNotifyEvent read FOnShakeHand write FOnShakeHand;
+
+    // 0:头发送完整url(默认), 1：只发送路径和参数部分
+    property HeadURIFlag: Integer read FHeadURIFlag write FHeadURIFlag;
     property HttpOrigin: string read FHttpOrigin write FHttpOrigin;
     property Masked: Boolean read FMasked write FMasked;
+
 
 
   end;
@@ -272,7 +282,14 @@ begin
   //Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
 
 
-  FHeaderBuilder.URI := FWsUrl; //FURL.URI;
+
+  if HeadURIFlag=1 then
+  begin
+    FHeaderBuilder.URI := FURL.URI;  // dss-URI
+  end else
+  begin
+    FHeaderBuilder.URI := FWsUrl; //FURL.URI;
+  end;
   FHeaderBuilder.URLParams := FURL.ParamStr;
   // FHeaderBuilder.URI := FWsUrl;
   FHeaderBuilder.Method := 'GET';

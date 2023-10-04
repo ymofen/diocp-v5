@@ -1341,6 +1341,7 @@ begin
   self.Cleanup;
   FRaiseOnResponseOnExceptCode := True;
   FResponseCookie := STRING_EMPTY;
+  self.FCustomeHeader.Clear();
 end;
 
 procedure TDiocpHttpClient.ResetState;
