@@ -29,6 +29,8 @@ procedure MsgPackParseFromBuffer(pvInBuffer:Pointer; pvSize:Integer;
 
 procedure MsgPackParseFromFile(pvFileName: string; pvOutDValue: TDValue);
 
+function Utf8EncodeEx(pvValue:string):{$IFDEF UNICODE}TBytes{$ELSE}AnsiString{$ENDIF};
+
 implementation
 
 resourcestring
@@ -269,6 +271,11 @@ begin
 {$IFDEF UNICODE}
   len := length(pvValue) shl 1;
   SetLength(lvBytes, len);
+  if len=0 then
+  begin
+    Result := lvBytes;
+    exit;
+  end;
   Move(PChar(pvValue)^, lvBytes[0], len);
   Result := TEncoding.Convert(TEncoding.Unicode, TEncoding.UTF8, lvBytes);
 {$ELSE}
