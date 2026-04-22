@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{                Delphi Runtime Library                 }
+{                Delphi Runtime Library                 }          
 {                                                       }
 {    File: winsock2.h                                   }
 {    Copyright (C) Microsoft Corporation, 1995-2001.    }
@@ -2747,8 +2747,12 @@ function htonl(hostlong: u_long): u_long; stdcall;
 function htons(hostshort: u_short): u_short; stdcall;
 {$EXTERNALSYM htons}
 
+{$IFNDEF WINXP}
 function inet_pton(af:Integer; src, dst: PAnsiChar): Integer; stdcall;
 {$EXTERNALSYM inet_pton}
+{$ENDIF}
+
+
 
 
 function inet_addr(cp: PAnsiChar): u_long; stdcall;
@@ -3323,7 +3327,9 @@ function getsockopt; external ws2_32 name 'getsockopt';
 function htonl; external ws2_32 name 'htonl';
 function htons; external ws2_32 name 'htons';
 function inet_addr; external ws2_32 name 'inet_addr';
+{$IFNDEF WINXP}
 function inet_pton; external ws2_32 name 'inet_pton';
+{$ENDIF}
 function inet_ntoa; external ws2_32 name 'inet_ntoa';
 function listen; external ws2_32 name 'listen';
 function ntohl; external ws2_32 name 'ntohl';

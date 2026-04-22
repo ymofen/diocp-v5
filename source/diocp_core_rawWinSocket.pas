@@ -14,6 +14,8 @@
 (*$HPPEMIT '  #undef s6_addr16'*)
 (*$HPPEMIT '#endif'*)
 
+
+
 unit diocp_core_rawWinSocket;
 
 interface
@@ -225,8 +227,9 @@ type
         Integer): Integer; overload;
 
     function Connect(const pvAddr: string; pvPort: Integer): Boolean;
-
+{$IFNDEF WINXP}
     function ConnectV6(const pvAddr: string; pvPort: Integer): Boolean;
+{$ENDIF}
     /// <summary>
     ///   超时连接, 返回失败，表示连接超时
     /// </summary>
@@ -481,6 +484,7 @@ begin
   Result := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn))  = 0;
 end;
 
+{$IFNDEF WINXP}
 function TRawSocket.ConnectV6(const pvAddr: string; pvPort: Integer): Boolean;
 var
   sockaddr: TSockAddrIn6;
@@ -492,6 +496,7 @@ begin
 
   Result := diocp_winapi_winsock2.Connect(FSocketHandle, PSockAddr(@sockaddr), sizeof(TSockAddrIn6))  = 0;
 end;
+{$ENDIF}
 
 function TRawSocket.ConnectTimeOut(const pvAddr: string; pvPort: Integer;
     pvMs:Cardinal): Boolean;

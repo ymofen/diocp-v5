@@ -884,10 +884,14 @@ begin
 //      begin
         if FRawSocket.IPVersion = IP_V6 then
         begin
+          {$IFNDEF WINXP}
           if not FRawSocket.ConnectV6(lvIpAddr, pvPort) then
           begin
             RaiseLastOSError;
           end;
+          {$ELSE}
+          RaiseLastOSError;
+          {$ENDIF}
         end else
         begin
           if not FRawSocket.ConnectTimeOut(lvIpAddr, pvPort, FConnectTimeOut) then
